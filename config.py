@@ -18,10 +18,10 @@ USER_LANGUAGE = os.getenv("LANGUAGE")
 OPERATOR_CHAT_ID = os.getenv("OPERATOR_CHAT_ID")
 LENGTH = 10
 
-
 deskent = os.getenv("DESKENT_TELEGRAM_ID")
 artem = os.getenv("ARTEM_TELEGRAM_ID")
 vova = os.getenv("VOVA_TELEGRAM_ID")
+# admins_list = [deskent, artem, vova]
 admins_list = [deskent]
 
 tgToken = os.getenv("DESKENT_TELEBOT_TOKEN")
