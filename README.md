@@ -26,6 +26,17 @@
 Написать функцию, которая проверяет дату подписки пользователя и если подписка истекла - оповещает
 пользователя и удаляет его из списка рассылок.
 
+Методы БД:
+1. Вернуть список telegran_id всех АКТИВНЫХ пользователей:
+get_all_active_users() -> list[User.telegram_id]
+2. Добавить ТОКЕН в БД по telegram_id:
+add_token(telegram_id: str) -> что там возвращается, я хз
+3. Вернуть список всех ТОКЕНОВ пользователя по его telegram_id:
+get_all_user_tokens(telegram_id: str) -> list[str]
+4. Вернуть timestamp (кд) токена по его "значению":
+get_time_by_token(token: str) -> float
+5. Удалить токен по его "значению":
+delete_token(token: str)
 
 
 Результаты.
