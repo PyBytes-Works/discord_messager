@@ -9,14 +9,11 @@ from peewee import SqliteDatabase
 from aiogram.contrib.fsm_storage.memory import MemoryStorage
 
 # Загружаем переменные из файла .env
+from receiver import UserDataStore
+
 load_dotenv()
 
-DISCORD_USER_TOKEN = os.getenv("DESKENT_DISCORD")
-DESKENT_MEMBER_ID = os.getenv("DESKENT_MEMBER_ID")
-PARSING_CHAT_ID = os.getenv("PARSING_CHAT_ID")
-USER_LANGUAGE = os.getenv("LANGUAGE")
-OPERATOR_CHAT_ID = os.getenv("OPERATOR_CHAT_ID")
-LENGTH = 10
+
 
 deskent = os.getenv("DESKENT_TELEGRAM_ID")
 artem = os.getenv("ARTEM_TELEGRAM_ID")
@@ -30,7 +27,7 @@ tgToken = os.getenv("DESKENT_TELEBOT_TOKEN")
 bot = Bot(token=tgToken)
 storage = MemoryStorage()
 dp = Dispatcher(bot, storage=storage)
-
+users_data_storage = UserDataStore()
 
 #  ********** LOGGER CONFIG ********************************
 

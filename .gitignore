@@ -1,8 +1,11 @@
-/formed.json
 /discordmsgparser.py
-/data.json
 /.env
 /logs
 /discord_mailer.db
 /discord_mailer.db-shm
 /discord_mailer.db-wal
+
+/answer.json
+/sended.json
+/data.json
+/formed.json
