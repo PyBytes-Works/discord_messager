@@ -7,8 +7,9 @@ import requests
 
 from utils import save_data_to_json
 from config import logger
-
 from dotenv import load_dotenv
+
+
 load_dotenv()
 
 DISCORD_USER_TOKEN = os.getenv("DESKENT_DISCORD")
@@ -102,7 +103,7 @@ class MessageReceiver:
     def __get_data_from_api(cls):
         session = requests.Session()
         session.headers['authorization'] = cls.STORE_INSTANCE.DISCORD_USER_TOKEN
-        limit = 10
+        limit = 100
         url = cls.STORE_INSTANCE.channel_url + f'?limit={limit}'
         response = session.get(url=url)
         status_code = response.status_code
