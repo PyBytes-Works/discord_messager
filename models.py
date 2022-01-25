@@ -1,8 +1,9 @@
+from typing import List
 import datetime
 import os
 
 from peewee import (
-    CharField, BooleanField, DateTimeField, ForeignKeyField
+    CharField, BooleanField, DateTimeField, ForeignKeyField, IntegerField
 )
 from peewee import Model
 from config import logger, db, admins_list, db_file_name
@@ -20,22 +21,28 @@ class User(BaseModel):
     """
     Model for table users
       methods
-        get_telegram_id
-        get_user_id_by_telegram_id
-        get_user_by_telegram_id
         add_new_user
-        delete_user_by_telegram_id
-        get_active_users
-        get_working_users
-        set_user_is_work
-        set_user_is_not_work
-        get_subscribers_list
-        deactivate_user
         activate_user
-        set_user_status_admin
+        check_expiration_date
+        deactivate_user
+        deactivate_expired_users
+        delete_user_by_telegram_id
         delete_status_admin
         is_admin
         is_active
+        get_active_users
+        get_active_users_not_admins
+        set_data_subscriber
+        set_expiration_dateset_expiration_date
+        get_expiration_date
+        get_working_users
+        get_subscribers_list
+        get_telegram_id
+        get_user_id_by_telegram_id
+        get_user_by_telegram_id
+        set_user_is_work
+        set_user_is_not_work
+        set_user_status_admin
     """
 
     telegram_id = CharField(unique=True, verbose_name="id пользователя в телеграмм")
@@ -45,8 +52,14 @@ class User(BaseModel):
     active = BooleanField(default=True, verbose_name="Активирован")
     is_work = BooleanField(default=False, verbose_name='В работе / в настройке')
     admin = BooleanField(default=False, verbose_name="Администраторство")
-    created_at = DateTimeField(default=datetime.datetime.now())
-    expiration = DateTimeField(default=datetime.datetime.now())
+    created_at = DateTimeField(
+        default=datetime.datetime.now(),
+        verbose_name='Дата добавления в базу'
+    )
+    expiration = IntegerField(
+        default=datetime.datetime.now().timestamp(),
+        verbose_name='Срок истечения подписки'
+    )
 
     class Meta:
         db_table = "users"
@@ -95,7 +108,9 @@ class User(BaseModel):
         """
         user = cls.get_or_none(cls.telegram_id == telegram_id)
         if not user:
-            return cls.create(nick_name=f'{nick_name}_{telegram_id}', telegram_id=telegram_id).save()
+            return cls.create(
+                nick_name=f'{nick_name}_{telegram_id}', telegram_id=telegram_id
+            ).save()
 
     @classmethod
     @logger.catch
@@ -115,6 +130,20 @@ class User(BaseModel):
         return: list
         """
         return [user.telegram_id for user in cls.select(cls.telegram_id).where(cls.active == True)]
+
+    @classmethod
+    @logger.catch
+    def get_active_users_not_admins(cls: 'User') -> list:
+        """
+        return list of telegram ids for active users without admins
+        return: list
+        """
+        return [
+            user.telegram_id
+            for user in cls.select(cls.telegram_id)
+                .where(cls.active == True)
+                .where(cls.admin == False)
+        ]
 
     @classmethod
     @logger.catch
@@ -165,12 +194,13 @@ class User(BaseModel):
     @logger.catch
     def get_subscribers_list(cls: 'User') -> list:
         """ возвращает список пользователей которым должна отправляться рассылка"""
-
+        now = datetime.datetime.now().timestamp()
         return [user.telegram_id
                 for user in cls
                     .select(cls.telegram_id)
                     .where(cls.active == True)
-                    .where(cls.is_work == True)]
+                    .where(cls.is_work == True)
+                    .where(cls.expiration > now).execute()]
 
     @classmethod
     @logger.catch
@@ -180,6 +210,16 @@ class User(BaseModel):
         return: 1 if good otherwise 0
         """
         return cls.update(active=False).where(cls.telegram_id == telegram_id).execute()
+
+    @classmethod
+    @logger.catch
+    def deactivate_expired_users(cls: 'User') -> list:
+        """
+        return list of telegram ids for active users without admins
+        return: list
+        """
+        now = datetime.datetime.now().timestamp()
+        return cls.update(active=False).where(cls.expiration < now).execute()
 
     @classmethod
     @logger.catch
@@ -198,6 +238,42 @@ class User(BaseModel):
         return: 1 if good otherwise 0
         """
         return cls.update(admin=True).where(cls.telegram_id == telegram_id).execute()
+
+    @classmethod
+    @logger.catch
+    def set_expiration_date(cls: 'User', telegram_id: str, subscription_period: int) -> bool:
+        """
+        set subscription expiration date for user
+        subscription_period:  (int) number of hours for which the subscription is activated
+        """
+        now = datetime.datetime.now().timestamp()
+        period = subscription_period * 60 * 60 + now
+        return cls.update(expiration=period).where(cls.telegram_id == telegram_id).execute()
+
+    @classmethod
+    @logger.catch
+    def check_expiration_date(cls: 'User', telegram_id: str) -> bool:
+        """
+        возвращает статус подписки пользователя,
+        True если подписка ещё действует
+        False если срок подписки истёк
+        """
+
+        user: User = cls.get_or_none(cls.telegram_id == telegram_id)
+        # print(type(result.expiration))
+        expiration = user.expiration if user else 0
+        return expiration > datetime.datetime.now().timestamp() if expiration else False
+
+    @classmethod
+    @logger.catch
+    def get_expiration_date(cls: 'User', telegram_id: str) -> int:
+        """
+        возвращает timestamp без миллисекунд в виде целого числа
+        """
+        user: User = cls.get_or_none(cls.expiration, cls.telegram_id == telegram_id)
+        # print(type(result.expiration))
+        expiration = user.expiration
+        return expiration
 
     @classmethod
     @logger.catch
@@ -386,93 +462,71 @@ class UserCollection(BaseModel):
             return {'collections': collections}
 
 
-class AllFilters:
+class UserTokenDiscord(BaseModel):
     """
-    Model for filters
+    Model for table discord_users
       methods
-        get_full_filter_by_telegram_id
-        clear_filters_and_collections_by_telegram_id
-        delete_filters_and_collections_by_telegram_id
+      add_token_by_telegram_id
+      get_all_user_tokens
+
     """
+    user = ForeignKeyField(User, on_delete="CASCADE")
+    token = CharField(max_length=255, verbose_name="Токен пользователя в discord")
+    last_message_time = IntegerField(
+        default=datetime.datetime.now().timestamp() - 60*5,
+        verbose_name="Время отправки последнего сообщения"
+    )
+
+    class Meta:
+        db_table = "user_token_discord"
 
     @classmethod
     @logger.catch
-    def get_full_filter_and_collections_by_telegram_id(cls, telegram_id: str) -> dict:
+    def add_token_by_telegram_id(cls, telegram_id: str, token: str) -> bool:
         """
-        full filter and collections
-        return: dict
+        add token by telegram id
+        FIXME
         """
-        full_filter = Filter.get_filters_for_user(telegram_id)
-        collections = UserCollection.get_collections(telegram_id)
-        if full_filter is not None:
-            full_filter.update(collections)
-        return full_filter
+        user_id = User.get_user_by_telegram_id(telegram_id)
+        if user_id:
+            return cls.get_or_create(user=user_id, discord_token=token)[-1]
 
     @classmethod
     @logger.catch
-    def clear_filters_and_collections_by_telegram_id(cls, telegram_id: str) -> None:
+    def get_all_user_tokens(cls, telegram_id: str) -> List[str]:
         """
-        clear all filters and delete collections for a user
-        return: None
+        Вернуть список всех ТОКЕНОВ пользователя по его telegram_id:
         """
-        Filter.clear_filters(telegram_id)
-        UserCollection.clear_collection(telegram_id)
+        user_id = User.get_user_by_telegram_id(telegram_id)
+        if user_id:
+            return [user.token for user in cls.select(cls.token).where(cls.user == user_id)]
 
     @classmethod
     @logger.catch
-    def add_or_update_filters_by_telegram_id(cls, telegram_id: str,
-                                             max_price: str = None,
-                                             min_price: str = None,
-                                             status: str = None,
-                                             type: str = None
-                                             ) -> bool:
-        return Filter.add_or_update(telegram_id, max_price, min_price, status, type)
+    def get_time_by_token(cls, token: str) -> int:
+        """
+        Вернуть timestamp(кд) токена по его "значению":
+        """
+        data: cls = cls.select(cls.last_message_time).where(cls.token == token)
+        cooldown = data.last_message_time
+        return cooldown
 
     @classmethod
     @logger.catch
-    def clear_filter_price_by_telegram_id(cls, telegram_id: str) -> bool:
-        """"""
-        return Filter.add_or_update(telegram_id, max_price="", min_price="")
+    def delete_token(cls, token: str):
+        """Удалить токен по его "значению": """
+        data = cls.get_or_none(cls.token == token)
+        if data:
+            return data.delete_instance()
 
-    @classmethod
-    @logger.catch
-    def clear_filter_status_by_telegram_id(cls, telegram_id: str) -> bool:
-        return Filter.add_or_update(telegram_id, status="")
+    def set_date_last_message_by_token(self, token: str) -> bool:
+        pass
 
-    @classmethod
-    @logger.catch
-    def clear_filter_type_by_telegram_id(cls, telegram_id: str) -> bool:
-        return Filter.add_or_update(telegram_id, type="")
+    def get_time_for_cd_by_token(self, token: str) -> int:
+        pass
 
-    @classmethod
-    @logger.catch
-    def add_collection_by_telegram_id(cls, telegram_id: str, collection_name: str) -> None:
-        UserCollection.add_collection(telegram_id=telegram_id, collection_name=collection_name)
-
-    @classmethod
-    @logger.catch
-    def delete_collection(cls, telegram_id: str, collection_name: str) -> None:
-        UserCollection.delete_collection(telegram_id=telegram_id, collection_name=collection_name)
-
-    @classmethod
-    @logger.catch
-    def clear_collection(cls, telegram_id: str) -> None:
-        UserCollection.clear_collection(telegram_id=telegram_id)
-
-    @classmethod
-    @logger.catch
-    def get_collections(cls, telegram_id: str) -> dict:
-        return UserCollection.get_collections(telegram_id=telegram_id)
-
-    @classmethod
-    @logger.catch
-    def clear_filters_by_telegram_id(cls, telegram_id: str) -> bool:
-        return Filter.clear_filters(telegram_id=telegram_id)
-
-    @classmethod
-    @logger.catch
-    def get_filters_for_user(cls, telegram_id):
-        return Filter.get_filters_for_user(telegram_id=telegram_id)
+    def get_all_cd_for_user_by_telegram_id(self,  telegram_id: str) -> tuple:
+        pass
 
 
 @logger.catch
@@ -494,15 +548,57 @@ def recreate_db(db_file_name: str) -> None:
     with db:
         if os.path.exists(db_file_name):
             drop_db()
-        db.create_tables([User, Filter, UserCollection], safe=True)
+        db.create_tables([User, UserTokenDiscord], safe=True)
         logger.info('DB REcreated')
 
 
 if __name__ == '__main__':
-    recreate_db(db_file_name)
-    for admin_id in admins_list:
-        nick_name = "Admin"
-        User.add_new_user(nick_name=nick_name, telegram_id=admin_id)
-        User.set_user_status_admin(telegram_id=admin_id)
-        logger.info(f"User {nick_name} with id {admin_id} created as ADMIN.")
+    recreate = False
+    add_test_users = 0
+    add_admins = False
+    import random
+    import string
+    test_user_list = (
+        (f'test{user}', ''.join(random.choices(string.ascii_letters, k=5)))
+        for user in range(1, 6)
+    )
 
+    if recreate:
+        recreate_db(db_file_name)
+    if add_admins:
+        for admin_id in admins_list:
+            nick_name = "Admin"
+            User.add_new_user(nick_name=nick_name, telegram_id=admin_id)
+            User.set_user_status_admin(telegram_id=admin_id)
+            # logger.info(f"User {nick_name} with id {admin_id} created as ADMIN.")
+    if add_test_users:
+        tttime = 0
+        for user_id, nick_name in test_user_list:
+            User.add_new_user(nick_name=nick_name, telegram_id=user_id)
+            # User.set_user_status_admin(telegram_id=user_id)
+            User.set_expiration_date(telegram_id=user_id, subscription_period=tttime)
+            tttime +=1
+            # logger.info(f"User {nick_name} with id {admin_id} created as ADMIN.")
+
+    # id = "305353027"
+    # print('check timestamp ', User.check_expiration_date(id))
+    # print('now timestamp ',datetime.datetime.now().timestamp())
+    # val = User.get_expiration_date(id)
+    #
+    # print('get timestamp ', datetime.datetime.fromtimestamp(val))
+    #
+    # res = User.set_expiration_date(id, (int(datetime.datetime.now().timestamp()) + 60*60))
+    # print('update timestamp ', res)
+    # val = User.get_expiration_date(id)
+    # print('get timestamp ',datetime.datetime.fromtimestamp(val))
+    # print('check timestamp ',User.check_expiration_date(id))
+    # # print(datetime.datetime.fromtimestamp(res))
+    # res = User.set_expiration_date(id, (int(datetime.datetime.now().timestamp()) - 60*60))
+    # print(User.get_active_users_not_admins())
+    print(User.deactivate_expired_users())
+    # print(User.get_active_users_not_admins())
+    # val = User.get_expiration_date('test5')
+    # print('get timestamp ', datetime.datetime.fromtimestamp(val))
+    # print('get subscribers ', User.get_subscribers_list())
+    print('check_expiration_dates ', User.check_expiration_date('test1'))
+    print('check_expiration_dates ', User.check_expiration_date('test2'))
