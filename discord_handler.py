@@ -281,12 +281,15 @@ class Translator:
     __iam_token = ''
 
     @classmethod
-    def translate(cls, text: str) -> str:
+    def translate(cls, text: str, target: str = 'ru', source: str = 'en') -> str:
         """
-        Метод принимает текст (английский или русский) и возвращает текс на русском
-        если в русском тексте будут присутствовать английские слова то они будут переведены
-        чисто английский текст тоже будет переведен. Слова с опечатками в основном переводятся.
+        Метод принимает текст и возвращает текст на языке цели
+        если в тексте будут присутствовать слова на языке источника то они будут переведены
+         Слова с опечатками в основном переводятся.
         Если какое то слово не получается перевести, вернётся тоже самое слово которое отправили.
+
+        target и source: str: по умолчанию "ru и en" в зависимости от выбора будет назначен язык
+        цель и язык источник
         """
 
         logger.info('Started translating')
@@ -302,8 +305,8 @@ class Translator:
             logger.info('I_AM-token is OK')
 
         folder_id = FOLDER_ID
-        target_language = 'ru'
-        source_language = 'en'
+        source_language = source
+        target_language = target
 
         body = {
             "targetLanguageCode": target_language,
