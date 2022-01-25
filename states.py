@@ -7,3 +7,5 @@ class UserState(StatesGroup):
     """Машина состояний для управления пользователями."""
 
     user_wait_message = State()
+    user_add_token = State()
+
