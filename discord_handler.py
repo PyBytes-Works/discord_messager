@@ -2,8 +2,16 @@ import datetime
 import os
 import random
 from typing import List
+import json
+from json.decoder import JSONDecodeError
 
 import requests
+from requests.exceptions import (
+    Timeout,
+    ConnectionError,
+    ConnectTimeout,
+    RequestException
+)
 
 from utils import save_data_to_json
 from config import logger
@@ -19,6 +27,9 @@ PARSING_GUILD_ID = os.getenv("PARSING_GUILD_ID")
 USER_LANGUAGE = os.getenv("LANGUAGE")
 OPERATOR_CHAT_ID = os.getenv("OPERATOR_CHAT_ID")
 LENGTH = 10
+
+FOLDER_ID = os.getenv("FOLDER_ID")  # Токен Андрея
+OAUTH_TOKEN = os.getenv("OAUTH_TOKEN")  # Токен Андрея
 
 
 class DataStore:
@@ -252,3 +263,118 @@ class MessageSender:
         logger.info(f"Результат отправки сообщения в дискорд: {answer}")
 
         return answer
+
+
+class Translator:
+    """
+    Получает токены для работы с Yandex
+    Отправляет сообщение и возвращает те4кст на русском, работает только для английского
+    при отправке русского текста вернёт тот же самый текст
+    Для работы необходим OAUTH_TOKEN, который можно получить для своего Яндекс-аккаунта по ссылке
+    https://cloud.yandex.ru/docs/iam/concepts/authorization/oauth-token
+    а также идентификатор каталога FOLDER_ID скопировать со стартовой страницы вашего аккаунта в
+    яндекс-облаке:
+    https://console.cloud.yandex.ru/
+    Актуальность ссылок: 25.01.2022
+    """
+
+    __iam_token = ''
+
+    @classmethod
+    def translate(cls, text: str) -> str:
+        """
+        Метод принимает текст (английский или русский) и возвращает текс на русском
+        если в русском тексте будут присутствовать английские слова то они будут переведены
+        чисто английский текст тоже будет переведен. Слова с опечатками в основном переводятся.
+        Если какое то слово не получается перевести, вернётся тоже самое слово которое отправили.
+        """
+
+        logger.info('Started translating')
+        try:
+            cls.__check_iam_token()
+        except (ValueError, FileExistsError):
+            try:
+                cls.__get_iam_token()
+            except ValueError as exc:
+                logger.exception(f'Ошибка получения A_IM-токена! : {exc}')
+                return 'Ошибка получения A_IM-токена!'
+        else:
+            logger.info('I_AM-token is OK')
+
+        folder_id = FOLDER_ID
+        target_language = 'ru'
+        source_language = 'en'
+
+        body = {
+            "targetLanguageCode": target_language,
+            "sourceLanguageCode": source_language,
+            "texts": text,
+            "folderId": folder_id,
+        }
+
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": "Bearer {0}".format(cls.__iam_token)
+        }
+        try:
+            response = requests.post(
+                'https://translate.api.cloud.yandex.net/translate/v2/translate',
+                json=body,
+                headers=headers
+            )
+
+            data = response.json()
+
+            result = data.get('translations', [dict()])[0].get('text', text)
+
+        except (Timeout, ConnectionError, ConnectTimeout, RequestException, JSONDecodeError) as exc:
+            logger.info(exc)
+            raise exc
+        return result
+
+    @classmethod
+    def __check_iam_token(cls) -> None:
+        """
+        Проверка наличия и актуальности I_AM токена
+        Check I_AM-token
+        :return:
+        """
+        json_file_name = 'iam_token.json'
+        if not os.path.exists(json_file_name):
+            raise FileExistsError(f'{json_file_name} not found.')
+        with open(json_file_name, 'r') as file:
+            tk = json.load(file)
+        cls.__iam_token = tk.get('iamToken')
+        if not cls.__iam_token:
+            logger.error('NO I_AM-token')
+            raise ValueError('NO I_AM-token')
+        exp_time = tk.get('expiresAt').rsplit(sep='.', maxsplit=2)[0]
+        expire_time = datetime.datetime.fromisoformat(exp_time)
+        delta = expire_time - datetime.datetime.utcnow()
+        token_time_actual = delta.seconds // 3600
+        if token_time_actual <= 3600:
+            logger.warning('Token expired!')
+            raise ValueError('Token expired!')
+
+    @classmethod
+    def __get_iam_token(cls) -> None:
+        """
+        Получаем I_AM токен и записываем его в файл json и в атрибут класса __iam_token
+        :return:
+        """
+        p = requests.post(
+            "https://iam.api.cloud.yandex.net/iam/v1/tokens",
+            json={"yandexPassportOauthToken": OAUTH_TOKEN}
+        )
+
+        tk = json.loads(p.text)
+        cls.__iam_token = tk.get('iamToken', 'Token_key_error')
+        if cls.__iam_token == 'Token_key_error':
+            raise ValueError('Ошибка получения iam-токена!')
+        with open('iam_token.json', 'w') as file:
+            json.dump(tk, file, indent=4, ensure_ascii=False)
+        logger.info('\nNew A_IM-token received.')
+
+
+if __name__ == '__main__':
+    print(Translator.translate('message for test testestik wont birdtday'))
