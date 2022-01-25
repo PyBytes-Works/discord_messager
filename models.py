@@ -300,6 +300,16 @@ class User(BaseModel):
 
     @classmethod
     @logger.catch
+    def get_max_tokens(cls: 'User', telegram_id: str) -> int:
+        """
+        возвращает timestamp без миллисекунд в виде целого числа
+        """
+        user = cls.get_or_none(cls.max_tokens, cls.telegram_id == telegram_id)
+        if user:
+            return user.max_tokens
+
+    @classmethod
+    @logger.catch
     def delete_status_admin(cls: 'User', telegram_id: str) -> bool:
         """
         set admin value enabled for user
@@ -336,9 +346,10 @@ class UserTokenDiscord(BaseModel):
       get_all_user_tokens
       set_token_cooldown
       get_time_by_token
+      delete_inactive_tokens
     """
     user = ForeignKeyField(User, on_delete="CASCADE")
-    token = CharField(max_length=255, verbose_name="Токен пользователя в discord")
+    token = CharField(max_length=255, unique=True, verbose_name="Токен пользователя в discord")
     last_message_time = IntegerField(
         default=datetime.datetime.now().timestamp() - 60*5,
         verbose_name="Время отправки последнего сообщения"
@@ -355,8 +366,12 @@ class UserTokenDiscord(BaseModel):
         FIXME
         """
         user_id = User.get_user_by_telegram_id(telegram_id)
+        all_token = cls.get_all_user_tokens(telegram_id)
         if user_id:
-            return cls.get_or_create(user=user_id, token=token)[-1]
+            max_tokens = User.get_max_tokens(telegram_id)
+            if max_tokens > len(all_token):
+                return cls.get_or_create(user=user_id, token=token)[-1]
+
 
     @classmethod
     @logger.catch
@@ -430,9 +445,9 @@ def recreate_db(db_file_name: str) -> None:
 
 
 if __name__ == '__main__':
-    recreate = 1
-    add_test_users = 1
-    add_admins = 1
+    recreate = 0
+    add_test_users = 0
+    add_admins = 0
     add_tokens = 1
     import random
     import string
