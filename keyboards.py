@@ -3,7 +3,7 @@
 from aiogram.types import (
     ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton
 )
-from models import User, UserCollection
+from models import User
 from config import logger
 #
 #

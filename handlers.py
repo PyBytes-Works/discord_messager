@@ -4,10 +4,11 @@ from aiogram.dispatcher.filters import Text
 from aiogram.types import Message, CallbackQuery, ReplyKeyboardRemove
 from aiogram.dispatcher import FSMContext
 
-from config import logger, Dispatcher, bot
-from models import User, Filter, UserCollection, AllFilters
+from config import logger, Dispatcher, users_data_storage
+from models import User
 from keyboards import cancel_keyboard
-from receiver import MessageReceiver
+from discord_handler import MessageReceiver, DataStore, MessageSender
+from states import UserState
 
 
 @logger.catch
@@ -22,13 +23,61 @@ async def cancel_handler(message: Message, state: FSMContext) -> None:
 
 
 @logger.catch
-async def start_command_handlder(message: Message) -> None:
-    print("Bot started.")
+async def invitation_add_discord_token_handler(message: Message) -> None:
+    if User.is_active(telegram_id=message.from_user.id):
+        await message.answer("Введите первый discord-токен", reply_markup=cancel_keyboard())
+    await UserState.user_add_token.set()
+
+
+@logger.catch
+async def add_discord_token_handler(message: Message) -> None:
+    token = message.text
+    if token:
+        pass
+        # TODO validation token
+        # TODO save token to DB for current user
+    await message.answer(
+        "Введите следующий discord-токен или нажмите кнопку ОТМЕНА",
+        reply_markup=cancel_keyboard()
+    )
+    return
+
+
+@logger.catch
+async def start_command_handler(message: Message) -> None:
+    """Получает случайное сообщение из дискорда, ставит машину состояний в положение
+    'жду ответа пользователя'
+    """
 
     await message.answer("Начинаю получение данных", reply_markup=cancel_keyboard())
-    text = MessageReceiver.get_message_data()
+    print("Создаю экземпляр класса-хранилища")
+    new_store = DataStore(message.from_user.id)
+    print("Добавляю его в общее хранилище")
+    users_data_storage.add_instance(telegram_id=message.from_user.id, data=new_store)
+    print("Отправляю запрос к АПИ")
+    text = MessageReceiver.get_message(new_store)
+    print("Получаю ответ", text)
     await message.answer(f"Данные получены:"
                          f"\nСообщение: {text}")
+    await UserState.user_wait_message.set()
+
+
+@logger.catch
+async def send_to_discord(message: Message, state: FSMContext) -> None:
+    """Отправляет полученное сообщение в дискорд"""
+
+    text = message.text
+    if len(text) > 50:
+        await message.answer(
+            "Сообщение не должно быть длиннее 50 символов. Попробуй еще раз.",
+            reply_markup=cancel_keyboard()
+        )
+        return
+    await message.answer("Понял, принял, отправляю.", reply_markup=cancel_keyboard())
+    datastore = users_data_storage.get_instance(message.from_user.id)
+    result = MessageSender.send_message(text=message.text, datastore=datastore)
+    await message.answer(f"Результат отправки: {result}", reply_markup=ReplyKeyboardRemove())
+    await state.finish()
 
 
 @logger.catch
@@ -51,5 +100,8 @@ def register_handlers(dp: Dispatcher) -> None:
         cancel_handler, commands=['отмена', 'cancel'], state="*")
     dp.register_message_handler(
         cancel_handler, Text(startswith=["отмена", "cancel"], ignore_case=True), state="*")
-    dp.register_message_handler(start_command_handlder, commands=["start", "старт"])
+    dp.register_message_handler(start_command_handler, commands=["start", "старт"])
+    dp.register_message_handler(invitation_add_discord_token_handler, commands=["at", "addtoken", "add_token"])
+    dp.register_message_handler(add_discord_token_handler, state=UserState.user_add_token)
+    dp.register_message_handler(send_to_discord, state=UserState.user_wait_message)
     dp.register_message_handler(default_message)

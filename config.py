@@ -7,17 +7,13 @@ from dotenv import load_dotenv
 from loguru import logger
 from peewee import SqliteDatabase
 from aiogram.contrib.fsm_storage.memory import MemoryStorage
+from discord_handler import UserDataStore
+
 
 # Загружаем переменные из файла .env
 load_dotenv()
 
-DISCORD_USER_TOKEN = os.getenv("DESKENT_DISCORD")
-DESKENT_MEMBER_ID = os.getenv("DESKENT_MEMBER_ID")
-PARSING_CHAT_ID = os.getenv("PARSING_CHAT_ID")
-USER_LANGUAGE = os.getenv("LANGUAGE")
-OPERATOR_CHAT_ID = os.getenv("OPERATOR_CHAT_ID")
-LENGTH = 10
-
+# initialization admins list
 deskent = os.getenv("DESKENT_TELEGRAM_ID")
 artem = os.getenv("ARTEM_TELEGRAM_ID")
 vova = os.getenv("VOVA_TELEGRAM_ID")
@@ -31,6 +27,8 @@ bot = Bot(token=tgToken)
 storage = MemoryStorage()
 dp = Dispatcher(bot, storage=storage)
 
+# initialization user data storage
+users_data_storage = UserDataStore()
 
 #  ********** LOGGER CONFIG ********************************
 
