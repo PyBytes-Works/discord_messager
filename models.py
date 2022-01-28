@@ -8,6 +8,23 @@ from peewee import (
 from peewee import Model
 from config import logger, db, admins_list, db_file_name
 
+# ______________________move______________________________
+
+
+# TODO move
+def is_int(text: str) -> bool:
+    return text.isdecimal()
+
+
+@logger.catch
+def str_to_int(text: str) -> int:
+    if is_int(text):
+        try:
+            return int(text)
+        except ValueError as exc:
+            logger.error("can't convert string to number", exc)
+# ______________________move______________________________
+
 
 class BaseModel(Model):
     """A base model that will use our Sqlite database."""
@@ -38,7 +55,7 @@ class User(BaseModel):
         get_id_inactive_users
         get_working_users
         get_subscribers_list
-        get_telegram_id
+        # FIXME delete method? get_telegram_id
         get_user_id_by_telegram_id
         get_user_by_telegram_id
         set_user_is_work
@@ -67,16 +84,16 @@ class User(BaseModel):
     class Meta:
         db_table = "users"
 
-    @classmethod
-    @logger.catch
-    def get_telegram_id(cls: 'User', id: str) -> str:
-        """
-        method returning telegram id for user by user id
-        if the user is not in the database will return None
-        return: telegram_id: str
-        """
-        user = cls.get_or_none(cls.id == id)
-        return user.telegram_id if user else None
+    # @classmethod
+    # @logger.catch
+    # def get_telegram_id(cls: 'User', id: str) -> str:
+    #     """
+    #     method returning telegram id for user by user id
+    #     if the user is not in the database will return None
+    #     return: telegram_id: str
+    #     """
+    #     user = cls.get_or_none(cls.id == id)
+    #     return user.telegram_id if user else None
 
     @classmethod
     @logger.catch
@@ -132,8 +149,9 @@ class User(BaseModel):
         return list of telegram ids for active users
         return: list
         """
-        return [user.telegram_id for user in cls.select(cls.telegram_id)
-            .where(cls.active == True).execute()]
+        return [user.telegram_id
+                for user in cls.select(cls.telegram_id)
+                .where(cls.active == True).execute()]
 
     @classmethod
     @logger.catch
@@ -280,10 +298,9 @@ class User(BaseModel):
         возвращает статус подписки пользователя,
         True если подписка ещё действует
         False если срок подписки истёк
+        # FIXME
         """
-
         user: User = cls.get_or_none(cls.telegram_id == telegram_id)
-        # print(type(result.expiration))
         expiration = user.expiration if user else 0
         return expiration > datetime.datetime.now().timestamp() if expiration else False
 
@@ -302,7 +319,7 @@ class User(BaseModel):
     @logger.catch
     def get_max_tokens(cls: 'User', telegram_id: str) -> int:
         """
-        возвращает timestamp без миллисекунд в виде целого числа
+        возвращает максимальное количество токенов для пользователя
         """
         user = cls.get_or_none(cls.max_tokens, cls.telegram_id == telegram_id)
         if user:
@@ -343,16 +360,33 @@ class UserTokenDiscord(BaseModel):
     Model for table discord_users
       methods
       add_token_by_telegram_id
-      get_all_user_tokens
-      set_token_cooldown
-      get_time_by_token
       delete_inactive_tokens
+      get_all_user_tokens
+      get_time_by_token
+      get_info_by_token
+      update_token_cooldown
+      update_token_channel
+      update_token_guild
+      update_token_proxy
+      update_token_time
     """
     user = ForeignKeyField(User, on_delete="CASCADE")
     token = CharField(max_length=255, unique=True, verbose_name="Токен пользователя в discord")
+    proxy = CharField(
+        default='', max_length=15, unique=False, verbose_name="Адрес прокси сервера"
+    )
+    guild = CharField(
+        default='0', max_length=30, unique=False, verbose_name="Гильдия для подключения"
+    )
+    channel = CharField(
+        default='0', max_length=30, unique=False, verbose_name="Канал для подключения"
+    )
     last_message_time = IntegerField(
         default=datetime.datetime.now().timestamp() - 60*5,
         verbose_name="Время отправки последнего сообщения"
+    )
+    cooldown = IntegerField(
+        default=60*5, verbose_name="Время отправки последнего сообщения"
     )
 
     class Meta:
@@ -372,16 +406,74 @@ class UserTokenDiscord(BaseModel):
             if max_tokens > len(all_token):
                 return cls.get_or_create(user=user_id, token=token)[-1]
 
+    @classmethod
+    @logger.catch
+    def update_token_time(cls, token: str) -> bool:
+        """
+        set last_time: now datetime last message
+        token: (str)
+        """
+        last_time = datetime.datetime.now().timestamp()
+        return cls.update(last_message_time=last_time).where(cls.token == token).execute()
 
     @classmethod
     @logger.catch
-    def get_all_user_tokens(cls, telegram_id: str) -> List[str]:
+    def update_token_cooldown(cls, token: str, cooldown: int) -> bool:
+        """
+        set cooldown: update cooldown for token
+         token: (str)
+         cooldown: (int) seconds
+        """
+        cooldown = cooldown if cooldown > 0 else 5 * 60
+        return cls.update(cooldown=cooldown).where(cls.token == token).execute()
+
+    @classmethod
+    @logger.catch
+    def update_token_channel(cls, token: str, channel: int) -> bool:
+        """
+        set last_time: now datetime last message
+         token: (str)
+         channel: (int) id cannel
+        """
+        channel = str(channel) if channel > 0 else '0'
+        return cls.update(channel=channel).where(cls.token == token).execute()
+
+    @classmethod
+    @logger.catch
+    def update_token_guild(cls, token: str, guild: int) -> bool:
+        """
+        set last_time: now datetime last message
+        token: (str)
+        guild: (int) id guild
+        """
+        guild = str(guild) if guild > 0 else '0'
+        return cls.update(guild=guild).where(cls.token == token).execute()
+
+    @classmethod
+    @logger.catch
+    def update_token_proxy(cls, token: str, proxy: str) -> bool:
+        """
+        set last_time: now datetime last message
+        token: (str)
+        proxy: (str) ip address
+        """
+        return cls.update(proxy=proxy).where(cls.token == token).execute()
+
+    @classmethod
+    @logger.catch
+    def get_all_user_tokens(cls, telegram_id: str) -> List[dict]:
         """
         Вернуть список всех ТОКЕНОВ пользователя по его telegram_id:
+        return: словарь {token:{'time':время_последнего_сообщения, 'cooldown': кулдаун}}
         """
         user_id = User.get_user_by_telegram_id(telegram_id)
         if user_id:
-            return [user.token for user in cls.select(cls.token).where(cls.user == user_id)]
+            return [
+                {user.token: {'time': user.last_message_time, 'cooldown': user.cooldown}}
+                for user in cls.select(
+                    cls.token, cls.last_message_time, cls.cooldown
+                ).where(cls.user == user_id)
+            ]
 
     @classmethod
     @logger.catch
@@ -390,8 +482,31 @@ class UserTokenDiscord(BaseModel):
         Вернуть timestamp(кд) токена по его "значению":
         """
         data: 'UserTokenDiscord' = cls.get_or_none(cls.last_message_time, cls.token == token)
-        cooldown = data.last_message_time if data else None
-        return cooldown
+        last_message_time = data.last_message_time if data else None
+        return last_message_time
+
+
+    @classmethod
+    @logger.catch
+    def get_info_by_token(cls, token: str) -> dict:
+        """
+        Вернуть info по токену
+        возвращает словарь:
+        {'proxy':proxy(str), 'guild':guild(int), 'channel': channel(int),
+        'last_message_time': last_message_time(int, timestamp), 'cooldown': cooldown(int, seconds)}
+        если токена нет приходит пустой словарь
+        guild, channel по умолчанию 0 если не было изменений вернётся 0
+        proxy по умолчанию пусто
+        cooldown по умолчанию 5 * 60
+        """
+        result = {}
+        data: 'UserTokenDiscord' = cls.get_or_none(cls.token == token)
+        if data:
+            guild = int(data.guild) if data.guild else 0
+            channel = int(data.channel) if data.channel else 0
+            result = {'proxy': data.proxy, 'guild': guild, 'channel': channel,
+                      'last_message_time': data.last_message_time, 'cooldown': data.cooldown}
+        return result
 
     @classmethod
     @logger.catch
@@ -403,19 +518,10 @@ class UserTokenDiscord(BaseModel):
 
     @classmethod
     @logger.catch
-    def set_token_cooldown(cls, token: str, cooldown: int) -> bool:
-        """
-        set cooldown: now + cooldown
-        cooldown: (int)  minutes
-        """
-        cooldown = datetime.datetime.now().timestamp() + cooldown
-        return cls.update(last_message_time=cooldown).where(cls.token == token).execute()
-
-    @classmethod
-    @logger.catch
-    def delete_inactive_tokens(cls) -> bool:
+    def delete_inactive_tokens(cls) -> int:
         """
         removes all tokens for inactive users
+        return: number of removed tokens
         """
         users = User.get_id_inactive_users()
         return cls.delete().where(cls.user.in_(users)).execute()
@@ -434,11 +540,11 @@ def drop_db() -> None:
 
 
 @logger.catch
-def recreate_db(db_file_name: str) -> None:
+def recreate_db(_db_file_name: str) -> None:
     """Creates new tables in database. Drop all data from DB if it exists."""
 
     with db:
-        if os.path.exists(db_file_name):
+        if os.path.exists(_db_file_name):
             drop_db()
         db.create_tables([User, UserTokenDiscord], safe=True)
         logger.info('DB REcreated')
