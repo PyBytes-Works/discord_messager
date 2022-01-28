@@ -319,7 +319,7 @@ class User(BaseModel):
     @logger.catch
     def get_max_tokens(cls: 'User', telegram_id: str) -> int:
         """
-        возвращает максимальное количество токенов для пользователя
+        возвращает timestamp без миллисекунд в виде целого числа
         """
         user = cls.get_or_none(cls.max_tokens, cls.telegram_id == telegram_id)
         if user:
@@ -360,15 +360,10 @@ class UserTokenDiscord(BaseModel):
     Model for table discord_users
       methods
       add_token_by_telegram_id
-      delete_inactive_tokens
       get_all_user_tokens
-      get_time_by_token
-      get_info_by_token
-      update_token_cooldown
-      update_token_channel
-      update_token_guild
-      update_token_proxy
       update_token_time
+      get_time_by_token
+      delete_inactive_tokens
     """
     user = ForeignKeyField(User, on_delete="CASCADE")
     token = CharField(max_length=255, unique=True, verbose_name="Токен пользователя в discord")
@@ -424,7 +419,6 @@ class UserTokenDiscord(BaseModel):
          token: (str)
          cooldown: (int) seconds
         """
-        cooldown = cooldown if cooldown > 0 else 5 * 60
         return cls.update(cooldown=cooldown).where(cls.token == token).execute()
 
     @classmethod
@@ -435,7 +429,7 @@ class UserTokenDiscord(BaseModel):
          token: (str)
          channel: (int) id cannel
         """
-        channel = str(channel) if channel > 0 else '0'
+        channel = str(channel)
         return cls.update(channel=channel).where(cls.token == token).execute()
 
     @classmethod
@@ -446,12 +440,12 @@ class UserTokenDiscord(BaseModel):
         token: (str)
         guild: (int) id guild
         """
-        guild = str(guild) if guild > 0 else '0'
+        guild = str(guild)
         return cls.update(guild=guild).where(cls.token == token).execute()
 
     @classmethod
     @logger.catch
-    def update_token_proxy(cls, token: str, proxy: str) -> bool:
+    def update_token_proxy(cls, token: str, proxy: int) -> bool:
         """
         set last_time: now datetime last message
         token: (str)
@@ -501,11 +495,8 @@ class UserTokenDiscord(BaseModel):
         """
         result = {}
         data: 'UserTokenDiscord' = cls.get_or_none(cls.token == token)
-        if data:
-            guild = int(data.guild) if data.guild else 0
-            channel = int(data.channel) if data.channel else 0
-            result = {'proxy': data.proxy, 'guild': guild, 'channel': channel,
-                      'last_message_time': data.last_message_time, 'cooldown': data.cooldown}
+        result = {'proxy': data.proxy, 'guild': int(data.guild), 'channel': int(data.channel),
+                  'last_message_time': data.last_message_time, 'cooldown': data.cooldown}
         return result
 
     @classmethod
