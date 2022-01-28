@@ -423,31 +423,31 @@ class UserTokenDiscord(BaseModel):
 
     @classmethod
     @logger.catch
+    def update_token_guild(cls, token: str, guild: int) -> bool:
+        """
+        update guild: update guild by token
+        token: (str)
+        guild: (int) id guild
+        """
+        guild = str(guild) if guild > 0 else '0'
+        return cls.update(guild=guild).where(cls.token == token).execute()
+
+    @classmethod
+    @logger.catch
     def update_token_channel(cls, token: str, channel: int) -> bool:
         """
-        set last_time: now datetime last message
+        update channel: update channel by token
          token: (str)
-         channel: (int) id cannel
+         channel: (int) id channel
         """
         channel = str(channel)
         return cls.update(channel=channel).where(cls.token == token).execute()
 
     @classmethod
     @logger.catch
-    def update_token_guild(cls, token: str, guild: int) -> bool:
+    def update_token_proxy(cls, token: str, proxy: str) -> bool:
         """
-        set last_time: now datetime last message
-        token: (str)
-        guild: (int) id guild
-        """
-        guild = str(guild)
-        return cls.update(guild=guild).where(cls.token == token).execute()
-
-    @classmethod
-    @logger.catch
-    def update_token_proxy(cls, token: str, proxy: int) -> bool:
-        """
-        set last_time: now datetime last message
+        update proxy: update proxy by token
         token: (str)
         proxy: (str) ip address
         """
@@ -455,10 +455,21 @@ class UserTokenDiscord(BaseModel):
 
     @classmethod
     @logger.catch
+    def update_token_info(cls, token: str, proxy: str, channel: int, guild: int) -> bool:
+        """
+        ????????
+        update guild, channel, proxy by token
+        token: (str)
+        proxy: (str) ip address
+        """
+        return cls.update(proxy=proxy, guild=guild, channel=channel).where(cls.token == token).execute()
+
+    @classmethod
+    @logger.catch
     def get_all_user_tokens(cls, telegram_id: str) -> List[dict]:
         """
         Вернуть список всех ТОКЕНОВ пользователя по его telegram_id:
-        return: словарь {token:{'time':время_последнего_сообщения, 'cooldown': кулдаун}}
+        return: список словарей {token:{'time':время_последнего_сообщения, 'cooldown': кулдаун}}
         """
         user_id = User.get_user_by_telegram_id(telegram_id)
         if user_id:
@@ -478,7 +489,6 @@ class UserTokenDiscord(BaseModel):
         data: 'UserTokenDiscord' = cls.get_or_none(cls.last_message_time, cls.token == token)
         last_message_time = data.last_message_time if data else None
         return last_message_time
-
 
     @classmethod
     @logger.catch
