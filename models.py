@@ -49,9 +49,9 @@ class User(BaseModel):
     telegram_id = CharField(unique=True, verbose_name="id пользователя в телеграмм")
     nick_name = CharField(max_length=50, verbose_name="Ник")
     first_name = CharField(max_length=50, null=True, verbose_name="Имя")
-    last_name = CharField(max_length=50, null=True, verbose_name="фамилия")
+    last_name = CharField(max_length=50, null=True, verbose_name="Фамилия")
     active = BooleanField(default=True, verbose_name="Активирован")
-    is_work = BooleanField(default=False, verbose_name="В работе / в настройке")
+    is_work = BooleanField(default=False, verbose_name="В работе / Отдыхает")
     admin = BooleanField(default=False, verbose_name="Администраторство")
     max_tokens = IntegerField(default=1, verbose_name="Максимальное количество токенов")
     channel_id = CharField(max_length=250, default="", verbose_name="Канал дискорда")
@@ -139,7 +139,7 @@ class User(BaseModel):
     @logger.catch
     def get_id_inactive_users(cls: 'User') -> list:
         """
-        return list of telegram ids for active users
+        return list of telegram ids for NOT active users
         return: list
         """
         return [user.id for user in cls.select(cls.id)
@@ -163,13 +163,13 @@ class User(BaseModel):
     @logger.catch
     def get_all_users(cls: 'User') -> dict:
         """
-        returns dict of users
+        returns dict of all users
         return: dict
         """
         return {
             user.telegram_id: (f'{user.nick_name.rsplit("_", maxsplit=1)[0]} | '
                                f'{"Active" if user.active else "Not active"} | '
-                               f'{"In work" if user.is_work else "Not in work"} | '
+                               f'{"Work" if user.is_work else "Not work"} | '
                                f'{"Admin" if user.admin else "Not admin"} | ')
             for user in User.select().execute()
         }
