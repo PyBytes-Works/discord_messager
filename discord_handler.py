@@ -22,48 +22,61 @@ load_dotenv()
 
 DISCORD_USER_TOKEN = os.getenv("DESKENT_DISCORD")
 DESKENT_MEMBER_ID = os.getenv("DESKENT_MEMBER_ID")
-PARSING_CHAT_ID = os.getenv("PARSING_CHAT_ID")
-PARSING_GUILD_ID = os.getenv("PARSING_GUILD_ID")
-USER_LANGUAGE = os.getenv("LANGUAGE")
-OPERATOR_CHAT_ID = os.getenv("OPERATOR_CHAT_ID")
+PARSING_CHAT_ID: int = int(os.getenv("PARSING_CHAT_ID"))
+PARSING_GUILD_ID: int = int(os.getenv("PARSING_GUILD_ID"))
+USER_LANGUAGE: str = os.getenv("LANGUAGE")
 LENGTH = 10
 
 FOLDER_ID = os.getenv("FOLDER_ID")  # Токен Андрея
 OAUTH_TOKEN = os.getenv("OAUTH_TOKEN")  # Токен Андрея
 
+# УДАЛИТЬ ПОСЛЕ ТЕСТОВ
+OPERATOR_CHAT_ID = os.getenv("OPERATOR_CHAT_ID")
+
 
 class DataStore:
     """Класс для хранения текущих данных для отправки и получения сообщений дискорда"""
 
-    MIN_LENGTH = LENGTH
-    CHANNEL_URL: str = f'https://discord.com/api/v9/channels/{PARSING_CHAT_ID}/messages'
-    LANGUAGE: str = USER_LANGUAGE
-    CURRENT_MESSAGE_ID: int = None
-    CURRENT_TIME_MESSAGE: float = None
-    DISCORD_USER_TOKEN: str = DISCORD_USER_TOKEN
-
     def __init__(self, telegram_id: str):
         self.user_id: str = telegram_id
+        self.__MIN_LENGTH: int = LENGTH
+        self.__CHANNEL_URL: str = f'https://discord.com/api/v9/channels/{PARSING_CHAT_ID}/messages'
+        self.__LANGUAGE: str = USER_LANGUAGE
+        self.__CURRENT_MESSAGE_ID: int = 0
+        self.__CURRENT_TIME_MESSAGE: float = 0
+        self.__DISCORD_USER_TOKEN: str = DISCORD_USER_TOKEN
 
     @property
     def channel_url(self) -> str:
-        return self.CHANNEL_URL
+        return self.__CHANNEL_URL
 
     @property
     def current_message_id(self) -> int:
-        return self.CURRENT_MESSAGE_ID
+        return self.__CURRENT_MESSAGE_ID
 
     @current_message_id.setter
     def current_message_id(self, message_id: int):
-        self.CURRENT_MESSAGE_ID = message_id
+        self.__CURRENT_MESSAGE_ID = message_id
 
     @property
     def current_time(self) -> float:
-        return self.CURRENT_TIME_MESSAGE
+        return self.__CURRENT_TIME_MESSAGE
 
     @current_time.setter
     def current_time(self, date: float):
-        self.CURRENT_TIME_MESSAGE = date
+        self.__CURRENT_TIME_MESSAGE = date
+
+    @property
+    def language(self):
+        return self.__LANGUAGE
+
+    @property
+    def token(self):
+        return self.__DISCORD_USER_TOKEN
+
+    @property
+    def length(self):
+        return self.__MIN_LENGTH
 
 
 class UserDataStore:
@@ -102,22 +115,18 @@ class MessageReceiver:
     @classmethod
     @logger.catch
     def __translate_to_russian(cls, message: str) -> str:
-        return message
-
-    @classmethod
-    @logger.catch
-    def __translate_to_english(cls, message: str) -> str:
-        return message
+        return Translator.translate(text=message, source="en", target="ru")
 
     @classmethod
     @logger.catch
     def __get_data_from_api(cls):
         session = requests.Session()
-        session.headers['authorization'] = cls.STORE_INSTANCE.DISCORD_USER_TOKEN
+        session.headers['authorization'] = cls.STORE_INSTANCE.token
         limit = 100
         url = cls.STORE_INSTANCE.channel_url + f'?limit={limit}'
         response = session.get(url=url)
         status_code = response.status_code
+        print(response.text, status_code)
         result = {}
         if status_code == 200:
             try:
@@ -143,7 +152,7 @@ class MessageReceiver:
 
         for elem in data:
             message = elem.get("content")
-            if len(message) > cls.STORE_INSTANCE.MIN_LENGTH:
+            if len(message) > cls.STORE_INSTANCE.length:
                 summa += len(message)
                 result.append(
                     {
@@ -183,7 +192,7 @@ class MessageReceiver:
 
         cls.STORE_INSTANCE.current_message_id = id_message
         cls.STORE_INSTANCE.current_time = datetime.datetime.now().timestamp()
-        if cls.STORE_INSTANCE.LANGUAGE == "en":
+        if cls.STORE_INSTANCE.language == "en":
             result_message: str = cls.__translate_to_russian(result_message)
         print(f"\nID for reply: {id_message}"
               f"\nMessage: {result_message}")
@@ -199,18 +208,27 @@ class MessageSender:
 
     @classmethod
     @logger.catch
+    def __translate_to_english(cls, message: str) -> str:
+        return Translator.translate(text=message, source="ru", target="en")
+
+    @classmethod
+    @logger.catch
     def __send_message_to_discord_channel(cls) -> str:
         """Отправляет данные в API, возвращает результат отправки."""
 
         session = requests.Session()
-        session.headers['authorization'] = DISCORD_USER_TOKEN
+        session.headers['authorization'] = cls.STORE_INSTANCE.token
         answer = 'Начало отправки'
-        if cls.STORE_INSTANCE.LANGUAGE is not None:
+
+        if cls.MESSAGE_TEXT:
+            text = cls.MESSAGE_TEXT
+            if cls.STORE_INSTANCE.language == 'en':
+                text = cls.__translate_to_english(cls.MESSAGE_TEXT)
             # data = {"content": f"<@!{cls.STORE_INSTANCE.current_message_id}>{text}",
             #         # "nonce": "??????????",
             #         "tts": "false"}
             data = {
-                "content": cls.MESSAGE_TEXT,
+                "content": text,
                 # "nonce": "935150872076222464",
                 "tts": "false",
                 "message_reference":
@@ -259,6 +277,7 @@ class MessageSender:
 
         cls.STORE_INSTANCE = datastore
         cls.MESSAGE_TEXT = text
+
         answer = cls.__send_message_to_discord_channel()
         logger.info(f"Результат отправки сообщения в дискорд: {answer}")
 
