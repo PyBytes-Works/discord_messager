@@ -1,4 +1,7 @@
-"""Главный модуль бота"""
+"""
+Python 3.8
+Главный модуль бота
+"""
 
 import os.path
 import datetime
@@ -22,7 +25,7 @@ async def send_report_to_admins(text: str) -> None:
 
 @logger.catch
 async def on_startup(_) -> None:
-    """Функция выполнябщаяся при старте бота."""
+    """Функция выполняющаяся при старте бота."""
 
     try:
         # Отправляет сообщение админам при запуске бота
