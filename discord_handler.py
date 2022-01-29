@@ -1,7 +1,6 @@
 import datetime
 import os
 import random
-import time
 from typing import List
 import json
 import asyncio
@@ -17,7 +16,7 @@ from requests.exceptions import (
     RequestException
 )
 
-from proxy_utils import get_free_proxies
+from models import UserTokenDiscord
 from utils import save_data_to_json
 from config import logger
 from dotenv import load_dotenv
@@ -58,6 +57,7 @@ class DataStore:
             proxy
             length
     """
+
     __DISCORD_BASE_URL: str = f'https://discord.com/api/v9/channels/'
     __EXCEPTIONS: tuple = (
         asyncio.exceptions.TimeoutError,
@@ -70,7 +70,7 @@ class DataStore:
     )
 
     def __init__(self, telegram_id: str):
-        self.user_id: str = telegram_id
+        self.telegram_id: str = telegram_id
         self.__MIN_MESSAGE_LENGTH: int = INIT_LENGTH
         self.__LANGUAGE: str = INIT_USER_LANGUAGE
         self.__CURRENT_MESSAGE_ID: int = 0
@@ -78,6 +78,7 @@ class DataStore:
         self.__DISCORD_USER_TOKEN: str = ''
         self.__PROXY: str = ''
         self.__CHANNEL: int = 0
+        self.__GUILD: int = 0
         self.__MAX_TIME_MESSAGE_VALUE: int = 600
 
     @classmethod
@@ -85,6 +86,7 @@ class DataStore:
         """Returns checked dictionary for user data
 
         Save valid data to instance variables """
+
         result = {"token": "bad token"}
         async with aiohttp.ClientSession() as session:
             session.headers['authorization'] = token
@@ -185,11 +187,21 @@ class DataStore:
     def channel(self) -> str:
         channel = self.__CHANNEL
 
-        return channel if channel else 'no token'
+        return channel if channel else 'no channel'
 
     @channel.setter
     def channel(self, channel: str):
         self.__CHANNEL = channel
+
+    @property
+    def guild(self) -> str:
+        guild = self.__GUILD
+
+        return guild if guild else 'no guild'
+
+    @guild.setter
+    def guild(self, guild: str):
+        self.__GUILD = guild
 
     @property
     def token(self) -> str:
@@ -235,7 +247,7 @@ class UserDataStore:
         return self.__instance.get(telegram_id, {})
 
     @logger.catch
-    def add_instance(self, telegram_id: str, data: 'DataStore') -> None:
+    def add_or_update(self, telegram_id: str, data: 'DataStore') -> None:
         """Сохраняет экземпляр класса пользователя"""
 
         self.__instance.update(
@@ -249,8 +261,6 @@ class MessageReceiver:
 
     """Класс парсит сообщения из ответа API дискорда, выбирает случайное и отправляет оператору."""
 
-    __STORE_INSTANCE = None
-
     @classmethod
     @logger.catch
     def __translate_to_russian(cls, message: str) -> str:
@@ -258,11 +268,11 @@ class MessageReceiver:
 
     @classmethod
     @logger.catch
-    def __get_data_from_api(cls):
+    def __get_data_from_api(cls, datastore: 'DataStore'):
         session = requests.Session()
-        session.headers['authorization'] = cls.__STORE_INSTANCE.token
+        session.headers['authorization'] = datastore.token
         limit = 100
-        url = cls.__STORE_INSTANCE.channel_url + f'?limit={limit}'
+        url = datastore.channel_url + f'{datastore.channel}/messages?limit={limit}'
         response = session.get(url=url)
         status_code = response.status_code
         print(response.text, status_code)
@@ -276,7 +286,7 @@ class MessageReceiver:
                 print(f"Data requested {limit}\n"
                       f"Data received: {len(data)}")
                 save_data_to_json(data)
-                result = cls.__data_filter(data)
+                result = cls.__data_filter(data=data, length=datastore.length)
                 save_data_to_json(result, "formed.json")
         else:
             logger.error(f"API request error: {status_code}")
@@ -285,13 +295,13 @@ class MessageReceiver:
 
     @classmethod
     @logger.catch
-    def __data_filter(cls, data: dict) -> list:
+    def __data_filter(cls, data: dict, length: int) -> list:
         result = []
         summa = 0
 
         for elem in data:
             message = elem.get("content")
-            if len(message) > cls.__STORE_INSTANCE.length:
+            if len(message) > length:
                 summa += len(message)
                 result.append(
                     {
@@ -318,108 +328,138 @@ class MessageReceiver:
 
     @classmethod
     @logger.catch
-    def get_message(cls, datastore: 'DataStore') -> str:
+    def __select_token_for_work(cls, telegram_id: str) -> dict:
+        """
+        Выбирает случайного токена дискорда из свободных, если нет свободных - пишет сообщение что
+        свободных нет.
+        """
+
+        cooldown = 300
+        result = {"message": "token ready"}
+        all_tokens: List[dict] = UserTokenDiscord.get_all_user_tokens(telegram_id=telegram_id)
+        current_time = int(datetime.datetime.now().timestamp())
+        tokens_for_job: list = [
+            key
+            for elem in all_tokens
+            for key, value in elem.items()
+            if current_time > value["time"] + value["cooldown"]
+        ]
+        print("Ready tokens: ", len(tokens_for_job))
+        if tokens_for_job:
+            random_token = random.choice(tokens_for_job)
+            result["token"] = random_token
+        else:
+            min_token_time = min(value["time"] for elem in all_tokens for value in elem.values())
+            delay = cooldown - abs(min_token_time - current_time)
+            text = "seconds"
+            if delay > 60:
+                delay = f"{delay // 60}:{delay % 60}"
+                text = "minutes"
+            result["message"] = f"All tokens are busy. Please wait {delay} {text}."
+
+        return result
+
+    @classmethod
+    @logger.catch
+    def get_message(cls, datastore: 'DataStore') -> dict:
         """Получает данные из АПИ, выбирает случайное сообщение и возвращает ID сообщения
         и само сообщение"""
 
-        cls.__STORE_INSTANCE = datastore
-        cls.__get_data_from_api()
-        data: List[dict] = cls.__get_data_from_api()
-        result_data: dict = cls.__message_selector(data)
-        id_message: int = int(result_data["id"])
-        result_message = result_data["message"]
+        result = {"work": False}
+        selected_data: dict = cls.__select_token_for_work(telegram_id=datastore.telegram_id)
+        result_message = selected_data["message"]
+        if selected_data.get("token", None):
+            cls.__get_data_from_api(datastore=datastore)
+            data: List[dict] = cls.__get_data_from_api()
+            result_data: dict = cls.__message_selector(data)
+            id_message: int = int(result_data["id"])
+            result_message = result_data["message"]
 
-        cls.__STORE_INSTANCE.current_message_id = id_message
-        cls.__STORE_INSTANCE.current_time = datetime.datetime.now().timestamp()
-        if cls.__STORE_INSTANCE.language == "en":
-            result_message: str = cls.__translate_to_russian(result_message)
-        print(f"\nID for reply: {id_message}"
-              f"\nMessage: {result_message}")
+            datastore.current_message_id = id_message
+            # datastore.current_time = datetime.datetime.now().timestamp()
+            if datastore.language == "en":
+                result_message: str = cls.__translate_to_russian(result_message)
+            print(f"\nID for reply: {id_message}"
+                  f"\nMessage: {result_message}")
 
-        return result_message
+        result.update({"message": result_message})
+
+        return result
 
 
 class MessageSender:
     """Класс отправляет сообщение, принятое из телеграма в дискорд канал"""
-
-    __STORE_INSTANCE: 'DataStore' = None
-    __MESSAGE_TEXT: str = None
-
-    @classmethod
-    @logger.catch
-    def __translate_to_english(cls, message: str) -> str:
-        return Translator.translate(text=message, source="ru", target="en")
-
-    @classmethod
-    @logger.catch
-    def __send_message_to_discord_channel(cls) -> str:
-        """Отправляет данные в API, возвращает результат отправки."""
-        session = requests.Session()
-        session.headers['authorization'] = cls.__STORE_INSTANCE.token
-        answer = 'Начало отправки'
-
-        if cls.__MESSAGE_TEXT:
-            text = cls.__MESSAGE_TEXT
-            if cls.__STORE_INSTANCE.language == 'en':
-                text = cls.__translate_to_english(cls.__MESSAGE_TEXT)
-            # data = {"content": f"<@!{cls.STORE_INSTANCE.current_message_id}>{text}",
-            #         # "nonce": "??????????",
-            #         "tts": "false"}
-            data = {
-                "content": text,
-                # "nonce": "935150872076222464",
-                "tts": "false",
-                "message_reference":
-                    {
-                        "guild_id": PARSING_GUILD_ID,
-                        "channel_id": PARSING_CHAT_ID,
-                        "message_id": cls.__STORE_INSTANCE.current_message_id
-                    },
-                "allowed_mentions":
-                    {
-                        "parse": [
-                            "users",
-                            "roles",
-                            "everyone"
-                        ],
-                        "replied_user": "false"
-                    }
-            }
-            response = session.post(url=cls.__STORE_INSTANCE.channel_url, json=data)
-
-            status_code = response.status_code
-            if status_code == 204:
-                answer = "Ошибка 204, нет содержимого."
-            elif status_code == 200:
-                try:
-                    data = response.json()
-                except Exception as err:
-                    print("JSON ERROR", err)
-                else:
-                    print(f"Data received: {len(data)}")
-                    # save_data_to_json(data, file_name="answer.json")
-                    answer = "Message sent"
-            else:
-                answer = f"API request error: {status_code}"
-
-        else:
-            answer = ("Нет ИД сообщения, на которое нужно ответить. "
-                      "\nСперва нужно запросить данные из АПИ.")
-
-        return answer
 
     @classmethod
     @logger.catch
     def send_message(cls, text: str, datastore: 'DataStore') -> str:
         """Отправляет данные в канал дискорда, возвращает результат отправки."""
 
-        cls.__STORE_INSTANCE = datastore
-        cls.__MESSAGE_TEXT = text
-
-        answer = cls.__send_message_to_discord_channel()
+        answer = cls.__send_message_to_discord_channel(text=text, datastore=datastore)
         logger.info(f"Результат отправки сообщения в дискорд: {answer}")
+        UserTokenDiscord.update_token_time(datastore.token)
 
         return answer
+
+    @classmethod
+    @logger.catch
+    def __send_message_to_discord_channel(cls, text: str, datastore: 'DataStore') -> str:
+        """Отправляет данные в API, возвращает результат отправки."""
+
+        if not datastore.current_message_id:
+            return ("Нет ИД сообщения, на которое нужно ответить. "
+                      "\nСперва нужно запросить данные из АПИ.")
+
+        if datastore.language == 'en':
+            text = cls.__translate_to_english(text)
+
+        data = {
+            "content": text,
+            "tts": "false",
+            "message_reference":
+                {
+                    "guild_id": datastore.guild,
+                    "channel_id": datastore.channel,
+                    "message_id": datastore.current_message_id
+                },
+            "allowed_mentions":
+                {
+                    "parse": [
+                        "users",
+                        "roles",
+                        "everyone"
+                    ],
+                    "replied_user": "false"
+                }
+        }
+
+        session = requests.Session()
+        session.headers['authorization'] = datastore.token
+        answer = 'Начало отправки'
+        url = datastore.channel_url + f'{datastore.channel}/messages?'
+        response = session.post(url=url, json=data)
+
+        status_code = response.status_code
+        if status_code == 204:
+            answer = "Ошибка 204, нет содержимого."
+        elif status_code == 200:
+            try:
+                data = response.json()
+            except Exception as err:
+                print("JSON ERROR", err)
+            else:
+                print(f"Data received: {len(data)}")
+                # save_data_to_json(data, file_name="answer.json")
+                answer = "Message sent"
+        else:
+            answer = f"API request error: {status_code}"
+
+        return answer
+
+    @classmethod
+    @logger.catch
+    def __translate_to_english(cls, message: str) -> str:
+        return Translator.translate(text=message, source="ru", target="en")
 
 
 class Translator:
@@ -535,50 +575,3 @@ class Translator:
             json.dump(tk, file, indent=4, ensure_ascii=False)
         logger.info('\nNew A_IM-token received.')
 
-
-async def main(token, proxy, channel):
-    """For testing"""
-    return await data.check_user_data(token=token, proxy=proxy, channel=channel)
-
-
-if __name__ == '__main__':
-    datastore = UserDataStore()
-    # token = get_random_token()
-    telegram_id = "12356"
-    my_data = DataStore(telegram_id=telegram_id)
-    datastore.add_instance(telegram_id=telegram_id, data=my_data)
-    # token = "OTMzMTE5MDEzNzc1NjI2MzAy.YfFAmw._X2-nZ6_knM7pK3081hqjdYHrn4"
-    data: 'DataStore' = datastore.get_instance(telegram_id=telegram_id)
-    # pr = "103.92.114.2:80"
-    chat_id = 932256559394861079
-    tokens = [
-  "OTMzMTE5MDEzNzc1NjI2MzAy.YfFAmw._X2-nZ6_knM7pK3081hqjdYHrn4",
-  "OTMzMTE5MDIwOTc3MjUwMzQ2.YfFBFg.JR8vuZzJyQR_dDo3l6tNxXajqeQ",
-  "OTMzMTE5MDYwNDIwNDc2OTM5.YfFBag.fPqptdKuRCUnQXmgJg6bYQWMiwA",
-  "OTMzMTE5MTA2OTI2OTE1NjQ1.YfFBzw.hMd49iD7F5wLEseaFPL9jSGR_OI",
-  "OTMzMTE5MTIzMTc1NjQ5Mzcx.YfFB7A.2PSJGY8x5LgLVv3vZgLSsAAhy4Y",
-  "OTMzMTE5MTE2ODE3MTA0OTE2.YfFBug.7xew7zy6RZCHoWBLBYVfYsEd-EQ",
-  "OTMzMTE5MDM2ODE0OTE3NzAy.YfFBiQ.snhTlAkzpga0JMyddwukdmgI2Y8",
-  "OTMzMTE5MTY4NDM2NDA0MjQ0.YfE_XA.WYJ8VjIn2YL2VPgNuN0i5XX1D1o"
-]
-    result = {}
-    try:
-        counter = 0
-        for token in tokens:
-            for proxy in get_free_proxies():
-                counter += 1
-                time.sleep(1)
-                print(f"Отправляю запрос с {token} через прокси {proxy} в канал {chat_id}:")
-
-                res = asyncio.get_event_loop().run_until_complete(main(token=token, proxy=proxy, channel=chat_id))
-                if res.get("token") != 'bad token' and res.get("proxy") != "bad proxy" and res.get("channel") != "bad channel":
-                    print(f"Попытка № {counter + 1}\t: Результат: {res}", file=open('res.txt', 'a', encoding='utf-8'))
-                    result.update(
-                        {
-                            res["token"]: [res["channel"], res["proxy"]]
-                        }
-                    )
-    except KeyboardInterrupt:
-        print("END")
-    else:
-        save_data_to_json(result, "parse_tokens.json")

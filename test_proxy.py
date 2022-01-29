@@ -1,95 +1,24 @@
+import asyncio
+import datetime
 import json
 import os.path
 import re
+from typing import List
 
 import requests
 import random
 from bs4 import BeautifulSoup as bs
 
-from utils import save_data_to_json
+from models import UserTokenDiscord
 
 
 def get_free_proxies() -> list:
     url = "https://free-proxy-list.net/"
-    # посылаем HTTP запрос и создаем soup объект
     soup = bs(requests.get(url).content, "html.parser")
     text = soup.text
     proxies = re.findall(r'\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}:\d{1,6}\b', text)
-    # proxies = []
 
-
-    # if soup:
-    #     for row in soup.find("table", attrs={"id": "proxylisttable"}).find_all("tr")[1:]:
-    #         tds = row.find_all("td")
-    #         try:
-    #             ip = tds[0].text.strip()
-    #             port = tds[1].text.strip()
-    #             host = f"{ip}:{port}"
-    #             proxies.append(host)
-    #         except IndexError:
-    #             continue
-    #
     return proxies
-
-
-def get_session(proxies):
-    # создаем сессию для отправки HTTP запроса
-    session = requests.Session()
-    # выбираем случайным образом один из адресов
-    proxy = random.choice(proxies)
-    session.proxies = {"http": proxy, "https": proxy}
-
-    return session
-
-
-def check_session():
-    proxies: list = get_proxies()
-    good_proxies = []
-    for i in range(len(proxies)):
-        s = get_session(proxies)
-        try:
-            proxy = s.get("http://icanhazip.com", timeout=1.5).text.strip()
-            print("Request page with IP:", proxy)
-            good_proxies.append(i)
-        except Exception as e:
-            continue
-
-    return good_proxies
-
-# def check_proxy():
-#     # url = 'http://ifconfig.me/all.json'
-#     url = "http://icanhazip.com"
-#     proxies = {'http': '207.154.231.208:3128'}
-#
-#     response = requests.get(url=url, proxies=proxies)
-#     # response.close()#
-#     print(response.status_code)
-
-def req():
-    # url = "https://www.google-analytics.com/j/collect?v=1&_v=j96&a=659062610&t=pageview&_s=1&dl=https%3A%2F%2Ffree-proxy-list.net%2F&ul=ru-ru&de=UTF-8&dt=Free%20Proxy%20List%20-%20Just%20Checked%20Proxy%20List&sd=24-bit&sr=1920x1080&vp=535x937&je=0&_u=AACAAEABAAAAAC~&jid=196714686&gjid=237017926&cid=608108730.1643363610&tid=UA-158616-8&_gid=552263806.1643363610&_r=1&_slc=1&z=282637364"
-    url = "https://free-proxy-list.net/"
-    resp = requests.get(url=url)
-    status = resp.status_code
-    if status == 200:
-        try:
-            data = resp.json()
-        except Exception as err:
-            print(resp.text)
-            print(err)
-        else:
-            save_data_to_json(data, "req.json")
-    else:
-
-        print(resp.status_code)
-
-
-def load_proxies(file_name: str = "proxies.json") -> list:
-    data = []
-    if os.path.exists(file_name):
-        with open(file_name) as f:
-            data = json.load(f)
-
-    return data
 
 
 def get_random_token(file_name: str = "dis_tokens.json"):
@@ -100,10 +29,46 @@ def get_random_token(file_name: str = "dis_tokens.json"):
     return random.choice(data)
 
 
+def select_token_for_work(telegram_id: str):
+    """
+    Выбирает случайного токена дискорда из свободных, если нет свободных - пишет сообщение что
+    свободных нет.
+    """
+
+    cooldown = 300
+    all_user_tokens: List[dict] = UserTokenDiscord.get_all_user_tokens(telegram_id=telegram_id)
+    current_time = int(datetime.datetime.now().timestamp())
+    tokens_for_job: list = [
+        key
+        for elem in all_user_tokens
+        for key, value in elem.items()
+        if current_time > value["time"] + value["cooldown"]
+    ]
+    print(len(tokens_for_job))
+    if tokens_for_job:
+        random_token = random.choice(tokens_for_job)
+
+        # save token to class data
+    else:
+        closest_token_time = abs(min(value["time"] for elem in all_user_tokens for value in elem.values()) - current_time)
+        delay = cooldown - closest_token_time
+        if delay > 60:
+            delay = f"{delay // 60}:{delay % 60}"
+            text = "minutes"
+        else:
+            text = "seconds"
+        print(f"All tokens busy. Please wait {delay} {text}.")
+
+
+def do_job(random_token):
+    # After sending message do this
+    UserTokenDiscord.update_token_time(random_token)
+
 
 if __name__ == '__main__':
-    pass
-    # pr = get_free_proxies()
-    # save_data_to_json(check_session(), file_name="good_proxies.json")
+    current_user = "test1"
+    try:
 
-    # proxies = load_proxies()
+        select_token_for_work(current_user)
+    except KeyboardInterrupt:
+        print("END")
