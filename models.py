@@ -8,17 +8,16 @@ from peewee import (
 from peewee import Model
 from config import logger, db, admins_list, db_file_name
 
+
 # ______________________move______________________________
-
-
 # TODO move
-def is_int(text: str) -> bool:
-    return text.isdecimal()
-
-
 @logger.catch
 def str_to_int(text: str) -> int:
-    if is_int(text):
+    """
+    перевод строки в число
+    если что не так вернёт None
+    """
+    if text.isdecimal():
         try:
             return int(text)
         except ValueError as exc:
@@ -319,11 +318,12 @@ class User(BaseModel):
     @logger.catch
     def get_max_tokens(cls: 'User', telegram_id: str) -> int:
         """
-        возвращает timestamp без миллисекунд в виде целого числа
+        возвращает максимальное количество токенов для пользователя
         """
         user = cls.get_or_none(cls.max_tokens, cls.telegram_id == telegram_id)
         if user:
             return user.max_tokens
+        return 0
 
     @classmethod
     @logger.catch
@@ -360,10 +360,16 @@ class UserTokenDiscord(BaseModel):
     Model for table discord_users
       methods
       add_token_by_telegram_id
-      get_all_user_tokens
-      update_token_time
-      get_time_by_token
       delete_inactive_tokens
+      get_all_user_tokens
+      get_number_of_free_slots_for_tokens
+      get_time_by_token
+      get_info_by_token
+      update_token_cooldown
+      update_token_channel
+      update_token_guild
+      update_token_proxy
+      update_token_time
     """
     user = ForeignKeyField(User, on_delete="CASCADE")
     token = CharField(max_length=255, unique=True, verbose_name="Токен пользователя в discord")
@@ -419,6 +425,7 @@ class UserTokenDiscord(BaseModel):
          token: (str)
          cooldown: (int) seconds
         """
+        cooldown = cooldown if cooldown > 0 else 5 * 60
         return cls.update(cooldown=cooldown).where(cls.token == token).execute()
 
     @classmethod
@@ -440,7 +447,7 @@ class UserTokenDiscord(BaseModel):
          token: (str)
          channel: (int) id channel
         """
-        channel = str(channel)
+        channel = str(channel) if channel > 0 else '0'
         return cls.update(channel=channel).where(cls.token == token).execute()
 
     @classmethod
@@ -479,6 +486,7 @@ class UserTokenDiscord(BaseModel):
                     cls.token, cls.last_message_time, cls.cooldown
                 ).where(cls.user == user_id)
             ]
+        return []
 
     @classmethod
     @logger.catch
@@ -505,8 +513,11 @@ class UserTokenDiscord(BaseModel):
         """
         result = {}
         data: 'UserTokenDiscord' = cls.get_or_none(cls.token == token)
-        result = {'proxy': data.proxy, 'guild': int(data.guild), 'channel': int(data.channel),
-                  'last_message_time': data.last_message_time, 'cooldown': data.cooldown}
+        if data:
+            guild = int(data.guild) if data.guild else 0
+            channel = int(data.channel) if data.channel else 0
+            result = {'proxy': data.proxy, 'guild': guild, 'channel': channel,
+                      'last_message_time': data.last_message_time, 'cooldown': data.cooldown}
         return result
 
     @classmethod
@@ -526,6 +537,17 @@ class UserTokenDiscord(BaseModel):
         """
         users = User.get_id_inactive_users()
         return cls.delete().where(cls.user.in_(users)).execute()
+
+    @classmethod
+    @logger.catch
+    def get_number_of_free_slots_for_tokens(cls, telegram_id: str) -> bool:
+        """
+        Вернуть количество свободных мест для размещения токенов
+        """
+        user_id = User.get_user_by_telegram_id(telegram_id)
+        max_tokens = User.get_max_tokens(telegram_id)
+        all_token = cls.get_all_user_tokens(cls.user == user_id)
+        return max_tokens - len(all_token)  # TODO Use count
 
 
 @logger.catch
