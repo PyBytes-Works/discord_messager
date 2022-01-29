@@ -70,7 +70,6 @@ class User(BaseModel):
     is_work = BooleanField(default=False, verbose_name="В работе / Отдыхает")
     admin = BooleanField(default=False, verbose_name="Администраторство")
     max_tokens = IntegerField(default=1, verbose_name="Максимальное количество токенов")
-    channel_id = CharField(max_length=250, default="", verbose_name="Канал дискорда")
     created_at = DateTimeField(
         default=datetime.datetime.now(),
         verbose_name='Дата добавления в базу'
@@ -382,12 +381,15 @@ class UserTokenDiscord(BaseModel):
     channel = CharField(
         default='0', max_length=30, unique=False, verbose_name="Канал для подключения"
     )
-    last_message_time = IntegerField(
-        default=datetime.datetime.now().timestamp() - 60*5,
-        verbose_name="Время отправки последнего сообщения"
+    language = CharField(
+        default='en', max_length=10, unique=False, verbose_name="Язык канала в discord"
     )
     cooldown = IntegerField(
         default=60*5, verbose_name="Время отправки последнего сообщения"
+    )
+    last_message_time = IntegerField(
+        default=datetime.datetime.now().timestamp() - 60*5,
+        verbose_name="Время отправки последнего сообщения"
     )
 
     class Meta:
@@ -395,17 +397,40 @@ class UserTokenDiscord(BaseModel):
 
     @classmethod
     @logger.catch
-    def add_token_by_telegram_id(cls, telegram_id: str, token: str) -> bool:
+    def add_token_by_telegram_id(
+                                    cls,
+                                    telegram_id: str,
+                                    token: str,
+                                    proxy: str,
+                                    guild: int,
+                                    channel: int,
+                                    language: str = 'en',
+                                    cooldown: int = 60 * 5
+
+                                 ) -> bool:
+
         """
         add token by telegram id
         FIXME
+        return: bool or None если запись прошла то True, если такой токен есть то False,
+        если нет такого пользователя None
         """
         user_id = User.get_user_by_telegram_id(telegram_id)
         all_token = cls.get_all_user_tokens(telegram_id)
         if user_id:
             max_tokens = User.get_max_tokens(telegram_id)
             if max_tokens > len(all_token):
-                return cls.get_or_create(user=user_id, token=token)[-1]
+                new_token = {
+                    'user': user_id,
+                    'token': token,
+                    'proxy': proxy,
+                    'guild': guild,
+                    'channel': channel,
+                    'language': language,
+                    'cooldown': cooldown,
+                }
+
+                return cls.get_or_create(**new_token)[-1]
 
     @classmethod
     @logger.catch
@@ -427,6 +452,17 @@ class UserTokenDiscord(BaseModel):
         """
         cooldown = cooldown if cooldown > 0 else 5 * 60
         return cls.update(cooldown=cooldown).where(cls.token == token).execute()
+
+    @classmethod
+    @logger.catch
+    def update_token_language(cls, token: str, language: str) -> bool:
+        """
+        # TODO а надо ли
+        set language: update language for token
+         token: (str)
+         language: (str)
+        """
+        return cls.update(language=language).where(cls.token == token).execute()
 
     @classmethod
     @logger.catch
@@ -504,7 +540,7 @@ class UserTokenDiscord(BaseModel):
         """
         Вернуть info по токену
         возвращает словарь:
-        {'proxy':proxy(str), 'guild':guild(int), 'channel': channel(int),
+        {'proxy':proxy(str), 'guild':guild(int), 'channel': channel(int), 'language': language(str),
         'last_message_time': last_message_time(int, timestamp), 'cooldown': cooldown(int, seconds)}
         если токена нет приходит пустой словарь
         guild, channel по умолчанию 0 если не было изменений вернётся 0
@@ -517,7 +553,8 @@ class UserTokenDiscord(BaseModel):
             guild = int(data.guild) if data.guild else 0
             channel = int(data.channel) if data.channel else 0
             result = {'proxy': data.proxy, 'guild': guild, 'channel': channel,
-                      'last_message_time': data.last_message_time, 'cooldown': data.cooldown}
+                      'language': data.language, 'last_message_time': data.last_message_time,
+                      'cooldown': data.cooldown}
         return result
 
     @classmethod
