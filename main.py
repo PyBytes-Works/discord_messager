@@ -9,15 +9,12 @@ import datetime
 from aiogram import executor
 
 from config import dp, logger, admins_list, bot, db_file_name
-from discord_handler import UserDataStore
 from handlers import register_handlers
 from models import recreate_db
 
 
 register_handlers(dp=dp)
 
-# initialization user data storage
-users_data_storage = UserDataStore()
 
 async def send_report_to_admins(text: str) -> None:
     """Отправляет сообщение в телеграме всем администраторам из списка"""
