@@ -1,4 +1,5 @@
 import json
+
 from typing import Union
 
 
@@ -15,3 +16,4 @@ def save_data_to_txt(data: Union[dict, list], file_name: str = "data.json"):
         f.write(data)
 
     print(file_name, "saved.")
+
