@@ -1,11 +1,14 @@
-"""Главный модуль бота"""
+"""
+Python 3.8
+Главный модуль бота
+"""
 
 import os.path
 import datetime
 
 from aiogram import executor
 
-from config import dp, logger, db_file_name, admins_list, bot
+from config import dp, logger, admins_list, bot, db_file_name
 from handlers import register_handlers
 from models import recreate_db
 
@@ -22,7 +25,7 @@ async def send_report_to_admins(text: str) -> None:
 
 @logger.catch
 async def on_startup(_) -> None:
-    """Функция выполнябщаяся при старте бота."""
+    """Функция выполняющаяся при старте бота."""
 
     try:
         # Отправляет сообщение админам при запуске бота
