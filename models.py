@@ -9,22 +9,6 @@ from peewee import Model
 from config import logger, db, admins_list, db_file_name
 
 
-# ______________________move______________________________
-# TODO move
-@logger.catch
-def str_to_int(text: str) -> int:
-    """
-    перевод строки в число
-    если что не так вернёт None
-    """
-    if text.isdecimal():
-        try:
-            return int(text)
-        except ValueError as exc:
-            logger.error("can't convert string to number", exc)
-# ______________________move______________________________
-
-
 class BaseModel(Model):
     """A base model that will use our Sqlite database."""
 
@@ -373,7 +357,7 @@ class UserTokenDiscord(BaseModel):
     user = ForeignKeyField(User, on_delete="CASCADE")
     token = CharField(max_length=255, unique=True, verbose_name="Токен пользователя в discord")
     proxy = CharField(
-        default='', max_length=15, unique=False, verbose_name="Адрес прокси сервера"
+        default='', max_length=25, unique=False, verbose_name="Адрес прокси сервера"
     )
     guild = CharField(
         default='0', max_length=30, unique=False, verbose_name="Гильдия для подключения"
