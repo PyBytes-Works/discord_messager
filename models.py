@@ -412,23 +412,25 @@ class UserTokenDiscord(BaseModel):
         """
         add token by telegram id
         FIXME
+        return: bool or None если запись прошла то True, если такой токен есть то False,
+        если нет такого пользователя None
         """
         user_id = User.get_user_by_telegram_id(telegram_id)
         all_token = cls.get_all_user_tokens(telegram_id)
         if user_id:
             max_tokens = User.get_max_tokens(telegram_id)
             if max_tokens > len(all_token):
-                new_token = UserTokenDiscord()
-                new_token.user = user_id
-                new_token.token = token
-                new_token.proxy = proxy
-                new_token.guild = guild
-                new_token.channel = channel
-                new_token.language = language
-                new_token.cooldown = cooldown
-                new_token.save()
+                new_token = {
+                    'user': user_id,
+                    'token': token,
+                    'proxy': proxy,
+                    'guild': guild,
+                    'channel': channel,
+                    'language': language,
+                    'cooldown': cooldown,
+                }
 
-                return cls.get_or_create(user=user_id, token=token)[-1]
+                return cls.get_or_create(**new_token)[-1]
 
     @classmethod
     @logger.catch
@@ -450,6 +452,17 @@ class UserTokenDiscord(BaseModel):
         """
         cooldown = cooldown if cooldown > 0 else 5 * 60
         return cls.update(cooldown=cooldown).where(cls.token == token).execute()
+
+    @classmethod
+    @logger.catch
+    def update_token_language(cls, token: str, language: str) -> bool:
+        """
+        # TODO а надо ли
+        set language: update language for token
+         token: (str)
+         language: (str)
+        """
+        return cls.update(language=language).where(cls.token == token).execute()
 
     @classmethod
     @logger.catch
