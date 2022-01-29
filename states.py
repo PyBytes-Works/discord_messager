@@ -8,4 +8,7 @@ class UserState(StatesGroup):
 
     user_wait_message = State()
     user_add_token = State()
-
+    user_add_guild = State()
+    user_add_channel = State()
+    user_add_proxy = State()
+    user_add_cooldown = State()

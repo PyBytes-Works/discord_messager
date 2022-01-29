@@ -65,6 +65,26 @@ def users_keyboard() -> 'InlineKeyboardMarkup':
 
     return keyboard
 
+
+@logger.catch
+def user_menu_keyboard() -> 'ReplyKeyboardMarkup':
+    """Возвращает кнопочки из списка"""
+
+    keyboard = ReplyKeyboardMarkup(
+            resize_keyboard=True,
+            one_time_keyboard=True
+    )
+
+    keyboard.row(
+        KeyboardButton("/start"),
+        KeyboardButton("/stop"),
+    )
+    keyboard.row(
+        KeyboardButton("/add_token"),
+        KeyboardButton("/add_target"),
+        KeyboardButton("/info"),
+    )
+    return keyboard
 #
 # @logger.catch
 # def get_yes_no_buttons(yes_msg: str, no_msg: str) -> 'InlineKeyboardMarkup':
