@@ -58,6 +58,16 @@ class DataStore:
             proxy
             length
     """
+    __DISCORD_BASE_URL: str = f'https://discord.com/api/v9/channels/'
+    __EXCEPTIONS: tuple = (
+        asyncio.exceptions.TimeoutError,
+        aiohttp.client_exceptions.ServerDisconnectedError,
+        aiohttp.client_exceptions.ClientProxyConnectionError,
+        aiohttp.client_exceptions.ClientHttpProxyError,
+        aiohttp.client_exceptions.ClientOSError,
+        aiohttp.client_exceptions.TooManyRedirects,
+        ConnectionResetError
+    )
 
     def __init__(self, telegram_id: str):
         self.user_id: str = telegram_id
@@ -68,54 +78,43 @@ class DataStore:
         self.__DISCORD_USER_TOKEN: str = ''
         self.__PROXY: str = ''
         self.__CHANNEL: int = 0
-        self.__DISCORD_BASE_URL: str = f'https://discord.com/api/v9/channels/'
         self.__MAX_TIME_MESSAGE_VALUE: int = 600
-        self.__EXCEPTIONS: tuple = (
-            asyncio.exceptions.TimeoutError,
-            aiohttp.client_exceptions.ServerDisconnectedError,
-            aiohttp.client_exceptions.ClientProxyConnectionError,
-            aiohttp.client_exceptions.ClientHttpProxyError,
-            aiohttp.client_exceptions.ClientOSError,
-            aiohttp.client_exceptions.TooManyRedirects,
-            ConnectionResetError
-        )
 
-    async def check_user_data(self, token: str, proxy: str, channel: int) -> dict:
+    @classmethod
+    async def check_user_data(cls, token: str, proxy: str, channel: int) -> dict:
         """Returns checked dictionary for user data
 
         Save valid data to instance variables """
         result = {"token": "bad token"}
         async with aiohttp.ClientSession() as session:
             session.headers['authorization'] = token
-            result["channel"] = await self.__check_channel(session=session, token=token, channel=channel)
+            result["channel"] = await cls.__check_channel(session=session, token=token, channel=channel)
             if result["channel"] != "bad channel":
-                result["proxy"] = await self.__check_proxy(session=session, proxy=proxy)
-                self.channel = channel
+                result["proxy"] = await cls.__check_proxy(session=session, proxy=proxy)
                 if result["proxy"] != "bad proxy":
-                    self.proxy = proxy
-                    result["token"] = await self.__check_token(session=session, token=token)
-                    if result["token"] != "bad token":
-                        self.token = token
+                    result["token"] = await cls.__check_token(session=session, token=token, proxy=proxy, channel=channel)
 
         return result
 
-    async def __check_channel(self, session, token: str, channel: int) -> str:
+    @classmethod
+    async def __check_channel(cls, session, token: str, channel: int) -> str:
         """Returns valid channel else 'bad channel'"""
 
         session.headers['authorization'] = token
         limit = 1
-        url = self.__DISCORD_BASE_URL + f'{channel}/messages?limit={limit}'
+        url = cls.__DISCORD_BASE_URL + f'{channel}/messages?limit={limit}'
         result = 'bad channel'
         try:
             async with session.get(url=url, timeout=3) as response:
                 if response.status == 200:
                     result = channel
-        except self.__EXCEPTIONS as err:
+        except cls.__EXCEPTIONS as err:
             logger.info(f"Channel check Error: {err}")
 
         return result
 
-    async def __check_proxy(self, session, proxy: str) -> str:
+    @classmethod
+    async def __check_proxy(cls, session, proxy: str) -> str:
         """Returns valid proxy else 'bad proxy'"""
 
         url = "http://icanhazip.com"
@@ -124,23 +123,24 @@ class DataStore:
             async with session.get(url=url, proxy=f"http://{proxy}", ssl=False, timeout=3) as response:
                 if response.status == 200:
                     result = proxy
-        except self.__EXCEPTIONS as err:
+        except cls.__EXCEPTIONS as err:
             logger.info(f"Proxy check Error: {err}")
 
         return result
 
-    async def __check_token(self, session, token: str) -> str:
+    @classmethod
+    async def __check_token(cls, session, token: str, proxy: str, channel: int) -> str:
         """Returns valid token else 'bad token'"""
 
         session.headers['authorization'] = token
         limit = 1
-        url = self.__DISCORD_BASE_URL + f'{self.channel}/messages?limit={limit}'
+        url = cls.__DISCORD_BASE_URL + f'{channel}/messages?limit={limit}'
         result = 'bad token'
         try:
-            async with session.get(url=url, proxy=f"http://{self.proxy}", ssl=False, timeout=3) as response:
+            async with session.get(url=url, proxy=f"http://{proxy}", ssl=False, timeout=3) as response:
                 if response.status == 200:
                     result = token
-        except self.__EXCEPTIONS as err:
+        except cls.__EXCEPTIONS as err:
             logger.info(f"Token check Error: {err}")
 
         return result
@@ -561,23 +561,24 @@ if __name__ == '__main__':
   "OTMzMTE5MDM2ODE0OTE3NzAy.YfFBiQ.snhTlAkzpga0JMyddwukdmgI2Y8",
   "OTMzMTE5MTY4NDM2NDA0MjQ0.YfE_XA.WYJ8VjIn2YL2VPgNuN0i5XX1D1o"
 ]
-    for token in tokens:
-        for proxy in get_free_proxies():
-            print(f"Отправляю запрос со 100% рабочим токеном через прокси {proxy} в канал {chat_id}:")
-            result = {}
-            try:
-                for i in range(1):
-                    res = asyncio.get_event_loop().run_until_complete(main(token=token, proxy=proxy, channel=chat_id))
-                    if res.get("token", None):
-                        print(f"Попытка № {i + 1}\t: Результат: {res}", file=open('res.txt', 'a', encoding='utf-8'))
+    result = {}
+    try:
+        counter = 0
+        for token in tokens:
+            for proxy in get_free_proxies():
+                counter += 1
+                time.sleep(1)
+                print(f"Отправляю запрос с {token} через прокси {proxy} в канал {chat_id}:")
 
-                        result.update(
-                            {
-                                res["token"]: [res["channel"], res["proxy"]]
-                            }
-                        )
-                    time.sleep(1)
-            except KeyboardInterrupt:
-                print("END")
-            else:
-                save_data_to_json(result, "parse_tokens.jsoin")
+                res = asyncio.get_event_loop().run_until_complete(main(token=token, proxy=proxy, channel=chat_id))
+                if res.get("token") != 'bad token' and res.get("proxy") != "bad proxy" and res.get("channel") != "bad channel":
+                    print(f"Попытка № {counter + 1}\t: Результат: {res}", file=open('res.txt', 'a', encoding='utf-8'))
+                    result.update(
+                        {
+                            res["token"]: [res["channel"], res["proxy"]]
+                        }
+                    )
+    except KeyboardInterrupt:
+        print("END")
+    else:
+        save_data_to_json(result, "parse_tokens.json")
