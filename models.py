@@ -8,17 +8,16 @@ from peewee import (
 from peewee import Model
 from config import logger, db, admins_list, db_file_name
 
+
 # ______________________move______________________________
-
-
 # TODO move
-def is_int(text: str) -> bool:
-    return text.isdecimal()
-
-
 @logger.catch
 def str_to_int(text: str) -> int:
-    if is_int(text):
+    """
+    перевод строки в число
+    если что не так вернёт None
+    """
+    if text.isdecimal():
         try:
             return int(text)
         except ValueError as exc:
@@ -324,6 +323,7 @@ class User(BaseModel):
         user = cls.get_or_none(cls.max_tokens, cls.telegram_id == telegram_id)
         if user:
             return user.max_tokens
+        return 0
 
     @classmethod
     @logger.catch
@@ -362,6 +362,7 @@ class UserTokenDiscord(BaseModel):
       add_token_by_telegram_id
       delete_inactive_tokens
       get_all_user_tokens
+      get_number_of_free_slots_for_tokens
       get_time_by_token
       get_info_by_token
       update_token_cooldown
@@ -485,6 +486,7 @@ class UserTokenDiscord(BaseModel):
                     cls.token, cls.last_message_time, cls.cooldown
                 ).where(cls.user == user_id)
             ]
+        return []
 
     @classmethod
     @logger.catch
@@ -535,6 +537,17 @@ class UserTokenDiscord(BaseModel):
         """
         users = User.get_id_inactive_users()
         return cls.delete().where(cls.user.in_(users)).execute()
+
+    @classmethod
+    @logger.catch
+    def get_number_of_free_slots_for_tokens(cls, telegram_id: str) -> bool:
+        """
+        Вернуть количество свободных мест для размещения токенов
+        """
+        user_id = User.get_user_by_telegram_id(telegram_id)
+        max_tokens = User.get_max_tokens(telegram_id)
+        all_token = cls.get_all_user_tokens(cls.user == user_id)
+        return max_tokens - len(all_token)  # TODO Use count
 
 
 @logger.catch
