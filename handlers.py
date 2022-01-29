@@ -53,7 +53,7 @@ async def start_command_handler(message: Message) -> None:
     print("Создаю экземпляр класса-хранилища")
     new_store = DataStore(message.from_user.id)
     print("Добавляю его в общее хранилище")
-    users_data_storage.add_instance(telegram_id=message.from_user.id, data=new_store)
+    users_data_storage.add_or_update(telegram_id=message.from_user.id, data=new_store)
     print("Отправляю запрос к АПИ")
     text = MessageReceiver.get_message(new_store)
     print("Получаю ответ", text)

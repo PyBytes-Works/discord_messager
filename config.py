@@ -5,12 +5,12 @@ import sys
 from aiogram import Bot, Dispatcher
 from dotenv import load_dotenv
 from loguru import logger
-from peewee import SqliteDatabase
 from aiogram.contrib.fsm_storage.memory import MemoryStorage
-from discord_handler import UserDataStore
 
 
 # Загружаем переменные из файла .env
+from peewee import SqliteDatabase
+
 load_dotenv()
 
 # initialization admins list
@@ -27,8 +27,7 @@ bot = Bot(token=tgToken)
 storage = MemoryStorage()
 dp = Dispatcher(bot, storage=storage)
 
-# initialization user data storage
-users_data_storage = UserDataStore()
+
 
 #  ********** LOGGER CONFIG ********************************
 
@@ -55,6 +54,8 @@ logger.configure(**logger_cfg)
 print('Start logging to:', file_path)
 
 #  ********** END OF LOGGER CONFIG *************************
+
+
 
 #  ********** DATABASE CONFIG *************************
 
