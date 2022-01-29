@@ -30,6 +30,7 @@ def str_to_int(text: str) -> int:
 # ______________________move______________________________
 
 
+
 class BaseModel(Model):
     """A base model that will use our Sqlite database."""
 

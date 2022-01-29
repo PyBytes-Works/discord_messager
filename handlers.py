@@ -4,10 +4,10 @@ from aiogram.dispatcher.filters import Text
 from aiogram.types import Message, CallbackQuery, ReplyKeyboardRemove
 from aiogram.dispatcher import FSMContext
 
-from config import logger, Dispatcher, users_data_storage
+from config import logger, Dispatcher
 from models import User
 from keyboards import cancel_keyboard
-from discord_handler import MessageReceiver, DataStore, MessageSender
+from discord_handler import MessageReceiver, DataStore, MessageSender, users_data_storage
 from states import UserState
 
 
@@ -52,6 +52,8 @@ async def start_command_handler(message: Message) -> None:
     await message.answer("Начинаю получение данных", reply_markup=cancel_keyboard())
     print("Создаю экземпляр класса-хранилища")
     new_store = DataStore(message.from_user.id)
+    # TODO написать заполнение данных этого хранилища
+
     print("Добавляю его в общее хранилище")
     users_data_storage.add_or_update(telegram_id=message.from_user.id, data=new_store)
     print("Отправляю запрос к АПИ")

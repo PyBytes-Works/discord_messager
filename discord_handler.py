@@ -38,6 +38,9 @@ OAUTH_TOKEN = os.getenv("OAUTH_TOKEN")  # Токен Андрея
 OPERATOR_CHAT_ID = os.getenv("OPERATOR_CHAT_ID")
 
 
+
+
+
 class DataStore:
     """
     Класс для хранения текущих данных для отправки и получения сообщений дискорда
@@ -337,6 +340,7 @@ class MessageReceiver:
         cooldown = 300
         result = {"message": "token ready"}
         all_tokens: List[dict] = UserTokenDiscord.get_all_user_tokens(telegram_id=telegram_id)
+        print(all_tokens)
         current_time = int(datetime.datetime.now().timestamp())
         tokens_for_job: list = [
             key
@@ -348,6 +352,7 @@ class MessageReceiver:
         if tokens_for_job:
             random_token = random.choice(tokens_for_job)
             result["token"] = random_token
+
         else:
             min_token_time = min(value["time"] for elem in all_tokens for value in elem.values())
             delay = cooldown - abs(min_token_time - current_time)
@@ -368,8 +373,11 @@ class MessageReceiver:
         result = {"work": False}
         selected_data: dict = cls.__select_token_for_work(telegram_id=datastore.telegram_id)
         result_message = selected_data["message"]
-        if selected_data.get("token", None):
+        token = selected_data.get("token", None)
+        if token is not None:
+            datastore.token = token
             cls.__get_data_from_api(datastore=datastore)
+
             data: List[dict] = cls.__get_data_from_api()
             result_data: dict = cls.__message_selector(data)
             id_message: int = int(result_data["id"])
@@ -575,3 +583,6 @@ class Translator:
             json.dump(tk, file, indent=4, ensure_ascii=False)
         logger.info('\nNew A_IM-token received.')
 
+
+# initialization user data storage
+users_data_storage = UserDataStore()
