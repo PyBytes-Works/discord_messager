@@ -4,7 +4,7 @@ from aiogram.dispatcher.filters import Text
 from aiogram.types import Message, CallbackQuery, ReplyKeyboardRemove
 from aiogram.dispatcher import FSMContext
 
-from config import logger, Dispatcher, users_data_storage
+from config import logger, Dispatcher
 from models import User, UserTokenDiscord
 from keyboards import cancel_keyboard, user_menu_keyboard
 from discord_handler import MessageReceiver, DataStore, MessageSender, users_data_storage
@@ -28,6 +28,7 @@ async def cancel_handler(message: Message, state: FSMContext) -> None:
 @logger.catch
 async def invitation_add_discord_token_handler(message: Message) -> None:
     """Запрос discord-токена """
+    print(message.from_user.id)
     user = message.from_user.id
     if User.is_active(telegram_id=user):
         if UserTokenDiscord.get_number_of_free_slots_for_tokens(user):
@@ -97,9 +98,53 @@ async def add_language_handler(message: Message, state: FSMContext) -> None:
        проверка и запись, либо возврат в другое состояние
     """
 
+    languages = ['az', 'sq', 'am', 'en', 'ar', 'hy', 'af', 'eu', 'ba', 'be', 'bn', 'my', 'bg',
+                 'bs', 'cy', 'hu', 'vi', 'ht', 'gl', 'nl', 'el', 'ka', 'gu', 'da', 'he', 'yi',
+                 'id', 'ga', 'it', 'is', 'es', 'kk', 'kn', 'ca', 'ky', 'zh', 'ko', 'xh', 'km',
+                 'lo', 'la', 'lv', 'lt', 'lb', 'mg', 'ms', 'ml', 'mt', 'mk', 'mi', 'mr', 'mn',
+                 'de', 'ne', 'no', 'pa', 'fa', 'pl', 'pt', 'ro', 'ru', 'sr', 'si', 'sk', 'sl',
+                 'sw', 'su', 'tg', 'th', 'tl', 'ta', 'tt', 'te', 'tr', 'uz', 'uk', 'ur', 'fi',
+                 'fr', 'hi', 'hr', 'cs', 'sv', 'gd', 'et', 'eo', 'jv', 'ja']
 
-    await UserState.user_add_proxy.set()
-    pass
+    user = message.from_user.id
+    language = message.text
+    if language not in languages:
+        await message.answer(
+            "Язык не поддерживается попробуйте ещё раз ввести язык language ru, es, en или другой)",
+            reply_markup=cancel_keyboard())
+        return
+    data = await state.get_data()
+
+    token = data.get('token')
+    guild = data.get('guild')
+    channel = data.get('channel')
+    proxy = data.get('proxy')
+    result = DataStore.check_user_data(token, proxy, channel)
+    if result.get('token', 'bad token') == 'bad token':
+        await message.answer(
+                                "токен не добавлен повторите ввод", reply_markup=cancel_keyboard())
+        await UserState.user_add_token.set()
+        return
+
+    if result.get('channel', 'bad channel') == 'bad channel':
+        await message.answer(
+                                "токен не добавлен повторите ввод ссылки на канал",
+                                reply_markup=cancel_keyboard())
+        await UserState.user_add_channel.set()
+        return
+    if result.get('proxy', 'bad proxy') == 'bad proxy':
+        await message.answer(
+                                "токен не добавлен повторите ввод proxy",
+                                reply_markup=user_menu_keyboard())
+        await UserState.user_add_proxy.set()
+        return
+
+    UserTokenDiscord.add_token_by_telegram_id(user, token, proxy, guild, channel, language)
+    await message.answer(
+            "токен добавлен",
+            reply_markup=user_menu_keyboard())
+    await state.finish()
+
 ##################
 
 
