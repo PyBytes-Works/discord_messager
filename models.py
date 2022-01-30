@@ -171,7 +171,7 @@ class User(BaseModel):
         return {
             user.telegram_id: (f'{user.nick_name.rsplit("_", maxsplit=1)[0]} | '
                                f'{"Active" if user.active else "Not active"} | '
-                               f'{"Work" if user.is_work else "Not work"} | '
+                               # f'{"Work" if user.is_work else "Not work"} | '
                                f'{"Admin" if user.admin else "Not admin"} | ')
             for user in User.select().execute()
         }
