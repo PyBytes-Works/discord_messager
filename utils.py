@@ -1,4 +1,5 @@
 import json
+
 from typing import Union
 
 
@@ -15,3 +16,15 @@ def save_data_to_txt(data: Union[dict, list], file_name: str = "data.json"):
         f.write(data)
 
     print(file_name, "saved.")
+
+
+def str_to_int(text: str) -> int:
+    """
+    перевод строки в число
+    если что не так вернёт None
+    """
+    if text.isdecimal():
+        try:
+            return int(text)
+        except ValueError as exc:
+            pass
