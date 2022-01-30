@@ -59,19 +59,19 @@ async def admin_help_handler(message: Message) -> None:
         await message.answer(f'Список команд администратора: {admin_commands}', reply_markup=user_menu_keyboard())
     else:
         logger.info(f'{message.from_user.id}:{message.from_user.username}: NOT AUTORIZATED')
-#
-#
+
+
 @logger.catch
 async def add_new_user_name_handler(message: Message) -> None:
     """Обработчик для создания нового пользователя. Команда /add_user"""
-
+    # TODO запросить максимальное кол-во токенов
     if User.is_admin(telegram_id=message.from_user.id):
         await message.answer('Введите имя для нового пользователя: ', reply_markup=cancel_keyboard())
         await UserState.name_for_cr.set()
     else:
         logger.info(f'{message.from_user.id}:{message.from_user.username}: NOT AUTORIZATED')
-#
-#
+
+
 @logger.catch
 async def add_new_user_handler(message: Message, state: FSMContext) -> None:
     """Обработчик ввода имени нового пользователя"""
@@ -109,8 +109,8 @@ async def show_all_users_handler(message: Message) -> None:
         await message.answer(user_list, reply_markup=ReplyKeyboardRemove())
     else:
         logger.info(f'{message.from_user.id}:{message.from_user.username}: NOT AUTORIZATED')
-#
-#
+
+
 @logger.catch
 async def delete_user_name_handler(message: Message) -> None:
     """Обработчик для удаления пользователя. Команда /delete_user"""
@@ -121,8 +121,8 @@ async def delete_user_name_handler(message: Message) -> None:
         await UserState.name_for_del.set()
     else:
         logger.info(f'{message.from_user.id}:{message.from_user.username}: NOT AUTORIZATED')
-#
-#
+
+
 @logger.catch
 async def delete_user_handler(callback: CallbackQuery, state: FSMContext) -> None:
     """Обработчик ввода имени пользователя для удаления"""
@@ -137,16 +137,31 @@ async def delete_user_handler(callback: CallbackQuery, state: FSMContext) -> Non
         f"Пользователь {name}: {user_id} удален из БД.", reply_markup=user_menu_keyboard())
     await state.finish()
     await callback.answer()
-#
-#
+
+
 @logger.catch
 async def activate_new_user_handler(message: Message) -> None:
     """Обработчик команды /ua для авторизации нового пользователя"""
 
     await message.answer("Введите токен: ", reply_markup=cancel_keyboard())
     await UserState.name_for_activate.set()
-#
-#
+
+
+@logger.catch
+async def set_user_max_tokens_handler(message: Message) -> None:
+    """Обработчик команды /set_tokens для авторизации нового пользователя"""
+    # TODO написать !!!
+    user_telegram_id = message.from_user.id
+    if user_telegram_id in admins_list:
+        users: dict = User.get_all_users()
+        user_list: str = "\n".join(tuple(users.values()))
+        await message.answer(
+            f'Список пользователей: {len(users)}',
+            reply_markup=ReplyKeyboardRemove()
+        )
+        await message.answer(user_list, reply_markup=ReplyKeyboardRemove())
+
+
 @logger.catch
 async def add_user_to_db_by_token(message: Message, state: FSMContext) -> None:
     """Обработчик создания инициализации активации нового пользователя"""
@@ -188,5 +203,6 @@ def register_admin_handlers(dp: Dispatcher) -> None:
     dp.register_message_handler(set_user_admin_handler, state=UserState.name_for_admin)
     dp.register_message_handler(show_all_users_handler, commands=['show_users'])
     dp.register_message_handler(delete_user_name_handler, commands=['delete_user'])
+    dp.register_message_handler(set_user_max_tokens_handler, commands=['set_tokens'])
     dp.register_callback_query_handler(delete_user_handler, Text(startswith=['user_']), state=UserState.name_for_del)
     dp.register_message_handler(add_new_user_handler, state=UserState.name_for_cr)

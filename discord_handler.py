@@ -294,8 +294,7 @@ class MessageReceiver:
         limit = 100
         url = datastore.channel_url + f'{datastore.channel}/messages?limit={limit}'
         proxies = {
-            "http": f"http://{PROXY_USER}:{PROXY_PASSWORD}@{datastore.proxy}/",
-            # "https": f"http://{PROXY_USER}:{PROXY_PASSWORD}@{datastore.proxy}/"
+            "http": f"http://{PROXY_USER}:{PROXY_PASSWORD}@{datastore.proxy}/"
         }
         response = session.get(url=url, proxies=proxies)
         status_code = response.status_code
@@ -418,6 +417,7 @@ class MessageReceiver:
             result_message: str = result_data["message"]
 
             datastore.current_message_id = id_message
+            # TODO определять разницу времени между получением сообщения и ответа оператора
             # datastore.current_time = datetime.datetime.now().timestamp()
             if datastore.language == "en":
                 result_message: str = cls.__translate_to_russian(result_message)

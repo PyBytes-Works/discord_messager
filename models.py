@@ -55,7 +55,7 @@ class User(BaseModel):
     active = BooleanField(default=True, verbose_name="Активирован")
     is_work = BooleanField(default=False, verbose_name="В работе / Отдыхает")
     admin = BooleanField(default=False, verbose_name="Администраторство")
-    max_tokens = IntegerField(default=1, verbose_name="Максимальное количество токенов")
+    max_tokens = IntegerField(default=5, verbose_name="Максимальное количество токенов")
     created_at = DateTimeField(
         default=datetime.datetime.now(),
         verbose_name='Дата добавления в базу'
