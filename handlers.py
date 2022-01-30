@@ -55,7 +55,7 @@ async def add_discord_token_handler(message: Message, state: FSMContext) -> None
 @logger.catch
 async def add_channel_handler(message: Message, state: FSMContext) -> None:
     """
-        получения ссылки на канал, запрос прокси
+        получения ссылки на канал, запрос языка
     """
     mess = message.text
     guild, channel = mess.rsplit('/', maxsplit=3)[-2:]
@@ -68,28 +68,27 @@ async def add_channel_handler(message: Message, state: FSMContext) -> None:
 
     await state.update_data(guild=guild, channel=channel)
     await message.answer(
-        "Введите ip прокси (ip адрес:порт )", reply_markup=cancel_keyboard())
-    await UserState.user_add_proxy.set()
-
-
-@logger.catch
-async def add_proxy_handler(message: Message, state: FSMContext) -> None:
-    """
-        добавить прокси
-    """
-
-    proxy = message.text
-    proxy = re.match(r'\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}:\d{1,6}\b', proxy.strip())
-
-    if not proxy:
-        await message.answer(
-            "Проверьте proxy и попробуйте ещё раз", reply_markup=cancel_keyboard())
-        return
-
-    await state.update_data(proxy=proxy.string)
-    await message.answer(
         "Добавьте language ru, es, en или другой)", reply_markup=cancel_keyboard())
     await UserState.user_add_language.set()
+
+
+# @logger.catch
+# async def add_proxy_handler(message: Message, state: FSMContext) -> None:
+#     """
+#         добавить прокси
+#     """
+#
+#     proxy = message.text
+#     proxy = re.match(r'\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}:\d{1,6}\b', proxy.strip())
+#     if not proxy:
+#         await message.answer(
+#             "Проверьте proxy и попробуйте ещё раз", reply_markup=cancel_keyboard())
+#         return
+#
+#     await state.update_data(proxy=proxy.string)
+#     await message.answer(
+#         "Добавьте language ru, es, en или другой)", reply_markup=cancel_keyboard())
+#     await UserState.user_add_language.set()
 
 
 @logger.catch
@@ -119,6 +118,7 @@ async def add_language_handler(message: Message, state: FSMContext) -> None:
     guild = data.get('guild')
     channel = data.get('channel')
     proxy = data.get('proxy')
+
     result = await DataStore.check_user_data(token, proxy, channel)
     if result.get('token') == 'bad token':
         await message.answer(
@@ -157,6 +157,10 @@ async def start_command_handler(message: Message, state: FSMContext) -> None:
     users_data_storage.add_or_update(telegram_id=message.from_user.id, data=new_store)
     print("Отправляю запрос к АПИ")
     answer = MessageReceiver.get_message(new_store)
+    if answer.get("message", "no messages") == "no messages":
+        await message.answer("Нет новых сообщений", reply_markup=user_menu_keyboard())
+        await state.finish()
+        return
     text = answer.get("message", "ERROR")
     if answer.get("work", False):
         print("Получаю ответ", text)
@@ -166,6 +170,7 @@ async def start_command_handler(message: Message, state: FSMContext) -> None:
     else:
         await message.answer(text, reply_markup=user_menu_keyboard())
         await state.finish()
+
 
 
 @logger.catch
@@ -182,7 +187,12 @@ async def send_to_discord(message: Message, state: FSMContext) -> None:
     await message.answer("Понял, принял, отправляю.", reply_markup=cancel_keyboard())
     datastore = users_data_storage.get_instance(message.from_user.id)
     result = MessageSender.send_message(text=message.text, datastore=datastore)
-    await message.answer(f"Результат отправки: {result}", reply_markup=ReplyKeyboardRemove())
+    if result == "Message sent":
+        await message.answer(f"Результат отправки: {result}", reply_markup=ReplyKeyboardRemove())
+        await message.answer("Ожидаю новых сообщений", reply_markup=cancel_keyboard())
+        await UserState.user_start_game.set()
+        await start_command_handler(message=message, state=state)
+        return
     await state.finish()
 
 
@@ -208,11 +218,12 @@ def register_handlers(dp: Dispatcher) -> None:
     dp.register_message_handler(
         cancel_handler, Text(startswith=["отмена", "cancel"], ignore_case=True), state="*")
     dp.register_message_handler(start_command_handler, commands=["start", "старт"])
+    dp.register_message_handler(start_command_handler, state=UserState.user_start_game)
     dp.register_message_handler(invitation_add_discord_token_handler, commands=["at", "addtoken", "add_token"])
     dp.register_message_handler(add_discord_token_handler, state=UserState.user_add_token)
     dp.register_message_handler(send_to_discord, state=UserState.user_wait_message)
     dp.register_message_handler(add_discord_token_handler, state=UserState.user_add_token)
     dp.register_message_handler(add_channel_handler, state=UserState.user_add_channel)
-    dp.register_message_handler(add_proxy_handler, state=UserState.user_add_proxy)
+    # dp.register_message_handler(add_proxy_handler, state=UserState.user_add_proxy)
     dp.register_message_handler(add_language_handler, state=UserState.user_add_language)
     dp.register_message_handler(default_message)

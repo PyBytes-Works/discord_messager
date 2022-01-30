@@ -77,11 +77,11 @@ def user_menu_keyboard() -> 'ReplyKeyboardMarkup':
 
     keyboard.row(
         KeyboardButton("/start"),
-        KeyboardButton("/stop"),
+        # KeyboardButton("/stop"),
     )
     keyboard.row(
         KeyboardButton("/add_token"),
-        KeyboardButton("/add_target"),
+        # KeyboardButton("/add_target"),
         KeyboardButton("/info"),
     )
     return keyboard

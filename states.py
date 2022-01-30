@@ -10,3 +10,4 @@ class UserState(StatesGroup):
     user_add_channel = State()
     user_add_proxy = State()
     user_add_language = State()
+    user_start_game = State()

@@ -24,6 +24,9 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+PROXY_USER = os.getenv("PROXY_USER")
+PROXY_PASSWORD = os.getenv("PROXY_PASSWORD")
+
 DISCORD_USER_TOKEN = os.getenv("DESKENT_DISCORD")
 DESKENT_MEMBER_ID = os.getenv("DESKENT_MEMBER_ID")
 PARSING_CHAT_ID: int = int(os.getenv("PARSING_CHAT_ID"))
@@ -36,9 +39,6 @@ OAUTH_TOKEN = os.getenv("OAUTH_TOKEN")  # Токен Андрея
 
 # УДАЛИТЬ ПОСЛЕ ТЕСТОВ
 OPERATOR_CHAT_ID = os.getenv("OPERATOR_CHAT_ID")
-
-
-
 
 
 class DataStore:
@@ -83,6 +83,7 @@ class DataStore:
         self.__CHANNEL: int = 0
         self.__GUILD: int = 0
         self.__MAX_TIME_MESSAGE_VALUE: int = 600
+        self.__TOKEN_COOLDOWN: int = 0
 
     @classmethod
     async def check_user_data(cls, token: str, proxy: str, channel: int) -> dict:
@@ -93,15 +94,11 @@ class DataStore:
         result = {}
         async with aiohttp.ClientSession() as session:
             session.headers['authorization'] = token
-            # result["channel"] = await cls.__check_channel(session=session, token=token, channel=channel)
-            # if result["channel"] == "bad channel":
-            #     return result
-                # result["proxy"] = await cls.__check_proxy(session=session, proxy=proxy)
-                # if result["proxy"] != "bad proxy":
+            # result["proxy"] = await cls.__check_proxy(session=session, proxy=proxy)
+            # if result["proxy"] != "bad proxy":
             result["token"] = await cls.__check_token(session=session, token=token, proxy=proxy, channel=channel)
             if result["token"] != "bad token":
                 result["channel"] = channel
-                result["proxy"] = proxy
 
         return result
 
@@ -146,12 +143,11 @@ class DataStore:
         result = 'bad token'
         try:
             # async with session.get(url=url, proxy=f"http://{proxy}", ssl=False, timeout=3) as response:
-            async with session.get(url=url, ssl=False, timeout=3) as response:
+            async with session.get(url=url) as response:
                 if response.status == 200:
                     result = token
         except cls.__EXCEPTIONS as err:
             logger.info(f"Token check Error: {err}")
-
         return result
 
     def save_token_data(self, token: str):
@@ -161,6 +157,7 @@ class DataStore:
         self.channel = token_data.get("channel")
         self.language = token_data.get("language")
         self.guild = token_data.get("guild")
+        self.cooldown = token_data.get("cooldown")
 
     @property
     def message_time(self) -> int:
@@ -169,6 +166,14 @@ class DataStore:
     @message_time.setter
     def message_time(self, message_time: int):
         self.__MAX_TIME_MESSAGE_VALUE = message_time
+
+    @property
+    def cooldown(self) -> int:
+        return self.__TOKEN_COOLDOWN
+
+    @cooldown.setter
+    def cooldown(self, cooldown: int):
+        self.__TOKEN_COOLDOWN = cooldown
 
     @property
     def channel_url(self) -> str:
@@ -288,7 +293,11 @@ class MessageReceiver:
         session.headers['authorization'] = datastore.token
         limit = 100
         url = datastore.channel_url + f'{datastore.channel}/messages?limit={limit}'
-        response = session.get(url=url)
+        proxies = {
+            "http": f"http://{PROXY_USER}:{PROXY_PASSWORD}@{datastore.proxy}/",
+            # "https": f"http://{PROXY_USER}:{PROXY_PASSWORD}@{datastore.proxy}/"
+        }
+        response = session.get(url=url, proxies=proxies)
         status_code = response.status_code
         # print(response.text, status_code)
         result = {}
@@ -352,11 +361,9 @@ class MessageReceiver:
         свободных нет.
         """
 
-        cooldown = 300
-        result = {"message": "token ready"}
+        result: dict = {"message": "token ready"}
         all_tokens: List[dict] = UserTokenDiscord.get_all_user_tokens(telegram_id=datastore.telegram_id)
-        print(all_tokens)
-        current_time = int(datetime.datetime.now().timestamp())
+        current_time: int = int(datetime.datetime.now().timestamp())
         tokens_for_job: list = [
             key
             for elem in all_tokens
@@ -365,24 +372,27 @@ class MessageReceiver:
         ]
         print("Ready tokens: ", len(tokens_for_job))
         if tokens_for_job:
-            random_token = random.choice(tokens_for_job)
-            result["token"] = random_token
+            random_token: str = random.choice(tokens_for_job)
+            result["token"]: str = random_token
             datastore.save_token_data(random_token)
-
         else:
-            min_token_time = min(value["time"] for elem in all_tokens for value in elem.values())
-            delay = cooldown - abs(min_token_time - current_time)
+            min_token_data: dict = min(all_tokens, key=lambda x: x.get('time'))
+            token: str = tuple(min_token_data)[0]
+            datastore.save_token_data(token)
+            min_token_time: int = UserTokenDiscord.get_time_by_token(token)
+            delay: int = datastore.cooldown - abs(min_token_time - current_time)
             text = "seconds"
             if delay > 60:
-                minutes = delay // 60
-                seconds = delay % 60
+                minutes: int = delay // 60
+                seconds: int = delay % 60
                 if minutes < 10:
-                    minutes = f"0{minutes}"
+                    minutes: str = f"0{minutes}"
                 if seconds < 10:
-                    seconds = f'0{seconds}'
-                delay = f"{minutes}:{seconds}"
+                    seconds: str = f'0{seconds}'
+                delay: str = f"{minutes}:{seconds}"
                 text = "minutes"
-            result["message"] = f"В данный момент все токены заняты. Подождите {delay} {text}."
+            result["message"] = (f"В данный момент все токены заняты. Подождите {delay} {text}. "
+                                 f"Затем нажмите /start")
 
         return result
 
@@ -394,16 +404,19 @@ class MessageReceiver:
 
         result = {"work": False}
         selected_data: dict = cls.__select_token_for_work(datastore=datastore)
-        result_message = selected_data["message"]
-        token = selected_data.get("token", None)
+        result_message: str = selected_data["message"]
+        token: str = selected_data.get("token", None)
         if token is not None:
             datastore.token = token
             cls.__get_data_from_api(datastore=datastore)
 
             data: List[dict] = cls.__get_data_from_api(datastore=datastore)
+            if not data:
+                result.update({"message": "no messages"})
+                return result
             result_data: dict = cls.__get_random_message(data)
             id_message: int = int(result_data["id"])
-            result_message = result_data["message"]
+            result_message: str = result_data["message"]
 
             datastore.current_message_id = id_message
             # datastore.current_time = datetime.datetime.now().timestamp()
@@ -425,7 +438,7 @@ class MessageSender:
     def send_message(cls, text: str, datastore: 'DataStore') -> str:
         """Отправляет данные в канал дискорда, возвращает результат отправки."""
 
-        answer = cls.__send_message_to_discord_channel(text=text, datastore=datastore)
+        answer: str = cls.__send_message_to_discord_channel(text=text, datastore=datastore)
         logger.info(f"Результат отправки сообщения в дискорд: {answer}")
         UserTokenDiscord.update_token_time(datastore.token)
 
@@ -467,7 +480,11 @@ class MessageSender:
         session.headers['authorization'] = datastore.token
         answer = 'Начало отправки'
         url = datastore.channel_url + f'{datastore.channel}/messages?'
-        response = session.post(url=url, json=data)
+        proxies = {
+            "http": f"http://{PROXY_USER}:{PROXY_PASSWORD}@{datastore.proxy}/",
+            # "https": f"http://{PROXY_USER}:{PROXY_PASSWORD}@{datastore.proxy}/"
+        }
+        response = session.post(url=url, json=data, proxies=proxies)
 
         status_code = response.status_code
         if status_code == 204:

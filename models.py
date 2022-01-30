@@ -402,14 +402,14 @@ class UserTokenDiscord(BaseModel):
         """
         user_id = User.get_user_by_telegram_id(telegram_id)
         if user_id:
-            token: UserTokenDiscord = UserTokenDiscord.get_or_none(cls.token == token)
-            if token:
-                token.proxy = proxy
-                token.guild = guild
-                token.channel = channel
-                token.language = language
-                token.cooldown = cooldown
-                return token.save()
+            db_token: UserTokenDiscord = UserTokenDiscord.get_or_none(cls.token == token)
+            if db_token:
+                db_token.proxy = proxy
+                db_token.guild = guild
+                db_token.channel = channel
+                db_token.language = language
+                db_token.cooldown = cooldown
+                return db_token.save()
 
             all_token = cls.get_all_user_tokens(telegram_id)
             max_tokens = User.get_max_tokens(telegram_id)
