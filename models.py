@@ -500,7 +500,7 @@ class UserTokenDiscord(BaseModel):
         Вернуть список всех ТОКЕНОВ пользователя по его telegram_id:
         return: список словарей {token:{'time':время_последнего_сообщения, 'cooldown': кулдаун}}
         """
-        user_id = User.get_user_by_telegram_id(telegram_id)
+        user_id: 'User' = User.get_user_by_telegram_id(telegram_id)
         if user_id:
             return [
                 {user.token: {'time': user.last_message_time, 'cooldown': user.cooldown}}
@@ -526,12 +526,13 @@ class UserTokenDiscord(BaseModel):
         """
         Вернуть info по токену
         возвращает словарь:
-        {'proxy':proxy(str), 'guild':guild(int), 'channel': channel(int), 'language': language(str),
-        'last_message_time': last_message_time(int, timestamp), 'cooldown': cooldown(int, seconds)}
-        если токена нет приходит пустой словарь
-        guild, channel по умолчанию 0 если не было изменений вернётся 0
-        proxy по умолчанию пусто
-        cooldown по умолчанию 5 * 60
+
+            {'proxy':proxy(str), 'guild':guild(int), 'channel': channel(int), 'language': language(str),
+            'last_message_time': last_message_time(int, timestamp), 'cooldown': cooldown(int, seconds)}
+            если токена нет приходит пустой словарь
+            guild, channel по умолчанию 0 если не было изменений вернётся 0
+            proxy по умолчанию пусто
+            cooldown по умолчанию 5 * 60
         """
         result = {}
         data: 'UserTokenDiscord' = cls.get_or_none(cls.token == token)
@@ -563,13 +564,13 @@ class UserTokenDiscord(BaseModel):
 
     @classmethod
     @logger.catch
-    def get_number_of_free_slots_for_tokens(cls, telegram_id: str) -> bool:
+    def get_number_of_free_slots_for_tokens(cls, telegram_id: str) -> int:
         """
         Вернуть количество свободных мест для размещения токенов
         """
-        user_id = User.get_user_by_telegram_id(telegram_id)
-        max_tokens = User.get_max_tokens(telegram_id)
-        all_token = cls.get_all_user_tokens(cls.user == user_id)
+        max_tokens: int = User.get_max_tokens(telegram_id)
+        all_token: list = cls.get_all_user_tokens(telegram_id)
+
         return max_tokens - len(all_token)  # TODO Use count
 
 
