@@ -402,7 +402,7 @@ class MessageReceiver:
         """Получает данные из АПИ, выбирает случайное сообщение и возвращает ID сообщения
         и само сообщение"""
 
-        result = {"work": False}
+        result = {"work": False, "message": "no messages"}
         selected_data: dict = cls.__select_token_for_work(datastore=datastore)
         result_message: str = selected_data["message"]
         token: str = selected_data.get("token", None)
@@ -412,7 +412,6 @@ class MessageReceiver:
 
             data: List[dict] = cls.__get_data_from_api(datastore=datastore)
             if not data:
-                result.update({"message": "no messages"})
                 return result
             result_data: dict = cls.__get_random_message(data)
             id_message: int = int(result_data["id"])

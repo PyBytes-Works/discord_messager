@@ -149,12 +149,16 @@ async def start_command_handler(message: Message, state: FSMContext) -> None:
     """Получает случайное сообщение из дискорда, ставит машину состояний в положение
     'жду ответа пользователя'
     """
-
+    user_telegram_id = message.from_user.id
+    if not UserTokenDiscord.get_all_user_tokens(user_telegram_id):
+        await message.answer("Сначала добавь токен.", reply_markup=user_menu_keyboard())
+        await state.finish()
+        return
     await message.answer("Начинаю получение данных", reply_markup=cancel_keyboard())
     print("Создаю экземпляр класса-хранилища")
-    new_store = DataStore(message.from_user.id)
+    new_store = DataStore(user_telegram_id)
     print("Добавляю его в общее хранилище")
-    users_data_storage.add_or_update(telegram_id=message.from_user.id, data=new_store)
+    users_data_storage.add_or_update(telegram_id=user_telegram_id, data=new_store)
     print("Отправляю запрос к АПИ")
     answer = MessageReceiver.get_message(new_store)
     if answer.get("message", "no messages") == "no messages":
@@ -203,7 +207,7 @@ async def default_message(message: Message) -> None:
     if User.is_active(message.from_user.id):
         await message.answer(
             'Доступные команды\n'
-            '/start - Активирует бота.',
+            '/start parsing - Активирует бота.',
             reply_markup=user_menu_keyboard()
         )
 
@@ -217,7 +221,7 @@ def register_handlers(dp: Dispatcher) -> None:
         cancel_handler, commands=['отмена', 'cancel'], state="*")
     dp.register_message_handler(
         cancel_handler, Text(startswith=["отмена", "cancel"], ignore_case=True), state="*")
-    dp.register_message_handler(start_command_handler, commands=["start", "старт"])
+    dp.register_message_handler(start_command_handler, commands=["start parsing", "старт"])
     dp.register_message_handler(start_command_handler, state=UserState.user_start_game)
     dp.register_message_handler(invitation_add_discord_token_handler, commands=["at", "addtoken", "add_token"])
     dp.register_message_handler(add_discord_token_handler, state=UserState.user_add_token)
