@@ -150,6 +150,8 @@ async def start_command_handler(message: Message, state: FSMContext) -> None:
     'жду ответа пользователя'
     """
     user_telegram_id = message.from_user.id
+    if not User.is_active(telegram_id=user_telegram_id):
+        return
     if not UserTokenDiscord.get_all_user_tokens(user_telegram_id):
         await message.answer("Сначала добавь токен.", reply_markup=user_menu_keyboard())
         await state.finish()
@@ -207,7 +209,7 @@ async def default_message(message: Message) -> None:
     if User.is_active(message.from_user.id):
         await message.answer(
             'Доступные команды\n'
-            '/start parsing - Активирует бота.',
+            '/start_parsing - Активирует бота.',
             reply_markup=user_menu_keyboard()
         )
 
@@ -221,7 +223,7 @@ def register_handlers(dp: Dispatcher) -> None:
         cancel_handler, commands=['отмена', 'cancel'], state="*")
     dp.register_message_handler(
         cancel_handler, Text(startswith=["отмена", "cancel"], ignore_case=True), state="*")
-    dp.register_message_handler(start_command_handler, commands=["start parsing", "старт"])
+    dp.register_message_handler(start_command_handler, commands=["start_parsing", "старт"])
     dp.register_message_handler(start_command_handler, state=UserState.user_start_game)
     dp.register_message_handler(invitation_add_discord_token_handler, commands=["at", "addtoken", "add_token"])
     dp.register_message_handler(add_discord_token_handler, state=UserState.user_add_token)
