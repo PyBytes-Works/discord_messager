@@ -20,6 +20,9 @@ vova = os.getenv("VOVA_TELEGRAM_ID")
 # admins_list = [deskent, artem, vova]
 admins_list = [deskent]
 
+DEFAULT_PROXY = os.getenv("DEFAULT_PROXY")
+
+
 tgToken = os.getenv("TELEBOT_TOKEN")
 
 # configure bot

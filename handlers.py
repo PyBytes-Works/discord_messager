@@ -4,7 +4,7 @@ from aiogram.dispatcher.filters import Text
 from aiogram.types import Message, CallbackQuery, ReplyKeyboardRemove
 from aiogram.dispatcher import FSMContext
 
-from config import logger, Dispatcher
+from config import logger, Dispatcher, DEFAULT_PROXY
 from models import User, UserTokenDiscord
 from keyboards import cancel_keyboard, user_menu_keyboard
 from discord_handler import MessageReceiver, DataStore, MessageSender, users_data_storage
@@ -117,7 +117,7 @@ async def add_language_handler(message: Message, state: FSMContext) -> None:
     token = data.get('token')
     guild = data.get('guild')
     channel = data.get('channel')
-    proxy = data.get('proxy')
+    proxy = DEFAULT_PROXY
 
     result = await DataStore.check_user_data(token, proxy, channel)
     if result.get('token') == 'bad token':
