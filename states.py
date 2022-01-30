@@ -11,3 +11,7 @@ class UserState(StatesGroup):
     user_add_proxy = State()
     user_add_language = State()
     user_start_game = State()
+    name_for_cr = State()
+    name_for_del = State()
+    name_for_activate = State()
+    name_for_admin = State()
