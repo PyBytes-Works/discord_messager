@@ -20,7 +20,7 @@ vova = os.getenv("VOVA_TELEGRAM_ID")
 # admins_list = [deskent, artem, vova]
 admins_list = [deskent]
 
-tgToken = os.getenv("DESKENT_TELEBOT_TOKEN")
+tgToken = os.getenv("TELEBOT_TOKEN")
 
 # configure bot
 bot = Bot(token=tgToken)

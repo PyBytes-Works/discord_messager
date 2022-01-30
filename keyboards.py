@@ -76,7 +76,7 @@ def user_menu_keyboard() -> 'ReplyKeyboardMarkup':
     )
 
     keyboard.row(
-        KeyboardButton("/start"),
+        KeyboardButton("/start parsing"),
         # KeyboardButton("/stop"),
     )
     keyboard.row(
