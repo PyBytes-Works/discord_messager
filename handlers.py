@@ -21,14 +21,14 @@ async def cancel_handler(message: Message, state: FSMContext) -> None:
     user = message.from_user.id
     logger.info(f'CANCELED')
     await state.finish()
-    await message.answer("Ввод отменен.")
+    await message.answer("Ввод отменен.", reply_markup=user_menu_keyboard())
     User.set_user_is_not_work(user)
 
 
 @logger.catch
 async def invitation_add_discord_token_handler(message: Message) -> None:
     """Запрос discord-токена """
-    print(message.from_user.id)
+    # print(message.from_user.id)
     user = message.from_user.id
     if User.is_active(telegram_id=user):
         if UserTokenDiscord.get_number_of_free_slots_for_tokens(user):
@@ -119,25 +119,21 @@ async def add_language_handler(message: Message, state: FSMContext) -> None:
     guild = data.get('guild')
     channel = data.get('channel')
     proxy = data.get('proxy')
-    result = DataStore.check_user_data(token, proxy, channel)
-    if result.get('token', 'bad token') == 'bad token':
+    result = await DataStore.check_user_data(token, proxy, channel)
+    if result.get('token') == 'bad token':
         await message.answer(
-                                "токен не добавлен повторите ввод", reply_markup=cancel_keyboard())
+            "Ваш токен не прошел проверку в данном канале. "
+            "\nЛибо канал не существует либо токен отсутствует данном канале. ",
+            reply_markup=cancel_keyboard()
+        )
         await UserState.user_add_token.set()
         return
-
-    if result.get('channel', 'bad channel') == 'bad channel':
-        await message.answer(
-                                "токен не добавлен повторите ввод ссылки на канал",
-                                reply_markup=cancel_keyboard())
-        await UserState.user_add_channel.set()
-        return
-    if result.get('proxy', 'bad proxy') == 'bad proxy':
-        await message.answer(
-                                "токен не добавлен повторите ввод proxy",
-                                reply_markup=user_menu_keyboard())
-        await UserState.user_add_proxy.set()
-        return
+    # if result.get('proxy', 'bad proxy') == 'bad proxy':
+    #     await message.answer(
+    #                             "токен не добавлен повторите ввод proxy",
+    #                             reply_markup=user_menu_keyboard())
+        # await UserState.user_add_proxy.set()
+        # return
 
     UserTokenDiscord.add_token_by_telegram_id(user, token, proxy, guild, channel, language)
     await message.answer(
@@ -149,7 +145,7 @@ async def add_language_handler(message: Message, state: FSMContext) -> None:
 
 
 @logger.catch
-async def start_command_handler(message: Message) -> None:
+async def start_command_handler(message: Message, state: FSMContext) -> None:
     """Получает случайное сообщение из дискорда, ставит машину состояний в положение
     'жду ответа пользователя'
     """
@@ -157,16 +153,19 @@ async def start_command_handler(message: Message) -> None:
     await message.answer("Начинаю получение данных", reply_markup=cancel_keyboard())
     print("Создаю экземпляр класса-хранилища")
     new_store = DataStore(message.from_user.id)
-    # TODO написать заполнение данных этого хранилища
-
     print("Добавляю его в общее хранилище")
     users_data_storage.add_or_update(telegram_id=message.from_user.id, data=new_store)
     print("Отправляю запрос к АПИ")
-    text = MessageReceiver.get_message(new_store)
-    print("Получаю ответ", text)
-    await message.answer(f"Данные получены:"
-                         f"\nСообщение: {text}")
-    await UserState.user_wait_message.set()
+    answer = MessageReceiver.get_message(new_store)
+    text = answer.get("message", "ERROR")
+    if answer.get("work", False):
+        print("Получаю ответ", text)
+        await message.answer(f"Данные получены:"
+                             f"\nСообщение: {text}")
+        await UserState.user_wait_message.set()
+    else:
+        await message.answer(text, reply_markup=user_menu_keyboard())
+        await state.finish()
 
 
 @logger.catch
@@ -194,7 +193,8 @@ async def default_message(message: Message) -> None:
     if User.is_active(message.from_user.id):
         await message.answer(
             'Доступные команды\n'
-            '/start - Активирует бота.'
+            '/start - Активирует бота.',
+            reply_markup=user_menu_keyboard()
         )
 
 

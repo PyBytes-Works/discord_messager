@@ -90,14 +90,18 @@ class DataStore:
 
         Save valid data to instance variables """
 
-        result = {"token": "bad token"}
+        result = {}
         async with aiohttp.ClientSession() as session:
             session.headers['authorization'] = token
-            result["channel"] = await cls.__check_channel(session=session, token=token, channel=channel)
-            if result["channel"] != "bad channel":
-                result["proxy"] = await cls.__check_proxy(session=session, proxy=proxy)
-                if result["proxy"] != "bad proxy":
-                    result["token"] = await cls.__check_token(session=session, token=token, proxy=proxy, channel=channel)
+            # result["channel"] = await cls.__check_channel(session=session, token=token, channel=channel)
+            # if result["channel"] == "bad channel":
+            #     return result
+                # result["proxy"] = await cls.__check_proxy(session=session, proxy=proxy)
+                # if result["proxy"] != "bad proxy":
+            result["token"] = await cls.__check_token(session=session, token=token, proxy=proxy, channel=channel)
+            if result["token"] != "bad token":
+                result["channel"] = channel
+                result["proxy"] = proxy
 
         return result
 
@@ -115,7 +119,7 @@ class DataStore:
                     result = channel
         except cls.__EXCEPTIONS as err:
             logger.info(f"Channel check Error: {err}")
-
+        print(f"CHECK CHANNEL RESULT: {result}")
         return result
 
     @classmethod
@@ -136,19 +140,27 @@ class DataStore:
     @classmethod
     async def __check_token(cls, session, token: str, proxy: str, channel: int) -> str:
         """Returns valid token else 'bad token'"""
-
         session.headers['authorization'] = token
         limit = 1
         url = cls.__DISCORD_BASE_URL + f'{channel}/messages?limit={limit}'
         result = 'bad token'
         try:
-            async with session.get(url=url, proxy=f"http://{proxy}", ssl=False, timeout=3) as response:
+            # async with session.get(url=url, proxy=f"http://{proxy}", ssl=False, timeout=3) as response:
+            async with session.get(url=url, ssl=False, timeout=3) as response:
                 if response.status == 200:
                     result = token
         except cls.__EXCEPTIONS as err:
             logger.info(f"Token check Error: {err}")
 
         return result
+
+    def save_token_data(self, token: str):
+        self.token = token
+        token_data = UserTokenDiscord.get_info_by_token(token)
+        self.proxy = token_data.get("proxy")
+        self.channel = token_data.get("channel")
+        self.language = token_data.get("language")
+        self.guild = token_data.get("guild")
 
     @property
     def message_time(self) -> int:
@@ -278,7 +290,7 @@ class MessageReceiver:
         url = datastore.channel_url + f'{datastore.channel}/messages?limit={limit}'
         response = session.get(url=url)
         status_code = response.status_code
-        print(response.text, status_code)
+        # print(response.text, status_code)
         result = {}
         if status_code == 200:
             try:
@@ -289,7 +301,7 @@ class MessageReceiver:
                 print(f"Data requested {limit}\n"
                       f"Data received: {len(data)}")
                 save_data_to_json(data)
-                result = cls.__data_filter(data=data, length=datastore.length)
+                result = cls.__data_filter(data=data, datastore=datastore)
                 save_data_to_json(result, "formed.json")
         else:
             logger.error(f"API request error: {status_code}")
@@ -298,23 +310,26 @@ class MessageReceiver:
 
     @classmethod
     @logger.catch
-    def __data_filter(cls, data: dict, length: int) -> list:
+    def __data_filter(cls, data: dict, datastore: 'DataStore') -> list:
         result = []
         summa = 0
 
         for elem in data:
             message = elem.get("content")
-            if len(message) > length:
-                summa += len(message)
-                result.append(
-                    {
-                        "id": elem.get("id"),
-                        "message": message,
-                        "channel_id": elem.get("channel_id"),
-                        "author": elem.get("author"),
-                        "timestamp": elem.get("timestamp")
-                    }
-                )
+            message_time = elem.get("timestamp")
+            message_time = int(datetime.datetime.fromisoformat(message_time).timestamp())
+            if int(datetime.datetime.now().timestamp()) - message_time < datastore.message_time:
+                if len(message) > datastore.length:
+                    summa += len(message)
+                    result.append(
+                        {
+                            "id": elem.get("id"),
+                            "message": message,
+                            "channel_id": elem.get("channel_id"),
+                            "author": elem.get("author"),
+                            "timestamp": message_time
+                        }
+                    )
 
         middle_len = summa // len(data)
         print('Средняя длина сообщения:', middle_len)
@@ -324,14 +339,14 @@ class MessageReceiver:
 
     @classmethod
     @logger.catch
-    def __message_selector(cls, seq: list) -> dict:
+    def __get_random_message(cls, seq: list) -> dict:
         """Возвращает случайно выбранный словарь из списка"""
 
         return random.choice(tuple(seq))
 
     @classmethod
     @logger.catch
-    def __select_token_for_work(cls, telegram_id: str) -> dict:
+    def __select_token_for_work(cls, datastore: 'DataStore') -> dict:
         """
         Выбирает случайного токена дискорда из свободных, если нет свободных - пишет сообщение что
         свободных нет.
@@ -339,7 +354,7 @@ class MessageReceiver:
 
         cooldown = 300
         result = {"message": "token ready"}
-        all_tokens: List[dict] = UserTokenDiscord.get_all_user_tokens(telegram_id=telegram_id)
+        all_tokens: List[dict] = UserTokenDiscord.get_all_user_tokens(telegram_id=datastore.telegram_id)
         print(all_tokens)
         current_time = int(datetime.datetime.now().timestamp())
         tokens_for_job: list = [
@@ -352,15 +367,22 @@ class MessageReceiver:
         if tokens_for_job:
             random_token = random.choice(tokens_for_job)
             result["token"] = random_token
+            datastore.save_token_data(random_token)
 
         else:
             min_token_time = min(value["time"] for elem in all_tokens for value in elem.values())
             delay = cooldown - abs(min_token_time - current_time)
             text = "seconds"
             if delay > 60:
-                delay = f"{delay // 60}:{delay % 60}"
+                minutes = delay // 60
+                seconds = delay % 60
+                if minutes < 10:
+                    minutes = f"0{minutes}"
+                if seconds < 10:
+                    seconds = f'0{seconds}'
+                delay = f"{minutes}:{seconds}"
                 text = "minutes"
-            result["message"] = f"All tokens are busy. Please wait {delay} {text}."
+            result["message"] = f"В данный момент все токены заняты. Подождите {delay} {text}."
 
         return result
 
@@ -371,15 +393,15 @@ class MessageReceiver:
         и само сообщение"""
 
         result = {"work": False}
-        selected_data: dict = cls.__select_token_for_work(telegram_id=datastore.telegram_id)
+        selected_data: dict = cls.__select_token_for_work(datastore=datastore)
         result_message = selected_data["message"]
         token = selected_data.get("token", None)
         if token is not None:
             datastore.token = token
             cls.__get_data_from_api(datastore=datastore)
 
-            data: List[dict] = cls.__get_data_from_api()
-            result_data: dict = cls.__message_selector(data)
+            data: List[dict] = cls.__get_data_from_api(datastore=datastore)
+            result_data: dict = cls.__get_random_message(data)
             id_message: int = int(result_data["id"])
             result_message = result_data["message"]
 
@@ -389,7 +411,7 @@ class MessageReceiver:
                 result_message: str = cls.__translate_to_russian(result_message)
             print(f"\nID for reply: {id_message}"
                   f"\nMessage: {result_message}")
-
+            result["work"] = True
         result.update({"message": result_message})
 
         return result
