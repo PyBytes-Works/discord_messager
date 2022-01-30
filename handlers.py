@@ -1,46 +1,151 @@
 """Модуль с основными обработчиками команд, сообщений и коллбэков"""
-
+import re
 from aiogram.dispatcher.filters import Text
 from aiogram.types import Message, CallbackQuery, ReplyKeyboardRemove
 from aiogram.dispatcher import FSMContext
 
 from config import logger, Dispatcher
-from models import User
-from keyboards import cancel_keyboard
+from models import User, UserTokenDiscord
+from keyboards import cancel_keyboard, user_menu_keyboard
 from discord_handler import MessageReceiver, DataStore, MessageSender, users_data_storage
 from states import UserState
+from utils import str_to_int
 
 
 @logger.catch
 async def cancel_handler(message: Message, state: FSMContext) -> None:
     """
     Отменяет текущие запросы и сбрасывает состояние.
-
+    Ставит пользователя в нерабочее состояние.
     """
+    user = message.from_user.id
     logger.info(f'CANCELED')
     await state.finish()
     await message.answer("Ввод отменен.")
+    User.set_user_is_not_work(user)
 
 
 @logger.catch
 async def invitation_add_discord_token_handler(message: Message) -> None:
-    if User.is_active(telegram_id=message.from_user.id):
-        await message.answer("Введите первый discord-токен", reply_markup=cancel_keyboard())
-    await UserState.user_add_token.set()
+    """Запрос discord-токена """
+    print(message.from_user.id)
+    user = message.from_user.id
+    if User.is_active(telegram_id=user):
+        if UserTokenDiscord.get_number_of_free_slots_for_tokens(user):
+            await message.answer("Введите discord-токен", reply_markup=cancel_keyboard())
+            await UserState.user_add_token.set()
+            return
+        await message.answer(
+            "Максимальное количество discord-токенов уже добавлено", reply_markup=user_menu_keyboard())
 
 
 @logger.catch
-async def add_discord_token_handler(message: Message) -> None:
+async def add_discord_token_handler(message: Message, state: FSMContext) -> None:
+    """ Получение токена запрос ссылки на канал"""
+
     token = message.text
-    if token:
-        pass
-        # TODO validation token
-        # TODO save token to DB for current user
+    await state.update_data(token=token)
     await message.answer(
-        "Введите следующий discord-токен или нажмите кнопку ОТМЕНА",
+        "Введите ссылку на канал (должна заканчиваться на 2 числа через /)",
         reply_markup=cancel_keyboard()
     )
-    return
+    await UserState.user_add_channel.set()
+
+
+@logger.catch
+async def add_channel_handler(message: Message, state: FSMContext) -> None:
+    """
+        получения ссылки на канал, запрос прокси
+    """
+    mess = message.text
+    guild, channel = mess.rsplit('/', maxsplit=3)[-2:]
+    guild = str_to_int(guild)
+    channel = str_to_int(channel)
+    if not guild or not channel:
+        await message.answer(
+            "Проверьте ссылку на канал и попробуйте ещё раз", reply_markup=cancel_keyboard())
+        return
+
+    await state.update_data(guild=guild, channel=channel)
+    await message.answer(
+        "Введите ip прокси (ip адрес:порт )", reply_markup=cancel_keyboard())
+    await UserState.user_add_proxy.set()
+
+
+@logger.catch
+async def add_proxy_handler(message: Message, state: FSMContext) -> None:
+    """
+        добавить прокси
+    """
+
+    proxy = message.text
+    proxy = re.match(r'\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}:\d{1,6}\b', proxy.strip())
+
+    if not proxy:
+        await message.answer(
+            "Проверьте proxy и попробуйте ещё раз", reply_markup=cancel_keyboard())
+        return
+
+    await state.update_data(proxy=proxy.string)
+    await message.answer(
+        "Добавьте language ru, es, en или другой)", reply_markup=cancel_keyboard())
+    await UserState.user_add_language.set()
+
+
+@logger.catch
+async def add_language_handler(message: Message, state: FSMContext) -> None:
+    """
+       проверка и запись, либо возврат в другое состояние
+    """
+
+    languages = ['az', 'sq', 'am', 'en', 'ar', 'hy', 'af', 'eu', 'ba', 'be', 'bn', 'my', 'bg',
+                 'bs', 'cy', 'hu', 'vi', 'ht', 'gl', 'nl', 'el', 'ka', 'gu', 'da', 'he', 'yi',
+                 'id', 'ga', 'it', 'is', 'es', 'kk', 'kn', 'ca', 'ky', 'zh', 'ko', 'xh', 'km',
+                 'lo', 'la', 'lv', 'lt', 'lb', 'mg', 'ms', 'ml', 'mt', 'mk', 'mi', 'mr', 'mn',
+                 'de', 'ne', 'no', 'pa', 'fa', 'pl', 'pt', 'ro', 'ru', 'sr', 'si', 'sk', 'sl',
+                 'sw', 'su', 'tg', 'th', 'tl', 'ta', 'tt', 'te', 'tr', 'uz', 'uk', 'ur', 'fi',
+                 'fr', 'hi', 'hr', 'cs', 'sv', 'gd', 'et', 'eo', 'jv', 'ja']
+
+    user = message.from_user.id
+    language = message.text
+    if language not in languages:
+        await message.answer(
+            "Язык не поддерживается попробуйте ещё раз ввести язык language ru, es, en или другой)",
+            reply_markup=cancel_keyboard())
+        return
+    data = await state.get_data()
+
+    token = data.get('token')
+    guild = data.get('guild')
+    channel = data.get('channel')
+    proxy = data.get('proxy')
+    result = DataStore.check_user_data(token, proxy, channel)
+    if result.get('token', 'bad token') == 'bad token':
+        await message.answer(
+                                "токен не добавлен повторите ввод", reply_markup=cancel_keyboard())
+        await UserState.user_add_token.set()
+        return
+
+    if result.get('channel', 'bad channel') == 'bad channel':
+        await message.answer(
+                                "токен не добавлен повторите ввод ссылки на канал",
+                                reply_markup=cancel_keyboard())
+        await UserState.user_add_channel.set()
+        return
+    if result.get('proxy', 'bad proxy') == 'bad proxy':
+        await message.answer(
+                                "токен не добавлен повторите ввод proxy",
+                                reply_markup=user_menu_keyboard())
+        await UserState.user_add_proxy.set()
+        return
+
+    UserTokenDiscord.add_token_by_telegram_id(user, token, proxy, guild, channel, language)
+    await message.answer(
+            "токен добавлен",
+            reply_markup=user_menu_keyboard())
+    await state.finish()
+
+##################
 
 
 @logger.catch
@@ -106,4 +211,8 @@ def register_handlers(dp: Dispatcher) -> None:
     dp.register_message_handler(invitation_add_discord_token_handler, commands=["at", "addtoken", "add_token"])
     dp.register_message_handler(add_discord_token_handler, state=UserState.user_add_token)
     dp.register_message_handler(send_to_discord, state=UserState.user_wait_message)
+    dp.register_message_handler(add_discord_token_handler, state=UserState.user_add_token)
+    dp.register_message_handler(add_channel_handler, state=UserState.user_add_channel)
+    dp.register_message_handler(add_proxy_handler, state=UserState.user_add_proxy)
+    dp.register_message_handler(add_language_handler, state=UserState.user_add_language)
     dp.register_message_handler(default_message)
