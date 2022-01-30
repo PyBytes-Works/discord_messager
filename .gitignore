@@ -10,3 +10,6 @@
 /data.json
 /formed.json
 /dis_tokens.json
+__pycache__/
+env
+iam_token.json
