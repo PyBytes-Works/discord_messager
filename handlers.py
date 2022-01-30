@@ -135,7 +135,7 @@ async def add_language_handler(message: Message, state: FSMContext) -> None:
         # await UserState.user_add_proxy.set()
         # return
 
-    UserTokenDiscord.add_token_by_telegram_id(user, token, proxy, guild, channel, language)
+    UserTokenDiscord.add_or_update_token_by_telegram_id(user, token, proxy, guild, channel, language)
     await message.answer(
             "токен добавлен",
             reply_markup=user_menu_keyboard())
