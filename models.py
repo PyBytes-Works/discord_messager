@@ -383,7 +383,7 @@ class UserTokenDiscord(BaseModel):
 
     @classmethod
     @logger.catch
-    def add_token_by_telegram_id(
+    def add_or_update_token_by_telegram_id(
                                     cls,
                                     telegram_id: str,
                                     token: str,
@@ -392,7 +392,6 @@ class UserTokenDiscord(BaseModel):
                                     channel: int,
                                     language: str = 'en',
                                     cooldown: int = 60 * 5
-
                                  ) -> bool:
 
         """
@@ -402,8 +401,18 @@ class UserTokenDiscord(BaseModel):
         если нет такого пользователя None
         """
         user_id = User.get_user_by_telegram_id(telegram_id)
-        all_token = cls.get_all_user_tokens(telegram_id)
         if user_id:
+            token = UserTokenDiscord.get_or_none(cls.token == token)
+            if token:
+                return cls.update(
+                    proxy=proxy,
+                    guild=guild,
+                    channel=channel,
+                    language=language,
+                    cooldown=cooldown
+                ).where(cls.token == token).execute()
+
+            all_token = cls.get_all_user_tokens(telegram_id)
             max_tokens = User.get_max_tokens(telegram_id)
             if max_tokens > len(all_token):
                 new_token = {
