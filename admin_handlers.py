@@ -39,7 +39,7 @@ async def set_user_admin_handler(message: Message, state: FSMContext) -> None:
     await state.finish()
 #
 #
-from utils import get_token, add_new_token, delete_used_token, send_report_to_admins
+from utils import get_token, add_new_token, delete_used_token, send_report_to_admins, check_is_int
 
 
 @logger.catch
@@ -62,10 +62,23 @@ async def admin_help_handler(message: Message) -> None:
 
 
 @logger.catch
-async def add_new_user_name_handler(message: Message) -> None:
+async def max_user_request_handler(message: Message) -> None:
     """Обработчик для создания нового пользователя. Команда /add_user"""
-    # TODO запросить максимальное кол-во токенов
     if User.is_admin(telegram_id=message.from_user.id):
+        await message.answer('Сколько максимум токенов будет у пользователя?', reply_markup=cancel_keyboard())
+        await UserState.max_tokens_req.set()
+    else:
+        logger.info(f'{message.from_user.id}:{message.from_user.username}: NOT AUTORIZATED')
+
+
+@logger.catch
+async def add_new_user_name_handler(message: Message, state: FSMContext) -> None:
+    if User.is_admin(telegram_id=message.from_user.id):
+        max_tokens = check_is_int(message.text)
+        if max_tokens is None:
+            await message.answer('Число должно быть целым положительным. Введите еще раз.: ', reply_markup=cancel_keyboard())
+            return
+        await state.update_data(max_tokens=max_tokens)
         await message.answer('Введите имя для нового пользователя: ', reply_markup=cancel_keyboard())
         await UserState.name_for_cr.set()
     else:
@@ -86,11 +99,20 @@ async def add_new_user_handler(message: Message, state: FSMContext) -> None:
     if len(name) > 20:
         await message.answer('Имя пользователя не должно превышать 20 символов. Введите заново.')
         return
+    state_data = await state.get_data()
+    max_tokens = state_data.get("max_tokens", 0)
     new_token: str = get_token(key="user")
-    tokens: dict = {new_token: name}
+    tokens: dict = {
+        new_token: {
+            name: max_tokens
+        }
+    }
     add_new_token(tokens)
     await message.answer(
-        f"Токен для нового пользователя {name}: {new_token}", reply_markup=user_menu_keyboard())
+        f"Токен для нового пользователя {name}: {new_token}"
+        f"\nМаксимум токенов: {max_tokens}",
+        reply_markup=user_menu_keyboard()
+    )
     await state.finish()
 
 
@@ -148,6 +170,40 @@ async def activate_new_user_handler(message: Message) -> None:
 
 
 @logger.catch
+async def add_user_to_db_by_token(message: Message, state: FSMContext) -> None:
+    """Обработчик создания инициализации активации нового пользователя"""
+
+    user_data: dict = delete_used_token(message.text)
+    if not user_data:
+        await send_report_to_admins("При чтении токена для создания нового пользователя из файла произошла ошибка.")
+    user_name = tuple(user_data.keys())[0]
+    max_tokens = user_data[user_name]
+    if user_name and max_tokens:
+        user_telegram_id = message.from_user.id
+        user_created = User.add_new_user(telegram_id=user_telegram_id, nick_name=user_name)
+        if not user_created:
+            await send_report_to_admins(
+                text=f"Пользователь {user_name} : ID: {user_telegram_id} уже существует."
+            )
+            await message.answer('Пользователь уже существует.')
+        else:
+            tokens_set = User.set_max_tokens(telegram_id=user_telegram_id, max_tokens=max_tokens)
+            if tokens_set:
+                await message.answer(
+                    'Поздравляю, вы добавлены в БД'
+                    f'\nВам назначен лимит в {max_tokens} токенов.',
+                    reply_markup=user_menu_keyboard()
+                )
+                await send_report_to_admins(
+                    text=f"Пользователь {user_name} : ID: {user_telegram_id} добавлен в БД."
+                         f"\nМаксимальное количество токенов: {max_tokens}",
+                )
+            else:
+                await send_report_to_admins("Произошла ошибка при добавлении нового пользователя.")
+    await state.finish()
+
+
+@logger.catch
 async def set_user_max_tokens_handler(message: Message) -> None:
     """Обработчик команды /set_tokens для авторизации нового пользователя"""
     # TODO написать !!!
@@ -163,29 +219,6 @@ async def set_user_max_tokens_handler(message: Message) -> None:
 
 
 @logger.catch
-async def add_user_to_db_by_token(message: Message, state: FSMContext) -> None:
-    """Обработчик создания инициализации активации нового пользователя"""
-
-    user: str = delete_used_token(message.text)
-    if user:
-        user_id = message.from_user.id
-        if not User.add_new_user(telegram_id=user_id, nick_name=user):
-            await send_report_to_admins(
-                text=f"Пользователь {user} : ID: {user_id} уже существует."
-            )
-        else:
-            await message.answer(
-                'Поздравляю, вы добавлены в БД рассылки. '
-                'Введите команду /lots или отправьте любое сообщение для вызова помощи.',
-                reply_markup=user_menu_keyboard()
-            )
-            await send_report_to_admins(
-                text=f"Пользователь {user} : ID: {user_id} добавлен в БД.",
-            )
-    await state.finish()
-
-
-@logger.catch
 def register_admin_handlers(dp: Dispatcher) -> None:
     """
     Регистратор для функций данного модуля
@@ -195,7 +228,8 @@ def register_admin_handlers(dp: Dispatcher) -> None:
         cancel_handler, Text(startswith=["отмена", "cancel"], ignore_case=True), state="*")
     dp.register_message_handler(
         add_user_to_db_by_token, Text(startswith=["new_user_"]), state=UserState.name_for_activate)
-    dp.register_message_handler(add_new_user_name_handler, commands=['add_user'])
+    dp.register_message_handler(max_user_request_handler, commands=['add_user'])
+    dp.register_message_handler(add_new_user_name_handler, state=UserState.max_tokens_req)
     dp.register_message_handler(
         activate_new_user_handler, commands=['ua'])
     dp.register_message_handler(admin_help_handler, commands=['admin'])

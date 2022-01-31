@@ -15,3 +15,4 @@ class UserState(StatesGroup):
     name_for_del = State()
     name_for_activate = State()
     name_for_admin = State()
+    max_tokens_req = State()

@@ -22,16 +22,12 @@ def save_data_to_txt(data: Union[dict, list], file_name: str = "data.json"):
     print(file_name, "saved.")
 
 
-def str_to_int(text: str) -> int:
-    """
-    перевод строки в число
-    если что не так вернёт None
-    """
-    if text.isdecimal():
-        try:
+def check_is_int(text: str) -> int:
+    """Проверяет что в строке пришло положительное число и возвращает его обратно если да"""
+
+    if text.isdigit():
+        if int(text) >= 0:
             return int(text)
-        except ValueError as exc:
-            pass
 
 
 @logger.catch
@@ -61,10 +57,10 @@ def add_new_token(tokens: dict) -> None:
 
 
 @logger.catch
-def delete_used_token(token: str) -> str:
+def delete_used_token(token: str) -> dict:
     """Удаляет использованный токен из файла, возвращает имя пользователя"""
 
-    user_name = ''
+    user_data = {}
     tokens = {}
     if os.path.exists("tokens.json"):
         with open("tokens.json", "r", encoding="utf-8") as f:
@@ -72,12 +68,12 @@ def delete_used_token(token: str) -> str:
             if data:
                 tokens = json.loads(data)
                 if token in tokens:
-                    user_name = tokens.pop(token)
+                    user_data = tokens.pop(token)
 
     with open("tokens.json", "w", encoding="utf-8") as f:
         json.dump(tokens, f, indent=4, ensure_ascii=False)
 
-    return user_name
+    return user_data
 
 
 async def send_report_to_admins(text: str) -> None:
