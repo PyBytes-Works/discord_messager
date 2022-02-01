@@ -99,7 +99,7 @@ async def add_discord_token_handler(message: Message, state: FSMContext) -> None
 @logger.catch
 async def add_channel_handler(message: Message, state: FSMContext) -> None:
     """
-        Получение ссылки на канал, запрос языка
+        получения ссылки на канал, запрос discord_id
     """
     mess = message.text
     guild, channel = mess.rsplit('/', maxsplit=3)[-2:]
@@ -111,6 +111,43 @@ async def add_channel_handler(message: Message, state: FSMContext) -> None:
         return
 
     await state.update_data(guild=guild, channel=channel)
+    await message.answer(
+        "введите discord_id", reply_markup=cancel_keyboard())
+    await UserState.user_add_discord_id.set()
+
+
+# @logger.catch
+# async def add_proxy_handler(message: Message, state: FSMContext) -> None:
+#     """
+#         добавить прокси
+#     """
+#
+#     proxy = message.text
+#     proxy = re.match(r'\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}:\d{1,6}\b', proxy.strip())
+#     if not proxy:
+#         await message.answer(
+#             "Проверьте proxy и попробуйте ещё раз", reply_markup=cancel_keyboard())
+#         return
+#
+#     await state.update_data(proxy=proxy.string)
+#     await message.answer(
+#         "Добавьте language ru, es, en или другой)", reply_markup=cancel_keyboard())
+#     await UserState.user_add_language.set()
+
+@logger.catch
+async def add_discord_id_handler(message: Message, state: FSMContext) -> None:
+    """
+        добавить discord_id
+    """
+
+    discord_id = message.text
+    token = UserTokenDiscord.get_token_by_discord_id(discord_id)
+    if not discord_id or token:
+        await message.answer(
+            "Проверьте discord_id и попробуйте ещё раз", reply_markup=cancel_keyboard())
+        return
+
+    await state.update_data(discord_id=discord_id)
     await message.answer(
         "Выберите основной язык канала: ru, es, en или другой)", reply_markup=cancel_keyboard())
     await UserState.user_add_language.set()
@@ -141,6 +178,7 @@ async def add_language_handler(message: Message, state: FSMContext) -> None:
 
     token = data.get('token')
     guild = data.get('guild')
+    discord_id = data.get('discord_id')
     channel = data.get('channel')
     # Здесь должна быть функция случайного выбора прокси и назначения ее для токена
     proxy = DEFAULT_PROXY
@@ -155,11 +193,57 @@ async def add_language_handler(message: Message, state: FSMContext) -> None:
         await UserState.user_add_token.set()
         return
 
-    UserTokenDiscord.add_or_update_token_by_telegram_id(user, token, proxy, guild, channel, language)
-    await message.answer(
-            "Токен добавлен",
+    token = UserTokenDiscord.add_or_update_token_by_telegram_id(user, discord_id, token, proxy, guild, channel, language)
+    if token:
+        await message.answer(
+                "Токен добавлен",
+                reply_markup=user_menu_keyboard())
+    else:
+        await message.answer(
+            "что то прошло не так, токен не добавлен",
             reply_markup=user_menu_keyboard())
     await state.finish()
+
+#
+# @logger.catch
+# async def add_proxy_handler(message: Message) -> None:
+#     """
+#         get info
+#     """
+#     if User.is_active(message.from_user.id):
+#
+#         user = message.from_user.id
+#         tokens = UserTokenDiscord.get_all_user_tokens(user)
+#         if tokens:
+#             token = UserTokenDiscord.get_info_by_token(tokens[0][[0].items()])
+#             mess = (f'токен{token.get("token")} канал {token.get("channel")} гильдия '
+#                     f'{token.get("guild")} colldown {token.get("colldown")}language{token.get("language")}')
+#             await message.answer(
+#                 "mess", reply_markup=user_menu_keyboard())
+#
+#         await message.answer(
+#                 "Не обнаружено токенов", reply_markup=user_menu_keyboard())
+
+
+@logger.catch
+async def info_tokens_handler(message: Message, state: FSMContext) -> None:
+    """выводит инфо о токенах
+    TODO нужны тесты
+    """
+    user = message.from_user.id
+    if User.is_active(message.from_user.id):
+        data = UserTokenDiscord.get_all_info_tokens(user)
+        print(data)
+        for token_info in data:
+            token = token_info.get('token')
+            channel = token_info.get('channel')
+            discord_id = token_info.get('discord_id')
+            mate_id = token_info.get('mate_id')
+            cooldown = token_info.get('cooldown')
+            await message.answer(
+                f"токен {token} канал {channel} дискорд id {discord_id} id пары  {mate_id} куллдаун {cooldown}",
+                reply_markup=user_menu_keyboard()
+            )
 
 
 @logger.catch
@@ -250,6 +334,7 @@ def register_handlers(dp: Dispatcher) -> None:
     dp.register_message_handler(
         cancel_handler, Text(startswith=["отмена", "cancel"], ignore_case=True), state="*")
     dp.register_message_handler(start_command_handler, commands=["start_parsing", "старт"])
+    dp.register_message_handler(info_tokens_handler, commands=["info"])
     dp.register_message_handler(start_command_handler, state=UserState.user_start_game)
     dp.register_message_handler(invitation_add_discord_token_handler, commands=["at", "addtoken", "add_token"])
     dp.register_message_handler(get_all_tokens_handler, commands=["set_cooldown"])
@@ -259,6 +344,6 @@ def register_handlers(dp: Dispatcher) -> None:
     dp.register_message_handler(send_to_discord, state=UserState.user_wait_message)
     dp.register_message_handler(add_discord_token_handler, state=UserState.user_add_token)
     dp.register_message_handler(add_channel_handler, state=UserState.user_add_channel)
-    # dp.register_message_handler(add_proxy_handler, state=UserState.user_add_proxy)
+    dp.register_message_handler(add_discord_id_handler, state=UserState.user_add_discord_id)
     dp.register_message_handler(add_language_handler, state=UserState.user_add_language)
     dp.register_message_handler(default_message)
