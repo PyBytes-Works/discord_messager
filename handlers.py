@@ -153,6 +153,45 @@ async def add_language_handler(message: Message, state: FSMContext) -> None:
 
 
 @logger.catch
+async def add_proxy_handler(message: Message) -> None:
+    """
+        get info
+    """
+    if User.is_active(message.from_user.id):
+
+        user = message.from_user.id
+        tokens = UserTokenDiscord.get_all_user_tokens(user)
+        if tokens:
+            token = UserTokenDiscord.get_info_by_token(tokens[0][[0].items()])
+            mess = (f'токен{token.get("token")} канал {token.get("channel")} гильдия '
+                    f'{token.get("guild")} colldown {token.get("colldown")}language{token.get("language")}')
+            await message.answer(
+                "mess", reply_markup=user_menu_keyboard())
+
+        await message.answer(
+                "Не обнаружено токенов", reply_markup=user_menu_keyboard())
+
+
+@logger.catch
+async def info_tokens_handler(message: Message, state: FSMContext) -> None:
+    """выводит инфо о токенах
+    TODO нужны тесты
+    """
+
+    user = message.from_user.id
+    if User.is_active(message.from_user.id):
+        data = UserTokenDiscord.get_all_info_tokens(user)
+        for token_info in data:
+            token = token_info.get('token')
+            channel = token_info.get('channel')
+            cooldown = token_info.get('cooldown')
+            await message.answer(
+                    f"токен {token} канал {channel}  куллдаун{cooldown}",
+                    reply_markup=user_menu_keyboard()
+                )
+
+
+@logger.catch
 async def start_command_handler(message: Message, state: FSMContext) -> None:
     """Получает случайное сообщение из дискорда, ставит машину состояний в положение
     'жду ответа пользователя'
@@ -240,6 +279,7 @@ def register_handlers(dp: Dispatcher) -> None:
     dp.register_message_handler(
         cancel_handler, Text(startswith=["отмена", "cancel"], ignore_case=True), state="*")
     dp.register_message_handler(start_command_handler, commands=["start_parsing", "старт"])
+    dp.register_message_handler(info_tokens_handler, commands=["info"])
     dp.register_message_handler(start_command_handler, state=UserState.user_start_game)
     dp.register_message_handler(invitation_add_discord_token_handler, commands=["at", "addtoken", "add_token"])
     # dp.register_message_handler(set_self_token_cooldown_handler, commands=["set_cooldown"])
