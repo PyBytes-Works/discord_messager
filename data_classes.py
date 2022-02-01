@@ -28,7 +28,7 @@ class DataStore:
     )
 
     def __init__(self, telegram_id: str):
-        self.__telegram_id: str = telegram_id
+        self.telegram_id: str = telegram_id
         self.__CURRENT_MESSAGE_ID: int = 0
         self.__CURRENT_TIME_MESSAGE: float = 0
         self.__DISCORD_USER_TOKEN: str = ''
