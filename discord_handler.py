@@ -3,11 +3,11 @@ import os
 import random
 from typing import List
 import json
+
 import asyncio
 from json.decoder import JSONDecodeError
 import aiohttp
 import aiohttp.client_exceptions
-
 import requests
 from requests.exceptions import (
     Timeout,
@@ -84,6 +84,7 @@ class DataStore:
         self.__GUILD: int = 0
         self.__MAX_TIME_MESSAGE_VALUE: int = 600
         self.__TOKEN_COOLDOWN: int = 0
+        self.__RELATED_ACCOUNT_ID: int = 0
 
     @classmethod
     async def check_user_data(cls, token: str, proxy: str, channel: int) -> dict:
@@ -156,16 +157,26 @@ class DataStore:
         self.proxy = token_data.get("proxy")
         self.channel = token_data.get("channel")
         self.language = token_data.get("language")
-        self.guild = token_data.get("guild")
-        self.cooldown = token_data.get("cooldown")
+        self.guild: int = token_data.get("guild")
+        self.cooldown: int = token_data.get("cooldown")
+        self.max_message_time: int = self.cooldown + 10
+        self.mate_id: str = token_data.get("???")
 
     @property
-    def message_time(self) -> int:
+    def mate_id(self) -> int:
+        return self.__RELATED_ACCOUNT_ID
+
+    @mate_id.setter
+    def mate_id(self, mate_id: int):
+        self.__RELATED_ACCOUNT_ID = mate_id
+
+    @property
+    def max_message_time(self) -> int:
         return self.__MAX_TIME_MESSAGE_VALUE
 
-    @message_time.setter
-    def message_time(self, message_time: int):
-        self.__MAX_TIME_MESSAGE_VALUE = message_time
+    @max_message_time.setter
+    def max_message_time(self, max_message_time: int):
+        self.__MAX_TIME_MESSAGE_VALUE = max_message_time
 
     @property
     def cooldown(self) -> int:
@@ -256,9 +267,26 @@ class UserDataStore:
     для каждого пользователя телеграма.
     Инициализируется при запуске бота.
     """
+    __VOCABULARY: list = []
 
     def __init__(self):
         self.__instance = {}
+
+    @classmethod
+    @logger.catch
+    def update_vocabulary(cls, file_name: str = "vocabulary_en.txt"):
+        if not cls.__VOCABULARY:
+            with open(file_name, 'r', encoding='utf-8') as f:
+                cls.__VOCABULARY = f.readlines()
+
+    @property
+    @logger.catch
+    def vocabulary(self):
+        spam = self.__VOCABULARY
+        if not spam:
+            self.update_vocabulary()
+
+        return self.__VOCABULARY
 
     @logger.catch
     def get_instance(self, telegram_id: str) -> 'DataStore':
@@ -306,10 +334,11 @@ class MessageReceiver:
             except Exception as err:
                 logger.error(f"JSON ERROR: {err}")
             else:
-                print(f"Data requested {limit}\n"
-                      f"Data received: {len(data)}")
+                print(f"TOTAL Data requested {limit}\n"
+                      f"TOTAL Data received: {len(data)}")
                 save_data_to_json(data)
                 result = cls.__data_filter(data=data, datastore=datastore)
+                print(f"FILTERED DATA: {len(result)}")
                 save_data_to_json(result, "formed.json")
         else:
             logger.error(f"API request error: {status_code}")
@@ -326,8 +355,8 @@ class MessageReceiver:
             message = elem.get("content")
             message_time = elem.get("timestamp")
             message_time = int(datetime.datetime.fromisoformat(message_time).timestamp())
-            if int(datetime.datetime.now().timestamp()) - message_time < datastore.message_time:
-                if len(message) > datastore.length:
+            if datastore.mate_id == elem["author"]["id"]:
+                if int(datetime.datetime.now().timestamp()) - message_time < datastore.max_message_time:
                     summa += len(message)
                     result.append(
                         {
@@ -395,6 +424,7 @@ class MessageReceiver:
 
         return result
 
+
     @classmethod
     @logger.catch
     def get_message(cls, datastore: 'DataStore') -> dict:
@@ -405,7 +435,7 @@ class MessageReceiver:
         selected_data: dict = cls.__select_token_for_work(datastore=datastore)
         result_message: str = selected_data["message"]
         token: str = selected_data.get("token", None)
-        if token is not None:
+        if token:
             datastore.token = token
             cls.__get_data_from_api(datastore=datastore)
 
@@ -417,13 +447,12 @@ class MessageReceiver:
             result_message: str = result_data["message"]
 
             datastore.current_message_id = id_message
-            # TODO определять разницу времени между получением сообщения и ответа оператора
-            # datastore.current_time = datetime.datetime.now().timestamp()
-            if datastore.language == "en":
-                result_message: str = cls.__translate_to_russian(result_message)
+            # if datastore.language == "en":
+            #     result_message: str = cls.__translate_to_russian(result_message)
             print(f"\nID for reply: {id_message}"
                   f"\nMessage: {result_message}")
             result["work"] = True
+
         result.update({"message": result_message})
 
         return result
@@ -434,14 +463,30 @@ class MessageSender:
 
     @classmethod
     @logger.catch
-    def send_message(cls, text: str, datastore: 'DataStore') -> str:
+    def send_message(cls, datastore: 'DataStore') -> str:
         """Отправляет данные в канал дискорда, возвращает результат отправки."""
 
+        text = cls.__get_random_message_from_vocabulary()
         answer: str = cls.__send_message_to_discord_channel(text=text, datastore=datastore)
         logger.info(f"Результат отправки сообщения в дискорд: {answer}")
         UserTokenDiscord.update_token_time(datastore.token)
 
         return answer
+
+    @classmethod
+    @logger.catch
+    def __get_random_message_from_vocabulary(cls) -> str:
+        text = "error"
+
+        vocabulary: list = users_data_storage.messages
+
+        length = len(vocabulary)
+        if length:
+            text = vocabulary.pop(random.randint(0, length - 1))
+            print("Случайное сообщение из файлика:", text)
+            users_data_storage.messages = vocabulary
+
+        return text
 
     @classmethod
     @logger.catch

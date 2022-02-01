@@ -1,5 +1,4 @@
 """Модуль с основными обработчиками команд, сообщений и коллбэков"""
-import re
 from aiogram.dispatcher.filters import Text
 from aiogram.types import Message, CallbackQuery, ReplyKeyboardRemove
 from aiogram.dispatcher import FSMContext
@@ -180,9 +179,10 @@ async def add_language_handler(message: Message, state: FSMContext) -> None:
     guild = data.get('guild')
     discord_id = data.get('discord_id')
     channel = data.get('channel')
-    # Здесь должна быть функция случайного выбора прокси и назначения ее для токена
-    proxy = DEFAULT_PROXY
 
+    # Здесь должна быть функция случайного выбора прокси и назначения ее для токена
+    # proxy = User.get_proxy(telegram_id=user)
+    proxy = DEFAULT_PROXY
     result = await DataStore.check_user_data(token, proxy, channel)
     if result.get('token') == 'bad token':
         await message.answer(
@@ -280,8 +280,8 @@ async def start_command_handler(message: Message, state: FSMContext) -> None:
     if not token_work:
         await message.answer(text, reply_markup=user_menu_keyboard())
         await state.finish()
-    # else:
-    #     print("Получаю ответ", text)
+    else:
+        print("Получили ответ", text)
     #     await message.answer(f"Данные получены:"
     #                          f"\nСообщение: {text}")
     await UserState.user_wait_message.set()
@@ -298,12 +298,13 @@ async def send_to_discord(message: Message, state: FSMContext) -> None:
             reply_markup=cancel_keyboard()
         )
         return
-    await message.answer("Понял, принял, отправляю.", reply_markup=cancel_keyboard())
+    # await message.answer("Понял, принял, отправляю.", reply_markup=cancel_keyboard())
+
     datastore = users_data_storage.get_instance(message.from_user.id)
     result = MessageSender.send_message(text=message.text, datastore=datastore)
     if result == "Message sent":
         await message.answer(f"Результат отправки: {result}", reply_markup=ReplyKeyboardRemove())
-        await message.answer("Ожидаю новых сообщений", reply_markup=cancel_keyboard())
+        # await message.answer("Ожидаю новых сообщений", reply_markup=cancel_keyboard())
         await UserState.user_start_game.set()
         await start_command_handler(message=message, state=state)
         return
