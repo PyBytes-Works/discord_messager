@@ -345,6 +345,7 @@ class UserTokenDiscord(BaseModel):
       add_token_by_telegram_id
       delete_inactive_tokens
       get_all_user_tokens
+      get_all_info_tokens
       get_number_of_free_slots_for_tokens
       get_time_by_token
       get_info_by_token
@@ -356,6 +357,8 @@ class UserTokenDiscord(BaseModel):
     """
     user = ForeignKeyField(User, on_delete="CASCADE")
     token = CharField(max_length=255, unique=True, verbose_name="Токен пользователя в discord")
+    discord_id = CharField(max_length=255, unique=True, verbose_name="ID пользователя в discord")
+    mate_id = CharField(max_length=255, unique=True, verbose_name="ID напарника в discord")
     proxy = CharField(
         default='', max_length=25, unique=False, verbose_name="Адрес прокси сервера"
     )
@@ -385,6 +388,7 @@ class UserTokenDiscord(BaseModel):
                                     cls,
                                     telegram_id: str,
                                     token: str,
+                                    discord_id: str,
                                     proxy: str,
                                     guild: int,
                                     channel: int,
@@ -403,6 +407,7 @@ class UserTokenDiscord(BaseModel):
             db_token: UserTokenDiscord = UserTokenDiscord.get_or_none(cls.token == token)
             if db_token:
                 db_token.proxy = proxy
+                db_token.discord_id = discord_id
                 db_token.guild = guild
                 db_token.channel = channel
                 db_token.language = language
@@ -444,6 +449,61 @@ class UserTokenDiscord(BaseModel):
         """
         cooldown = cooldown if cooldown > 0 else 5 * 60
         return cls.update(cooldown=cooldown).where(cls.token == token).execute()
+
+    @classmethod
+    @logger.catch
+    def make_token_pair(cls, telegram_id: str, discord_id: str, mate_id: int) -> bool:
+        """
+        Update mate_id: update mate_id for token
+             token: (str)
+             mate_id: (str)
+             соединяет пару токенов
+             ищет и проверяет наличие токена с нужным id, и наличие у пользователя токена по mate_id
+             если токое присутствует соединяет пару.
+        """
+        user = User.get_user_by_telegram_id(telegram_id)
+        if user:
+            tokens = [token.discord_id for token in
+                      UserTokenDiscord.select(cls.discord_id)
+                          .where(cls.user == user.get_id)
+                          .where(cls.discord_id != discord_id)]
+            if mate_id in tokens:
+                discord_token: UserTokenDiscord = UserTokenDiscord.get_or_none(discord_id=discord_id)
+                discord_token_mate: UserTokenDiscord = UserTokenDiscord.get_or_none(discord_id=mate_id)
+                if discord_token and discord_token_mate:
+                    discord_token.mate_id = mate_id
+                    discord_token.save()
+                    discord_token_mate.mate_id = discord_id
+                    discord_token.save()
+                    return True
+
+    @classmethod
+    @logger.catch
+    def delete_token_pair(cls, telegram_id: str, discord_id: str, mate_id: int) -> bool:
+        """ FIXME
+        update mate_id: update mate_id for token
+         token: (str)
+         mate_id: (str)
+         соединяет пару токенов
+         ищет и проверяет наличие токена с нужным id, и наличие у пользователя токена по mate_id
+         если токое присутствует соединяет пару.
+        """
+        user = User.get_user_by_telegram_id(telegram_id)
+        if user:
+            tokens = [token.discord_id for token in
+                      UserTokenDiscord.select(cls.discord_id)
+                          .where(cls.user == user.get_id)
+                          .where(cls.discord_id != discord_id)]
+            if mate_id in tokens:
+                discord_token: UserTokenDiscord = UserTokenDiscord.get_or_none(discord_id=discord_id)
+                discord_token_mate: UserTokenDiscord = UserTokenDiscord.get_or_none(discord_id=mate_id)
+                if discord_token and discord_token_mate:
+                    discord_token.mate_id = mate_id
+                    discord_token.save()
+                    discord_token_mate.mate_id = discord_id
+                    discord_token.save()
+                    return True
+
 
     @classmethod
     @logger.catch
