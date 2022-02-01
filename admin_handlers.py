@@ -30,7 +30,7 @@ async def set_user_admin_handler(message: Message, state: FSMContext) -> None:
     user_name = message.text
     user = User.get_or_none(User.nick_name.contains(user_name))
     if user:
-        user_id = user.__telegram_id
+        user_id = user.telegram_id
         User.set_user_status_admin(telegram_id=user_id)
         await message.answer(f'{user_name} назначен администратором. ', reply_markup=user_menu_keyboard())
         await bot.send_message(chat_id=user_id, text='Вас назначили администратором.')

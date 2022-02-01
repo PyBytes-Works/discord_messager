@@ -132,7 +132,7 @@ class User(BaseModel):
         return list of telegram ids for active users
         return: list
         """
-        return [user.__telegram_id
+        return [user.telegram_id
                 for user in cls.select(cls.telegram_id)
                 .where(cls.active == True).execute()]
 
@@ -154,7 +154,7 @@ class User(BaseModel):
         return: list
         """
         return [
-            user.__telegram_id
+            user.telegram_id
             for user in cls.select(cls.telegram_id)
                 .where(cls.active == True)
                 .where(cls.admin == False)
@@ -168,10 +168,10 @@ class User(BaseModel):
         return: dict
         """
         return {
-            user.__telegram_id: (f'{user.nick_name.rsplit("_", maxsplit=1)[0]} | '
+            user.telegram_id: (f'{user.nick_name.rsplit("_", maxsplit=1)[0]} | '
                                f'{"Active" if user.active else "Not active"} | '
                                # f'{"Work" if user.is_work else "Not work"} | '
-                                 f'{"Admin" if user.admin else "Not admin"} | ')
+                               f'{"Admin" if user.admin else "Not admin"} | ')
             for user in User.select().execute()
         }
 
@@ -183,7 +183,7 @@ class User(BaseModel):
         return: list
         """
         return [
-            user.__telegram_id for user in cls.select(
+            user.telegram_id for user in cls.select(
                 cls.telegram_id).where(cls.is_work == True).where(cls.active == True).execute()
         ]
 
@@ -210,7 +210,7 @@ class User(BaseModel):
     def get_subscribers_list(cls: 'User') -> list:
         """ возвращает список пользователей которым должна отправляться рассылка"""
         now = datetime.datetime.now().timestamp()
-        return [user.__telegram_id
+        return [user.telegram_id
                 for user in cls
                     .select(cls.telegram_id)
                     .where(cls.active == True)
