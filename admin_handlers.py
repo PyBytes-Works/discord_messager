@@ -180,7 +180,9 @@ async def add_user_to_db_by_token(message: Message, state: FSMContext) -> None:
     max_tokens = user_data[user_name]
     if user_name and max_tokens:
         user_telegram_id = message.from_user.id
+
         user_created = User.add_new_user(telegram_id=user_telegram_id, nick_name=user_name)
+        # user_created = User.add_new_user(telegram_id=user_telegram_id, nick_name=user_name, proxy=get_random_proxy())
         if not user_created:
             await send_report_to_admins(
                 text=f"Пользователь {user_name} : ID: {user_telegram_id} уже существует."
