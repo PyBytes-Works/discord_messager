@@ -13,3 +13,13 @@
 __pycache__/
 env
 iam_token.json
+/tokens.json
+/res.txt
+/proxies_checked.json
+/proxies.txt
+/proxies.json
+/parse_tokens.json
+/good_proxies.json
+/accounts.txt
+/data/
+/tests/
