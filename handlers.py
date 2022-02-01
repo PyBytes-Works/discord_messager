@@ -25,6 +25,16 @@ async def cancel_handler(message: Message, state: FSMContext) -> None:
     User.set_user_is_not_work(user)
 
 
+# @logger.catch
+# async def set_self_token_cooldown_handler(message: Message, state: FSMContext) -> None:
+#     """Обработчик команды /set_cooldown"""
+#
+#     user_telegram_id = message.from_user.id
+#     if User.is_active(telegram_id=user_telegram_id):
+#         await message.answer("Введите время кулдауна в минутах", reply_markup=cancel_keyboard())
+#         await UserState.set_user_self_cooldown.set()
+
+
 @logger.catch
 async def invitation_add_discord_token_handler(message: Message) -> None:
     """Запрос discord-токена """
@@ -232,6 +242,7 @@ def register_handlers(dp: Dispatcher) -> None:
     dp.register_message_handler(start_command_handler, commands=["start_parsing", "старт"])
     dp.register_message_handler(start_command_handler, state=UserState.user_start_game)
     dp.register_message_handler(invitation_add_discord_token_handler, commands=["at", "addtoken", "add_token"])
+    # dp.register_message_handler(set_self_token_cooldown_handler, commands=["set_cooldown"])
     dp.register_message_handler(add_discord_token_handler, state=UserState.user_add_token)
     dp.register_message_handler(send_to_discord, state=UserState.user_wait_message)
     dp.register_message_handler(add_discord_token_handler, state=UserState.user_add_token)
