@@ -62,6 +62,7 @@ class User(BaseModel):
         default=datetime.datetime.now().timestamp(),
         verbose_name='Срок истечения подписки'
     )
+    proxy = CharField(max_length=50, default='', verbose_name="Прокси")
 
     class Meta:
         db_table = "users"
@@ -102,7 +103,7 @@ class User(BaseModel):
 
     @classmethod
     @logger.catch
-    def add_new_user(cls: 'User', nick_name: str, telegram_id: str) -> str:
+    def add_new_user(cls: 'User', nick_name: str, telegram_id: str, proxy: str = '') -> str:
         """
         if the user is already in the database, returns None
         if created user will return user id
@@ -111,7 +112,7 @@ class User(BaseModel):
         user = cls.get_or_none(cls.telegram_id == telegram_id)
         if not user:
             return cls.create(
-                nick_name=f'{nick_name}_{telegram_id}', telegram_id=telegram_id
+                nick_name=f'{nick_name}_{telegram_id}', telegram_id=telegram_id, proxy=proxy
             ).save()
 
     @classmethod
@@ -384,7 +385,7 @@ class UserTokenDiscord(BaseModel):
 
     @classmethod
     @logger.catch
-    def add_or_update_token_by_telegram_id(
+    def add_token_by_telegram_id(
                                     cls,
                                     telegram_id: str,
                                     token: str,
@@ -406,13 +407,14 @@ class UserTokenDiscord(BaseModel):
         if user_id:
             db_token: UserTokenDiscord = UserTokenDiscord.get_or_none(cls.token == token)
             if db_token:
-                db_token.proxy = proxy
-                db_token.discord_id = discord_id
-                db_token.guild = guild
-                db_token.channel = channel
-                db_token.language = language
-                db_token.cooldown = cooldown
-                return db_token.save()
+                # db_token.proxy = proxy
+                # db_token.discord_id = discord_id
+                # db_token.guild = guild
+                # db_token.channel = channel
+                # db_token.language = language
+                # db_token.cooldown = cooldown
+                # return db_token.save()
+                return False
 
             all_token = cls.get_all_user_tokens(telegram_id)
             max_tokens = User.get_max_tokens(telegram_id)
