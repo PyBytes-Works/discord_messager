@@ -7,6 +7,13 @@ from typing import Union
 from config import logger, bot, admins_list
 
 
+def get_random_proxy() -> list:
+    """Возвращает случайную проксю из списка"""
+    proxies = []
+
+    return proxies.pop(random.randint(0, len(proxies) - 1))
+
+
 def save_data_to_json(data, file_name: str = "data.json"):
     with open(file_name, 'w', encoding='utf-8') as f:
         json.dump(data, f, ensure_ascii=False, indent=4)

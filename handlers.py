@@ -253,6 +253,7 @@ async def start_command_handler(message: Message, state: FSMContext) -> None:
 
     """
     user_telegram_id = message.from_user.id
+    print(message.text)
     if not User.is_active(telegram_id=user_telegram_id):
         return
     if not UserTokenDiscord.get_all_user_tokens(user_telegram_id):
@@ -280,37 +281,33 @@ async def start_command_handler(message: Message, state: FSMContext) -> None:
     if not token_work:
         await message.answer(text, reply_markup=user_menu_keyboard())
         await state.finish()
-    else:
-        print("Получили ответ", text)
-    #     await message.answer(f"Данные получены:"
-    #                          f"\nСообщение: {text}")
-    await UserState.user_wait_message.set()
 
 
-@logger.catch
-async def send_to_discord(message: Message, state: FSMContext) -> None:
-    """Отправляет полученное сообщение в дискорд"""
-
-    text = message.text
-    if len(text) > 50:
-        await message.answer(
-            "Сообщение не должно быть длиннее 50 символов. Попробуй еще раз.",
-            reply_markup=cancel_keyboard()
-        )
-        return
-    # await message.answer("Понял, принял, отправляю.", reply_markup=cancel_keyboard())
-
-    datastore = users_data_storage.get_instance(message.from_user.id)
-    result = MessageSender.send_message(text=message.text, datastore=datastore)
-    if result == "Message sent":
-        await message.answer(f"Результат отправки: {result}", reply_markup=ReplyKeyboardRemove())
-        # await message.answer("Ожидаю новых сообщений", reply_markup=cancel_keyboard())
-        await UserState.user_start_game.set()
-        await start_command_handler(message=message, state=state)
-        return
-    else:
-        await message.answer(f'При отправке сообщения произошла ошибка: {result}. Обратитесь к администратору.')
-    await state.finish()
+#
+# @logger.catch
+# async def send_to_discord(message: Message, state: FSMContext) -> None:
+#     """Отправляет полученное сообщение в дискорд"""
+#
+#     text = message.text
+#     if len(text) > 50:
+#         await message.answer(
+#             "Сообщение не должно быть длиннее 50 символов. Попробуй еще раз.",
+#             reply_markup=cancel_keyboard()
+#         )
+#         return
+#     # await message.answer("Понял, принял, отправляю.", reply_markup=cancel_keyboard())
+#
+#     datastore = users_data_storage.get_instance(message.from_user.id)
+#     result = MessageSender.send_message(text=message.text, datastore=datastore)
+#     if result == "Message sent":
+#         await message.answer(f"Результат отправки: {result}", reply_markup=ReplyKeyboardRemove())
+#         # await message.answer("Ожидаю новых сообщений", reply_markup=cancel_keyboard())
+#         await UserState.user_start_game.set()
+#         await start_command_handler(message=message, state=state)
+#         return
+#     else:
+#         await message.answer(f'При отправке сообщения произошла ошибка: {result}. Обратитесь к администратору.')
+#     await state.finish()
 
 
 @logger.catch
@@ -320,7 +317,10 @@ async def default_message(message: Message) -> None:
     if User.is_active(message.from_user.id):
         await message.answer(
             'Доступные команды\n'
-            '/start_parsing - Активирует бота.',
+            '/start_parsing - Активирует бота.'
+            '/add_token - Добавить токены.'
+            '/set_cooldown - Назначить кулдаун для токена.'
+            '/info - показать информацию по всем токенам пользователя.',
             reply_markup=user_menu_keyboard()
         )
 
@@ -342,7 +342,7 @@ def register_handlers(dp: Dispatcher) -> None:
     dp.register_callback_query_handler(request_self_token_cooldown_handler, state=UserState.select_token)
     dp.register_message_handler(set_self_token_cooldown_handler, state=UserState.set_user_self_cooldown)
     dp.register_message_handler(add_discord_token_handler, state=UserState.user_add_token)
-    dp.register_message_handler(send_to_discord, state=UserState.user_wait_message)
+    # dp.register_message_handler(send_to_discord, state=UserState.user_wait_message)
     dp.register_message_handler(add_discord_token_handler, state=UserState.user_add_token)
     dp.register_message_handler(add_channel_handler, state=UserState.user_add_channel)
     dp.register_message_handler(add_discord_id_handler, state=UserState.user_add_discord_id)

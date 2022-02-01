@@ -30,7 +30,7 @@ async def set_user_admin_handler(message: Message, state: FSMContext) -> None:
     user_name = message.text
     user = User.get_or_none(User.nick_name.contains(user_name))
     if user:
-        user_id = user.telegram_id
+        user_id = user.__telegram_id
         User.set_user_status_admin(telegram_id=user_id)
         await message.answer(f'{user_name} назначен администратором. ', reply_markup=user_menu_keyboard())
         await bot.send_message(chat_id=user_id, text='Вас назначили администратором.')
@@ -39,7 +39,8 @@ async def set_user_admin_handler(message: Message, state: FSMContext) -> None:
     await state.finish()
 #
 #
-from utils import get_token, add_new_token, delete_used_token, send_report_to_admins, check_is_int
+from utils import get_token, add_new_token, delete_used_token, send_report_to_admins, check_is_int, \
+    get_random_proxy
 
 
 @logger.catch
@@ -64,6 +65,7 @@ async def admin_help_handler(message: Message) -> None:
 @logger.catch
 async def max_user_request_handler(message: Message) -> None:
     """Обработчик для создания нового пользователя. Команда /add_user"""
+
     if User.is_admin(telegram_id=message.from_user.id):
         await message.answer('Сколько максимум токенов будет у пользователя?', reply_markup=cancel_keyboard())
         await UserState.max_tokens_req.set()
@@ -175,17 +177,30 @@ async def add_user_to_db_by_token(message: Message, state: FSMContext) -> None:
 
     user_data: dict = delete_used_token(message.text)
     if not user_data:
-        await send_report_to_admins("При чтении токена для создания нового пользователя из файла произошла ошибка.")
+        await send_report_to_admins("При чтении токена для создания нового пользователя из файла произошла ошибка."
+                                    f"\nUser: {message.from_user.id}"
+                                    f"\nData: {message}")
     user_name = tuple(user_data.keys())[0]
     max_tokens = user_data[user_name]
     if user_name and max_tokens:
         user_telegram_id = message.from_user.id
 
+        # НЕ УДАЛЯТЬ, РАССКОМЕНТИРОВАТЬ КОГДА БУДУТ ПРОКСИ И ДОПИСАТЬ ФУНКЦИЮ!!!!
+        # try:
+        #     proxy = get_random_proxy()
+        # except IndexError as err:
+        #     text = f"Get random proxy error: {err}"
+        #     logger.error(text)
+        #     message = f"Свободные прокси закончились, не могу зарегистрировать пользователя {user_name}."
+        #     await send_report_to_admins(text=message + text)
+        #     await state.finish()
+        # user_created = User.add_new_user(telegram_id=user_telegram_id, nick_name=user_name, proxy=proxy)
         user_created = User.add_new_user(telegram_id=user_telegram_id, nick_name=user_name)
-        # user_created = User.add_new_user(telegram_id=user_telegram_id, nick_name=user_name, proxy=get_random_proxy())
+
         if not user_created:
             await send_report_to_admins(
-                text=f"Пользователь {user_name} : ID: {user_telegram_id} уже существует."
+                text=(f"При добавлении нового пользователя произошла ошибка:"
+                      f"\nПользователь {user_name} : ID: {user_telegram_id} уже существует.")
             )
             await message.answer('Пользователь уже существует.')
         else:
@@ -207,7 +222,7 @@ async def add_user_to_db_by_token(message: Message, state: FSMContext) -> None:
 
 @logger.catch
 async def set_user_max_tokens_handler(message: Message) -> None:
-    """Обработчик команды /set_tokens для авторизации нового пользователя"""
+    """Обработчик команды /set_max_tokens"""
     # TODO написать !!!
     user_telegram_id = message.from_user.id
     if user_telegram_id in admins_list:
@@ -239,6 +254,6 @@ def register_admin_handlers(dp: Dispatcher) -> None:
     dp.register_message_handler(set_user_admin_handler, state=UserState.name_for_admin)
     dp.register_message_handler(show_all_users_handler, commands=['show_users'])
     dp.register_message_handler(delete_user_name_handler, commands=['delete_user'])
-    dp.register_message_handler(set_user_max_tokens_handler, commands=['set_tokens'])
+    dp.register_message_handler(set_user_max_tokens_handler, commands=['set_max_tokens'])
     dp.register_callback_query_handler(delete_user_handler, Text(startswith=['user_']), state=UserState.name_for_del)
     dp.register_message_handler(add_new_user_handler, state=UserState.name_for_cr)
