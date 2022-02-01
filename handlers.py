@@ -6,7 +6,7 @@ from aiogram.dispatcher import FSMContext
 
 from config import logger, Dispatcher, DEFAULT_PROXY
 from models import User, UserTokenDiscord
-from keyboards import cancel_keyboard, user_menu_keyboard
+from keyboards import cancel_keyboard, user_menu_keyboard, all_tokens_keyboard
 from discord_handler import MessageReceiver, DataStore, MessageSender, users_data_storage
 from states import UserState
 from utils import check_is_int
@@ -25,19 +25,53 @@ async def cancel_handler(message: Message, state: FSMContext) -> None:
     User.set_user_is_not_work(user)
 
 
-# @logger.catch
-# async def set_self_token_cooldown_handler(message: Message, state: FSMContext) -> None:
-#     """Обработчик команды /set_cooldown"""
-#
-#     user_telegram_id = message.from_user.id
-#     if User.is_active(telegram_id=user_telegram_id):
-#         await message.answer("Введите время кулдауна в минутах", reply_markup=cancel_keyboard())
-#         await UserState.set_user_self_cooldown.set()
+@logger.catch
+async def get_all_tokens_handler(message: Message) -> None:
+    """Обработчик команды /set_cooldown"""
+
+    user_telegram_id = message.from_user.id
+    if User.is_active(telegram_id=user_telegram_id):
+        await message.answer("Выберите токен: ", reply_markup=all_tokens_keyboard(user_telegram_id))
+
+        await UserState.select_token.set()
+
+
+@logger.catch
+async def request_self_token_cooldown_handler(callback: CallbackQuery, state: FSMContext) -> None:
+    """Обработчик нажатия на кнопку с токеном"""
+
+    token = callback.data
+    await state.update_data(token=token)
+    await callback.message.answer("Введите время кулдауна в минутах", reply_markup=cancel_keyboard())
+    await UserState.set_user_self_cooldown.set()
+
+    await callback.answer()
+
+
+@logger.catch
+async def set_self_token_cooldown_handler(message: Message, state: FSMContext):
+    """Получает время кулдауна в минутах, переводит в секунды, сохраняет новые данные для токена"""
+
+    cooldown = check_is_int(message.text)
+    if not cooldown:
+        await message.answer(
+            "Время должно быть целым, положительным числом. "
+            "\nВведите время кулдауна в минутах.",
+            reply_markup=cancel_keyboard()
+        )
+        return
+
+    state_data = await state.get_data()
+    token = state_data["token"]
+    UserTokenDiscord.update_token_cooldown(token=token, cooldown=cooldown * 60)
+    await message.answer(f"Кулдаун для токена [{token}] установлен: [{cooldown}] минут", reply_markup=cancel_keyboard())
+    await state.finish()
 
 
 @logger.catch
 async def invitation_add_discord_token_handler(message: Message) -> None:
     """Запрос discord-токена """
+
     # print(message.from_user.id)
     user = message.from_user.id
     if User.is_active(telegram_id=user):
@@ -65,7 +99,7 @@ async def add_discord_token_handler(message: Message, state: FSMContext) -> None
 @logger.catch
 async def add_channel_handler(message: Message, state: FSMContext) -> None:
     """
-        получения ссылки на канал, запрос языка
+        Получение ссылки на канал, запрос языка
     """
     mess = message.text
     guild, channel = mess.rsplit('/', maxsplit=3)[-2:]
@@ -80,25 +114,6 @@ async def add_channel_handler(message: Message, state: FSMContext) -> None:
     await message.answer(
         "Выберите основной язык канала: ru, es, en или другой)", reply_markup=cancel_keyboard())
     await UserState.user_add_language.set()
-
-
-# @logger.catch
-# async def add_proxy_handler(message: Message, state: FSMContext) -> None:
-#     """
-#         добавить прокси
-#     """
-#
-#     proxy = message.text
-#     proxy = re.match(r'\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}:\d{1,6}\b', proxy.strip())
-#     if not proxy:
-#         await message.answer(
-#             "Проверьте proxy и попробуйте ещё раз", reply_markup=cancel_keyboard())
-#         return
-#
-#     await state.update_data(proxy=proxy.string)
-#     await message.answer(
-#         "Добавьте language ru, es, en или другой)", reply_markup=cancel_keyboard())
-#     await UserState.user_add_language.set()
 
 
 @logger.catch
@@ -127,6 +142,7 @@ async def add_language_handler(message: Message, state: FSMContext) -> None:
     token = data.get('token')
     guild = data.get('guild')
     channel = data.get('channel')
+    # Здесь должна быть функция случайного выбора прокси и назначения ее для токена
     proxy = DEFAULT_PROXY
 
     result = await DataStore.check_user_data(token, proxy, channel)
@@ -138,12 +154,6 @@ async def add_language_handler(message: Message, state: FSMContext) -> None:
         )
         await UserState.user_add_token.set()
         return
-    # if result.get('proxy', 'bad proxy') == 'bad proxy':
-    #     await message.answer(
-    #                             "токен не добавлен повторите ввод proxy",
-    #                             reply_markup=user_menu_keyboard())
-        # await UserState.user_add_proxy.set()
-        # return
 
     UserTokenDiscord.add_or_update_token_by_telegram_id(user, token, proxy, guild, channel, language)
     await message.answer(
@@ -183,14 +193,14 @@ async def start_command_handler(message: Message, state: FSMContext) -> None:
         return
     text = answer.get("message", "ERROR")
     token_work = answer.get("work", False)
-    if token_work:
-        print("Получаю ответ", text)
-        await message.answer(f"Данные получены:"
-                             f"\nСообщение: {text}")
-        await UserState.user_wait_message.set()
-    else:
+    if not token_work:
         await message.answer(text, reply_markup=user_menu_keyboard())
         await state.finish()
+    # else:
+    #     print("Получаю ответ", text)
+    #     await message.answer(f"Данные получены:"
+    #                          f"\nСообщение: {text}")
+    await UserState.user_wait_message.set()
 
 
 @logger.catch
@@ -242,7 +252,9 @@ def register_handlers(dp: Dispatcher) -> None:
     dp.register_message_handler(start_command_handler, commands=["start_parsing", "старт"])
     dp.register_message_handler(start_command_handler, state=UserState.user_start_game)
     dp.register_message_handler(invitation_add_discord_token_handler, commands=["at", "addtoken", "add_token"])
-    # dp.register_message_handler(set_self_token_cooldown_handler, commands=["set_cooldown"])
+    dp.register_message_handler(get_all_tokens_handler, commands=["set_cooldown"])
+    dp.register_callback_query_handler(request_self_token_cooldown_handler, state=UserState.select_token)
+    dp.register_message_handler(set_self_token_cooldown_handler, state=UserState.set_user_self_cooldown)
     dp.register_message_handler(add_discord_token_handler, state=UserState.user_add_token)
     dp.register_message_handler(send_to_discord, state=UserState.user_wait_message)
     dp.register_message_handler(add_discord_token_handler, state=UserState.user_add_token)
