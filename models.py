@@ -635,7 +635,7 @@ class UserTokenDiscord(BaseModel):
             channel = int(data.channel) if data.channel else 0
             result = {'proxy': data.proxy, 'guild': guild, 'channel': channel,
                       'language': data.language, 'last_message_time': data.last_message_time,
-                      'cooldown': data.cooldown}
+                      'mate_id': data.mate_id, 'cooldown': data.cooldown}
         return result
 
     @classmethod
