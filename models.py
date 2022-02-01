@@ -358,7 +358,7 @@ class UserTokenDiscord(BaseModel):
     user = ForeignKeyField(User, on_delete="CASCADE")
     token = CharField(max_length=255, unique=True, verbose_name="Токен пользователя в discord")
     discord_id = CharField(max_length=255, unique=True, verbose_name="ID пользователя в discord")
-    mate_id = CharField(max_length=255, unique=True, verbose_name="ID напарника в discord")
+    mate_id = CharField(max_length=255, default='', verbose_name="ID напарника в discord")
     proxy = CharField(
         default='', max_length=25, unique=False, verbose_name="Адрес прокси сервера"
     )
@@ -420,6 +420,7 @@ class UserTokenDiscord(BaseModel):
                 new_token = {
                     'user': user_id,
                     'token': token,
+                    'discord_id': discord_id,
                     'proxy': proxy,
                     'guild': guild,
                     'channel': channel,
@@ -503,7 +504,6 @@ class UserTokenDiscord(BaseModel):
                     discord_token_mate.mate_id = discord_id
                     discord_token.save()
                     return True
-
 
     @classmethod
     @logger.catch
@@ -589,16 +589,16 @@ class UserTokenDiscord(BaseModel):
         if user_id:
             return [
                 {
-                    'token': user.token,
-                    'guild': user.guild,
-                    'channel': user.channel,
-                    'time': user.last_message_time,
-                    'cooldown': user.cooldown
+                    'token': discord_token.token,
+                    'discord_id': discord_token.discord_id,
+                    'mate_id': discord_token.mate_id,
+                    'guild': discord_token.guild,
+                    'channel': discord_token.channel,
+                    'time': discord_token.last_message_time,
+                    'cooldown': discord_token.cooldown
 
                 }
-                for user in cls.select(
-                    cls.token, cls.last_message_time, cls.cooldown
-                ).where(cls.user == user_id)
+                for discord_token in cls.select().where(cls.user == user_id).execute()
             ]
         return []
 
@@ -664,6 +664,16 @@ class UserTokenDiscord(BaseModel):
         all_token: list = cls.get_all_user_tokens(telegram_id)
 
         return max_tokens - len(all_token)  # TODO Use count
+
+    @classmethod
+    @logger.catch
+    def get_token_by_discord_id(cls, discord_id: str) -> 'UserTokenDiscord':
+        """
+        Вернуть token по discord_id
+        """
+        token: 'UserTokenDiscord' = cls.get_or_none(discord_id=discord_id)
+
+        return token
 
 
 @logger.catch
