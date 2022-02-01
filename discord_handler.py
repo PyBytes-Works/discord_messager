@@ -294,8 +294,7 @@ class MessageReceiver:
         limit = 100
         url = datastore.channel_url + f'{datastore.channel}/messages?limit={limit}'
         proxies = {
-            "http": f"http://{PROXY_USER}:{PROXY_PASSWORD}@{datastore.proxy}/",
-            # "https": f"http://{PROXY_USER}:{PROXY_PASSWORD}@{datastore.proxy}/"
+            "http": f"http://{PROXY_USER}:{PROXY_PASSWORD}@{datastore.proxy}/"
         }
         response = session.get(url=url, proxies=proxies)
         status_code = response.status_code
@@ -418,6 +417,7 @@ class MessageReceiver:
             result_message: str = result_data["message"]
 
             datastore.current_message_id = id_message
+            # TODO определять разницу времени между получением сообщения и ответа оператора
             # datastore.current_time = datetime.datetime.now().timestamp()
             if datastore.language == "en":
                 result_message: str = cls.__translate_to_russian(result_message)
@@ -477,14 +477,15 @@ class MessageSender:
 
         session = requests.Session()
         session.headers['authorization'] = datastore.token
-        answer = 'Начало отправки'
         url = datastore.channel_url + f'{datastore.channel}/messages?'
         proxies = {
             "http": f"http://{PROXY_USER}:{PROXY_PASSWORD}@{datastore.proxy}/",
             # "https": f"http://{PROXY_USER}:{PROXY_PASSWORD}@{datastore.proxy}/"
         }
-        response = session.post(url=url, json=data, proxies=proxies)
-
+        try:
+            response = session.post(url=url, json=data, proxies=proxies)
+        except Exception as err:
+            return f'Ошибка отправки сообщения: {err}'
         status_code = response.status_code
         if status_code == 204:
             answer = "Ошибка 204, нет содержимого."
@@ -492,13 +493,15 @@ class MessageSender:
             try:
                 data = response.json()
             except Exception as err:
-                print("JSON ERROR", err)
+                logger.warning(err)
+                return f"JSON ERROR {err}"
             else:
-                print(f"Data received: {len(data)}")
+                logger.info(f"Data received: {len(data)}")
                 # save_data_to_json(data, file_name="answer.json")
                 answer = "Message sent"
         else:
             answer = f"API request error: {status_code}"
+            logger.error(answer)
 
         return answer
 
