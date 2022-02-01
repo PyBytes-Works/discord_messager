@@ -518,6 +518,32 @@ class UserTokenDiscord(BaseModel):
 
     @classmethod
     @logger.catch
+    def get_all_info_tokens(cls, telegram_id: str) -> list:
+        """
+        Вернуть список всех ТОКЕНОВ пользователя по его telegram_id:
+        return: список словарей
+        {'token': str, 'guild':str, channel: str,
+        'time':время_последнего_сообщения, 'cooldown': кулдаун}
+        """
+        user_id: 'User' = User.get_user_by_telegram_id(telegram_id)
+        if user_id:
+            return [
+                {
+                    'token': user.token,
+                    'guild': user.guild,
+                    'channel': user.channel,
+                    'time': user.last_message_time,
+                    'cooldown': user.cooldown
+
+                }
+                for user in cls.select(
+                    cls.token, cls.last_message_time, cls.cooldown
+                ).where(cls.user == user_id)
+            ]
+        return []
+
+    @classmethod
+    @logger.catch
     def get_time_by_token(cls, token: str) -> int:
         """
         Вернуть timestamp(кд) токена по его "значению":
