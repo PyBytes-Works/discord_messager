@@ -14,9 +14,17 @@ def get_random_proxy() -> list:
     return proxies.pop(random.randint(0, len(proxies) - 1))
 
 
-def save_data_to_json(data, file_name: str = "data.json"):
-    with open(file_name, 'w', encoding='utf-8') as f:
-        json.dump(data, f, ensure_ascii=False, indent=4)
+def save_data_to_json(data, file_name: str = "data.json", key: str = 'w'):
+    if key == 'w':
+        with open(file_name, 'w', encoding='utf-8') as f:
+            json.dump(data, f, ensure_ascii=False, indent=4)
+    elif key == 'a':
+        result = {}
+        if os.path.exists(file_name):
+            with open(file_name, 'r', encoding='utf-8') as f:
+                result: dict = json.load(f)
+        result.update(data)
+        save_data_to_json(data=result, file_name=file_name, key='w')
 
     # print(file_name, "saved.")
 
