@@ -309,11 +309,11 @@ async def default_message(message: Message) -> None:
 
     if User.is_active(message.from_user.id):
         await message.answer(
-            'Доступные команды\n'
-            '/start_parsing - Активирует бота.'
-            '/add_token - Добавить токены.'
-            '/set_cooldown - Назначить кулдаун для токена.'
-            '/info - показать информацию по всем токенам пользователя.',
+            'Доступные команды:'
+            '\n/start_parsing - Активирует бота.'
+            '\n/add_token - Добавить токены.'
+            '\n/set_cooldown - Назначить кулдаун для токена.'
+            '\n/info - показать информацию по всем токенам пользователя.',
             reply_markup=user_menu_keyboard()
         )
 
