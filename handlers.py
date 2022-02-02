@@ -337,9 +337,9 @@ async def start_command_handler(message: Message, state: FSMContext) -> None:
     datastore = DataStore(user_telegram_id)
     users_data_storage.add_or_update(telegram_id=user_telegram_id, data=datastore)
     User.set_user_is_work(telegram_id=user_telegram_id)
-    # Начинаем игру
+
     await lets_play(message=message, datastore=datastore)
-    print("GAME OVER")
+    logger.info(f"GAME OVER {user_telegram_id}")
     await state.finish()
 
 
@@ -349,14 +349,17 @@ async def lets_play(message: Message, datastore: 'DataStore'):
 
     user_telegram_id = message.from_user.id
     while User.get_is_work(telegram_id=user_telegram_id):
-        print(f"PAUSE: {datastore.delay + 1}")
-        await asyncio.sleep(datastore.delay + 1)
-        datastore.delay = 0
-        answer = await MessageReceiver.get_message(datastore=datastore, telegram_id=user_telegram_id)
+        answer = await MessageReceiver.get_message(datastore=datastore)
         text = answer.get("message", "ERROR")
-        token_work = answer.get("work", False)
+        if text in ("API request error: 400", "Vocabulary error"):
+            await message.answer(text, reply_markup=user_menu_keyboard())
+            return
+        token_work = answer.get("work")
         if not token_work:
             await message.answer(text, reply_markup=cancel_keyboard())
+            logger.info(f"PAUSE: {datastore.delay + 1}")
+            await asyncio.sleep(datastore.delay + 1)
+            datastore.delay = 0
 
 
 @logger.catch
@@ -397,5 +400,4 @@ def register_handlers(dp: Dispatcher) -> None:
     dp.register_message_handler(add_discord_token_handler, state=UserState.user_add_token)
     dp.register_message_handler(add_discord_id_handler, state=UserState.user_add_discord_id)
     dp.register_callback_query_handler(delete_pair_handler, state=UserState.user_delete_token_pair)
-    # dp.register_message_handler(send_to_discord, state=UserState.user_wait_message)
     dp.register_message_handler(default_message)
