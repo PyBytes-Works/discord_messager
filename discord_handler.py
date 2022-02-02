@@ -32,30 +32,31 @@ class MessageReceiver:
         """Получает данные из АПИ, выбирает случайное сообщение и возвращает ID сообщения
         и само сообщение"""
 
-        print("Get message start: ", datetime.datetime.now())
+        # print("Get message start: ", datetime.datetime.now())
         result = {"work": False, "message": "ERROR"}
-        selected_data: dict = cls.__select_token_for_work(datastore=datastore)
-        result_message: str = selected_data["message"]
-        token: str = selected_data.get("token", None)
-        if not token:
-            result.update({"message": result_message})
-            return result
-
-        print("Token found")
-        datastore.token = token
-        data: List[dict] = cls.__get_data_from_api(datastore=datastore)
-        if data:
-            print("Data found")
-            result_data: dict = cls.__get_random_message(data)
-            datastore.current_message_id = int(result_data["id"])
-        answer = MessageSender.send_message(datastore=datastore)
-        print("ANSWER:", answer)
-        if answer != "Message sent":
-            result.update({"message": answer})
-        else:
+        token = '_'
+        while token:
             await asyncio.sleep(timer)
-            result = cls.get_message(datastore)
-            print("RESULT:", result)
+            selected_data: dict = cls.__select_token_for_work(datastore=datastore)
+            result_message: str = selected_data["message"]
+            token: str = selected_data.get("token", None)
+            if not token:
+                result.update({"message": result_message})
+                break
+            # print("Token found")
+            datastore.token = token
+            data: List[dict] = cls.__get_data_from_api(datastore=datastore)
+            if data:
+                # print("Data found")
+                result_data: dict = cls.__get_random_message(data)
+                datastore.current_message_id = int(result_data["id"])
+            answer = MessageSender.send_message(datastore=datastore)
+            # print("ANSWER:", answer)
+            if answer != "Message sent":
+                result.update({"message": answer})
+                break
+
+        print("RESULT:", result)
 
         return result
 
@@ -68,7 +69,7 @@ class MessageReceiver:
         """
 
         result: dict = {"message": "token ready"}
-        all_tokens: List[dict] = UserTokenDiscord.get_all_user_tokens(telegram_id=datastore.__telegram_id)
+        all_tokens: List[dict] = UserTokenDiscord.get_all_user_tokens(telegram_id=datastore.telegram_id)
         current_time: int = int(datetime.datetime.now().timestamp())
         tokens_for_job: list = [
             key
@@ -76,18 +77,21 @@ class MessageReceiver:
             for key, value in elem.items()
             if current_time > value["time"] + value["cooldown"]
         ]
-        print("Ready tokens: ", len(tokens_for_job))
+        # print("Ready tokens: ", len(tokens_for_job))
         if tokens_for_job:
             random_token: str = random.choice(tokens_for_job)
             result["token"]: str = random_token
             datastore.save_token_data(random_token)
         else:
-            min_token_data: dict = min(all_tokens, key=lambda x: x.get('time'))
+            print("ALL_TOKENS:", all_tokens)
+            min_token_data = {}
+            for elem in all_tokens:
+                min_token_data: dict = min(elem.items(), key=lambda x: x[1].get('time'))
             token: str = tuple(min_token_data)[0]
             datastore.save_token_data(token)
             min_token_time: int = UserTokenDiscord.get_time_by_token(token)
             delay: int = datastore.cooldown - abs(min_token_time - current_time)
-            text = "seconds"
+            text = "секунд"
             if delay > 60:
                 minutes: int = delay // 60
                 seconds: int = delay % 60
@@ -96,9 +100,9 @@ class MessageReceiver:
                 if seconds < 10:
                     seconds: str = f'0{seconds}'
                 delay: str = f"{minutes}:{seconds}"
-                text = "minutes"
+                text = "минут"
             result["message"] = (f"В данный момент все токены заняты. Подождите {delay} {text}. "
-                                 f"Затем нажмите /start")
+                                 f"Затем нажмите /start_parsing")
 
         return result
 
@@ -122,11 +126,11 @@ class MessageReceiver:
             except Exception as err:
                 logger.error(f"JSON ERROR: {err}")
             else:
-                print(f"TOTAL Data requested {limit}\n"
-                      f"TOTAL Data received: {len(data)}")
+                # print(f"TOTAL Data requested {limit}\n"
+                #       f"TOTAL Data received: {len(data)}")
                 save_data_to_json(data)
                 result = cls.__data_filter(data=data, datastore=datastore)
-                print(f"FILTERED DATA: {len(result)}")
+                # print(f"FILTERED DATA: {len(result)}")
                 save_data_to_json(result, "formed.json")
         else:
             logger.error(f"API request error: {status_code}")
@@ -157,8 +161,8 @@ class MessageReceiver:
                     )
 
         middle_len = summa // len(data)
-        print('Средняя длина сообщения:', middle_len)
-        print('Выбрано сообщений:', len(result))
+        # print('Средняя длина сообщения:', middle_len)
+        # print('Выбрано сообщений:', len(result))
 
         return result
 
@@ -179,7 +183,7 @@ class MessageSender:
     @logger.catch
     def send_message(cls, datastore: 'DataStore') -> str:
         """Отправляет данные в канал дискорда, возвращает результат отправки."""
-        print("SEND MESSAGE START:")
+        # print("SEND MESSAGE START:")
         answer: str = cls.__send_message_to_discord_channel(datastore=datastore)
         logger.info(f"Результат отправки сообщения в дискорд: {answer}")
         UserTokenDiscord.update_token_time(datastore.token)
@@ -192,31 +196,30 @@ class MessageSender:
         """Отправляет данные в API, возвращает результат отправки."""
 
         text = cls.__get_random_message_from_vocabulary()
-
-        if not datastore.current_message_id:
-            return ("Нет ИД сообщения, на которое нужно ответить. "
-                      "\nСперва нужно запросить данные из АПИ.")
-
         data = {
             "content": text,
             "tts": "false",
-            "message_reference":
-                {
-                    "guild_id": datastore.guild,
-                    "channel_id": datastore.channel,
-                    "message_id": datastore.current_message_id
-                },
-            "allowed_mentions":
-                {
-                    "parse": [
-                        "users",
-                        "roles",
-                        "everyone"
-                    ],
-                    "replied_user": "false"
-                }
         }
-
+        if datastore.current_message_id:
+            data = {
+                "content": text,
+                "tts": "false",
+                "message_reference":
+                    {
+                        "guild_id": datastore.guild,
+                        "channel_id": datastore.channel,
+                        "message_id": datastore.current_message_id
+                    },
+                "allowed_mentions":
+                    {
+                        "parse": [
+                            "users",
+                            "roles",
+                            "everyone"
+                        ],
+                        "replied_user": "false"
+                    }
+            }
         session = requests.Session()
         session.headers['authorization'] = datastore.token
         url = datastore.channel_url + f'{datastore.channel}/messages?'
@@ -257,7 +260,7 @@ class MessageSender:
         if vocabulary:
             length = len(vocabulary)
             text = vocabulary.pop(random.randint(0, length - 1))
-            print("Случайное сообщение из файлика:", text)
+            # print("Случайное сообщение из файлика:", text)
             users_data_storage.vocabulary = vocabulary
 
         return text

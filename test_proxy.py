@@ -66,9 +66,12 @@ def do_job(random_token):
 
 
 if __name__ == '__main__':
-    current_user = "test1"
-    try:
+    # current_user = "test1"
+    # try:
+    #
+    #     select_token_for_work(current_user)
+    # except KeyboardInterrupt:
+    #     print("END")
 
-        select_token_for_work(current_user)
-    except KeyboardInterrupt:
-        print("END")
+    all_tokens = []
+    min(all_tokens, key=lambda x: x.get('time'))

@@ -6,7 +6,7 @@ from peewee import (
     CharField, BooleanField, DateTimeField, ForeignKeyField, IntegerField
 )
 from peewee import Model
-from config import logger, admins_list, db, db_file_name
+from config import logger, admins_list, db, db_file_name, DEFAULT_PROXY
 
 
 class BaseModel(Model):
@@ -319,8 +319,7 @@ class User(BaseModel):
         user: User = cls.get_or_none(cls.proxy, cls.telegram_id == telegram_id)
         # print(type(result.expiration))
         if user:
-            proxy = user.proxy
-            return proxy
+            return user.proxy
 
     @classmethod
     @logger.catch
@@ -728,73 +727,30 @@ def recreate_db(_db_file_name: str) -> None:
 
 
 if __name__ == '__main__':
-
-    # def add_fake_user_data():
-    #     """test func"""
-    #     import json
-    #     current_user = "305353027"
-    #     channel = 932256559394861079
-    #     guild = 932256559394861076
-    #     token = "OTMzMTE5MDEzNzc1NjI2MzAy.YfFAmw._X2-nZ6_knM7pK3081hqjdYHrn4"
-    #
-    #     with open("dis_tokens.json", encoding='utf-8') as f:
-    #         tokens = json.load(f)
-    #
-    #     proxy = asyncio.get_event_loop().run_until_complete(get_checked_proxy_by_number(1, token, channel))
-    #     proxy = proxy[0][1]
-    #     # proxy = ""
-    #     User.set_max_tokens(telegram_id=current_user, max_tokens=8)
-    #     for token in tokens:
-    #         UserTokenDiscord.add_token_by_telegram_id(
-    #             telegram_id=current_user,
-    #             token=token,
-    #             proxy=proxy,
-    #             channel=channel,
-    #             guild=guild,
-    #             language='ru',
-    #             cooldown=300
-    #
-    #         )
-
-
-    def add_data():
-
-        tttime = 0
-        for user_id, nick_name in test_user_list:
-            User.add_new_user(nick_name=nick_name, telegram_id=user_id)
-            # User.set_user_status_admin(telegram_id=user_id)
-            User.set_expiration_date(telegram_id=user_id, subscription_period=tttime)
-            tttime += 1
-            # logger.info(f"User {nick_name} with id {admin_id} created as ADMIN.")
-
-
-    if __name__ == '__main__':
-        # add_fake_user_data()
-
-        recreate = 0
-        add_test_users = 0
-        add_admins = 0
-        add_tokens = 0
-        import random
-        import string
-        test_user_list = (
-            (f'test{user}', ''.join(random.choices(string.ascii_letters, k=5)))
-            for user in range(1, 6)
-        )
-        # if add_tokens:
-        #     # user_id = User.get_user_id_by_telegram_id('test2')
-        #     [
-        #         (UserTokenDiscord.add_token_by_telegram_id(user_id, f'{user_id}token{number}'))
-        #         for user_id in ('test1', 'test3', 'test5') for number in range(1, 4)
-        #     ]
-        add_data()
-        if recreate:
-            recreate_db(db_file_name)
-        if add_admins:
-            for admin_id in admins_list:
-                nick_name = "Admin"
-                User.add_new_user(nick_name=nick_name, telegram_id=admin_id)
-                User.set_user_status_admin(telegram_id=admin_id)
-                logger.info(f"User {nick_name} with id {admin_id} created as ADMIN.")
+    recreate = 0
+    add_test_users = 0
+    add_admins = 0
+    add_tokens = 0
+    import random
+    import string
+    test_user_list = (
+        (f'test{user}', ''.join(random.choices(string.ascii_letters, k=5)))
+        for user in range(1, 6)
+    )
+    # if add_tokens:
+    #     # user_id = User.get_user_id_by_telegram_id('test2')
+    #     [
+    #         (UserTokenDiscord.add_token_by_telegram_id(user_id, f'{user_id}token{number}'))
+    #         for user_id in ('test1', 'test3', 'test5') for number in range(1, 4)
+    #     ]
+    if recreate:
+        recreate_db(db_file_name)
+    if add_admins:
+        for admin_id in admins_list:
+            nick_name = "Admin"
+            User.add_new_user(nick_name=nick_name, telegram_id=admin_id, proxy=DEFAULT_PROXY)
+            User.set_user_status_admin(telegram_id=admin_id)
+            User.activate_user(admin_id)
+            logger.info(f"User {nick_name} with id {admin_id} created as ADMIN.")
 
 
