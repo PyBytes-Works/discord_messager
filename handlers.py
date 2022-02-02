@@ -1,4 +1,6 @@
 """Модуль с основными обработчиками команд, сообщений и коллбэков"""
+import asyncio
+
 from aiogram.dispatcher.filters import Text
 from aiogram.types import Message, CallbackQuery, ReplyKeyboardRemove
 from aiogram.dispatcher import FSMContext
@@ -264,6 +266,7 @@ async def start_command_handler(message: Message, state: FSMContext) -> None:
     print("Добавляю его в общее хранилище")
     users_data_storage.add_or_update(telegram_id=user_telegram_id, data=new_store)
     print("Отправляю запрос к АПИ")
+    # result = await MessageReceiver.get_message(new_store)
     answer = await MessageReceiver.get_message(new_store)
     if answer.get("message", "no messages") == "no messages":
         await message.answer("Нет новых сообщений", reply_markup=user_menu_keyboard())
@@ -309,7 +312,7 @@ async def default_message(message: Message) -> None:
 
     if User.is_active(message.from_user.id):
         await message.answer(
-            'Доступные команды:'
+            'Доступные команды: '
             '\n/start_parsing - Активирует бота.'
             '\n/add_token - Добавить токены.'
             '\n/set_cooldown - Назначить кулдаун для токена.'

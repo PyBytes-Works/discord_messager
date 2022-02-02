@@ -750,6 +750,7 @@ if __name__ == '__main__':
             nick_name = "Admin"
             User.add_new_user(nick_name=nick_name, telegram_id=admin_id, proxy=DEFAULT_PROXY)
             User.set_user_status_admin(telegram_id=admin_id)
+            User.activate_user(admin_id)
             logger.info(f"User {nick_name} with id {admin_id} created as ADMIN.")
 
 
