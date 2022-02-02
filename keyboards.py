@@ -57,12 +57,13 @@ def all_tokens_keyboard(telegram_id: str) -> 'InlineKeyboardMarkup':
 
     keyboard = InlineKeyboardMarkup(row_width=1)
     all_tokens: List[dict] = UserTokenDiscord.get_all_user_tokens(telegram_id=telegram_id)
-    for elem in all_tokens:
-        token = tuple(elem.keys())[0]
-        cooldown = elem[token]["cooldown"]
-        keyboard.add(InlineKeyboardButton(text=f'CD: {cooldown // 60} - tkn: {token}', callback_data=f"{token}"))
+    if all_tokens:
+        for elem in all_tokens:
+            token = tuple(elem.keys())[0]
+            cooldown = elem[token]["cooldown"]
+            keyboard.add(InlineKeyboardButton(text=f'CD: {cooldown // 60} - tkn: {token}', callback_data=f"{token}"))
 
-    return keyboard
+        return keyboard
 
 
 

@@ -45,10 +45,14 @@ async def get_all_tokens_handler(message: Message) -> None:
     """Обработчик команды /set_cooldown"""
 
     user_telegram_id = message.from_user.id
-    if User.is_active(telegram_id=user_telegram_id):
-        await message.answer("Выберите токен: ", reply_markup=all_tokens_keyboard(user_telegram_id))
 
-        await UserState.select_token.set()
+    if User.is_active(telegram_id=user_telegram_id):
+        keyboard = all_tokens_keyboard(user_telegram_id)
+        if not keyboard:
+            await message.answer("Токенов нет. Нужно ввести хотя бы два.", reply_markup=user_menu_keyboard())
+        else:
+            await message.answer("Выберите токен: ", reply_markup=keyboard)
+            await UserState.select_token.set()
 
 
 @logger.catch
@@ -289,6 +293,8 @@ async def info_tokens_handler(message: Message) -> None:
                         mess,
                         reply_markup=keyboard
                     )
+        else:
+            await message.answer("Данных нет.", reply_markup=user_menu_keyboard())
 
 
 @logger.catch
@@ -315,15 +321,16 @@ async def start_command_handler(message: Message, state: FSMContext) -> None:
     """
 
     user_telegram_id = message.from_user.id
-    if not User.is_active(telegram_id=user_telegram_id):
-        return
+    if not User.is_admin(telegram_id=user_telegram_id):
+        if not User.is_active(telegram_id=user_telegram_id):
+            return
+        if not User.check_expiration_date(telegram_id=user_telegram_id):
+            await message.answer("Время подписки истекло.", reply_markup=cancel_keyboard())
+            User.deactivate_user(telegram_id=user_telegram_id)
+            await state.finish()
+            return
     if not UserTokenDiscord.get_all_user_tokens(user_telegram_id):
         await message.answer("Сначала добавьте токен.", reply_markup=user_menu_keyboard())
-        await state.finish()
-        return
-    if not User.is_admin(telegram_id=user_telegram_id) and not User.check_expiration_date(telegram_id=user_telegram_id):
-        await message.answer("Время подписки истекло.", reply_markup=cancel_keyboard())
-        User.deactivate_user(telegram_id=user_telegram_id)
         await state.finish()
         return
     await message.answer("Начинаю работу.", reply_markup=cancel_keyboard())
