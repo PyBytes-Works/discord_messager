@@ -23,3 +23,5 @@ iam_token.json
 /accounts.txt
 /data/
 /tests/
+/discord_mailer.conf
+/help.txt
