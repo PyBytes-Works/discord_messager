@@ -528,24 +528,11 @@ class UserTokenDiscord(BaseModel):
             discord_id = token_data.discord_id
             mate_data: 'UserTokenDiscord' = UserTokenDiscord.get_or_none(
                 discord_id=mate_id, mate_id=discord_id)
+            x = token_data.delete_instance()
+            y = 0
             if mate_data:
-                x = token_data.delete_instance()
                 y = mate_data.delete_instance()
-                return x + y
             return 0
-        # token =  UserTokenDiscord.get_or_none()
-        #               .where(cls.gpuser == user_id)
-        #               .where(cls.discord_id != discord_id)]
-        # if mate_id in tokens:
-        #     discord_token: UserTokenDiscord = UserTokenDiscord.get_or_none(discord_id=discord_id)
-        #     discord_token_mate: UserTokenDiscord = UserTokenDiscord.get_or_none(discord_id=mate_id)
-        #     if discord_token and discord_token_mate:
-        #         discord_token.mate_id = mate_id
-        #         discord_token.save()
-        #         discord_token_mate.mate_id = discord_id
-        #         discord_token.save()
-        #         return True
-
 
     @classmethod
     @logger.catch
@@ -594,7 +581,6 @@ class UserTokenDiscord(BaseModel):
     @logger.catch
     def update_token_info(cls, token: str, proxy: str, channel: int, guild: int) -> bool:
         """
-        ????????
         update guild, channel, proxy by token
         token: (str)
         proxy: (str) ip address
@@ -627,21 +613,35 @@ class UserTokenDiscord(BaseModel):
         {'token': str, 'guild':str, channel: str,
         'time':время_последнего_сообщения, 'cooldown': кулдаун}
         """
+        def get_info(token_data: 'UserTokenDiscord') -> dict:
+            if not token_data:
+                return {}
+            return {
+                'token': token_data.token,
+                'discord_id': token_data.discord_id,
+                'mate_id': token_data.mate_id,
+                'guild': token_data.guild,
+                'channel': token_data.channel,
+                'time': token_data.last_message_time,
+                'cooldown': token_data.cooldown
+                }
+
         user_id: 'User' = User.get_user_by_telegram_id(telegram_id)
         if user_id:
-            return [
-                {
-                    'token': discord_token.token,
-                    'discord_id': discord_token.discord_id,
-                    'mate_id': discord_token.mate_id,
-                    'guild': discord_token.guild,
-                    'channel': discord_token.channel,
-                    'time': discord_token.last_message_time,
-                    'cooldown': discord_token.cooldown
 
-                }
-                for discord_token in cls.select().where(cls.user == user_id).execute()
-            ]
+            data = []
+            result = []
+            for discord_token in cls.select().where(cls.user == user_id).execute():
+                data.append(discord_token)
+            while data:
+                first: 'UserTokenDiscord' = data.pop()
+                second = None
+                for i, value in enumerate(data):
+                    if first.mate_id == value.discord_id:
+                        second = data.pop(i)
+                        break
+                result.append([get_info(first), get_info(second)])
+            return result
         return []
 
     @classmethod

@@ -3,7 +3,7 @@ import asyncio
 import json
 
 from aiogram.dispatcher.filters import Text
-from aiogram.types import Message, CallbackQuery, ReplyKeyboardRemove
+from aiogram.types import Message, CallbackQuery, ReplyKeyboardRemove, InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.dispatcher import FSMContext
 
 from config import logger, Dispatcher
@@ -143,8 +143,17 @@ async def add_discord_token_handler(message: Message, state: FSMContext) -> None
     """ Получение токена запрос discord_id"""
 
     token = message.text
-    data = await state.get_data()
+    token_info = UserTokenDiscord.get_info_by_token(token)
+    if token_info:
+        await message.answer(
+            "Такой токен токен уже есть в база данных."
+            "\n Повторите ввод токена.",
+            reply_markup=cancel_keyboard()
+        )
+        await UserState.user_add_channel.set()
+        return
 
+    data = await state.get_data()
     channel = data.get('channel')
     first_token = data.get('first_token')
     proxy: str = User.get_proxy(telegram_id=message.from_user.id)
@@ -155,7 +164,9 @@ async def add_discord_token_handler(message: Message, state: FSMContext) -> None
             await message.answer(
                 "Ваш токен не прошел проверку в данном канале. "
                 "\nЛибо канал не существует либо токен отсутствует данном канале, "
-                "\nЛибо токен не рабочий.",
+                "\nЛибо токен не рабочий."
+                "\n Повторите ввод токена.",
+
                 reply_markup=cancel_keyboard()
             )
             await UserState.user_add_channel.set()
@@ -163,7 +174,8 @@ async def add_discord_token_handler(message: Message, state: FSMContext) -> None
         else:
             await message.answer(
                 "Ваш токен не прошел проверку в данном канале. "
-                "\nТокен отсутствует данном канале, либо токен не рабочий.",
+                "\nТокен отсутствует данном канале, либо токен не рабочий."
+                "\n Повторите ввод токена.",
                 reply_markup=cancel_keyboard()
             )
             return
@@ -237,24 +249,52 @@ async def add_discord_id_handler(message: Message, state: FSMContext) -> None:
 
 
 @logger.catch
-async def info_tokens_handler(message: Message, state: FSMContext) -> None:
-    """выводит инфо о токенах. Обработчик кнопки /info
+async def info_tokens_handler(message: Message) -> None:
     """
-
+    выводит инфо о токенах. Обработчик кнопки /info
+    """
     user = message.from_user.id
     if User.is_active(message.from_user.id):
+        def get_mess(data: dict) -> str:
+            if not data:
+                return ''
+            token = data.get('token')
+            channel = data.get('channel')
+            discord_id = data.get('discord_id')
+            mate_id = data.get('mate_id')
+            cooldown = data.get('cooldown')
+            return (f" токен {token} канал {channel} дискорд id {discord_id} \n"
+                    f"id пары  {mate_id} куллдаун {cooldown}")
+
         data = UserTokenDiscord.get_all_info_tokens(user)
-        print(data)
-        for token_info in data:
-            token = token_info.get('token')
-            channel = token_info.get('channel')
-            discord_id = token_info.get('discord_id')
-            mate_id = token_info.get('mate_id')
-            cooldown = token_info.get('cooldown')
+        if data:
+            await UserState.user_delete_token_pair.set()
             await message.answer(
-                f"токен {token} канал {channel} дискорд id {discord_id} id пары  {mate_id} куллдаун {cooldown}",
-                reply_markup=user_menu_keyboard()
+                'Пары токенов:',
+                reply_markup=cancel_keyboard()
             )
+
+            for token_info in data:
+                first_token = token_info[0].get('token')
+                mess = f'1) {get_mess(token_info[0])} \n2) {get_mess(token_info[1])}'
+                keyboard = InlineKeyboardMarkup(row_width=1)
+                keyboard.add(InlineKeyboardButton(text="Удалить пару.", callback_data=f"{first_token}"))
+                await message.answer(
+                        mess,
+                        reply_markup=keyboard
+                    )
+
+
+@logger.catch
+async def delete_pair_handler(callback: CallbackQuery, state: FSMContext) -> None:
+    user = callback.from_user.id
+    print(callback.data)
+    if User.is_active(user):
+        print(callback.data)
+
+        UserTokenDiscord.delete_token_pair(callback.data)
+        await callback.message.delete()
+        return
 
 
 @logger.catch
@@ -338,4 +378,6 @@ def register_handlers(dp: Dispatcher) -> None:
     dp.register_message_handler(add_channel_handler, state=UserState.user_add_channel)
     dp.register_message_handler(add_discord_token_handler, state=UserState.user_add_token)
     dp.register_message_handler(add_discord_id_handler, state=UserState.user_add_discord_id)
+    dp.register_callback_query_handler(delete_pair_handler, state=UserState.user_delete_token_pair)
+    # dp.register_message_handler(send_to_discord, state=UserState.user_wait_message)
     dp.register_message_handler(default_message)
