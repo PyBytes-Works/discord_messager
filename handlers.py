@@ -132,8 +132,17 @@ async def add_discord_token_handler(message: Message, state: FSMContext) -> None
     """ Получение токена запрос discord_id"""
 
     token = message.text
-    data = await state.get_data()
+    token_info = UserTokenDiscord.get_info_by_token(token)
+    if token_info:
+        await message.answer(
+            "Такой токен токен уже есть в база данных."
+            "\n Повторите ввод токена.",
+            reply_markup=cancel_keyboard()
+        )
+        await UserState.user_add_channel.set()
+        return
 
+    data = await state.get_data()
     channel = data.get('channel')
     first_token = data.get('first_token')
     proxy: str = User.get_proxy(telegram_id=message.from_user.id)
@@ -144,7 +153,9 @@ async def add_discord_token_handler(message: Message, state: FSMContext) -> None
             await message.answer(
                 "Ваш токен не прошел проверку в данном канале. "
                 "\nЛибо канал не существует либо токен отсутствует данном канале, "
-                "\nЛибо токен не рабочий.",
+                "\nЛибо токен не рабочий."
+                "\n Повторите ввод токена.",
+
                 reply_markup=cancel_keyboard()
             )
             await UserState.user_add_channel.set()
@@ -152,7 +163,8 @@ async def add_discord_token_handler(message: Message, state: FSMContext) -> None
         else:
             await message.answer(
                 "Ваш токен не прошел проверку в данном канале. "
-                "\nТокен отсутствует данном канале, либо токен не рабочий.",
+                "\nТокен отсутствует данном канале, либо токен не рабочий."
+                "\n Повторите ввод токена.",
                 reply_markup=cancel_keyboard()
             )
             return
