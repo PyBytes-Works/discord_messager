@@ -32,17 +32,19 @@ class User(BaseModel):
         is_active
         get_active_users
         get_active_users_not_admins
-        set_data_subscriber
-        set_expiration_dateset_expiration_date
         get_expiration_date
+        get_proxy
         get_id_inactive_users
         get_working_users
         get_subscribers_list
         # FIXME delete method? get_telegram_id
         get_user_id_by_telegram_id
         get_user_by_telegram_id
+        set_data_subscriber
+        set_expiration_date
         set_user_is_work
         set_user_is_not_work
+        set_proxy_by_telegram_id
         set_user_status_admin
     """
 
@@ -276,6 +278,15 @@ class User(BaseModel):
 
     @classmethod
     @logger.catch
+    def set_proxy_by_telegram_id(cls: 'User', telegram_id: str, proxy: str) -> bool:
+        """
+        set max tokens for user
+        subscription_period:  int
+        """
+        return cls.update(proxy=proxy).where(cls.telegram_id == telegram_id).execute()
+
+    @classmethod
+    @logger.catch
     def check_expiration_date(cls: 'User', telegram_id: str) -> bool:
         """
         возвращает статус подписки пользователя,
@@ -295,8 +306,21 @@ class User(BaseModel):
         """
         user: User = cls.get_or_none(cls.expiration, cls.telegram_id == telegram_id)
         # print(type(result.expiration))
-        expiration = user.expiration
-        return expiration
+        if user:
+            expiration = user.expiration
+            return expiration
+
+    @classmethod
+    @logger.catch
+    def get_proxy(cls: 'User', telegram_id: str) -> CharField:
+        """
+        возвращает timestamp без миллисекунд в виде целого числа
+        """
+        user: User = cls.get_or_none(cls.proxy, cls.telegram_id == telegram_id)
+        # print(type(result.expiration))
+        if user:
+            proxy = user.proxy
+            return proxy
 
     @classmethod
     @logger.catch
@@ -390,6 +414,7 @@ class UserTokenDiscord(BaseModel):
                                     telegram_id: str,
                                     token: str,
                                     discord_id: str,
+                                    mate_id: str,
                                     proxy: str,
                                     guild: int,
                                     channel: int,
@@ -423,6 +448,7 @@ class UserTokenDiscord(BaseModel):
                     'user': user_id,
                     'token': token,
                     'discord_id': discord_id,
+                    'mate_id': mate_id,
                     'proxy': proxy,
                     'guild': guild,
                     'channel': channel,

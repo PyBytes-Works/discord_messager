@@ -6,6 +6,7 @@ from aiogram.dispatcher.filters.state import State, StatesGroup
 class UserState(StatesGroup):
     """Машина состояний для управления пользователями."""
     user_wait_message = State()
+    user_add_cooldown = State()
     user_add_token = State()
     user_add_channel = State()
     user_add_proxy = State()
