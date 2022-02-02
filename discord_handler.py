@@ -8,8 +8,7 @@ import asyncio
 import requests
 
 from data_classes import users_data_storage, DataStore
-from models import UserTokenDiscord
-from utils import save_data_to_json
+from models import UserTokenDiscord, User
 from config import logger
 from dotenv import load_dotenv
 
@@ -28,14 +27,17 @@ class MessageReceiver:
 
     @classmethod
     @logger.catch
-    async def get_message(cls, datastore: 'DataStore', timer: float = 7) -> dict:
+    async def get_message(cls, datastore: 'DataStore', telegram_id: str, timer: float = 7) -> dict:
         """Получает данные из АПИ, выбирает случайное сообщение и возвращает ID сообщения
         и само сообщение"""
 
-        # print("Get message start: ", datetime.datetime.now())
         result = {"work": False, "message": "ERROR"}
         token = '_'
         while token:
+            if not User.get_is_work(telegram_id=telegram_id):
+                result.update({"message": "Работа завершена."})
+                break
+            print(f"Пауза между отправкой сообщений: {timer}")
             await asyncio.sleep(timer)
             selected_data: dict = cls.__select_token_for_work(datastore=datastore)
             result_message: str = selected_data["message"]
@@ -43,20 +45,15 @@ class MessageReceiver:
             if not token:
                 result.update({"message": result_message})
                 break
-            # print("Token found")
             datastore.token = token
             data: List[dict] = cls.__get_data_from_api(datastore=datastore)
             if data:
-                # print("Data found")
                 result_data: dict = cls.__get_random_message(data)
                 datastore.current_message_id = int(result_data["id"])
             answer = MessageSender.send_message(datastore=datastore)
-            # print("ANSWER:", answer)
             if answer != "Message sent":
                 result.update({"message": answer})
                 break
-
-        print("RESULT:", result)
 
         return result
 
@@ -77,13 +74,11 @@ class MessageReceiver:
             for key, value in elem.items()
             if current_time > value["time"] + value["cooldown"]
         ]
-        # print("Ready tokens: ", len(tokens_for_job))
         if tokens_for_job:
             random_token: str = random.choice(tokens_for_job)
             result["token"]: str = random_token
             datastore.save_token_data(random_token)
         else:
-            print("ALL_TOKENS:", all_tokens)
             min_token_data = {}
             for elem in all_tokens:
                 min_token_data: dict = min(elem.items(), key=lambda x: x[1].get('time'))
@@ -91,6 +86,7 @@ class MessageReceiver:
             datastore.save_token_data(token)
             min_token_time: int = UserTokenDiscord.get_time_by_token(token)
             delay: int = datastore.cooldown - abs(min_token_time - current_time)
+            datastore.delay = delay
             text = "секунд"
             if delay > 60:
                 minutes: int = delay // 60
@@ -101,8 +97,7 @@ class MessageReceiver:
                     seconds: str = f'0{seconds}'
                 delay: str = f"{minutes}:{seconds}"
                 text = "минут"
-            result["message"] = (f"В данный момент все токены заняты. Подождите {delay} {text}. "
-                                 f"Затем нажмите /start_parsing")
+            result["message"] = f"Все токены отработали. Следующий старт через {delay} {text}."
 
         return result
 
@@ -118,7 +113,6 @@ class MessageReceiver:
         }
         response = session.get(url=url, proxies=proxies)
         status_code = response.status_code
-        # print(response.text, status_code)
         result = {}
         if status_code == 200:
             try:
@@ -126,12 +120,7 @@ class MessageReceiver:
             except Exception as err:
                 logger.error(f"JSON ERROR: {err}")
             else:
-                # print(f"TOTAL Data requested {limit}\n"
-                #       f"TOTAL Data received: {len(data)}")
-                save_data_to_json(data)
                 result = cls.__data_filter(data=data, datastore=datastore)
-                # print(f"FILTERED DATA: {len(result)}")
-                save_data_to_json(result, "formed.json")
         else:
             logger.error(f"API request error: {status_code}")
 
@@ -160,10 +149,6 @@ class MessageReceiver:
                         }
                     )
 
-        middle_len = summa // len(data)
-        # print('Средняя длина сообщения:', middle_len)
-        # print('Выбрано сообщений:', len(result))
-
         return result
 
     @classmethod
@@ -183,7 +168,6 @@ class MessageSender:
     @logger.catch
     def send_message(cls, datastore: 'DataStore') -> str:
         """Отправляет данные в канал дискорда, возвращает результат отправки."""
-        # print("SEND MESSAGE START:")
         answer: str = cls.__send_message_to_discord_channel(datastore=datastore)
         logger.info(f"Результат отправки сообщения в дискорд: {answer}")
         UserTokenDiscord.update_token_time(datastore.token)
@@ -225,7 +209,6 @@ class MessageSender:
         url = datastore.channel_url + f'{datastore.channel}/messages?'
         proxies = {
             "http": f"http://{PROXY_USER}:{PROXY_PASSWORD}@{datastore.proxy}/",
-            # "https": f"http://{PROXY_USER}:{PROXY_PASSWORD}@{datastore.proxy}/"
         }
         try:
             response = session.post(url=url, json=data, proxies=proxies)
@@ -242,7 +225,6 @@ class MessageSender:
                 return f"JSON ERROR {err}"
             else:
                 logger.info(f"Data received: {len(data)}")
-                # save_data_to_json(data, file_name="answer.json")
                 answer = "Message sent"
         else:
             answer = f"API request error: {status_code}"
@@ -260,7 +242,6 @@ class MessageSender:
         if vocabulary:
             length = len(vocabulary)
             text = vocabulary.pop(random.randint(0, length - 1))
-            # print("Случайное сообщение из файлика:", text)
             users_data_storage.vocabulary = vocabulary
 
         return text
