@@ -321,7 +321,7 @@ async def start_command_handler(message: Message, state: FSMContext) -> None:
         await message.answer("Сначала добавьте токен.", reply_markup=user_menu_keyboard())
         await state.finish()
         return
-    if not User.check_expiration_date(telegram_id=user_telegram_id):
+    if not User.is_admin(telegram_id=user_telegram_id) and not User.check_expiration_date(telegram_id=user_telegram_id):
         await message.answer("Время подписки истекло.", reply_markup=cancel_keyboard())
         User.deactivate_user(telegram_id=user_telegram_id)
         await state.finish()
