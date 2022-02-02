@@ -4,7 +4,7 @@ from aiogram.dispatcher import FSMContext
 from aiogram.dispatcher.filters import Text
 from aiogram.types import Message, CallbackQuery, ReplyKeyboardRemove
 
-from config import logger, bot, admins_list
+from config import logger, bot, admins_list, DEFAULT_PROXY
 from handlers import cancel_handler
 from keyboards import cancel_keyboard, users_keyboard, user_menu_keyboard
 from states import UserState
@@ -194,8 +194,8 @@ async def add_user_to_db_by_token(message: Message, state: FSMContext) -> None:
         #     message = f"Свободные прокси закончились, не могу зарегистрировать пользователя {user_name}."
         #     await send_report_to_admins(text=message + text)
         #     await state.finish()
-        # user_created = User.add_new_user(telegram_id=user_telegram_id, nick_name=user_name, proxy=proxy)
-        user_created = User.add_new_user(telegram_id=user_telegram_id, nick_name=user_name)
+        proxy = DEFAULT_PROXY
+        user_created = User.add_new_user(telegram_id=user_telegram_id, nick_name=user_name, proxy=proxy)
 
         if not user_created:
             await send_report_to_admins(

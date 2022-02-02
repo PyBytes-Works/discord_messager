@@ -68,7 +68,7 @@ class MessageReceiver:
         """
 
         result: dict = {"message": "token ready"}
-        all_tokens: List[dict] = UserTokenDiscord.get_all_user_tokens(telegram_id=datastore.__telegram_id)
+        all_tokens: List[dict] = UserTokenDiscord.get_all_user_tokens(telegram_id=datastore.telegram_id)
         current_time: int = int(datetime.datetime.now().timestamp())
         tokens_for_job: list = [
             key
