@@ -4,13 +4,12 @@
 /discord_mailer.db
 /discord_mailer.db-shm
 /discord_mailer.db-wal
-
 /answer.json
 /sended.json
 /data.json
 /formed.json
 /dis_tokens.json
-__pycache__/
+*__pycache__
 env
 iam_token.json
 /tokens.json
