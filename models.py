@@ -179,6 +179,17 @@ class User(BaseModel):
 
     @classmethod
     @logger.catch
+    def get_is_work(cls: 'User', telegram_id: str) -> bool:
+        """
+        return list of telegram ids for active users with active subscription
+        return: list
+        """
+        user = User.get_or_none(telegram_id=telegram_id)
+        if user:
+            return user.is_work
+
+    @classmethod
+    @logger.catch
     def get_working_users(cls: 'User') -> list:
         """
         return list of telegram ids for active users with active subscription
@@ -507,30 +518,34 @@ class UserTokenDiscord(BaseModel):
 
     @classmethod
     @logger.catch
-    def delete_token_pair(cls, telegram_id: str, discord_id: str, mate_id: int) -> bool:
+    def delete_token_pair(cls, token: str) -> int:
         """ FIXME
-        update mate_id: update mate_id for token
-         token: (str)
-         mate_id: (str)
-         соединяет пару токенов
-         ищет и проверяет наличие токена с нужным id, и наличие у пользователя токена по mate_id
-         если токое присутствует соединяет пару.
+            Удаляет пару по токену
         """
-        user = User.get_user_by_telegram_id(telegram_id)
-        if user:
-            tokens = [token.discord_id for token in
-                      UserTokenDiscord.select(cls.discord_id)
-                          .where(cls.user == user.get_id)
-                          .where(cls.discord_id != discord_id)]
-            if mate_id in tokens:
-                discord_token: UserTokenDiscord = UserTokenDiscord.get_or_none(discord_id=discord_id)
-                discord_token_mate: UserTokenDiscord = UserTokenDiscord.get_or_none(discord_id=mate_id)
-                if discord_token and discord_token_mate:
-                    discord_token.mate_id = mate_id
-                    discord_token.save()
-                    discord_token_mate.mate_id = discord_id
-                    discord_token.save()
-                    return True
+        token_data: 'UserTokenDiscord' = UserTokenDiscord.get_or_none(token=token)
+        if token_data:
+            mate_id = token_data.mate_id
+            discord_id = token_data.discord_id
+            mate_data: 'UserTokenDiscord' = UserTokenDiscord.get_or_none(
+                discord_id=mate_id, mate_id=discord_id)
+            if mate_data:
+                x = token_data.delete_instance()
+                y = mate_data.delete_instance()
+                return x + y
+            return 0
+        # token =  UserTokenDiscord.get_or_none()
+        #               .where(cls.gpuser == user_id)
+        #               .where(cls.discord_id != discord_id)]
+        # if mate_id in tokens:
+        #     discord_token: UserTokenDiscord = UserTokenDiscord.get_or_none(discord_id=discord_id)
+        #     discord_token_mate: UserTokenDiscord = UserTokenDiscord.get_or_none(discord_id=mate_id)
+        #     if discord_token and discord_token_mate:
+        #         discord_token.mate_id = mate_id
+        #         discord_token.save()
+        #         discord_token_mate.mate_id = discord_id
+        #         discord_token.save()
+        #         return True
+
 
     @classmethod
     @logger.catch
