@@ -1,3 +1,4 @@
+import datetime
 import json
 import os
 import random
@@ -96,3 +97,8 @@ async def send_report_to_admins(text: str) -> None:
 
     for admin_id in admins_list:
         await bot.send_message(chat_id=admin_id, text=text)
+
+
+
+if __name__ == '__main__':
+    print(datetime.datetime.utcnow().isoformat())

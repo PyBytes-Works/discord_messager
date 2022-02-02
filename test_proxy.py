@@ -72,5 +72,5 @@ if __name__ == '__main__':
     #     select_token_for_work(current_user)
     # except KeyboardInterrupt:
     #     print("END")
-
-    save
+    pass
+    print(datetime.datetime.utcnow(tz))

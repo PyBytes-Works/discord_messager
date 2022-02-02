@@ -30,14 +30,12 @@ class DataStore:
     def __init__(self, telegram_id: str):
         self.telegram_id: str = telegram_id
         self.__CURRENT_MESSAGE_ID: int = 0
-        self.__CURRENT_TIME_MESSAGE: float = 0
         self.__DISCORD_USER_TOKEN: str = ''
         self.__PROXY: str = ''
         self.__CHANNEL: int = 0
         self.__GUILD: int = 0
         self.__TOKEN_COOLDOWN: int = 0
-        self.__MAX_TIME_MESSAGE_VALUE: int = int(self.__TOKEN_COOLDOWN * 1.5)
-        self.__MATE_DISCORD_ID: int = 0
+        self.__MATE_DISCORD_ID: str = ''
         self.__DELAY: int = 0
 
     @classmethod
@@ -49,8 +47,6 @@ class DataStore:
         result = {}
         async with aiohttp.ClientSession() as session:
             session.headers['authorization'] = token
-            # result["proxy"] = await cls.__check_proxy(session=session, proxy=proxy)
-            # if result["proxy"] != "bad proxy":
             result["token"] = await cls.__check_token(
                 session=session, token=token, proxy=proxy, channel=channel
             )
@@ -114,24 +110,19 @@ class DataStore:
         self.channel = token_data.get("channel")
         self.guild: int = token_data.get("guild")
         self.cooldown: int = token_data.get("cooldown")
-        self.max_message_time: int = self.cooldown + 10
         self.mate_id: str = token_data.get("mate_id")
 
     @property
-    def mate_id(self) -> int:
+    def mate_id(self) -> str:
         return self.__MATE_DISCORD_ID
 
     @mate_id.setter
-    def mate_id(self, mate_id: int):
+    def mate_id(self, mate_id: str):
         self.__MATE_DISCORD_ID = mate_id
 
     @property
-    def max_message_time(self) -> float:
-        return self.__MAX_TIME_MESSAGE_VALUE
-
-    @max_message_time.setter
-    def max_message_time(self, max_message_time: float):
-        self.__MAX_TIME_MESSAGE_VALUE = max_message_time
+    def last_message_time(self) -> float:
+        return self.__TOKEN_COOLDOWN + 180
 
     @property
     def delay(self) -> int:
@@ -160,14 +151,6 @@ class DataStore:
     @current_message_id.setter
     def current_message_id(self, message_id: int):
         self.__CURRENT_MESSAGE_ID = message_id
-
-    @property
-    def current_time(self) -> float:
-        return self.__CURRENT_TIME_MESSAGE
-
-    @current_time.setter
-    def current_time(self, date: float):
-        self.__CURRENT_TIME_MESSAGE = date
 
     @property
     def channel(self) -> str:
@@ -222,23 +205,25 @@ class UserDataStore:
     @classmethod
     @logger.catch
     def __update_vocabulary(cls, file_name: str = "vocabulary_en.txt"):
+        with open(file_name, 'r', encoding='utf-8') as f:
+            cls.__VOCABULARY = f.readlines()
+
+    @classmethod
+    @logger.catch
+    def get_vocabulary(cls) -> list:
         if not cls.__VOCABULARY:
-            with open(file_name, 'r', encoding='utf-8') as f:
-                cls.__VOCABULARY = f.readlines()
+            cls.__update_vocabulary()
 
-    @property
+        return cls.__VOCABULARY
+
+    @classmethod
     @logger.catch
-    def vocabulary(self) -> list:
-        if not self.__VOCABULARY:
-            self.__update_vocabulary()
-
-        return self.__VOCABULARY
-
-    @vocabulary.setter
-    @logger.catch
-    def vocabulary(self, vocabulary: list):
+    def set_vocabulary(cls, vocabulary: list):
         if isinstance(vocabulary, list):
-            self.__VOCABULARY = vocabulary
+            if not vocabulary:
+                cls.__update_vocabulary()
+            else:
+                cls.__VOCABULARY = vocabulary
 
     @logger.catch
     def get_instance(self, telegram_id: str) -> 'DataStore':

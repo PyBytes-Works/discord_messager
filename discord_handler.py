@@ -8,9 +8,11 @@ import asyncio
 import requests
 
 from data_classes import users_data_storage, DataStore
-from models import UserTokenDiscord, User
+from models import UserTokenDiscord
 from config import logger
 from dotenv import load_dotenv
+
+from utils import save_data_to_json
 
 
 load_dotenv()
@@ -27,33 +29,29 @@ class MessageReceiver:
 
     @classmethod
     @logger.catch
-    async def get_message(cls, datastore: 'DataStore', telegram_id: str, timer: float = 7) -> dict:
+    async def get_message(cls, datastore: 'DataStore', timer: float = 7) -> dict:
         """Получает данные из АПИ, выбирает случайное сообщение и возвращает ID сообщения
         и само сообщение"""
+        result = {"work": True, "message": "ERROR"}
+        datastore.current_message_id = 0
+        selected_data: dict = cls.__select_token_for_work(datastore=datastore)
+        result_message: str = selected_data["message"]
+        token: str = selected_data.get("token", None)
 
-        result = {"work": False, "message": "ERROR"}
-        token = '_'
-        while token:
-            if not User.get_is_work(telegram_id=telegram_id):
-                result.update({"message": "Работа завершена."})
-                break
-            print(f"Пауза между отправкой сообщений: {timer}")
-            await asyncio.sleep(timer)
-            selected_data: dict = cls.__select_token_for_work(datastore=datastore)
-            result_message: str = selected_data["message"]
-            token: str = selected_data.get("token", None)
-            if not token:
-                result.update({"message": result_message})
-                break
-            datastore.token = token
-            data: List[dict] = cls.__get_data_from_api(datastore=datastore)
-            if data:
-                result_data: dict = cls.__get_random_message(data)
-                datastore.current_message_id = int(result_data["id"])
-            answer = MessageSender.send_message(datastore=datastore)
-            if answer != "Message sent":
-                result.update({"message": answer})
-                break
+        if not token:
+            result.update({"work": False, "message": result_message})
+            return result
+        data: List[dict] = cls.__get_data_from_api(datastore=datastore)
+        if data:
+            result_data: dict = cls.__get_random_message(data)
+            datastore.current_message_id = int(result_data["id"])
+        answer = MessageSender.send_message(datastore=datastore)
+        if answer != "Message sent":
+            result.update({"work": False, "message": answer})
+            return result
+        # timer += random.randint(0, 10)
+        logger.info(f"Пауза между отправкой сообщений: {timer}")
+        await asyncio.sleep(timer)
 
         return result
 
@@ -64,7 +62,6 @@ class MessageReceiver:
         Выбирает случайного токена дискорда из свободных, если нет свободных - пишет сообщение что
         свободных нет.
         """
-
         result: dict = {"message": "token ready"}
         all_tokens: List[dict] = UserTokenDiscord.get_all_user_tokens(telegram_id=datastore.telegram_id)
         current_time: int = int(datetime.datetime.now().timestamp())
@@ -106,7 +103,7 @@ class MessageReceiver:
     def __get_data_from_api(cls, datastore: 'DataStore'):
         session = requests.Session()
         session.headers['authorization'] = datastore.token
-        limit = 100
+        limit = 10
         url = datastore.channel_url + f'{datastore.channel}/messages?limit={limit}'
         proxies = {
             "http": f"http://{PROXY_USER}:{PROXY_PASSWORD}@{datastore.proxy}/"
@@ -120,7 +117,9 @@ class MessageReceiver:
             except Exception as err:
                 logger.error(f"JSON ERROR: {err}")
             else:
+                save_data_to_json(data=data)
                 result = cls.__data_filter(data=data, datastore=datastore)
+                print("LEN RESULT:", len(result))
         else:
             logger.error(f"API request error: {status_code}")
 
@@ -135,9 +134,10 @@ class MessageReceiver:
         for elem in data:
             message = elem.get("content")
             message_time = elem.get("timestamp")
-            message_time = int(datetime.datetime.fromisoformat(message_time).timestamp())
+            mes_time = datetime.datetime.fromisoformat(message_time).replace(tzinfo=None)
             if datastore.mate_id == elem["author"]["id"]:
-                if int(datetime.datetime.now().timestamp()) - message_time < datastore.max_message_time:
+                delta = datetime.datetime.utcnow().replace(tzinfo=None) - mes_time
+                if delta.seconds < datastore.last_message_time:
                     summa += len(message)
                     result.append(
                         {
@@ -178,7 +178,6 @@ class MessageSender:
     @logger.catch
     def __send_message_to_discord_channel(cls, datastore: 'DataStore') -> str:
         """Отправляет данные в API, возвращает результат отправки."""
-
         text = cls.__get_random_message_from_vocabulary()
         data = {
             "content": text,
@@ -235,14 +234,16 @@ class MessageSender:
     @classmethod
     @logger.catch
     def __get_random_message_from_vocabulary(cls) -> str:
-        text = "error"
+        vocabulary: list = users_data_storage.get_vocabulary()
 
-        vocabulary: list = users_data_storage.vocabulary
+        length = len(vocabulary)
+        try:
+            index = random.randint(0, length - 1)
+            text = vocabulary.pop(index)
+        except ValueError as err:
+            logger.error(f"ERROR: __get_random_message_from_vocabulary: {err}")
+            return "Vocabulary error"
 
-        if vocabulary:
-            length = len(vocabulary)
-            text = vocabulary.pop(random.randint(0, length - 1))
-            users_data_storage.vocabulary = vocabulary
+        users_data_storage.set_vocabulary(vocabulary)
 
         return text
-
