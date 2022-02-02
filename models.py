@@ -1,5 +1,3 @@
-import asyncio
-import json
 from typing import List
 import datetime
 import os
@@ -8,7 +6,7 @@ from peewee import (
     CharField, BooleanField, DateTimeField, ForeignKeyField, IntegerField
 )
 from peewee import Model
-from config import logger, admins_list, db, db_file_name
+from config import logger, admins_list, db, db_file_name, DEFAULT_PROXY
 
 
 class BaseModel(Model):
@@ -34,17 +32,19 @@ class User(BaseModel):
         is_active
         get_active_users
         get_active_users_not_admins
-        set_data_subscriber
-        set_expiration_dateset_expiration_date
         get_expiration_date
+        get_proxy
         get_id_inactive_users
         get_working_users
         get_subscribers_list
         # FIXME delete method? get_telegram_id
         get_user_id_by_telegram_id
         get_user_by_telegram_id
+        set_data_subscriber
+        set_expiration_date
         set_user_is_work
         set_user_is_not_work
+        set_proxy_by_telegram_id
         set_user_status_admin
     """
 
@@ -55,7 +55,7 @@ class User(BaseModel):
     active = BooleanField(default=True, verbose_name="Активирован")
     is_work = BooleanField(default=False, verbose_name="В работе / Отдыхает")
     admin = BooleanField(default=False, verbose_name="Администраторство")
-    max_tokens = IntegerField(default=1, verbose_name="Максимальное количество токенов")
+    max_tokens = IntegerField(default=5, verbose_name="Максимальное количество токенов")
     created_at = DateTimeField(
         default=datetime.datetime.now(),
         verbose_name='Дата добавления в базу'
@@ -64,6 +64,7 @@ class User(BaseModel):
         default=datetime.datetime.now().timestamp(),
         verbose_name='Срок истечения подписки'
     )
+    proxy = CharField(max_length=50, default='', verbose_name="Прокси")
 
     class Meta:
         db_table = "users"
@@ -104,7 +105,7 @@ class User(BaseModel):
 
     @classmethod
     @logger.catch
-    def add_new_user(cls: 'User', nick_name: str, telegram_id: str) -> str:
+    def add_new_user(cls: 'User', nick_name: str, telegram_id: str, proxy: str = '') -> str:
         """
         if the user is already in the database, returns None
         if created user will return user id
@@ -113,7 +114,7 @@ class User(BaseModel):
         user = cls.get_or_none(cls.telegram_id == telegram_id)
         if not user:
             return cls.create(
-                nick_name=f'{nick_name}_{telegram_id}', telegram_id=telegram_id
+                nick_name=f'{nick_name}_{telegram_id}', telegram_id=telegram_id, proxy=proxy
             ).save()
 
     @classmethod
@@ -171,7 +172,7 @@ class User(BaseModel):
         return {
             user.telegram_id: (f'{user.nick_name.rsplit("_", maxsplit=1)[0]} | '
                                f'{"Active" if user.active else "Not active"} | '
-                               f'{"Work" if user.is_work else "Not work"} | '
+                               # f'{"Work" if user.is_work else "Not work"} | '
                                f'{"Admin" if user.admin else "Not admin"} | ')
             for user in User.select().execute()
         }
@@ -277,6 +278,15 @@ class User(BaseModel):
 
     @classmethod
     @logger.catch
+    def set_proxy_by_telegram_id(cls: 'User', telegram_id: str, proxy: str) -> bool:
+        """
+        set max tokens for user
+        subscription_period:  int
+        """
+        return cls.update(proxy=proxy).where(cls.telegram_id == telegram_id).execute()
+
+    @classmethod
+    @logger.catch
     def check_expiration_date(cls: 'User', telegram_id: str) -> bool:
         """
         возвращает статус подписки пользователя,
@@ -296,8 +306,20 @@ class User(BaseModel):
         """
         user: User = cls.get_or_none(cls.expiration, cls.telegram_id == telegram_id)
         # print(type(result.expiration))
-        expiration = user.expiration
-        return expiration
+        if user:
+            expiration = user.expiration
+            return expiration
+
+    @classmethod
+    @logger.catch
+    def get_proxy(cls: 'User', telegram_id: str) -> CharField:
+        """
+        возвращает timestamp без миллисекунд в виде целого числа
+        """
+        user: User = cls.get_or_none(cls.proxy, cls.telegram_id == telegram_id)
+        # print(type(result.expiration))
+        if user:
+            return user.proxy
 
     @classmethod
     @logger.catch
@@ -347,6 +369,7 @@ class UserTokenDiscord(BaseModel):
       add_token_by_telegram_id
       delete_inactive_tokens
       get_all_user_tokens
+      get_all_info_tokens
       get_number_of_free_slots_for_tokens
       get_time_by_token
       get_info_by_token
@@ -358,6 +381,8 @@ class UserTokenDiscord(BaseModel):
     """
     user = ForeignKeyField(User, on_delete="CASCADE")
     token = CharField(max_length=255, unique=True, verbose_name="Токен пользователя в discord")
+    discord_id = CharField(max_length=255, unique=True, verbose_name="ID пользователя в discord")
+    mate_id = CharField(max_length=255, default='', verbose_name="ID напарника в discord")
     proxy = CharField(
         default='', max_length=25, unique=False, verbose_name="Адрес прокси сервера"
     )
@@ -383,10 +408,12 @@ class UserTokenDiscord(BaseModel):
 
     @classmethod
     @logger.catch
-    def add_or_update_token_by_telegram_id(
+    def add_token_by_telegram_id(
                                     cls,
                                     telegram_id: str,
                                     token: str,
+                                    discord_id: str,
+                                    mate_id: str,
                                     proxy: str,
                                     guild: int,
                                     channel: int,
@@ -404,12 +431,14 @@ class UserTokenDiscord(BaseModel):
         if user_id:
             db_token: UserTokenDiscord = UserTokenDiscord.get_or_none(cls.token == token)
             if db_token:
-                db_token.proxy = proxy
-                db_token.guild = guild
-                db_token.channel = channel
-                db_token.language = language
-                db_token.cooldown = cooldown
-                return db_token.save()
+                # db_token.proxy = proxy
+                # db_token.discord_id = discord_id
+                # db_token.guild = guild
+                # db_token.channel = channel
+                # db_token.language = language
+                # db_token.cooldown = cooldown
+                # return db_token.save()
+                return False
 
             all_token = cls.get_all_user_tokens(telegram_id)
             max_tokens = User.get_max_tokens(telegram_id)
@@ -417,6 +446,8 @@ class UserTokenDiscord(BaseModel):
                 new_token = {
                     'user': user_id,
                     'token': token,
+                    'discord_id': discord_id,
+                    'mate_id': mate_id,
                     'proxy': proxy,
                     'guild': guild,
                     'channel': channel,
@@ -446,6 +477,60 @@ class UserTokenDiscord(BaseModel):
         """
         cooldown = cooldown if cooldown > 0 else 5 * 60
         return cls.update(cooldown=cooldown).where(cls.token == token).execute()
+
+    @classmethod
+    @logger.catch
+    def make_token_pair(cls, telegram_id: str, discord_id: str, mate_id: int) -> bool:
+        """
+        Update mate_id: update mate_id for token
+             token: (str)
+             mate_id: (str)
+             соединяет пару токенов
+             ищет и проверяет наличие токена с нужным id, и наличие у пользователя токена по mate_id
+             если токое присутствует соединяет пару.
+        """
+        user = User.get_user_by_telegram_id(telegram_id)
+        if user:
+            tokens = [token.discord_id for token in
+                      UserTokenDiscord.select(cls.discord_id)
+                          .where(cls.user == user.get_id)
+                          .where(cls.discord_id != discord_id)]
+            if mate_id in tokens:
+                discord_token: UserTokenDiscord = UserTokenDiscord.get_or_none(discord_id=discord_id)
+                discord_token_mate: UserTokenDiscord = UserTokenDiscord.get_or_none(discord_id=mate_id)
+                if discord_token and discord_token_mate:
+                    discord_token.mate_id = mate_id
+                    discord_token.save()
+                    discord_token_mate.mate_id = discord_id
+                    discord_token.save()
+                    return True
+
+    @classmethod
+    @logger.catch
+    def delete_token_pair(cls, telegram_id: str, discord_id: str, mate_id: int) -> bool:
+        """ FIXME
+        update mate_id: update mate_id for token
+         token: (str)
+         mate_id: (str)
+         соединяет пару токенов
+         ищет и проверяет наличие токена с нужным id, и наличие у пользователя токена по mate_id
+         если токое присутствует соединяет пару.
+        """
+        user = User.get_user_by_telegram_id(telegram_id)
+        if user:
+            tokens = [token.discord_id for token in
+                      UserTokenDiscord.select(cls.discord_id)
+                          .where(cls.user == user.get_id)
+                          .where(cls.discord_id != discord_id)]
+            if mate_id in tokens:
+                discord_token: UserTokenDiscord = UserTokenDiscord.get_or_none(discord_id=discord_id)
+                discord_token_mate: UserTokenDiscord = UserTokenDiscord.get_or_none(discord_id=mate_id)
+                if discord_token and discord_token_mate:
+                    discord_token.mate_id = mate_id
+                    discord_token.save()
+                    discord_token_mate.mate_id = discord_id
+                    discord_token.save()
+                    return True
 
     @classmethod
     @logger.catch
@@ -520,6 +605,32 @@ class UserTokenDiscord(BaseModel):
 
     @classmethod
     @logger.catch
+    def get_all_info_tokens(cls, telegram_id: str) -> list:
+        """
+        Вернуть список всех ТОКЕНОВ пользователя по его telegram_id:
+        return: список словарей
+        {'token': str, 'guild':str, channel: str,
+        'time':время_последнего_сообщения, 'cooldown': кулдаун}
+        """
+        user_id: 'User' = User.get_user_by_telegram_id(telegram_id)
+        if user_id:
+            return [
+                {
+                    'token': discord_token.token,
+                    'discord_id': discord_token.discord_id,
+                    'mate_id': discord_token.mate_id,
+                    'guild': discord_token.guild,
+                    'channel': discord_token.channel,
+                    'time': discord_token.last_message_time,
+                    'cooldown': discord_token.cooldown
+
+                }
+                for discord_token in cls.select().where(cls.user == user_id).execute()
+            ]
+        return []
+
+    @classmethod
+    @logger.catch
     def get_time_by_token(cls, token: str) -> int:
         """
         Вернуть timestamp(кд) токена по его "значению":
@@ -549,7 +660,7 @@ class UserTokenDiscord(BaseModel):
             channel = int(data.channel) if data.channel else 0
             result = {'proxy': data.proxy, 'guild': guild, 'channel': channel,
                       'language': data.language, 'last_message_time': data.last_message_time,
-                      'cooldown': data.cooldown}
+                      'mate_id': data.mate_id, 'cooldown': data.cooldown}
         return result
 
     @classmethod
@@ -581,6 +692,16 @@ class UserTokenDiscord(BaseModel):
 
         return max_tokens - len(all_token)  # TODO Use count
 
+    @classmethod
+    @logger.catch
+    def get_token_by_discord_id(cls, discord_id: str) -> 'UserTokenDiscord':
+        """
+        Вернуть token по discord_id
+        """
+        token: 'UserTokenDiscord' = cls.get_or_none(discord_id=discord_id)
+
+        return token
+
 
 @logger.catch
 def drop_db() -> None:
@@ -606,73 +727,29 @@ def recreate_db(_db_file_name: str) -> None:
 
 
 if __name__ == '__main__':
-
-    # def add_fake_user_data():
-    #     """test func"""
-    #     import json
-    #     current_user = "305353027"
-    #     channel = 932256559394861079
-    #     guild = 932256559394861076
-    #     token = "OTMzMTE5MDEzNzc1NjI2MzAy.YfFAmw._X2-nZ6_knM7pK3081hqjdYHrn4"
-    #
-    #     with open("dis_tokens.json", encoding='utf-8') as f:
-    #         tokens = json.load(f)
-    #
-    #     proxy = asyncio.get_event_loop().run_until_complete(get_checked_proxy_by_number(1, token, channel))
-    #     proxy = proxy[0][1]
-    #     # proxy = ""
-    #     User.set_max_tokens(telegram_id=current_user, max_tokens=8)
-    #     for token in tokens:
-    #         UserTokenDiscord.add_token_by_telegram_id(
-    #             telegram_id=current_user,
-    #             token=token,
-    #             proxy=proxy,
-    #             channel=channel,
-    #             guild=guild,
-    #             language='ru',
-    #             cooldown=300
-    #
-    #         )
-
-
-    def add_data():
-
-        tttime = 0
-        for user_id, nick_name in test_user_list:
-            User.add_new_user(nick_name=nick_name, telegram_id=user_id)
-            # User.set_user_status_admin(telegram_id=user_id)
-            User.set_expiration_date(telegram_id=user_id, subscription_period=tttime)
-            tttime += 1
-            # logger.info(f"User {nick_name} with id {admin_id} created as ADMIN.")
-
-
-    if __name__ == '__main__':
-        # add_fake_user_data()
-
-        recreate = 0
-        add_test_users = 0
-        add_admins = 0
-        add_tokens = 0
-        import random
-        import string
-        test_user_list = (
-            (f'test{user}', ''.join(random.choices(string.ascii_letters, k=5)))
-            for user in range(1, 6)
-        )
-        # if add_tokens:
-        #     # user_id = User.get_user_id_by_telegram_id('test2')
-        #     [
-        #         (UserTokenDiscord.add_token_by_telegram_id(user_id, f'{user_id}token{number}'))
-        #         for user_id in ('test1', 'test3', 'test5') for number in range(1, 4)
-        #     ]
-        add_data()
-        if recreate:
-            recreate_db(db_file_name)
-        if add_admins:
-            for admin_id in admins_list:
-                nick_name = "Admin"
-                User.add_new_user(nick_name=nick_name, telegram_id=admin_id)
-                User.set_user_status_admin(telegram_id=admin_id)
-                logger.info(f"User {nick_name} with id {admin_id} created as ADMIN.")
+    recreate = 0
+    add_test_users = 0
+    add_admins = 0
+    add_tokens = 0
+    import random
+    import string
+    test_user_list = (
+        (f'test{user}', ''.join(random.choices(string.ascii_letters, k=5)))
+        for user in range(1, 6)
+    )
+    # if add_tokens:
+    #     # user_id = User.get_user_id_by_telegram_id('test2')
+    #     [
+    #         (UserTokenDiscord.add_token_by_telegram_id(user_id, f'{user_id}token{number}'))
+    #         for user_id in ('test1', 'test3', 'test5') for number in range(1, 4)
+    #     ]
+    if recreate:
+        recreate_db(db_file_name)
+    if add_admins:
+        for admin_id in admins_list:
+            nick_name = "Admin"
+            User.add_new_user(nick_name=nick_name, telegram_id=admin_id, proxy=DEFAULT_PROXY)
+            User.set_user_status_admin(telegram_id=admin_id)
+            logger.info(f"User {nick_name} with id {admin_id} created as ADMIN.")
 
 
