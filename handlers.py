@@ -21,6 +21,7 @@ async def cancel_handler(message: Message, state: FSMContext) -> None:
     Ставит пользователя в нерабочее состояние.
     Обработчик команды /cancel
     """
+
     user_telegram_id = message.from_user.id
     datastore = users_data_storage.get_instance(telegram_id=user_telegram_id)
     time_to_over = 0
@@ -121,8 +122,9 @@ async def add_cooldown_handler(message: Message, state: FSMContext) -> None:
 @logger.catch
 async def add_channel_handler(message: Message, state: FSMContext) -> None:
     """
-        получения ссылки на канал, запрос token
+        Получения ссылки на канал, запрос tokenа
     """
+
     mess = message.text
     guild, channel = mess.rsplit('/', maxsplit=3)[-2:]
     guild = check_is_int(guild)
@@ -197,7 +199,7 @@ async def add_discord_token_handler(message: Message, state: FSMContext) -> None
 @logger.catch
 async def add_discord_id_handler(message: Message, state: FSMContext) -> None:
     """
-        добавить discord_id
+        Проверяет оба токена и добавляет их в БД
     """
 
     discord_id = message.text
@@ -251,8 +253,9 @@ async def add_discord_id_handler(message: Message, state: FSMContext) -> None:
 @logger.catch
 async def info_tokens_handler(message: Message) -> None:
     """
-    выводит инфо о токенах. Обработчик кнопки /info
+    Выводит инфо о токенах. Обработчик кнопки /info
     """
+
     user = message.from_user.id
     if User.is_active(message.from_user.id):
         def get_mess(data: dict) -> str:
@@ -263,8 +266,11 @@ async def info_tokens_handler(message: Message) -> None:
             discord_id = data.get('discord_id')
             mate_id = data.get('mate_id')
             cooldown = data.get('cooldown')
-            return (f" токен {token} канал {channel} дискорд id {discord_id} \n"
-                    f"id пары  {mate_id} куллдаун {cooldown}")
+            return (f"Токен: {token}"
+                    f"\nКанал {channel}"
+                    f"\nДискорд id {discord_id}"
+                    f"\nID пары  {mate_id}"
+                    f"\nКуллдаун {cooldown}")
 
         data = UserTokenDiscord.get_all_info_tokens(user)
         if data:
@@ -286,15 +292,19 @@ async def info_tokens_handler(message: Message) -> None:
 
 
 @logger.catch
-async def delete_pair_handler(callback: CallbackQuery, state: FSMContext) -> None:
-    user = callback.from_user.id
-    print(callback.data)
-    if User.is_active(user):
-        print(callback.data)
+async def delete_pair_handler(callback: CallbackQuery) -> None:
+    """Хэндлер для нажатия на кнопку "Удалить токен" """
 
-        UserTokenDiscord.delete_token_pair(callback.data)
-        await callback.message.delete()
-        return
+    user = callback.from_user.id
+    if User.is_active(user):
+        if User.get_is_work(telegram_id=user):
+            await callback.message.answer("Бот запущен, сначала остановите бота.", reply_markup=cancel_keyboard())
+        else:
+            UserTokenDiscord.delete_token_pair(callback.data)
+            await callback.message.delete()
+            return
+
+    await callback.answer()
 
 
 @logger.catch
@@ -302,8 +312,8 @@ async def start_command_handler(message: Message, state: FSMContext) -> None:
     """Получает случайное сообщение из дискорда, ставит машину состояний в положение
     'жду ответа пользователя'
     Обработчик команды /start_parsing
-
     """
+
     user_telegram_id = message.from_user.id
     if not User.is_active(telegram_id=user_telegram_id):
         return
@@ -329,6 +339,7 @@ async def start_command_handler(message: Message, state: FSMContext) -> None:
 @logger.catch
 async def lets_play(message: Message, datastore: 'DataStore'):
     """Show must go on"""
+
     user_telegram_id = message.from_user.id
     while User.get_is_work(telegram_id=user_telegram_id):
         print(f"PAUSE: {datastore.delay + 1}")
@@ -361,13 +372,13 @@ def register_handlers(dp: Dispatcher) -> None:
     """
     Регистратор для функций данного модуля
     """
+
     dp.register_message_handler(
         cancel_handler, commands=['отмена', 'cancel'], state="*")
     dp.register_message_handler(
         cancel_handler, Text(startswith=["отмена", "cancel"], ignore_case=True), state="*")
     dp.register_message_handler(start_command_handler, commands=["start_parsing"])
     dp.register_message_handler(info_tokens_handler, commands=["info"])
-    dp.register_message_handler(start_command_handler, state=UserState.user_start_game)
     dp.register_message_handler(get_all_tokens_handler, commands=["set_cooldown"])
     dp.register_callback_query_handler(request_self_token_cooldown_handler, state=UserState.select_token)
     dp.register_message_handler(set_self_token_cooldown_handler, state=UserState.set_user_self_cooldown)
