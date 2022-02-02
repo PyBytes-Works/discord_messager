@@ -35,9 +35,10 @@ class DataStore:
         self.__PROXY: str = ''
         self.__CHANNEL: int = 0
         self.__GUILD: int = 0
-        self.__MAX_TIME_MESSAGE_VALUE: int = 600
         self.__TOKEN_COOLDOWN: int = 0
+        self.__MAX_TIME_MESSAGE_VALUE: int = int(self.__TOKEN_COOLDOWN * 1.5)
         self.__MATE_DISCORD_ID: int = 0
+        self.__DELAY: int = 0
 
     @classmethod
     async def check_user_data(cls, token: str, proxy: str, channel: int) -> dict:
@@ -125,12 +126,20 @@ class DataStore:
         self.__MATE_DISCORD_ID = mate_id
 
     @property
-    def max_message_time(self) -> int:
+    def max_message_time(self) -> float:
         return self.__MAX_TIME_MESSAGE_VALUE
 
     @max_message_time.setter
-    def max_message_time(self, max_message_time: int):
+    def max_message_time(self, max_message_time: float):
         self.__MAX_TIME_MESSAGE_VALUE = max_message_time
+
+    @property
+    def delay(self) -> int:
+        return self.__DELAY
+
+    @delay.setter
+    def delay(self, delay: int):
+        self.__DELAY = delay
 
     @property
     def cooldown(self) -> int:

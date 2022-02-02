@@ -73,5 +73,4 @@ if __name__ == '__main__':
     # except KeyboardInterrupt:
     #     print("END")
 
-    all_tokens = []
-    min(all_tokens, key=lambda x: x.get('time'))
+    save

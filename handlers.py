@@ -1,5 +1,6 @@
 """Модуль с основными обработчиками команд, сообщений и коллбэков"""
 import asyncio
+import json
 
 from aiogram.dispatcher.filters import Text
 from aiogram.types import Message, CallbackQuery, ReplyKeyboardRemove
@@ -10,7 +11,7 @@ from models import User, UserTokenDiscord
 from keyboards import cancel_keyboard, user_menu_keyboard, all_tokens_keyboard
 from discord_handler import MessageReceiver, DataStore, MessageSender, users_data_storage
 from states import UserState
-from utils import check_is_int
+from utils import check_is_int, save_data_to_json
 
 
 @logger.catch
@@ -20,12 +21,22 @@ async def cancel_handler(message: Message, state: FSMContext) -> None:
     Ставит пользователя в нерабочее состояние.
     Обработчик команды /cancel
     """
-
-    user = message.from_user.id
+    user_telegram_id = message.from_user.id
+    datastore = users_data_storage.get_instance(telegram_id=user_telegram_id)
+    time_to_over = 0
+    if datastore:
+        time_to_over = datastore.delay
     logger.info(f'CANCELED')
+    text = ''
+    if User.get_is_work(telegram_id=user_telegram_id):
+        text = ("\nДождитесь завершения работы бота..."
+                f"\nОсталось: {time_to_over} секунд")
+    await message.answer(
+        "Вы отменили текущую команду." + text,
+        reply_markup=user_menu_keyboard()
+    )
+    User.set_user_is_not_work(telegram_id=user_telegram_id)
     await state.finish()
-    await message.answer("Ввод отменен.", reply_markup=user_menu_keyboard())
-    User.set_user_is_not_work(user)
 
 
 @logger.catch
@@ -178,7 +189,6 @@ async def add_discord_id_handler(message: Message, state: FSMContext) -> None:
     """
 
     discord_id = message.text
-    # token = False  # TODO проверка используется ли дискорд id
 
     data = await state.get_data()
     first_discord_id = data.get('first_discord_id')
@@ -206,10 +216,17 @@ async def add_discord_id_handler(message: Message, state: FSMContext) -> None:
     token2 = UserTokenDiscord.add_token_by_telegram_id(
         telegram_id=user, token=second_token, discord_id=second_discord_id, mate_id=first_discord_id,
         proxy=second_proxy, guild=guild, channel=channel, cooldown=cooldown)
+    data.update({
+        "second_discord_id": discord_id,
+    })
     if token1 and token2:
         await message.answer(
-            "Токен добавлен",
+            "Токены удачно добавлены.",
             reply_markup=user_menu_keyboard())
+        data = {
+            user: data
+        }
+        save_data_to_json(data=data, file_name="user_data.json", key='a')
     else:
         UserTokenDiscord.delete_token(first_token)
         UserTokenDiscord.delete_token(second_token)
@@ -248,7 +265,6 @@ async def start_command_handler(message: Message, state: FSMContext) -> None:
 
     """
     user_telegram_id = message.from_user.id
-    print(message.text)
     if not User.is_active(telegram_id=user_telegram_id):
         return
     if not UserTokenDiscord.get_all_user_tokens(user_telegram_id):
@@ -260,50 +276,29 @@ async def start_command_handler(message: Message, state: FSMContext) -> None:
         User.deactivate_user(telegram_id=user_telegram_id)
         await state.finish()
         return
-    await message.answer("Начинаю получение данных", reply_markup=cancel_keyboard())
-    print("Создаю экземпляр класса-хранилища")
-    new_store = DataStore(user_telegram_id)
-    print("Добавляю его в общее хранилище")
-    users_data_storage.add_or_update(telegram_id=user_telegram_id, data=new_store)
-    print("Отправляю запрос к АПИ")
-    # result = await MessageReceiver.get_message(new_store)
-    answer = await MessageReceiver.get_message(new_store)
-    if answer.get("message", "no messages") == "no messages":
-        await message.answer("Нет новых сообщений", reply_markup=user_menu_keyboard())
-        await state.finish()
-        return
-    text = answer.get("message", "ERROR")
-    token_work = answer.get("work", False)
-    if not token_work:
-        await message.answer(text, reply_markup=user_menu_keyboard())
-        await state.finish()
+    await message.answer("Начинаю работу.", reply_markup=cancel_keyboard())
+    datastore = DataStore(user_telegram_id)
+    users_data_storage.add_or_update(telegram_id=user_telegram_id, data=datastore)
+    User.set_user_is_work(telegram_id=user_telegram_id)
+    # Начинаем игру
+    await lets_play(message=message, datastore=datastore)
+    print("GAME OVER")
+    await state.finish()
 
 
-#
-# @logger.catch
-# async def send_to_discord(message: Message, state: FSMContext) -> None:
-#     """Отправляет полученное сообщение в дискорд"""
-#
-#     text = message.text
-#     if len(text) > 50:
-#         await message.answer(
-#             "Сообщение не должно быть длиннее 50 символов. Попробуй еще раз.",
-#             reply_markup=cancel_keyboard()
-#         )
-#         return
-#     # await message.answer("Понял, принял, отправляю.", reply_markup=cancel_keyboard())
-#
-#     datastore = users_data_storage.get_instance(message.from_user.id)
-#     result = MessageSender.send_message(text=message.text, datastore=datastore)
-#     if result == "Message sent":
-#         await message.answer(f"Результат отправки: {result}", reply_markup=ReplyKeyboardRemove())
-#         # await message.answer("Ожидаю новых сообщений", reply_markup=cancel_keyboard())
-#         await UserState.user_start_game.set()
-#         await start_command_handler(message=message, state=state)
-#         return
-#     else:
-#         await message.answer(f'При отправке сообщения произошла ошибка: {result}. Обратитесь к администратору.')
-#     await state.finish()
+@logger.catch
+async def lets_play(message: Message, datastore: 'DataStore'):
+    """Show must go on"""
+    user_telegram_id = message.from_user.id
+    while User.get_is_work(telegram_id=user_telegram_id):
+        print(f"PAUSE: {datastore.delay + 1}")
+        await asyncio.sleep(datastore.delay + 1)
+        datastore.delay = 0
+        answer = await MessageReceiver.get_message(datastore=datastore, telegram_id=user_telegram_id)
+        text = answer.get("message", "ERROR")
+        token_work = answer.get("work", False)
+        if not token_work:
+            await message.answer(text, reply_markup=cancel_keyboard())
 
 
 @logger.catch
@@ -343,5 +338,4 @@ def register_handlers(dp: Dispatcher) -> None:
     dp.register_message_handler(add_channel_handler, state=UserState.user_add_channel)
     dp.register_message_handler(add_discord_token_handler, state=UserState.user_add_token)
     dp.register_message_handler(add_discord_id_handler, state=UserState.user_add_discord_id)
-    # dp.register_message_handler(send_to_discord, state=UserState.user_wait_message)
     dp.register_message_handler(default_message)
