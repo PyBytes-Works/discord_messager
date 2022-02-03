@@ -1,5 +1,6 @@
 """Модуль с основными обработчиками команд, сообщений и коллбэков"""
 import asyncio
+import datetime
 import json
 
 from aiogram.dispatcher.filters import Text
@@ -155,7 +156,7 @@ async def add_channel_handler(message: Message, state: FSMContext) -> None:
 async def add_discord_token_handler(message: Message, state: FSMContext) -> None:
     """ Получение токена запрос discord_id"""
 
-    token = message.text
+    token = message.text.strip()
     token_info = UserTokenDiscord.get_info_by_token(token)
     if token_info:
         await message.answer(
@@ -218,10 +219,18 @@ async def add_discord_id_handler(message: Message, state: FSMContext) -> None:
         Проверяет оба токена и добавляет их в БД
     """
 
-    discord_id = message.text
+    discord_id = message.text.strip()
 
     data = await state.get_data()
     first_discord_id = data.get('first_discord_id')
+    check_discord_id = UserTokenDiscord.check_token_by_discord_id(discord_id=discord_id)
+
+    if check_discord_id or discord_id == first_discord_id:
+        await message.answer(
+            "Такой discord_id уже был введен повторите ввод discord_id.",
+            reply_markup=cancel_keyboard()
+        )
+        return
 
     if not first_discord_id:
         await state.update_data(first_discord_id=discord_id)
@@ -288,11 +297,14 @@ async def info_tokens_handler(message: Message) -> None:
                     f"\nID пары  {mate_id}"
                     f"\nКуллдаун {cooldown}")
 
+        date_expiration = User.get_expiration_date(user)
+        date_expiration = datetime.datetime.fromtimestamp(date_expiration)
         data = UserTokenDiscord.get_all_info_tokens(user)
         if data:
             await UserState.user_delete_token_pair.set()
             await message.answer(
-                'Пары токенов:',
+                f'Подписка истекает  {date_expiration}'
+                f'\nПары токенов:',
                 reply_markup=cancel_keyboard()
             )
 
@@ -306,7 +318,9 @@ async def info_tokens_handler(message: Message) -> None:
                         reply_markup=keyboard
                     )
         else:
-            await message.answer("Данных нет.", reply_markup=user_menu_keyboard())
+            await message.answer(
+                "f'Подписка истекает  {date_expiration}"
+                "'Данных о токенах нет.", reply_markup=user_menu_keyboard())
 
 
 @logger.catch

@@ -37,7 +37,6 @@ class User(BaseModel):
         get_id_inactive_users
         get_working_users
         get_subscribers_list
-        # FIXME delete method? get_telegram_id
         get_user_id_by_telegram_id
         get_user_by_telegram_id
         set_data_subscriber
@@ -68,17 +67,6 @@ class User(BaseModel):
 
     class Meta:
         db_table = "users"
-
-    # @classmethod
-    # @logger.catch
-    # def get_telegram_id(cls: 'User', id: str) -> str:
-    #     """
-    #     method returning telegram id for user by user id
-    #     if the user is not in the database will return None
-    #     return: telegram_id: str
-    #     """
-    #     user = cls.get_or_none(cls.id == id)
-    #     return user.telegram_id if user else None
 
     @classmethod
     @logger.catch
@@ -125,13 +113,15 @@ class User(BaseModel):
 
     @classmethod
     @logger.catch
-    def delete_user_by_telegram_id(cls: 'User', telegram_id: str) -> None:
+    def delete_user_by_telegram_id(cls: 'User', telegram_id: str) -> tuple:
         """
         delete user by telegram id
         """
         user = cls.get_or_none(cls.telegram_id == telegram_id)
         if user:
-            user.delete_instance()
+            user_id = user.id
+            return (user.delete_instance(),
+                    UserTokenDiscord.delete().where(UserTokenDiscord.user == user_id).execute())
 
     @classmethod
     @logger.catch
@@ -390,6 +380,8 @@ class UserTokenDiscord(BaseModel):
       get_number_of_free_slots_for_tokens
       get_time_by_token
       get_info_by_token
+      get_token_by_discord_id
+      check_token_by_discord_id
       update_token_cooldown
       update_token_channel
       update_token_guild
@@ -524,7 +516,7 @@ class UserTokenDiscord(BaseModel):
 
     @classmethod
     @logger.catch
-    def delete_token_pair(cls, token: str) -> int:
+    def delete_token_pair(cls, token: str) -> None:
         """ FIXME
             Удаляет пару по токену
         """
@@ -534,11 +526,9 @@ class UserTokenDiscord(BaseModel):
             discord_id = token_data.discord_id
             mate_data: 'UserTokenDiscord' = UserTokenDiscord.get_or_none(
                 discord_id=mate_id, mate_id=discord_id)
-            x = token_data.delete_instance()
-            y = 0
+            token_data.delete_instance()
             if mate_data:
-                y = mate_data.delete_instance()
-            return 0
+                mate_data.delete_instance()
 
     @classmethod
     @logger.catch
@@ -659,6 +649,15 @@ class UserTokenDiscord(BaseModel):
         data: 'UserTokenDiscord' = cls.get_or_none(cls.last_message_time, cls.token == token)
         last_message_time = data.last_message_time if data else None
         return last_message_time
+
+    @classmethod
+    @logger.catch
+    def check_token_by_discord_id(cls, discord_id: str) -> bool:
+        """
+        Вернуть timestamp(кд) токена по его "значению":
+        """
+        data = cls.select().where(cls.discord_id == discord_id).execute()
+        return True if data else False
 
     @classmethod
     @logger.catch
