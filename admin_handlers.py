@@ -77,8 +77,8 @@ async def max_user_request_handler(message: Message) -> None:
 async def add_new_user_name_handler(message: Message, state: FSMContext) -> None:
     if User.is_admin(telegram_id=message.from_user.id):
         max_tokens = check_is_int(message.text)
-        if max_tokens is None:
-            await message.answer('Число должно быть целым положительным. Введите еще раз.: ', reply_markup=cancel_keyboard())
+        if max_tokens is None or max_tokens % 2:
+            await message.answer('Число должно быть четным целым положительным. Введите еще раз.: ', reply_markup=cancel_keyboard())
             return
         await state.update_data(max_tokens=max_tokens)
         await message.answer('Введите имя для нового пользователя: ', reply_markup=cancel_keyboard())

@@ -42,7 +42,7 @@ def check_is_int(text: str) -> int:
     """Проверяет что в строке пришло положительное число и возвращает его обратно если да"""
 
     if text.isdigit():
-        if int(text) >= 0:
+        if int(text) > 0:
             return int(text)
 
 

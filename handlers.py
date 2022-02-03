@@ -130,7 +130,11 @@ async def add_channel_handler(message: Message, state: FSMContext) -> None:
     """
 
     mess = message.text
-    guild, channel = mess.rsplit('/', maxsplit=3)[-2:]
+    try:
+        guild, channel = mess.rsplit('/', maxsplit=3)[-2:]
+    except ValueError as err:
+        logger.error(err)
+        guild = channel = 0
     guild = check_is_int(guild)
     channel = check_is_int(channel)
     if not guild or not channel:
@@ -140,8 +144,13 @@ async def add_channel_handler(message: Message, state: FSMContext) -> None:
 
     await state.update_data(guild=guild, channel=channel)
     await UserState.user_add_token.set()
+    link = "https://teletype.in/@ted_crypto/Txzfz8Vuwd2"
     await message.answer(
-        "Введите первый токен", reply_markup=cancel_keyboard())
+        "Введите первый токен"
+        "\nЧтобы узнать свой токен - перейдите по ссылке: "
+        f"\n{link}",
+        reply_markup=cancel_keyboard()
+    )
 
 
 @logger.catch
