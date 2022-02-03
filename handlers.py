@@ -91,7 +91,6 @@ async def set_self_token_cooldown_handler(message: Message, state: FSMContext):
 async def invitation_add_discord_token_handler(message: Message) -> None:
     """Обработчик команды /add_token"""
 
-    # print(message.from_user.id)
     user = message.from_user.id
     if User.is_active(telegram_id=user):
         if UserTokenDiscord.get_number_of_free_slots_for_tokens(user):
@@ -105,8 +104,7 @@ async def invitation_add_discord_token_handler(message: Message) -> None:
 
 @logger.catch
 async def add_cooldown_handler(message: Message, state: FSMContext) -> None:
-    """ Получение токена запрос ссылки на канал
-    """
+    """ Получение токена запрос ссылки на канал"""
 
     cooldown = check_is_int(message.text)
     if not cooldown:

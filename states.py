@@ -21,3 +21,4 @@ class UserState(StatesGroup):
     max_tokens_req = State()
     set_user_self_cooldown = State()
     select_token = State()
+    subscribe_time = State()
