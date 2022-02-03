@@ -109,7 +109,8 @@ async def add_new_user_handler(message: Message, state: FSMContext) -> None:
     """Проверка введенного времени подписки и создание токена для нового пользователя"""
 
     subscribe_time = check_is_int(message.text)
-    if not subscribe_time:
+    hours_in_year = 8760
+    if not subscribe_time or subscribe_time > hours_in_year * 2:
         await message.answer(
             'Время в часах должно быть четным целым положительным. '
             '\nВведите еще раз время подписки в ЧАСАХ: ',
@@ -235,7 +236,8 @@ async def add_user_to_db_by_token(message: Message, state: FSMContext) -> None:
                 )
                 await send_report_to_admins(
                     text=f"Пользователь {user_name} : ID: {user_telegram_id} добавлен в БД."
-                         f"\nМаксимальное количество токенов: {max_tokens}",
+                         f"\r\nМаксимальное количество токенов: {max_tokens}"
+                         f"\r\nВремя подписки: {subscribe_time}",
                 )
             else:
                 await send_report_to_admins("Произошла ошибка при добавлении нового пользователя.")
