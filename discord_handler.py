@@ -33,7 +33,6 @@ class MessageReceiver:
         """Получает данные из АПИ, выбирает случайное сообщение и возвращает ID сообщения
         и само сообщение"""
         result = {"work": True, "message": "ERROR"}
-        datastore.current_message_id = 0
         selected_data: dict = cls.__select_token_for_work(datastore=datastore)
         result_message: str = selected_data["message"]
         token: str = selected_data.get("token", None)
@@ -46,10 +45,11 @@ class MessageReceiver:
             result_data: dict = cls.__get_random_message(data)
             datastore.current_message_id = int(result_data["id"])
         answer = MessageSender.send_message(datastore=datastore)
+        datastore.current_message_id = 0
         if answer != "Message sent":
             result.update({"work": False, "message": answer})
             return result
-        # timer += random.randint(0, 10)
+        timer += random.randint(0, 4)
         logger.info(f"Пауза между отправкой сообщений: {timer}")
         await asyncio.sleep(timer)
 
@@ -184,7 +184,7 @@ class MessageSender:
             "tts": "false",
         }
         if datastore.current_message_id:
-            data = {
+            data.update({
                 "content": text,
                 "tts": "false",
                 "message_reference":
@@ -202,7 +202,7 @@ class MessageSender:
                         ],
                         "replied_user": "false"
                     }
-            }
+            })
         session = requests.Session()
         session.headers['authorization'] = datastore.token
         url = datastore.channel_url + f'{datastore.channel}/messages?'

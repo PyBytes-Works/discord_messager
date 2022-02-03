@@ -387,6 +387,15 @@ async def lets_play(message: Message, datastore: 'DataStore'):
         elif text == "Vocabulary error":
             await message.answer("Ошибка словаря.", reply_markup=user_menu_keyboard())
             return
+        elif text == "token ban":
+            await message.answer(
+                "Токен забанен:",
+                reply_markup=user_menu_keyboard()
+            )
+            return
+        elif text == "API request error: 429":
+            await message.answer("API request error: 429. Продолжу через 10 секунд.")
+            datastore.delay = 10
         token_work = answer.get("work")
         if not token_work:
             await message.answer(text, reply_markup=cancel_keyboard())
