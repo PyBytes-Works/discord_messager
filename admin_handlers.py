@@ -10,6 +10,11 @@ from keyboards import cancel_keyboard, users_keyboard, user_menu_keyboard
 from states import UserState
 from models import User
 
+from utils import (
+    get_token, add_new_token, delete_used_token, send_report_to_admins, check_is_int,
+    get_random_proxy
+)
+
 
 @logger.catch
 async def request_user_admin_handler(message: Message) -> None:
@@ -37,10 +42,6 @@ async def set_user_admin_handler(message: Message, state: FSMContext) -> None:
     else:
         await message.answer(f'Имя пользователя нераспознано.')
     await state.finish()
-#
-#
-from utils import get_token, add_new_token, delete_used_token, send_report_to_admins, check_is_int, \
-    get_random_proxy
 
 
 @logger.catch
@@ -49,12 +50,12 @@ async def admin_help_handler(message: Message) -> None:
 
     if User.is_admin(telegram_id=message.from_user.id):
         commands: tuple = (
+            "\n/admin - показать список команд администратора",
             "\n/add_user - добавить нового пользователя",
-            "\n/delete_user - удалить пользователя",
             "\n/show_users - показать список пользователей",
-            "\n/admin - показать список команд администратора"
-            "\n/ua - команда для пользователя, для активации по токену"
-            "\n/add_admin - команда для назначения пользователя администратором"
+            "\n/ua - команда для пользователя, для активации по токену",
+            "\n/add_admin - команда для назначения пользователя администратором",
+            "\n/delete_user - удалить пользователя",
         )
         admin_commands: str = "".join(commands)
         await message.answer(f'Список команд администратора: {admin_commands}', reply_markup=user_menu_keyboard())
