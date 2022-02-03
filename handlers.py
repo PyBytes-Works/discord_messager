@@ -1,16 +1,15 @@
 """Модуль с основными обработчиками команд, сообщений и коллбэков"""
 import asyncio
 import datetime
-import json
 
 from aiogram.dispatcher.filters import Text
-from aiogram.types import Message, CallbackQuery, ReplyKeyboardRemove, InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.dispatcher import FSMContext
 
 from config import logger, Dispatcher
 from models import User, UserTokenDiscord
 from keyboards import cancel_keyboard, user_menu_keyboard, all_tokens_keyboard
-from discord_handler import MessageReceiver, DataStore, MessageSender, users_data_storage
+from discord_handler import MessageReceiver, DataStore, users_data_storage
 from states import UserState
 from utils import check_is_int, save_data_to_json
 
@@ -347,14 +346,8 @@ async def start_command_handler(message: Message, state: FSMContext) -> None:
     """
 
     user_telegram_id = message.from_user.id
-    if not User.is_admin(telegram_id=user_telegram_id):
-        if not User.is_active(telegram_id=user_telegram_id):
-            return
-        if not User.check_expiration_date(telegram_id=user_telegram_id):
-            await message.answer("Время подписки истекло.", reply_markup=cancel_keyboard())
-            User.deactivate_user(telegram_id=user_telegram_id)
-            await state.finish()
-            return
+    if not User.is_active(telegram_id=user_telegram_id):
+        return
     if not UserTokenDiscord.get_all_user_tokens(user_telegram_id):
         await message.answer("Сначала добавьте токен.", reply_markup=user_menu_keyboard())
         await state.finish()
@@ -365,7 +358,6 @@ async def start_command_handler(message: Message, state: FSMContext) -> None:
     User.set_user_is_work(telegram_id=user_telegram_id)
     await message.answer("Начинаю работу.", reply_markup=cancel_keyboard())
     await lets_play(message=message, datastore=datastore)
-    logger.info(f"GAME OVER {user_telegram_id}")
     await state.finish()
 
 
@@ -375,10 +367,25 @@ async def lets_play(message: Message, datastore: 'DataStore'):
 
     user_telegram_id = message.from_user.id
     while User.get_is_work(telegram_id=user_telegram_id):
+        if (not User.check_expiration_date(telegram_id=user_telegram_id)
+                and not User.is_admin(telegram_id=user_telegram_id)):
+            await message.answer("Время подписки истекло.", reply_markup=cancel_keyboard())
+            User.delete_user_by_telegram_id(telegram_id=user_telegram_id)
+            logger.info(f"Время подписки {user_telegram_id} истекло, пользователь удален.")
+            return
         answer = await MessageReceiver.get_message(datastore=datastore)
         text = answer.get("message", "ERROR")
-        if text in ("API request error: 400", "Vocabulary error"):
+        if text == "API request error: 400":
             await message.answer(text, reply_markup=user_menu_keyboard())
+            return
+        elif text == "API request error: 403":
+            await message.answer(
+                "У Вас нет прав отправлять сообщения в данный канал.",
+                reply_markup=user_menu_keyboard()
+            )
+            return
+        elif text == "Vocabulary error":
+            await message.answer("Ошибка словаря.", reply_markup=user_menu_keyboard())
             return
         token_work = answer.get("work")
         if not token_work:
@@ -392,7 +399,7 @@ async def lets_play(message: Message, datastore: 'DataStore'):
 @logger.catch
 async def default_message(message: Message) -> None:
     """Ответ на любое необработанное действие активного пользователя."""
-
+    print(message)
     if User.is_active(message.from_user.id):
         await message.answer(
             'Доступные команды: '
@@ -402,7 +409,6 @@ async def default_message(message: Message) -> None:
             '\n/info - показать информацию по всем токенам пользователя.',
             reply_markup=user_menu_keyboard()
         )
-
 
 @logger.catch
 def register_handlers(dp: Dispatcher) -> None:

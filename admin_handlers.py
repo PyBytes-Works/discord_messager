@@ -17,6 +17,17 @@ from utils import (
 
 
 @logger.catch
+async def send_message_to_all_users_handler(message: Message) -> None:
+    """Обработчик команды /sendall"""
+
+    data = message.text[9:]
+    user_id = str(message.from_user.id)
+    if user_id in admins_list:
+        for user in User.get_active_users():
+            await bot.send_message(chat_id=user, text=data)
+
+
+@logger.catch
 async def request_user_admin_handler(message: Message) -> None:
     """Обработчик команды /add_admin"""
 
@@ -269,6 +280,7 @@ def register_admin_handlers(dp: Dispatcher) -> None:
         cancel_handler, Text(startswith=["отмена", "cancel"], ignore_case=True), state="*")
     dp.register_message_handler(
         add_user_to_db_by_token, Text(startswith=["new_user_"]), state=UserState.name_for_activate)
+    dp.register_message_handler(send_message_to_all_users_handler, Text(startswith=["/sendall"]))
     dp.register_message_handler(max_user_request_handler, commands=['add_user'])
     dp.register_message_handler(add_new_user_name_handler, state=UserState.max_tokens_req)
     dp.register_message_handler(add_subscribe_time_handler, state=UserState.subscribe_time)
