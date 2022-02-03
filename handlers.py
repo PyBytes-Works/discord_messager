@@ -399,7 +399,6 @@ async def lets_play(message: Message, datastore: 'DataStore'):
 @logger.catch
 async def default_message(message: Message) -> None:
     """Ответ на любое необработанное действие активного пользователя."""
-    print(message)
     if User.is_active(message.from_user.id):
         await message.answer(
             'Доступные команды: '
@@ -409,6 +408,7 @@ async def default_message(message: Message) -> None:
             '\n/info - показать информацию по всем токенам пользователя.',
             reply_markup=user_menu_keyboard()
         )
+
 
 @logger.catch
 def register_handlers(dp: Dispatcher) -> None:

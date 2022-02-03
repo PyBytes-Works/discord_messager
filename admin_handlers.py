@@ -22,6 +22,9 @@ async def send_message_to_all_users_handler(message: Message) -> None:
 
     data = message.text[9:]
     user_id = str(message.from_user.id)
+    if not data:
+        await message.answer("Нет данных для отправки.")
+        return
     if user_id in admins_list:
         for user in User.get_active_users():
             await bot.send_message(chat_id=user, text=data)
@@ -67,6 +70,7 @@ async def admin_help_handler(message: Message) -> None:
             "\n/ua - команда для пользователя, для активации по токену",
             "\n/add_admin - команда для назначения пользователя администратором",
             "\n/delete_user - удалить пользователя",
+            "\n/sendall 'тут текст сообщения без кавычек' - отправить сообщение всем активным пользователям",
         )
         admin_commands: str = "".join(commands)
         await message.answer(f'Список команд администратора: {admin_commands}', reply_markup=user_menu_keyboard())
@@ -196,7 +200,10 @@ async def delete_user_handler(callback: CallbackQuery, state: FSMContext) -> Non
 @logger.catch
 async def activate_new_user_handler(message: Message) -> None:
     """Обработчик команды /ua для авторизации нового пользователя"""
-
+    user_telegram_id = message.from_user.id
+    if User.is_active(telegram_id=user_telegram_id):
+        await message.answer("Вы уже есть в базе данных.", reply_markup=cancel_keyboard())
+        return
     await message.answer("Введите токен: ", reply_markup=cancel_keyboard())
     await UserState.name_for_activate.set()
 
@@ -207,13 +214,15 @@ async def add_user_to_db_by_token(message: Message, state: FSMContext) -> None:
 
     user_data: dict = delete_used_token(message.text)
     if not user_data:
-        await send_report_to_admins("При чтении токена для создания нового пользователя из файла произошла ошибка."
-                                    f"\nUser: {message.from_user.id}"
-                                    f"\nData: {message}")
+        await send_report_to_admins("Пользователь ошибочно или повторно ввел токен."
+                                    "\r\nПри чтении токена для создания нового пользователя из файла произошла ошибка."
+                                    f"\r\nUser: {message.from_user.id}"
+                                    f"\r\nData: {message}")
+        return
     user_name = user_data["name"]
     max_tokens = user_data["max_tokens"]
     subscribe_time = user_data["subscribe_time"]
-    if user_name and max_tokens:
+    if user_name and max_tokens and subscribe_time:
         user_telegram_id = message.from_user.id
 
         # НЕ УДАЛЯТЬ, РАССКОМЕНТИРОВАТЬ КОГДА БУДУТ ПРОКСИ И ДОПИСАТЬ ФУНКЦИЮ!!!!

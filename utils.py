@@ -11,8 +11,10 @@ from config import logger, bot, admins_list
 def get_random_proxy() -> list:
     """Возвращает случайную проксю из списка"""
     proxies = []
+    if not proxies:
+        raise IndexError
 
-    return proxies.pop(random.randint(0, len(proxies) - 1))
+    return proxies.pop()
 
 
 def save_data_to_json(data, file_name: str = "data.json", key: str = 'w'):
@@ -97,7 +99,6 @@ async def send_report_to_admins(text: str) -> None:
 
     for admin_id in admins_list:
         await bot.send_message(chat_id=admin_id, text=text)
-
 
 
 if __name__ == '__main__':
