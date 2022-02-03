@@ -122,7 +122,7 @@ class DataStore:
 
     @property
     def last_message_time(self) -> float:
-        return self.__TOKEN_COOLDOWN + 180
+        return self.__TOKEN_COOLDOWN + 60
 
     @property
     def delay(self) -> int:

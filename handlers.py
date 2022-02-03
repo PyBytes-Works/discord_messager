@@ -83,7 +83,7 @@ async def set_self_token_cooldown_handler(message: Message, state: FSMContext):
     state_data = await state.get_data()
     token = state_data["token"]
     UserTokenDiscord.update_token_cooldown(token=token, cooldown=cooldown * 60)
-    await message.answer(f"Кулдаун для токена [{token}] установлен: [{cooldown}] минут", reply_markup=cancel_keyboard())
+    await message.answer(f"Кулдаун для токена [{token}] установлен: [{cooldown}] минут", reply_markup=user_menu_keyboard())
     await state.finish()
 
 
@@ -156,7 +156,7 @@ async def add_discord_token_handler(message: Message, state: FSMContext) -> None
             "\n Повторите ввод токена.",
             reply_markup=cancel_keyboard()
         )
-        await UserState.user_add_channel.set()
+        await UserState.user_add_token.set()
         return
 
     data = await state.get_data()
@@ -171,7 +171,7 @@ async def add_discord_token_handler(message: Message, state: FSMContext) -> None
                 "Ваш токен не прошел проверку в данном канале. "
                 "\nЛибо канал не существует либо токен отсутствует данном канале, "
                 "\nЛибо токен не рабочий."
-                "\n Повторите ввод токена.",
+                "\nВведите ссылку на канал заново:",
 
                 reply_markup=cancel_keyboard()
             )
@@ -181,7 +181,7 @@ async def add_discord_token_handler(message: Message, state: FSMContext) -> None
             await message.answer(
                 "Ваш токен не прошел проверку в данном канале. "
                 "\nТокен отсутствует данном канале, либо токен не рабочий."
-                "\n Повторите ввод токена.",
+                "\nПовторите ввод токена.",
                 reply_markup=cancel_keyboard()
             )
             return
@@ -196,8 +196,13 @@ async def add_discord_token_handler(message: Message, state: FSMContext) -> None
         mess_postfix = 'для первого токена'
 
     await UserState.user_add_discord_id.set()
+    link = "https://ibb.co/WHKKytW"
     await message.answer(
-        f"введите discord_id {mess_postfix}", reply_markup=cancel_keyboard())
+        f"Введите discord_id {mess_postfix}"
+        f"\nУзнать его можно перейдя по ссылке:"
+        f"\n{link}",
+        reply_markup=cancel_keyboard()
+    )
 
 
 @logger.catch
@@ -333,11 +338,11 @@ async def start_command_handler(message: Message, state: FSMContext) -> None:
         await message.answer("Сначала добавьте токен.", reply_markup=user_menu_keyboard())
         await state.finish()
         return
-    await message.answer("Начинаю работу.", reply_markup=cancel_keyboard())
+
     datastore = DataStore(user_telegram_id)
     users_data_storage.add_or_update(telegram_id=user_telegram_id, data=datastore)
     User.set_user_is_work(telegram_id=user_telegram_id)
-
+    await message.answer("Начинаю работу.", reply_markup=cancel_keyboard())
     await lets_play(message=message, datastore=datastore)
     logger.info(f"GAME OVER {user_telegram_id}")
     await state.finish()
@@ -360,6 +365,7 @@ async def lets_play(message: Message, datastore: 'DataStore'):
             logger.info(f"PAUSE: {datastore.delay + 1}")
             await asyncio.sleep(datastore.delay + 1)
             datastore.delay = 0
+            await message.answer("Начинаю работу.", reply_markup=cancel_keyboard())
 
 
 @logger.catch

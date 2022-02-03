@@ -103,7 +103,7 @@ class MessageReceiver:
     def __get_data_from_api(cls, datastore: 'DataStore'):
         session = requests.Session()
         session.headers['authorization'] = datastore.token
-        limit = 10
+        limit = 100
         url = datastore.channel_url + f'{datastore.channel}/messages?limit={limit}'
         proxies = {
             "http": f"http://{PROXY_USER}:{PROXY_PASSWORD}@{datastore.proxy}/"
