@@ -105,16 +105,22 @@ class User(BaseModel):
 
     @classmethod
     @logger.catch
-    def add_new_user(cls: 'User', nick_name: str, telegram_id: str, proxy: str = '') -> str:
+    def add_new_user(cls: 'User', nick_name: str, telegram_id: str, proxy: str = '', expiration: int=24) -> str:
         """
         if the user is already in the database, returns None
         if created user will return user id
+        nik_name: str
+        telegram_id: str
+        proxy: str
+        expiration: int  (hours)
         return: str
         """
         user = cls.get_or_none(cls.telegram_id == telegram_id)
         if not user:
+            expiration = int(datetime.datetime.now().timestamp()) + expiration * 60 * 60
             return cls.create(
-                nick_name=f'{nick_name}_{telegram_id}', telegram_id=telegram_id, proxy=proxy
+                nick_name=f'{nick_name}_{telegram_id}', telegram_id=telegram_id, proxy=proxy,
+                expiration=expiration
             ).save()
 
     @classmethod
