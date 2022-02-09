@@ -380,6 +380,7 @@ class UserTokenDiscord(BaseModel):
       get_number_of_free_slots_for_tokens
       get_time_by_token
       get_info_by_token
+      TODO Token.get_all_discord_id(token=datastore.token) list all discord_id
       get_token_by_discord_id
       check_token_by_discord_id
       update_token_cooldown
@@ -667,7 +668,7 @@ class UserTokenDiscord(BaseModel):
         возвращает словарь:
 
             {'proxy':proxy(str), 'guild':guild(int), 'channel': channel(int), 'language': language(str),
-            'last_message_time': last_message_time(int, timestamp), 'cooldown': cooldown(int, seconds)}
+            'last_message_time': last_message_time(int, timestamp),  'cooldown': cooldown(int, seconds)}
             если токена нет приходит пустой словарь
             guild, channel по умолчанию 0 если не было изменений вернётся 0
             proxy по умолчанию пусто
@@ -678,9 +679,9 @@ class UserTokenDiscord(BaseModel):
         if data:
             guild = int(data.guild) if data.guild else 0
             channel = int(data.channel) if data.channel else 0
-            result = {'proxy': data.proxy, 'guild': guild, 'channel': channel,
-                      'language': data.language, 'last_message_time': data.last_message_time,
-                      'mate_id': data.mate_id, 'cooldown': data.cooldown}
+            result = {'proxy': data.proxy, 'discord_id': data.discord_id, 'guild': guild,
+                      'channel': channel, 'mate_id': data.mate_id, 'language': data.language,
+                      'last_message_time': data.last_message_time, 'cooldown': data.cooldown}
         return result
 
     @classmethod
