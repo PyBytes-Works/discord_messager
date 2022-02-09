@@ -170,7 +170,7 @@ async def add_discord_token_handler(message: Message, state: FSMContext) -> None
     channel = data.get('channel')
     first_token = data.get('first_token')
     proxy: str = User.get_proxy(telegram_id=message.from_user.id)
-    result = await DataStore.check_user_data(token, proxy, channel)
+    result = await DataStore.check_user_data(token=token, proxy=proxy, channel=channel)
 
     if result.get('token') == 'bad token':
         if not first_token:
@@ -362,6 +362,11 @@ async def start_command_handler(message: Message, state: FSMContext) -> None:
 
 
 @logger.catch
+async def form_token_pairs(telegram_id: str) -> None:
+    free_tokens: list = UserTokenDiscord.get_all_free_tokens(telegram_id=telegram_id)
+
+
+@logger.catch
 async def lets_play(message: Message, datastore: 'DataStore'):
     """Show must go on"""
 
@@ -416,9 +421,11 @@ async def lets_play(message: Message, datastore: 'DataStore'):
         if not token_work:
             await message.answer(text, reply_markup=cancel_keyboard())
             logger.info(f"PAUSE: {datastore.delay + 1}")
-            current_hour = 0
-            if datetime.datetime.now().hour > current_hour:
-                pass
+            work_hour = 0
+            current_hour = datetime.datetime.now().hour
+            if current_hour > work_hour:
+                work_hour = current_hour
+                print("Время распределять токены!")
                 # TODO сделать перераспределение пар токенов каждый час
             await asyncio.sleep(datastore.delay + 1)
             datastore.delay = 0

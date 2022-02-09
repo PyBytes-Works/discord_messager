@@ -45,74 +45,39 @@ class DataStore:
 
         Save valid data to instance variables """
 
-        result = {}
-        async with aiohttp.ClientSession() as session:
-            session.headers['authorization'] = token
-            result["token"] = await cls.__check_token(
-                session=session, token=token, proxy=proxy, channel=channel
-            )
-            if result["token"] != "bad token":
-                result["channel"] = channel
+        result = {"token": await cls.__check_token(token=token, proxy=proxy, channel=channel)}
+        if result["token"] != "bad token":
+            result["channel"] = channel
 
         return result
 
     @classmethod
-    async def __check_channel(cls, session, token: str, channel: int) -> str:
-        """Returns valid channel else 'bad channel'"""
-
-        session.headers['authorization'] = token
-        limit = 1
-        url = cls.__DISCORD_BASE_URL + f'{channel}/messages?limit={limit}'
-        result = 'bad channel'
-        try:
-            async with session.get(url=url, timeout=3) as response:
-                if response.status == 200:
-                    result = channel
-        except cls.__EXCEPTIONS as err:
-            logger.info(f"Channel check Error: {err}")
-        print(f"CHECK CHANNEL RESULT: {result}")
-        return result
-
-    @classmethod
-    async def __check_proxy(cls, session, proxy: str) -> str:
-        """Returns valid proxy else 'bad proxy'"""
-
-        url = "http://icanhazip.com"
-        result = 'bad proxy'
-        try:
-            async with session.get(url=url, proxy=f"http://{proxy}", ssl=False, timeout=3) as response:
-                if response.status == 200:
-                    result = proxy
-        except cls.__EXCEPTIONS as err:
-            logger.info(f"Proxy check Error: {err}")
-
-        return result
-
-    @classmethod
-    async def __check_token(cls, session, token: str, proxy: str, channel: int) -> str:
+    async def __check_token(cls, token: str, proxy: str, channel: int) -> str:
         """Returns valid token else 'bad token'"""
-        session.headers['authorization'] = token
-        limit = 1
-        url = cls.__DISCORD_BASE_URL + f'{channel}/messages?limit={limit}'
-        result = 'bad token'
-        try:
-            # async with session.get(url=url, proxy=f"http://{proxy}", ssl=False, timeout=3) as response:
-            async with session.get(url=url) as response:
-                if response.status == 200:
-                    result = token
-        except cls.__EXCEPTIONS as err:
-            logger.info(f"Token check Error: {err}")
+        async with aiohttp.ClientSession() as session:
+            session.headers['authorization']: str = token
+            limit: int = 1
+            url: str = cls.__DISCORD_BASE_URL + f'{channel}/messages?limit={limit}'
+            result: str = 'bad token'
+            try:
+                async with session.get(url=url, proxy=f"http://{proxy}", ssl=False, timeout=3) as response:
+                # async with session.get(url=url, timeout=10) as response:
+                    if response.status == 200:
+                        result = token
+            except cls.__EXCEPTIONS as err:
+                logger.info(f"Token check Error: {err}")
+
         return result
 
     def save_token_data(self, token: str):
-        self.token = token
-        token_data = UserTokenDiscord.get_info_by_token(token)
-        self.proxy = token_data.get("proxy")
-        self.channel = token_data.get("channel")
+        self.token: str = token
+        token_data: dict = UserTokenDiscord.get_info_by_token(token)
+        self.proxy: str = token_data.get("proxy")
+        self.channel: int = token_data.get("channel")
         self.guild: int = token_data.get("guild")
         self.cooldown: int = token_data.get("cooldown")
         self.mate_id: str = token_data.get("mate_id")
-        self.my_discord_id: str = token_data.get("my_discord_id")
+        self.my_discord_id: str = token_data.get("discord_id")
 
     @property
     def my_discord_id(self) -> str:
