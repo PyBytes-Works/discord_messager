@@ -380,18 +380,12 @@ async def lets_play(message: Message, datastore: 'DataStore'):
             return
         elif text == "API request error: 403":
             await message.answer(
-                "У Вас нет прав отправлять сообщения в данный канал.",
+                "У Вас нет прав отправлять сообщения в данный канал. (Ошибка 403)",
                 reply_markup=user_menu_keyboard()
             )
             return
         elif text == "Vocabulary error":
             await message.answer("Ошибка словаря.", reply_markup=user_menu_keyboard())
-            return
-        elif text == "token ban":
-            await message.answer(
-                "Токен забанен:",
-                reply_markup=user_menu_keyboard()
-            )
             return
         elif text == "API request error: 429":
             await message.answer("API request error: 429. Продолжу через 10 секунд.")
