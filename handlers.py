@@ -318,8 +318,8 @@ async def info_tokens_handler(message: Message) -> None:
                     )
         else:
             await message.answer(
-                "f'Подписка истекает  {date_expiration}"
-                "'Данных о токенах нет.", reply_markup=user_menu_keyboard())
+                f'Подписка истекает  {date_expiration}'
+                'Данных о токенах нет.', reply_markup=user_menu_keyboard())
 
 
 @logger.catch
