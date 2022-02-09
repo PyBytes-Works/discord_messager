@@ -40,14 +40,17 @@ class MessageReceiver:
         if not token:
             result.update({"work": False, "message": result_message})
             return result
-        data: List[dict] = cls.__get_data_from_api(datastore=datastore)
+        data: dict = cls.__get_data_from_api(datastore=datastore)
         if data:
-            result_data: dict = cls.__get_random_message(data)
+            result_data: dict = cls.__get_random_message(data.get("messages"))
             datastore.current_message_id = int(result_data["id"])
+            result.update(
+                replies=data.get("replies", [{}])
+            )
         answer = MessageSender.send_message(datastore=datastore)
         datastore.current_message_id = 0
         if answer != "Message sent":
-            result.update({"work": False, "message": answer})
+            result.update({"work": False, "message": answer, "token": token})
             return result
         timer += random.randint(0, 4)
         logger.info(f"Пауза между отправкой сообщений: {timer}")
@@ -100,7 +103,7 @@ class MessageReceiver:
 
     @classmethod
     @logger.catch
-    def __get_data_from_api(cls, datastore: 'DataStore'):
+    def __get_data_from_api(cls, datastore: 'DataStore') -> dict:
         session = requests.Session()
         session.headers['authorization'] = datastore.token
         limit = 100
@@ -118,7 +121,7 @@ class MessageReceiver:
                 logger.error(f"JSON ERROR: {err}")
             else:
                 save_data_to_json(data=data)
-                result = cls.__data_filter(data=data, datastore=datastore)
+                result: dict = cls.__data_filter(data=data, datastore=datastore)
                 print("LEN RESULT:", len(result))
         else:
             logger.error(f"API request error: {status_code}")
@@ -127,11 +130,23 @@ class MessageReceiver:
 
     @classmethod
     @logger.catch
-    def __data_filter(cls, data: dict, datastore: 'DataStore') -> list:
-        result = []
+    def __data_filter(cls, data: dict, datastore: 'DataStore') -> dict:
+        messages = []
+        replies = [{}]
+        result = {}
         summa = 0
 
         for elem in data:
+            reply: str = elem.get("referenced_message", {}).get("author", {}).get("id", '')
+            mentions: tuple = tuple(filter(lambda x: x.get("id", '') == datastore.my_discord_id, elem.get("mentions", [])))
+            author: str = elem.get("author")
+            if any(mentions) or reply == datastore.my_discord_id:
+                if author not in UserTokenDiscord.get_all_discord_id(token=datastore.token):
+                    replies.append({
+                        "text": elem.get("content", ''),
+                        "id":  elem.get("id", '')
+                    })
+
             message = elem.get("content")
             message_time = elem.get("timestamp")
             mes_time = datetime.datetime.fromisoformat(message_time).replace(tzinfo=None)
@@ -139,7 +154,7 @@ class MessageReceiver:
                 delta = datetime.datetime.utcnow().replace(tzinfo=None) - mes_time
                 if delta.seconds < datastore.last_message_time:
                     summa += len(message)
-                    result.append(
+                    messages.append(
                         {
                             "id": elem.get("id"),
                             "message": message,
@@ -148,7 +163,8 @@ class MessageReceiver:
                             "timestamp": message_time
                         }
                     )
-
+        result.update(messages=messages, replies=replies)
+        print("Filtered result:", result)
         return result
 
     @classmethod

@@ -37,6 +37,7 @@ class DataStore:
         self.__TOKEN_COOLDOWN: int = 0
         self.__MATE_DISCORD_ID: str = ''
         self.__DELAY: int = 0
+        self.__MY_DISCORD_ID: str = ''
 
     @classmethod
     async def check_user_data(cls, token: str, proxy: str, channel: int) -> dict:
@@ -111,6 +112,15 @@ class DataStore:
         self.guild: int = token_data.get("guild")
         self.cooldown: int = token_data.get("cooldown")
         self.mate_id: str = token_data.get("mate_id")
+        self.my_discord_id: str = token_data.get("my_discord_id")
+
+    @property
+    def my_discord_id(self) -> str:
+        return self.__MY_DISCORD_ID
+
+    @my_discord_id.setter
+    def my_discord_id(self, my_discord_id: str):
+        self.__MY_DISCORD_ID = my_discord_id
 
     @property
     def mate_id(self) -> str:

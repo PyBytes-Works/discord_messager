@@ -11,7 +11,7 @@ from models import User, UserTokenDiscord
 from keyboards import cancel_keyboard, user_menu_keyboard, all_tokens_keyboard
 from discord_handler import MessageReceiver, DataStore, users_data_storage
 from states import UserState
-from utils import check_is_int, save_data_to_json
+from utils import check_is_int, save_data_to_json, send_report_to_admins
 
 
 @logger.catch
@@ -378,22 +378,48 @@ async def lets_play(message: Message, datastore: 'DataStore'):
         if text == "API request error: 400":
             await message.answer(text, reply_markup=user_menu_keyboard())
             return
-        elif text == "API request error: 403":
+        elif text == "API request error: 401":
             await message.answer(
-                "У Вас нет прав отправлять сообщения в данный канал. (Ошибка 403)",
+                "Произошла ошибка данных. Убедитесь, что вы ввели верные данные. Код ошибки - 401.",
                 reply_markup=user_menu_keyboard()
             )
             return
+        elif text == "API request error: 500":
+            await send_report_to_admins("Внутренняя ошибка сервера Дискорда. Пауза 10 секунд. Код ошибки - 500.")
+            datastore.delay = 10
+        elif text == "API request error: 403":
+            token = answer.get("token")
+            UserTokenDiscord.delete_token(token=token)
+            await message.answer(
+                "У Вас нет прав отправлять сообщения в данный канал. (Ошибка 403). "
+                "Похоже данный токен забанили/заглушили/токен сменился."
+                f"\nТокен: {token} удален.",
+                reply_markup=user_menu_keyboard()
+            )
+            # TODO сделать перераспределение пар токенов.
         elif text == "Vocabulary error":
             await message.answer("Ошибка словаря.", reply_markup=user_menu_keyboard())
+            await send_report_to_admins("Ошибка словаря.")
             return
         elif text == "API request error: 429":
-            await message.answer("API request error: 429. Продолжу через 10 секунд.")
+            await send_report_to_admins("Слишком много запросов к АПИ. API request error: 429. "
+                                        "Может еще проксей добавим? )")
             datastore.delay = 10
+
+        for reply in answer.get("replies", [{}]):
+            reply_id = reply.get("id")
+            reply_text = reply.get("text")
+            await message.answer(f"Вам пришел реплай:"
+                                 f"{reply_id}: {reply_text}\n", reply_markup=cancel_keyboard())
+
         token_work = answer.get("work")
         if not token_work:
             await message.answer(text, reply_markup=cancel_keyboard())
             logger.info(f"PAUSE: {datastore.delay + 1}")
+            current_hour = 0
+            if datetime.datetime.now().hour > current_hour:
+                pass
+                # TODO сделать перераспределение пар токенов каждый час
             await asyncio.sleep(datastore.delay + 1)
             datastore.delay = 0
             await message.answer("Начинаю работу.", reply_markup=cancel_keyboard())
@@ -402,6 +428,7 @@ async def lets_play(message: Message, datastore: 'DataStore'):
 @logger.catch
 async def default_message(message: Message) -> None:
     """Ответ на любое необработанное действие активного пользователя."""
+
     if User.is_active(message.from_user.id):
         await message.answer(
             'Доступные команды: '
