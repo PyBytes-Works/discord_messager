@@ -1,6 +1,8 @@
 """Модуль с основными обработчиками команд, сообщений и коллбэков"""
 import asyncio
 import datetime
+import random
+from typing import List, Set, Tuple
 
 from aiogram.dispatcher.filters import Text
 from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
@@ -362,8 +364,16 @@ async def start_command_handler(message: Message, state: FSMContext) -> None:
 
 
 @logger.catch
-async def form_token_pairs(telegram_id: str) -> None:
-    free_tokens: list = UserTokenDiscord.get_all_free_tokens(telegram_id=telegram_id)
+async def form_token_pairs(telegram_id: str, delete: bool = False) -> None:
+    """Формирует пары из токенов"""
+
+    if delete:
+        User.delete_all_pairs(telegram_id=telegram_id)
+    free_tokens: Tuple[tuple] = UserTokenDiscord.get_all_free_tokens(telegram_id=telegram_id)
+    for channel, tokens in free_tokens:
+        while len(tokens) > 1:
+            random.shuffle(tokens)
+            UserTokenDiscord.make_token_pair(tokens.pop(), tokens.pop())
 
 
 @logger.catch
@@ -401,7 +411,7 @@ async def lets_play(message: Message, datastore: 'DataStore'):
                 f"\nТокен: {token} удален.",
                 reply_markup=user_menu_keyboard()
             )
-            # TODO сделать перераспределение пар токенов.
+            await form_token_pairs(telegram_id=user_telegram_id, delete=False)
         elif text == "Vocabulary error":
             await message.answer("Ошибка словаря.", reply_markup=user_menu_keyboard())
             await send_report_to_admins("Ошибка словаря.")
@@ -426,7 +436,7 @@ async def lets_play(message: Message, datastore: 'DataStore'):
             if current_hour > work_hour:
                 work_hour = current_hour
                 print("Время распределять токены!")
-                # TODO сделать перераспределение пар токенов каждый час
+                await form_token_pairs(telegram_id=user_telegram_id, delete=True)
             await asyncio.sleep(datastore.delay + 1)
             datastore.delay = 0
             await message.answer("Начинаю работу.", reply_markup=cancel_keyboard())
