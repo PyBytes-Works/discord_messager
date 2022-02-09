@@ -73,4 +73,4 @@ if __name__ == '__main__':
     # except KeyboardInterrupt:
     #     print("END")
     pass
-    print(datetime.datetime.utcnow(tz))
+

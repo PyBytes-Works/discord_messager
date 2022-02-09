@@ -224,16 +224,8 @@ async def add_user_to_db_by_token(message: Message, state: FSMContext) -> None:
     subscribe_time = user_data["subscribe_time"]
     if user_name and max_tokens and subscribe_time:
         user_telegram_id = message.from_user.id
-
-        # НЕ УДАЛЯТЬ, РАССКОМЕНТИРОВАТЬ КОГДА БУДУТ ПРОКСИ И ДОПИСАТЬ ФУНКЦИЮ!!!!
-        # try:
-        #     proxy = get_random_proxy()
-        # except IndexError as err:
-        #     text = f"Get random proxy error: {err}"
-        #     logger.error(text)
-        #     message = f"Свободные прокси закончились, не могу зарегистрировать пользователя {user_name}."
-        #     await send_report_to_admins(text=message + text)
-        #     await state.finish()
+        # TODO здесь нужен метод получения самой низкозагруженной прокси для выдачи ее новому пользователю
+        # Proxy.get_proxy()
         proxy = DEFAULT_PROXY
         user_created = User.add_new_user(
             telegram_id=user_telegram_id, nick_name=user_name,
