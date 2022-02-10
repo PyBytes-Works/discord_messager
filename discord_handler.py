@@ -12,7 +12,7 @@ from models import UserTokenDiscord
 from config import logger
 from dotenv import load_dotenv
 
-from utils import save_data_to_json
+from utils import save_data_to_json, save_to_redis
 
 
 load_dotenv()
@@ -40,16 +40,20 @@ class MessageReceiver:
         if not token:
             result.update({"work": False, "message": result_message})
             return result
-        data: List[dict] = cls.__get_data_from_api(datastore=datastore)
+        data: dict = cls.__get_data_from_api(datastore=datastore)
         if data:
-            result_data: dict = cls.__get_random_message(data)
+            result_data: dict = cls.__get_random_message(data.get("messages"))
             datastore.current_message_id = int(result_data["id"])
-        answer = MessageSender.send_message(datastore=datastore)
+            replies: list = data.get("replies", [{}])
+            if replies:
+                await save_to_redis(telegram_id=datastore.telegram_id, data=replies, timeout=600)
+                result.update(replies=replies)
+        answer = MessageSender(datastore=datastore).send_message()
         datastore.current_message_id = 0
         if answer != "Message sent":
-            result.update({"work": False, "message": answer})
+            result.update({"work": False, "message": answer, "token": token})
             return result
-        timer += random.randint(0, 4)
+        # timer += random.randint(0, 4)
         logger.info(f"Пауза между отправкой сообщений: {timer}")
         await asyncio.sleep(timer)
 
@@ -100,7 +104,7 @@ class MessageReceiver:
 
     @classmethod
     @logger.catch
-    def __get_data_from_api(cls, datastore: 'DataStore'):
+    def __get_data_from_api(cls, datastore: 'DataStore') -> dict:
         session = requests.Session()
         session.headers['authorization'] = datastore.token
         limit = 100
@@ -118,7 +122,7 @@ class MessageReceiver:
                 logger.error(f"JSON ERROR: {err}")
             else:
                 save_data_to_json(data=data)
-                result = cls.__data_filter(data=data, datastore=datastore)
+                result: dict = cls.__data_filter(data=data, datastore=datastore)
                 print("LEN RESULT:", len(result))
         else:
             logger.error(f"API request error: {status_code}")
@@ -127,11 +131,25 @@ class MessageReceiver:
 
     @classmethod
     @logger.catch
-    def __data_filter(cls, data: dict, datastore: 'DataStore') -> list:
-        result = []
+    def __data_filter(cls, data: dict, datastore: 'DataStore') -> dict:
+        messages = []
+        replies = [{}]
+        result = {}
         summa = 0
 
         for elem in data:
+            reply: str = elem.get("referenced_message", {}).get("author", {}).get("id", '')
+            mentions: tuple = tuple(filter(lambda x: x.get("id", '') == datastore.my_discord_id, elem.get("mentions", [])))
+            author: str = elem.get("author")
+            if any(mentions) or reply == datastore.my_discord_id:
+                if author not in UserTokenDiscord.get_all_discord_id(token=datastore.token):
+                    replies.append({
+                        "token": datastore.token,
+                        "author": author,
+                        "text": elem.get("content", ''),
+                        "id":  elem.get("id", '')
+                    })
+
             message = elem.get("content")
             message_time = elem.get("timestamp")
             mes_time = datetime.datetime.fromisoformat(message_time).replace(tzinfo=None)
@@ -139,7 +157,7 @@ class MessageReceiver:
                 delta = datetime.datetime.utcnow().replace(tzinfo=None) - mes_time
                 if delta.seconds < datastore.last_message_time:
                     summa += len(message)
-                    result.append(
+                    messages.append(
                         {
                             "id": elem.get("id"),
                             "message": message,
@@ -148,7 +166,8 @@ class MessageReceiver:
                             "timestamp": message_time
                         }
                     )
-
+        result.update(messages=messages, replies=replies)
+        print("Filtered result:", result)
         return result
 
     @classmethod
@@ -160,38 +179,43 @@ class MessageReceiver:
 
 
 class MessageSender:
-    """Класс выбирает случайное сообщение из файла и отправляет его в дискорд в ответ на сообщение
+    """Отправляет сообщение в дискорд-канал в ответ на сообщение
     связанного токена
     Возвращает сообщение об ошибке или об успехе"""
 
-    @classmethod
     @logger.catch
-    def send_message(cls, datastore: 'DataStore') -> str:
+    def __init__(self, datastore: 'DataStore'):
+        self.__datastore: 'DataStore' = datastore
+
+    @logger.catch
+    def send_message(self, text: str = '') -> str:
         """Отправляет данные в канал дискорда, возвращает результат отправки."""
-        answer: str = cls.__send_message_to_discord_channel(datastore=datastore)
+
+        answer: str = self.__send_message_to_discord_channel(text=text)
         logger.info(f"Результат отправки сообщения в дискорд: {answer}")
-        UserTokenDiscord.update_token_time(datastore.token)
+        UserTokenDiscord.update_token_time(token=self.__datastore.token)
 
         return answer
 
-    @classmethod
     @logger.catch
-    def __send_message_to_discord_channel(cls, datastore: 'DataStore') -> str:
-        """Отправляет данные в API, возвращает результат отправки."""
-        text = cls.__get_random_message_from_vocabulary()
+    def __send_message_to_discord_channel(self, text: str = '') -> str:
+        """Формирует данные для отправки, возвращает результат отправки."""
+
+        if not text:
+            text = users_data_storage.get_random_message_from_vocabulary()
         data = {
             "content": text,
             "tts": "false",
         }
-        if datastore.current_message_id:
+        if self.__datastore.current_message_id:
             data.update({
                 "content": text,
                 "tts": "false",
                 "message_reference":
                     {
-                        "guild_id": datastore.guild,
-                        "channel_id": datastore.channel,
-                        "message_id": datastore.current_message_id
+                        "guild_id": self.__datastore.guild,
+                        "channel_id": self.__datastore.channel,
+                        "message_id": self.__datastore.current_message_id
                     },
                 "allowed_mentions":
                     {
@@ -203,11 +227,18 @@ class MessageSender:
                         "replied_user": "false"
                     }
             })
+
+        return self.__send_data_to_api(data=data)
+
+    @logger.catch
+    def __send_data_to_api(self, data):
+        """Отправляет данные в дискорд канал"""
+
         session = requests.Session()
-        session.headers['authorization'] = datastore.token
-        url = datastore.channel_url + f'{datastore.channel}/messages?'
+        session.headers['authorization'] = self.__datastore.token
+        url = self.__datastore.channel_url + f'{self.__datastore.channel}/messages?'
         proxies = {
-            "http": f"http://{PROXY_USER}:{PROXY_PASSWORD}@{datastore.proxy}/",
+            "http": f"http://{PROXY_USER}:{PROXY_PASSWORD}@{self.__datastore.proxy}/",
         }
         try:
             response = session.post(url=url, json=data, proxies=proxies)
@@ -230,20 +261,3 @@ class MessageSender:
             logger.error(answer)
 
         return answer
-
-    @classmethod
-    @logger.catch
-    def __get_random_message_from_vocabulary(cls) -> str:
-        vocabulary: list = users_data_storage.get_vocabulary()
-
-        length = len(vocabulary)
-        try:
-            index = random.randint(0, length - 1)
-            text = vocabulary.pop(index)
-        except ValueError as err:
-            logger.error(f"ERROR: __get_random_message_from_vocabulary: {err}")
-            return "Vocabulary error"
-
-        users_data_storage.set_vocabulary(vocabulary)
-
-        return text

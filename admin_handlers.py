@@ -1,4 +1,6 @@
-"""Модуль для обработчиков администратора"""
+"""Модул    ь для обработчиков администратора"""
+import re
+
 from aiogram import Dispatcher
 from aiogram.dispatcher import FSMContext
 from aiogram.dispatcher.filters import Text
@@ -11,8 +13,7 @@ from states import UserState
 from models import User
 
 from utils import (
-    get_token, add_new_token, delete_used_token, send_report_to_admins, check_is_int,
-    get_random_proxy
+    get_token, add_new_token, delete_used_token, send_report_to_admins, check_is_int
 )
 
 
@@ -21,7 +22,7 @@ async def send_message_to_all_users_handler(message: Message) -> None:
     """Обработчик команды /sendall"""
 
     data = message.text[9:]
-    user_id = str(message.from_user.id)
+    user_id = message.from_user.id
     if not data:
         await message.answer("Нет данных для отправки.")
         return
@@ -31,15 +32,46 @@ async def send_message_to_all_users_handler(message: Message) -> None:
 
 
 @logger.catch
+async def request_proxies_handler(message: Message) -> None:
+    """Обработчик команды /add_proxy и /delete_proxy"""
+
+    user_id = message.from_user.id
+    if user_id in admins_list:
+        await message.answer(f'Введите прокси в формате "123.123.123.123:5555" (можно несколько через пробел)', reply_markup=cancel_keyboard())
+        if message.text == '/add_proxy':
+            await UserState.user_add_proxy.set()
+        elif message.text == '/delete_proxy':
+            await UserState.user_delete_proxy.set()
+
+
+@logger.catch
+async def add_new_proxy_handler(message: Message) -> None:
+    """Обработчик введенной прокси"""
+
+    proxies: list = re.findall(r'\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}:\d{1,6}\b', message.text)
+    for proxy in proxies:
+        Proxy.add(proxy=proxy)
+        await message.answer(f"Добавлена прокси: {proxy}")
+
+
+@logger.catch
+async def delete_proxy_handler(message: Message) -> None:
+    """Обработчик введенной прокси"""
+
+    proxies: list = re.findall(r'\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}:\d{1,6}\b', message.text)
+    for proxy in proxies:
+        Proxy.delete(proxy=proxy)
+        await message.answer(f"Удалена прокси: {proxy}")
+
+
+@logger.catch
 async def request_user_admin_handler(message: Message) -> None:
     """Обработчик команды /add_admin"""
 
-    user_id = str(message.from_user.id)
+    user_id = message.from_user.id
     if User.is_admin(user_id) and user_id in admins_list:
         await message.answer(f'Введите имя пользователя: ', reply_markup=cancel_keyboard())
         await UserState.name_for_admin.set()
-    else:
-        logger.info(f'{message.from_user.id}:{message.from_user.username}: NOT AUTORIZATED')
 
 
 @logger.catch
@@ -289,6 +321,9 @@ def register_admin_handlers(dp: Dispatcher) -> None:
         activate_new_user_handler, commands=['ua'])
     dp.register_message_handler(admin_help_handler, commands=['admin'])
     dp.register_message_handler(request_user_admin_handler, commands=['add_admin'])
+    dp.register_message_handler(request_proxies_handler, commands=['add_proxy', 'delete_proxy'])
+    dp.register_message_handler(add_new_proxy_handler, state=UserState.user_add_proxy)
+    dp.register_message_handler(delete_proxy_handler, state=UserState.user_delete_proxy)
     dp.register_message_handler(set_user_admin_handler, state=UserState.name_for_admin)
     dp.register_message_handler(show_all_users_handler, commands=['show_users'])
     dp.register_message_handler(delete_user_name_handler, commands=['delete_user'])
