@@ -380,10 +380,9 @@ async def send_replies(message: Message, replies: list):
 
 
 @logger.catch
-async def answer_to_reply_handler(callback: CallbackQuery, state: FSMContext):
+async def answer_to_reply_handler(callback: CallbackQuery):
     message_id = callback.data.rsplit("_", maxsplit=1)[-1]
     await callback.message.answer('Что ответить?', reply_markup=cancel_keyboard())
-    await state.update_data(message_id=message_id)
     await UserState.answer_to_reply.set()
     await callback.answer()
 
@@ -391,8 +390,6 @@ async def answer_to_reply_handler(callback: CallbackQuery, state: FSMContext):
 @logger.catch
 async def send_message_to_reply_handler(message: Message, state: FSMContext):
     message_to_send = message.text
-    data = await state.get_data()
-    message_id = data.get("message_id")
 
     #TODO получение токена и отправка сообщения
     await message.answer('Сообщение отправлено.', reply_markup=cancel_keyboard())

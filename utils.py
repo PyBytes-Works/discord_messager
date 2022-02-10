@@ -1,3 +1,5 @@
+import aioredis
+from aioredis import Redis
 import datetime
 import json
 import os
@@ -101,5 +103,21 @@ async def send_report_to_admins(text: str) -> None:
         await bot.send_message(chat_id=admin_id, text=text)
 
 
-if __name__ == '__main__':
-    print(datetime.datetime.utcnow().isoformat())
+async def save_to_redis(telegram_id: str, data: list, timeout: int, redis_db: 'Redis' = None) -> int:
+    """Сериализует данные и сохраняет в Редис. Устанавливает время хранения в секундах.
+    Возвращает кол-во записей."""
+
+    if redis_db is None:
+        redis_db = aioredis.from_url("redis://localhost", decode_responses=True)
+    count = await redis_db.set(name=telegram_id, value=json.dumps(data))
+    await redis_db.expire(name=telegram_id, time=timeout)
+
+    return count
+
+
+async def load_from_redis(telegram_id: str, redis_db: 'Redis' = None) -> dict:
+    """Возвращает десериализованные данные из Редис"""
+
+    if redis_db is None:
+        redis_db = aioredis.from_url("redis://localhost", decode_responses=True)
+    return json.loads(await redis_db.get(telegram_id))
