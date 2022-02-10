@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Tuple, Optional
 import datetime
 import os
 
@@ -643,6 +643,19 @@ class UserTokenDiscord(BaseModel):
 
     @classmethod
     @logger.catch
+    def get_all_free_tokens(cls, telegram_id: Optional[str]) -> Tuple[Tuple[str, List[int]]]:
+        """
+        TODO make this method
+        Возвращает список всех discord_id для одного канала у пользователя
+        чей дискорд_id получили в параметрах
+
+        """
+        a: Tuple[Tuple[str, List[int, ...]], ...]
+        a = (('a',[1,2,32]),('b',[2,3,4,5]))
+        return a
+
+    @classmethod
+    @logger.catch
     def get_time_by_token(cls, token: str) -> int:
         """
         Вернуть timestamp(кд) токена по его "значению":
@@ -687,6 +700,7 @@ class UserTokenDiscord(BaseModel):
     @classmethod
     @logger.catch
     def delete_token(cls, token: str):
+        # TODO  Delete relation token
         """Удалить токен по его "значению": """
         data = cls.get_or_none(cls.token == token)
         if data:
@@ -724,6 +738,78 @@ class UserTokenDiscord(BaseModel):
         return token
 
 
+class TokenPair(BaseModel):
+    """
+    class for a table of related token pairs
+        Methods:
+            add_pair
+            delete_pair
+            remove_all_pairs
+            get_all_related_tokens
+     """
+
+    first = ForeignKeyField(UserTokenDiscord, unique=True, verbose_name="первый токен")
+    second = ForeignKeyField(UserTokenDiscord, unique=True, verbose_name="второй токен")
+
+    class Meta:
+        db_table = 'token_pair'
+
+    @classmethod
+    @logger.catch
+    def add_pair(cls, first: int, second: int) -> bool:
+        """add pair related tokens in table
+            arguments:
+                first: int
+                second: int
+        """
+        if cls.select().where((cls.first.in_((first, second)))|(cls.second.in_((first, second)))).execute().all():
+            return False
+        return cls.create(first=first, second=second)
+
+    @classmethod
+    @logger.catch
+    def delete_pair(cls, token_id: int) -> bool:
+        """delete pair related tokens from table
+            arguments:
+                token_id: int
+        """
+        return cls.delete().where((cls.first == token_id)|(cls.second == token_id)).execute()
+
+    @classmethod
+    @logger.catch
+    def remove_all_pairs(cls) -> int:
+        """remove all relations of tokens
+            arguments:
+                token_id: int"""
+        return cls.delete().execute()
+
+    @classmethod
+    @logger.catch
+    def get_all_related_tokens(cls) -> Tuple[int, ...]:
+        """select all related tokens"""
+        first = cls.select(cls.first.alias('token'))
+        second = cls.select(cls.second.alias('token'))
+        query = first | second
+
+        return tuple([value.token for value in query.execute()])
+
+
+
+class Proxy(BaseModel):
+    """
+    class for a table proxies
+        Methods:
+            TODO add proxy
+            TODO delete proxy
+            TODO Clear table ???
+            fields:
+            proxy: str
+            quantity users ????
+    """
+    pass
+
+
+
 @logger.catch
 def drop_db() -> None:
     """Deletes all tables in database"""
@@ -743,7 +829,7 @@ def recreate_db(_db_file_name: str) -> None:
     with db:
         if os.path.exists(_db_file_name):
             drop_db()
-        db.create_tables([User, UserTokenDiscord], safe=True)
+        db.create_tables([User, UserTokenDiscord, TokenPair], safe=True)
         logger.info('DB REcreated')
 
 
