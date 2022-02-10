@@ -11,9 +11,9 @@ from aiogram.dispatcher import FSMContext
 from config import logger, Dispatcher
 from models import User, UserTokenDiscord
 from keyboards import cancel_keyboard, user_menu_keyboard, all_tokens_keyboard
-from discord_handler import MessageReceiver, DataStore, users_data_storage
+from discord_handler import MessageReceiver, DataStore, users_data_storage, MessageSender
 from states import UserState
-from utils import check_is_int, save_data_to_json, send_report_to_admins
+from utils import check_is_int, save_data_to_json, send_report_to_admins, load_from_redis
 
 
 @logger.catch
@@ -380,21 +380,46 @@ async def send_replies(message: Message, replies: list):
 
 
 @logger.catch
-async def answer_to_reply_handler(callback: CallbackQuery):
+async def answer_to_reply_handler(callback: CallbackQuery, state: FSMContext):
     message_id = callback.data.rsplit("_", maxsplit=1)[-1]
     await callback.message.answer('Что ответить?', reply_markup=cancel_keyboard())
     await UserState.answer_to_reply.set()
+    await state.update_data(message_id=message_id)
     await callback.answer()
 
 
 @logger.catch
 async def send_message_to_reply_handler(message: Message, state: FSMContext):
-    message_to_send = message.text
+    """Отправляет сообщение в дискорд реплаем на реплай"""
 
-    #TODO получение токена и отправка сообщения
-    await message.answer('Сообщение отправлено.', reply_markup=cancel_keyboard())
+    state_data = await state.get_data()
+    message_id = state_data.get("message_id")
+    user_telegram_id = message.from_user.id
+    token_data: List[dict] = await load_from_redis(telegram_id=user_telegram_id)
+    token = ''
+    for elem in token_data:
+        if elem.get("message_id") == message_id:
+            token = elem.get('token')
+            break
+    if not token:
+        await send_report_to_admins(
+            text="Func: send_message_to_reply_handler: "
+            "Произошла ошибка получения токена из Redis"
+        )
+        return
+    reply_store = DataStore(telegram_id=user_telegram_id)
+    reply_store.save_token_data(token=token)
+    reply_store.current_message_id = message_id
+    answer = MessageSender(datastore=reply_store).send_message(text=message.text)
+    if answer != "Message sent":
+        await message.answer('Сообщение отправлено.', reply_markup=cancel_keyboard())
+    else:
+        await send_report_to_admins(
+            text="Func: send_message_to_reply_handler: "
+            "Произошла ошибка отправки реплая сообщения в функции "
+        )
+        return
     await state.finish()
-
 
 
 @logger.catch

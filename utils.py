@@ -1,6 +1,5 @@
 import aioredis
 from aioredis import Redis
-import datetime
 import json
 import os
 import random
@@ -8,15 +7,6 @@ import string
 
 from typing import Union
 from config import logger, bot, admins_list
-
-
-def get_random_proxy() -> list:
-    """Возвращает случайную проксю из списка"""
-    proxies = []
-    if not proxies:
-        raise IndexError
-
-    return proxies.pop()
 
 
 def save_data_to_json(data, file_name: str = "data.json", key: str = 'w'):
@@ -115,7 +105,7 @@ async def save_to_redis(telegram_id: str, data: list, timeout: int, redis_db: 'R
     return count
 
 
-async def load_from_redis(telegram_id: str, redis_db: 'Redis' = None) -> dict:
+async def load_from_redis(telegram_id: str, redis_db: 'Redis' = None) -> list:
     """Возвращает десериализованные данные из Редис"""
 
     if redis_db is None:

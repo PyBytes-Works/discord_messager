@@ -53,7 +53,7 @@ class MessageReceiver:
         if answer != "Message sent":
             result.update({"work": False, "message": answer, "token": token})
             return result
-        timer += random.randint(0, 4)
+        # timer += random.randint(0, 4)
         logger.info(f"Пауза между отправкой сообщений: {timer}")
         await asyncio.sleep(timer)
 
@@ -191,9 +191,9 @@ class MessageSender:
     def send_message(self, text: str = '') -> str:
         """Отправляет данные в канал дискорда, возвращает результат отправки."""
 
-        answer: str = self.__send_message_to_discord_channel(text)
+        answer: str = self.__send_message_to_discord_channel(text=text)
         logger.info(f"Результат отправки сообщения в дискорд: {answer}")
-        UserTokenDiscord.update_token_time(self.__datastore.token)
+        UserTokenDiscord.update_token_time(token=self.__datastore.token)
 
         return answer
 
