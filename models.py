@@ -1,11 +1,12 @@
 from typing import List, Tuple, Optional
 import datetime
 import os
+from itertools import groupby
 
 from peewee import (
     CharField, BooleanField, DateTimeField, ForeignKeyField, IntegerField
 )
-from peewee import Model
+from peewee import Model, fn
 from config import logger, admins_list, db, db_file_name, DEFAULT_PROXY
 
 
@@ -380,6 +381,7 @@ class UserTokenDiscord(BaseModel):
       get_number_of_free_slots_for_tokens
       get_time_by_token
       get_info_by_token
+      Todo get_all_free_tokens
       TODO Token.get_all_discord_id(token=datastore.token) list all discord_id
       get_token_by_discord_id
       check_token_by_discord_id
@@ -441,13 +443,6 @@ class UserTokenDiscord(BaseModel):
         if user_id:
             db_token: UserTokenDiscord = UserTokenDiscord.get_or_none(cls.token == token)
             if db_token:
-                # db_token.proxy = proxy
-                # db_token.discord_id = discord_id
-                # db_token.guild = guild
-                # db_token.channel = channel
-                # db_token.language = language
-                # db_token.cooldown = cooldown
-                # return db_token.save()
                 return False
 
             all_token = cls.get_all_user_tokens(telegram_id)
@@ -643,16 +638,23 @@ class UserTokenDiscord(BaseModel):
 
     @classmethod
     @logger.catch
-    def get_all_free_tokens(cls, telegram_id: Optional[str]) -> Tuple[Tuple[str, List[int]]]:
+    def get_all_free_tokens(cls, telegram_id: Optional[str] = None) -> Tuple[Tuple[str, list], ...]:
         """
         TODO make this method
-        Возвращает список всех discord_id для одного канала у пользователя
-        чей дискорд_id получили в параметрах
-
+        Возвращает список всех токенов свободных токенов по каналам
+        если ввести телеграмм id
+        ограничивает выбору одним пользователем
         """
-        a: Tuple[Tuple[str, List[int, ...]], ...]
-        a = (('a',[1,2,32]),('b',[2,3,4,5]))
-        return a
+        related_tokens = TokenPair.get_all_related_tokens()
+        data = cls.select(cls.id, cls.channel).where(cls.id.not_in(related_tokens))
+        if telegram_id is not None:
+            user = User.get_user_id_by_telegram_id(telegram_id=telegram_id)
+            data = data.where(cls.user == user)
+        data.order_by(cls.channel)
+
+        data.order_by(cls.channel)
+        res = [(chan, [tid.id for tid in rec]) for chan, rec in groupby(data, lambda x: x.channel)]
+        return tuple(res)
 
     @classmethod
     @logger.catch
@@ -794,20 +796,52 @@ class TokenPair(BaseModel):
         return tuple([value.token for value in query.execute()])
 
 
-
 class Proxy(BaseModel):
     """
     class for a table proxies
         Methods:
-            TODO add proxy
-            TODO delete proxy
+            add_proxy
+            delete_proxy
             TODO Clear table ???
-            fields:
+            get_list_proxies
+            get_low_used_proxy
+        fields:
             proxy: str
             quantity users ????
     """
-    pass
+    proxy = CharField(max_length=100, unique=True, verbose_name='Адрес прокси с портом.')
+    using = IntegerField(default=0, verbose_name='Количество пользователей.')
 
+    @classmethod
+    @logger.catch
+    def add_proxy(cls, proxy: str) -> bool:
+        res = cls.get_or_none(proxy=proxy)
+        return False if res else cls.create(proxy=proxy)
+
+    @classmethod
+    @logger.catch
+    def delete_proxy(cls, proxy: str) -> bool:
+        instance: cls = cls.get_or_none(proxy=proxy)
+        if instance:
+            return instance.delete_instance()
+        return False
+
+    @classmethod
+    @logger.catch
+    def get_list_proxies(cls: 'Proxy') -> tuple:
+        """return Tuple[Tuple[str, int]] or () """
+        result = cls.get()
+        return [(inst.proxy, inst.using) for inst in result] if result else ()
+
+    @classmethod
+    @logger.catch
+    def get_low_used_proxy(cls: 'Proxy') -> tuple:
+        """return Tuple[str, int] or ()
+         TODO add to the set_proxy method in "model User" counting the number of users
+         """
+        result = cls.select(fn.MIN(cls.using)).scalar()
+        if result:
+            return result.proxy, result.using
 
 
 @logger.catch
@@ -831,6 +865,13 @@ def recreate_db(_db_file_name: str) -> None:
             drop_db()
         db.create_tables([User, UserTokenDiscord, TokenPair], safe=True)
         logger.info('DB REcreated')
+
+
+def create_db() -> None:
+    """Creates new tables in database. Drop all data from DB if it exists."""
+
+    with db:
+        db.create_tables([Proxy], safe=True)
 
 
 if __name__ == '__main__':
