@@ -1,4 +1,6 @@
 import asyncio
+import os
+import random
 
 import aiohttp
 import aiohttp.client_exceptions
@@ -177,29 +179,6 @@ class UserDataStore:
     def __init__(self):
         self.__instance = {}
 
-    @classmethod
-    @logger.catch
-    def __update_vocabulary(cls, file_name: str = "vocabulary_en.txt"):
-        with open(file_name, 'r', encoding='utf-8') as f:
-            cls.__VOCABULARY = f.readlines()
-
-    @classmethod
-    @logger.catch
-    def get_vocabulary(cls) -> list:
-        if not cls.__VOCABULARY:
-            cls.__update_vocabulary()
-
-        return cls.__VOCABULARY
-
-    @classmethod
-    @logger.catch
-    def set_vocabulary(cls, vocabulary: list):
-        if isinstance(vocabulary, list):
-            if not vocabulary:
-                cls.__update_vocabulary()
-            else:
-                cls.__VOCABULARY = vocabulary
-
     @logger.catch
     def get_instance(self, telegram_id: str) -> 'DataStore':
         """Возвращает текущий экземпляр класса для пользователя'"""
@@ -215,6 +194,50 @@ class UserDataStore:
                 telegram_id: data
             }
         )
+
+    @classmethod
+    @logger.catch
+    def get_random_message_from_vocabulary(cls) -> str:
+        vocabulary: list = cls.__get_vocabulary()
+
+        length: int = len(vocabulary)
+        try:
+            index = random.randint(0, length - 1)
+            text = vocabulary.pop(index)
+            cls.__set_vocabulary(vocabulary)
+        except (ValueError, TypeError, FileNotFoundError) as err:
+            logger.error(f"ERROR: __get_random_message_from_vocabulary: {err}")
+            return "Vocabulary error"
+
+        return text
+
+    @classmethod
+    @logger.catch
+    def __get_vocabulary(cls) -> list:
+        if not cls.__VOCABULARY:
+            cls.__update_vocabulary()
+
+        return cls.__VOCABULARY
+
+    @classmethod
+    @logger.catch
+    def __set_vocabulary(cls, vocabulary: list):
+        if isinstance(vocabulary, list):
+            if not vocabulary:
+                cls.__update_vocabulary()
+            else:
+                cls.__VOCABULARY = vocabulary
+        else:
+            raise TypeError("__set_vocabulary error: ")
+
+    @classmethod
+    @logger.catch
+    def __update_vocabulary(cls, file_name: str = "vocabulary_en.txt"):
+        if os.path.exists(file_name):
+            with open(file_name, 'r', encoding='utf-8') as f:
+                cls.__VOCABULARY = f.readlines()
+        else:
+            raise FileNotFoundError(f"__update_vocabulary: {file_name} error: ")
 
 
 # initialization user data storage

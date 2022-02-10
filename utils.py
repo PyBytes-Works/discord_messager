@@ -1,4 +1,7 @@
-import datetime
+import re
+
+import aioredis
+from aioredis import Redis
 import json
 import os
 import random
@@ -6,15 +9,6 @@ import string
 
 from typing import Union
 from config import logger, bot, admins_list
-
-
-def get_random_proxy() -> list:
-    """Возвращает случайную проксю из списка"""
-    proxies = []
-    if not proxies:
-        raise IndexError
-
-    return proxies.pop()
 
 
 def save_data_to_json(data, file_name: str = "data.json", key: str = 'w'):
@@ -101,5 +95,37 @@ async def send_report_to_admins(text: str) -> None:
         await bot.send_message(chat_id=admin_id, text=text)
 
 
+async def save_to_redis(telegram_id: str, data: list, timeout: int, redis_db: 'Redis' = None) -> int:
+    """Сериализует данные и сохраняет в Редис. Устанавливает время хранения в секундах.
+    Возвращает кол-во записей."""
+
+    if redis_db is None:
+        redis_db = aioredis.from_url("redis://localhost", decode_responses=True)
+    count = await redis_db.set(name=telegram_id, value=json.dumps(data))
+    await redis_db.expire(name=telegram_id, time=timeout)
+
+    return count
+
+
+async def load_from_redis(telegram_id: str, redis_db: 'Redis' = None) -> list:
+    """Возвращает десериализованные данные из Редис"""
+
+    if redis_db is None:
+        redis_db = aioredis.from_url("redis://localhost", decode_responses=True)
+    return json.loads(await redis_db.get(telegram_id))
+
+
+@logger.catch
+def add_new_proxy_handler(message: str) -> None:
+    """Обработчик введенной прокси"""
+
+    proxies: list = re.findall(r'\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}:\d{1,6}\b', message)
+    for proxy in proxies:
+        print(f"Добавлена прокси: {proxy}")
+
+
+
 if __name__ == '__main__':
-    print(datetime.datetime.utcnow().isoformat())
+
+    a = '"192.168.1.1:8000" asjkdfhaksjdfh "1.1.1.1:5"'
+    add_new_proxy_handler(a)

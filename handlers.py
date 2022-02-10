@@ -11,9 +11,9 @@ from aiogram.dispatcher import FSMContext
 from config import logger, Dispatcher
 from models import User, UserTokenDiscord
 from keyboards import cancel_keyboard, user_menu_keyboard, all_tokens_keyboard
-from discord_handler import MessageReceiver, DataStore, users_data_storage
+from discord_handler import MessageReceiver, DataStore, users_data_storage, MessageSender
 from states import UserState
-from utils import check_is_int, save_data_to_json, send_report_to_admins
+from utils import check_is_int, save_data_to_json, send_report_to_admins, load_from_redis
 
 
 @logger.catch
@@ -348,11 +348,9 @@ async def lets_play(message: Message, datastore: 'DataStore'):
         if text == 'stop':
             return
 
-        for reply in answer.get("replies", [{}]):
-            reply_id = reply.get("id")
-            reply_text = reply.get("text")
-            await message.answer(f"Вам пришел реплай:"
-                                 f"{reply_id}: {reply_text}\n", reply_markup=cancel_keyboard())
+        replies: list = answer.get("replies", [{}])
+        if replies:
+            await send_replies(message=message, replies=replies)
 
         token_work: bool = answer.get("work")
         if not token_work:
@@ -368,6 +366,60 @@ async def lets_play(message: Message, datastore: 'DataStore'):
             await asyncio.sleep(datastore.delay + 1)
             datastore.delay = 0
             await message.answer("Начинаю работу.", reply_markup=cancel_keyboard())
+
+
+@logger.catch
+async def send_replies(message: Message, replies: list):
+    keyboard = InlineKeyboardMarkup(row_width=1)
+    for reply in replies:
+        author = reply.get("author")
+        reply_id = reply.get("id")
+        reply_text = reply.get("text")
+        keyboard.add(InlineKeyboardButton(text=f'От: {author}\nText: {reply_text}', callback_data=f'reply_{reply_id}'))
+    await message.answer(f"Вам пришли реплаи:", reply_markup=keyboard)
+
+
+@logger.catch
+async def answer_to_reply_handler(callback: CallbackQuery, state: FSMContext):
+    message_id = callback.data.rsplit("_", maxsplit=1)[-1]
+    await callback.message.answer('Что ответить?', reply_markup=cancel_keyboard())
+    await UserState.answer_to_reply.set()
+    await state.update_data(message_id=message_id)
+    await callback.answer()
+
+
+@logger.catch
+async def send_message_to_reply_handler(message: Message, state: FSMContext):
+    """Отправляет сообщение в дискорд реплаем на реплай"""
+
+    state_data = await state.get_data()
+    message_id = state_data.get("message_id")
+    user_telegram_id = message.from_user.id
+    token_data: List[dict] = await load_from_redis(telegram_id=user_telegram_id)
+    token = ''
+    for elem in token_data:
+        if elem.get("message_id") == message_id:
+            token = elem.get('token')
+            break
+    if not token:
+        await send_report_to_admins(
+            text="Func: send_message_to_reply_handler: "
+            "Произошла ошибка получения токена из Redis"
+        )
+        return
+    reply_store = DataStore(telegram_id=user_telegram_id)
+    reply_store.save_token_data(token=token)
+    reply_store.current_message_id = message_id
+    answer = MessageSender(datastore=reply_store).send_message(text=message.text)
+    if answer != "Message sent":
+        await message.answer('Сообщение отправлено.', reply_markup=cancel_keyboard())
+    else:
+        await send_report_to_admins(
+            text="Func: send_message_to_reply_handler: "
+            "Произошла ошибка отправки реплая сообщения в функции "
+        )
+        return
+    await state.finish()
 
 
 @logger.catch
@@ -458,6 +510,8 @@ def register_handlers(dp: Dispatcher) -> None:
     dp.register_message_handler(info_tokens_handler, commands=["info"])
     dp.register_message_handler(get_all_tokens_handler, commands=["set_cooldown"])
     dp.register_callback_query_handler(request_self_token_cooldown_handler, state=UserState.select_token)
+    dp.register_callback_query_handler(answer_to_reply_handler, Text(startswith=["reply_"]))
+    dp.register_message_handler(send_message_to_reply_handler, state=UserState.answer_to_reply)
     dp.register_message_handler(set_self_token_cooldown_handler, state=UserState.set_user_self_cooldown)
     dp.register_message_handler(invitation_add_discord_token_handler, commands=["at", "addtoken", "add_token"])
     dp.register_message_handler(add_cooldown_handler, state=UserState.user_add_cooldown)
