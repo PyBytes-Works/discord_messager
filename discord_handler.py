@@ -143,6 +143,7 @@ class MessageReceiver:
             if any(mentions) or reply == datastore.my_discord_id:
                 if author not in UserTokenDiscord.get_all_discord_id(token=datastore.token):
                     replies.append({
+                        "author": author,
                         "text": elem.get("content", ''),
                         "id":  elem.get("id", '')
                     })

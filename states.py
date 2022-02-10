@@ -22,3 +22,4 @@ class UserState(StatesGroup):
     set_user_self_cooldown = State()
     select_token = State()
     subscribe_time = State()
+    answer_to_reply = State()
