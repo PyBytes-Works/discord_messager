@@ -1,4 +1,5 @@
 import asyncio
+import os
 import random
 
 import aiohttp
@@ -194,19 +195,19 @@ class UserDataStore:
             }
         )
 
+    @classmethod
     @logger.catch
-    def get_random_message_from_vocabulary(self) -> str:
-        vocabulary: list = self.__get_vocabulary()
+    def get_random_message_from_vocabulary(cls) -> str:
+        vocabulary: list = cls.__get_vocabulary()
 
-        length = len(vocabulary)
+        length: int = len(vocabulary)
         try:
             index = random.randint(0, length - 1)
             text = vocabulary.pop(index)
-        except ValueError as err:
+            cls.__set_vocabulary(vocabulary)
+        except (ValueError, TypeError, FileNotFoundError) as err:
             logger.error(f"ERROR: __get_random_message_from_vocabulary: {err}")
             return "Vocabulary error"
-
-        self.__set_vocabulary(vocabulary)
 
         return text
 
@@ -226,12 +227,17 @@ class UserDataStore:
                 cls.__update_vocabulary()
             else:
                 cls.__VOCABULARY = vocabulary
+        else:
+            raise TypeError("__set_vocabulary error: ")
 
     @classmethod
     @logger.catch
     def __update_vocabulary(cls, file_name: str = "vocabulary_en.txt"):
-        with open(file_name, 'r', encoding='utf-8') as f:
-            cls.__VOCABULARY = f.readlines()
+        if os.path.exists(file_name):
+            with open(file_name, 'r', encoding='utf-8') as f:
+                cls.__VOCABULARY = f.readlines()
+        else:
+            raise FileNotFoundError(f"__update_vocabulary: {file_name} error: ")
 
 
 # initialization user data storage

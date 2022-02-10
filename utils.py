@@ -1,3 +1,5 @@
+import re
+
 import aioredis
 from aioredis import Redis
 import json
@@ -111,3 +113,19 @@ async def load_from_redis(telegram_id: str, redis_db: 'Redis' = None) -> list:
     if redis_db is None:
         redis_db = aioredis.from_url("redis://localhost", decode_responses=True)
     return json.loads(await redis_db.get(telegram_id))
+
+
+@logger.catch
+def add_new_proxy_handler(message: str) -> None:
+    """Обработчик введенной прокси"""
+
+    proxies: list = re.findall(r'\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}:\d{1,6}\b', message)
+    for proxy in proxies:
+        print(f"Добавлена прокси: {proxy}")
+
+
+
+if __name__ == '__main__':
+
+    a = '"192.168.1.1:8000" asjkdfhaksjdfh "1.1.1.1:5"'
+    add_new_proxy_handler(a)

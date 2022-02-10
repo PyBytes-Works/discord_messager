@@ -10,6 +10,7 @@ class UserState(StatesGroup):
     user_add_token = State()
     user_add_channel = State()
     user_add_proxy = State()
+    user_delete_proxy = State()
     user_add_discord_id = State()
     user_add_language = State()
     user_delete_token_pair = State()
