@@ -1,4 +1,5 @@
-from typing import List, Tuple, Optional
+import token
+from typing import List, Tuple, Optional, Any
 import datetime
 import os
 from itertools import groupby
@@ -29,6 +30,7 @@ class User(BaseModel):
         deactivate_expired_users
         delete_user_by_telegram_id
         delete_status_admin
+        # TODO test delete_all_pairs
         is_admin
         is_active
         get_active_users
@@ -123,6 +125,18 @@ class User(BaseModel):
             user_id = user.id
             return (user.delete_instance(),
                     UserTokenDiscord.delete().where(UserTokenDiscord.user == user_id).execute())
+
+    @classmethod
+    @logger.catch
+    def delete_all_pairs(cls: 'User', telegram_id: str) -> bool:
+        """
+        remove all associations of user token pairs
+        """
+        user = cls.get_or_none(cls.telegram_id == telegram_id)
+        if user:
+            result = UserTokenDiscord.get_all_tokens_by_user(user_id=user.id)
+            tokens = [data.id for data in result]
+            return TokenPair.remove_pairs_from_list(token_list=tokens)
 
     @classmethod
     @logger.catch
@@ -485,30 +499,15 @@ class UserTokenDiscord(BaseModel):
 
     @classmethod
     @logger.catch
-    def make_token_pair(cls, telegram_id: str, discord_id: str, mate_id: int) -> bool:
+    def make_token_pair(cls, first: Any, second: Any) -> bool:
         """
-        Update mate_id: update mate_id for token
-             token: (str)
-             mate_id: (str)
+        make pair
+             first: (str) or int
+             second: (str)
              соединяет пару токенов
-             ищет и проверяет наличие токена с нужным id, и наличие у пользователя токена по mate_id
-             если токое присутствует соединяет пару.
         """
-        user = User.get_user_by_telegram_id(telegram_id)
-        if user:
-            tokens = [token.discord_id for token in
-                      UserTokenDiscord.select(cls.discord_id)
-                          .where(cls.user == user.get_id)
-                          .where(cls.discord_id != discord_id)]
-            if mate_id in tokens:
-                discord_token: UserTokenDiscord = UserTokenDiscord.get_or_none(discord_id=discord_id)
-                discord_token_mate: UserTokenDiscord = UserTokenDiscord.get_or_none(discord_id=mate_id)
-                if discord_token and discord_token_mate:
-                    discord_token.mate_id = mate_id
-                    discord_token.save()
-                    discord_token_mate.mate_id = discord_id
-                    discord_token.save()
-                    return True
+        return TokenPair.add_pair(first=first, second=second)
+
 
     @classmethod
     @logger.catch
@@ -584,17 +583,27 @@ class UserTokenDiscord(BaseModel):
     def get_all_user_tokens(cls, telegram_id: str) -> List[dict]:
         """
         Вернуть список всех ТОКЕНОВ пользователя по его telegram_id:
-        return: список словарей {token:{'time':время_последнего_сообщения, 'cooldown': кулдаун}}
+        return: список словарей {token:{'time':время_последнего_сообщения,'cooldown': кулдаун}}
         """
         user_id: 'User' = User.get_user_by_telegram_id(telegram_id)
         if user_id:
             return [
-                {user.token: {'time': user.last_message_time, 'cooldown': user.cooldown}}
-                for user in cls.select(
+                {data.token: {'time': data.last_message_time, 'cooldown': data.cooldown}}
+                for data in cls.select(
                     cls.token, cls.last_message_time, cls.cooldown
                 ).where(cls.user == user_id)
             ]
         return []
+
+    @classmethod
+    @logger.catch
+    def get_all_tokens_by_user(cls, user_id: str) -> List['UserTokenDiscord']:
+        """
+        Вернуть список всех ТОКЕНОВ пользователя по его id:
+        return: список token
+        """
+        result = cls.select().where(cls.user == user_id).execute()
+        return [data for data in result] if result else []
 
     @classmethod
     @logger.catch
@@ -771,11 +780,20 @@ class TokenPair(BaseModel):
     @classmethod
     @logger.catch
     def delete_pair(cls, token_id: int) -> bool:
-        """delete pair related tokens from table
+        """FIXME delete pair related tokens from table
             arguments:
                 token_id: int
         """
         return cls.delete().where((cls.first == token_id)|(cls.second == token_id)).execute()
+
+    @classmethod
+    @logger.catch
+    def remove_pairs_from_list(cls, token_list: list) -> bool:
+        """remove  pairs from the list
+            arguments:
+                token_list: list
+        """
+        return cls.delete().where((cls.first.in_(token_list))|(cls.second.in_(token_list))).execute()
 
     @classmethod
     @logger.catch
