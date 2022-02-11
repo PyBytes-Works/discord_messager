@@ -272,15 +272,15 @@ async def info_tokens_handler(message: Message) -> None:
             await UserState.user_delete_token_pair.set()
             await message.answer(
                 f'Подписка истекает  {date_expiration}'
-                f'\nПары токенов:',
+                f'\nТокены:',
                 reply_markup=cancel_keyboard()
             )
 
             for token_info in data:
-                first_token = token_info[0].get('token')
-                mess = f'1) {get_mess(token_info[0])} \n2) {get_mess(token_info[1])}'
+                token = token_info.get('token')
+                mess = f'{get_mess(token_info)}'
                 keyboard = InlineKeyboardMarkup(row_width=1)
-                keyboard.add(InlineKeyboardButton(text="Удалить пару.", callback_data=f"{first_token}"))
+                keyboard.add(InlineKeyboardButton(text="Удалить токен.", callback_data=f"{token}"))
                 await message.answer(
                         mess,
                         reply_markup=keyboard
@@ -300,7 +300,7 @@ async def delete_pair_handler(callback: CallbackQuery) -> None:
         if User.get_is_work(telegram_id=user):
             await callback.message.answer("Бот запущен, сначала остановите бота.", reply_markup=cancel_keyboard())
         else:
-            UserTokenDiscord.delete_token_pair(callback.data)
+            UserTokenDiscord.delete_token(callback.data)
             await callback.message.delete()
             return
 

@@ -593,22 +593,11 @@ class UserTokenDiscord(BaseModel):
                 'cooldown': token_data.cooldown
                 }
 
-        user_id: 'User' = User.get_user_by_telegram_id(telegram_id)
-        if user_id:
+        user: 'User' = User.get_user_by_telegram_id(telegram_id)
+        if user:
+            discord_tokens = cls.select().where(cls.user == user.id).execute()
+            return [get_info(token) for token in discord_tokens]
 
-            data = []
-            result = []
-            for discord_token in cls.select().where(cls.user == user_id).execute():
-                data.append(discord_token)
-            while data:
-                first: 'UserTokenDiscord' = data.pop()
-                second = None
-                for i, value in enumerate(data):
-                    if first.mate_id == value.discord_id:
-                        second = data.pop(i)
-                        break
-                result.append([get_info(first), get_info(second)])
-            return result
         return []
 
     @classmethod
@@ -679,9 +668,11 @@ class UserTokenDiscord(BaseModel):
     def delete_token(cls, token: str):
         # TODO  Delete relation token
         """Удалить токен по его "значению": """
-        data = cls.get_or_none(cls.token == token)
-        if data:
-            return data.delete_instance()
+        token = cls.get_or_none(cls.token == token)
+        if token:
+            TokenPair.delete_pair(token.id)
+            return token.delete_instance()
+
 
     @classmethod
     @logger.catch
