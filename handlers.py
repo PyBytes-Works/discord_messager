@@ -2,7 +2,7 @@
 import asyncio
 import datetime
 import random
-from typing import List, Set, Tuple
+from typing import List, Tuple
 
 from aiogram.dispatcher.filters import Text
 from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
@@ -13,7 +13,8 @@ from models import User, UserTokenDiscord
 from keyboards import cancel_keyboard, user_menu_keyboard, all_tokens_keyboard
 from discord_handler import MessageReceiver, DataStore, users_data_storage, MessageSender
 from states import UserState
-from utils import check_is_int, save_data_to_json, send_report_to_admins, load_from_redis
+from utils import check_is_int, save_data_to_json, send_report_to_admins, load_from_redis, \
+    save_to_redis
 
 
 @logger.catch
@@ -51,7 +52,7 @@ async def get_all_tokens_handler(message: Message) -> None:
     if User.is_active(telegram_id=user_telegram_id):
         keyboard = all_tokens_keyboard(user_telegram_id)
         if not keyboard:
-            await message.answer("Токенов нет. Нужно ввести хотя бы два.", reply_markup=user_menu_keyboard())
+            await message.answer("Токенов нет. Нужно ввести хотя бы один.", reply_markup=user_menu_keyboard())
         else:
             await message.answer("Выберите токен: ", reply_markup=keyboard)
             await UserState.select_token.set()
@@ -171,7 +172,6 @@ async def add_discord_token_handler(message: Message, state: FSMContext) -> None
 
     data = await state.get_data()
     channel = data.get('channel')
-    # first_token = data.get('first_token')
     proxy: str = User.get_proxy(telegram_id=message.from_user.id)
     result = await DataStore.check_user_data(token=token, proxy=proxy, channel=channel)
 
@@ -323,17 +323,16 @@ async def start_command_handler(message: Message, state: FSMContext) -> None:
         await state.finish()
         return
 
-    datastore = DataStore(user_telegram_id)
-    users_data_storage.add_or_update(telegram_id=user_telegram_id, data=datastore)
     User.set_user_is_work(telegram_id=user_telegram_id)
     await message.answer("Начинаю работу.", reply_markup=cancel_keyboard())
-    await lets_play(message=message, datastore=datastore)
+    await lets_play(message=message)
     await state.finish()
 
 
 @logger.catch
-async def lets_play(message: Message, datastore: 'DataStore'):
+async def lets_play(message: Message):
     """Show must go on"""
+
     work_hour: int = datetime.datetime.now().hour
     user_telegram_id: str = message.from_user.id
 
@@ -344,7 +343,10 @@ async def lets_play(message: Message, datastore: 'DataStore'):
             User.delete_user_by_telegram_id(telegram_id=user_telegram_id)
             logger.info(f"Время подписки {user_telegram_id} истекло, пользователь удален.")
             return
-        answer: dict = await MessageReceiver.get_message(datastore=datastore)
+        datastore = DataStore(user_telegram_id)
+        users_data_storage.add_or_update(telegram_id=user_telegram_id, data=datastore)
+        message_manager = MessageReceiver(datastore=datastore)
+        answer: dict = await message_manager.get_message(datastore=datastore)
         text: str = await api_errors_handler(telegram_id=user_telegram_id, answer=answer)
         if text == 'stop':
             return
@@ -371,13 +373,16 @@ async def lets_play(message: Message, datastore: 'DataStore'):
 
 @logger.catch
 async def send_replies(message: Message, replies: list):
-    keyboard = InlineKeyboardMarkup(row_width=1)
+    answer_keyboard = InlineKeyboardMarkup(row_width=1)
     for reply in replies:
         author = reply.get("author")
         reply_id = reply.get("id")
         reply_text = reply.get("text")
-        keyboard.add(InlineKeyboardButton(text=f'От: {author}\nText: {reply_text}', callback_data=f'reply_{reply_id}'))
-    await message.answer(f"Вам пришли реплаи:", reply_markup=keyboard)
+        answer_keyboard.add(InlineKeyboardButton(
+            text=f'От: {author}\nText: {reply_text}',
+            callback_data=f'reply_{reply_id}'
+        ))
+    await message.answer(f"Вам пришли реплаи:", reply_markup=answer_keyboard)
 
 
 @logger.catch
@@ -396,30 +401,18 @@ async def send_message_to_reply_handler(message: Message, state: FSMContext):
     state_data = await state.get_data()
     message_id = state_data.get("message_id")
     user_telegram_id = message.from_user.id
-    token_data: List[dict] = await load_from_redis(telegram_id=user_telegram_id)
-    token = ''
-    for elem in token_data:
+    redis_data: List[dict] = await load_from_redis(telegram_id=user_telegram_id)
+    for elem in redis_data:
         if elem.get("message_id") == message_id:
-            token = elem.get('token')
+            elem.update({"answer_text": message.text})
             break
-    if not token:
-        await send_report_to_admins(
-            text="Func: send_message_to_reply_handler: "
-            "Произошла ошибка получения токена из Redis"
-        )
-        return
-    reply_store = DataStore(telegram_id=user_telegram_id)
-    reply_store.save_token_data(token=token)
-    reply_store.current_message_id = message_id
-    answer = MessageSender(datastore=reply_store).send_message(text=message.text)
-    if answer != "Message sent":
-        await message.answer('Сообщение отправлено.', reply_markup=cancel_keyboard())
     else:
-        await send_report_to_admins(
-            text="Func: send_message_to_reply_handler: "
-            "Произошла ошибка отправки реплая сообщения в функции "
-        )
+        logger.warning("f: send_message_to_reply_handler: elem in Redis data not found.")
+        await message.answer('Время хранения данных истекло.', reply_markup=cancel_keyboard())
+        await state.finish()
         return
+    await save_to_redis(telegram_id=user_telegram_id, data=redis_data)
+    await message.answer('Сообщение добавлено в очередь сообщений.', reply_markup=cancel_keyboard())
     await state.finish()
 
 

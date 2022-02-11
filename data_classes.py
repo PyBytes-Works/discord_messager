@@ -53,6 +53,16 @@ class DataStore:
 
         return result
 
+    def save_token_data(self, token: str):
+        self.token: str = token
+        token_data: dict = UserTokenDiscord.get_info_by_token(token)
+        self.proxy: str = token_data.get("proxy")
+        self.channel: int = token_data.get("channel")
+        self.guild: int = token_data.get("guild")
+        self.cooldown: int = token_data.get("cooldown")
+        self.mate_id: str = token_data.get("mate_id")
+        self.my_discord_id: str = token_data.get("discord_id")
+
     @classmethod
     async def __check_token(cls, token: str, proxy: str, channel: int) -> str:
         """Returns valid token else 'bad token'"""
@@ -70,16 +80,6 @@ class DataStore:
                 logger.info(f"Token check Error: {err}")
 
         return result
-
-    def save_token_data(self, token: str):
-        self.token: str = token
-        token_data: dict = UserTokenDiscord.get_info_by_token(token)
-        self.proxy: str = token_data.get("proxy")
-        self.channel: int = token_data.get("channel")
-        self.guild: int = token_data.get("guild")
-        self.cooldown: int = token_data.get("cooldown")
-        self.mate_id: str = token_data.get("mate_id")
-        self.my_discord_id: str = token_data.get("discord_id")
 
     @property
     def my_discord_id(self) -> str:
