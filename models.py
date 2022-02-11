@@ -6,7 +6,7 @@ from itertools import groupby
 from peewee import (
     CharField, BooleanField, DateTimeField, ForeignKeyField, IntegerField
 )
-from peewee import Model, fn
+from peewee import Model
 from config import logger, admins_list, db, db_file_name, DEFAULT_PROXY
 
 
@@ -29,7 +29,6 @@ class User(BaseModel):
         deactivate_expired_users
         delete_user_by_telegram_id
         delete_status_admin
-        # TODO test delete_all_pairs
         is_admin
         is_active
         get_active_users
@@ -95,7 +94,13 @@ class User(BaseModel):
 
     @classmethod
     @logger.catch
-    def add_new_user(cls: 'User', nick_name: str, telegram_id: str, proxy: str = '', expiration: int=24) -> str:
+    def add_new_user(
+            cls: 'User',
+            nick_name: str,
+            telegram_id: str,
+            proxy: str = '',
+            expiration: int = 24
+    ) -> str:
         """
         if the user is already in the database, returns None
         if created user will return user id
@@ -110,8 +115,8 @@ class User(BaseModel):
             expiration = 100 * 365 * 24 if expiration == -1 else expiration
             expiration = int(datetime.datetime.now().timestamp()) + expiration * 60 * 60
             result = cls.create(
-                            nick_name=f'{nick_name}_{telegram_id}', telegram_id=telegram_id, proxy=proxy,
-                            expiration=expiration
+                            nick_name=f'{nick_name}_{telegram_id}', telegram_id=telegram_id,
+                            proxy=proxy, expiration=expiration
                         ).save()
             if result:
                 proxy = Proxy.get_or_none(proxy=proxy)
@@ -416,7 +421,7 @@ class UserTokenDiscord(BaseModel):
       get_number_of_free_slots_for_tokens
       get_time_by_token
       get_info_by_token
-      Todo get_all_free_tokens
+      get_all_free_tokens
       get_all_discord_id
       get_all_discord_id_by_channel
       get_token_by_discord_id
@@ -468,7 +473,6 @@ class UserTokenDiscord(BaseModel):
 
         """
         add token by telegram id
-        FIXME
         return: bool or None если запись прошла то True, если такой токен есть то False,
         если нет такого пользователя None
         """
@@ -545,7 +549,8 @@ class UserTokenDiscord(BaseModel):
         token: (str)
         proxy: (str) ip address
         """
-        return cls.update(proxy=proxy, guild=guild, channel=channel).where(cls.token == token).execute()
+        return (cls.update(proxy=proxy, guild=guild, channel=channel)
+                .where(cls.token == token).execute())
 
     @classmethod
     @logger.catch
@@ -641,7 +646,6 @@ class UserTokenDiscord(BaseModel):
     @logger.catch
     def get_all_free_tokens(cls, telegram_id: Optional[str] = None) -> Tuple[Tuple[str, list], ...]:
         """
-        TODO make this method
         Возвращает список всех токенов свободных токенов по каналам
         если ввести телеграмм id
         ограничивает выбору одним пользователем
@@ -682,8 +686,9 @@ class UserTokenDiscord(BaseModel):
         """
         Вернуть info по токену
         возвращает словарь:
-            {'proxy':proxy(str), 'guild':guild(int), 'channel': channel(int), 'language': language(str),
-            'last_message_time': last_message_time(int, timestamp),  'cooldown': cooldown(int, seconds)}
+            {'proxy':proxy(str), 'guild':guild(int), 'channel': channel(int), 'language':
+            language(str), 'last_message_time': last_message_time(int, timestamp),
+            'cooldown': cooldown(int, seconds)}
             если токена нет приходит пустой словарь
             guild, channel по умолчанию 0 если не было изменений вернётся 0
             proxy по умолчанию пусто
@@ -767,18 +772,19 @@ class TokenPair(BaseModel):
                 first: int
                 second: int
         """
-        if cls.select().where((cls.first.in_((first, second)))|(cls.second.in_((first, second)))).execute().all():
+        if (cls.select().where((cls.first.in_((first, second)))
+                               | (cls.second.in_((first, second)))).execute().all()):
             return False
         return cls.create(first=first, second=second)
 
     @classmethod
     @logger.catch
     def delete_pair(cls, token_id: int) -> bool:
-        """FIXME delete pair related tokens from table
+        """delete pair related tokens from table
             arguments:
                 token_id: int
         """
-        return cls.delete().where((cls.first == token_id)|(cls.second == token_id)).execute()
+        return cls.delete().where((cls.first == token_id) | (cls.second == token_id)).execute()
 
     @classmethod
     @logger.catch
@@ -787,7 +793,8 @@ class TokenPair(BaseModel):
             arguments:
                 token_list: list
         """
-        return cls.delete().where((cls.first.in_(token_list))|(cls.second.in_(token_list))).execute()
+        return (cls.delete().where((cls.first.in_(token_list))
+                                   | (cls.second.in_(token_list))).execute())
 
     @classmethod
     @logger.catch
@@ -814,7 +821,6 @@ class Proxy(BaseModel):
         Methods:
             add_proxy
             delete_proxy
-            TODO Clear table ???
             get_list_proxies
             get_low_used_proxy
         fields:
@@ -864,9 +870,10 @@ class Proxy(BaseModel):
     @classmethod
     @logger.catch
     def get_low_used_proxy(cls: 'Proxy') -> tuple:
-        """return Tuple[str, int] or ()
-         TODO add to the set_proxy method in "model User" counting the number of users
-         """
+        """
+        Возвращает первую прокси с самым малым использованием
+        retur: str
+        """
         result = cls.select().order_by(cls.using).execute()[:1]
         if result:
             return result[0].proxy
