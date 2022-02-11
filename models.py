@@ -107,11 +107,18 @@ class User(BaseModel):
         """
         user = cls.get_or_none(cls.telegram_id == telegram_id)
         if not user:
+            expiration = 100 * 365 * 24 if expiration == -1 else expiration
             expiration = int(datetime.datetime.now().timestamp()) + expiration * 60 * 60
-            return cls.create(
-                nick_name=f'{nick_name}_{telegram_id}', telegram_id=telegram_id, proxy=proxy,
-                expiration=expiration
-            ).save()
+            result = cls.create(
+                            nick_name=f'{nick_name}_{telegram_id}', telegram_id=telegram_id, proxy=proxy,
+                            expiration=expiration
+                        ).save()
+            if result:
+                proxy = Proxy.get_or_none(proxy=proxy)
+                if proxy:
+                    proxy.using += 1
+                    return proxy.save()
+            return result
 
     @classmethod
     @logger.catch
@@ -304,7 +311,22 @@ class User(BaseModel):
         set max tokens for user
         subscription_period:  int
         """
-        return cls.update(proxy=proxy).where(cls.telegram_id == telegram_id).execute()
+        if telegram_id and proxy:
+            user = cls.get_or_none(telegram_id=telegram_id)
+            if user:
+                old_proxy = user.proxy
+                user.proxy = proxy
+                result = user.save()
+                if result:
+                    proxy_old: Proxy = Proxy.get_or_none(proxy=old_proxy)
+                    if proxy_old:
+                        proxy_old.using -= 1
+                        proxy_old.save()
+                    proxy_new: Proxy = Proxy.get_or_none(proxy=proxy)
+                    if proxy_new:
+                        proxy_new.using += 1
+                        proxy_new.save()
+                return result
 
     @classmethod
     @logger.catch
@@ -396,6 +418,7 @@ class UserTokenDiscord(BaseModel):
       get_info_by_token
       Todo get_all_free_tokens
       get_all_discord_id
+      get_all_discord_id_by_channel
       get_token_by_discord_id
       check_token_by_discord_id
       update_token_cooldown
@@ -573,6 +596,20 @@ class UserTokenDiscord(BaseModel):
 
     @classmethod
     @logger.catch
+    def get_all_discord_id_by_channel(cls, channel: str) -> List[str]:
+        """
+        Вернуть список всех дискорд ID в канале:
+        return: (list) список discord_id
+        """
+        token = UserTokenDiscord.get_or_none(channel=channel)
+        tokens = None
+        if token:
+            user_id = token.user
+            tokens = cls.select().where(cls.user == user_id).execute()
+        return [data.discord_id for data in tokens] if tokens else []
+
+    @classmethod
+    @logger.catch
     def get_all_info_tokens(cls, telegram_id: str) -> list:
         """
         Вернуть список всех ТОКЕНОВ пользователя по его telegram_id:
@@ -645,7 +682,6 @@ class UserTokenDiscord(BaseModel):
         """
         Вернуть info по токену
         возвращает словарь:
-
             {'proxy':proxy(str), 'guild':guild(int), 'channel': channel(int), 'language': language(str),
             'last_message_time': last_message_time(int, timestamp),  'cooldown': cooldown(int, seconds)}
             если токена нет приходит пустой словарь
@@ -666,13 +702,12 @@ class UserTokenDiscord(BaseModel):
     @classmethod
     @logger.catch
     def delete_token(cls, token: str):
-        # TODO  Delete relation token
+        #
         """Удалить токен по его "значению": """
         token = cls.get_or_none(cls.token == token)
         if token:
             TokenPair.delete_pair(token.id)
             return token.delete_instance()
-
 
     @classmethod
     @logger.catch
@@ -784,7 +819,7 @@ class Proxy(BaseModel):
             get_low_used_proxy
         fields:
             proxy: str
-            quantity users ????
+            using: int ????
     """
     proxy = CharField(max_length=100, unique=True, verbose_name='Адрес прокси с портом.')
     using = IntegerField(default=0, verbose_name='Количество пользователей.')
@@ -810,15 +845,31 @@ class Proxy(BaseModel):
         result = cls.get()
         return [(inst.proxy, inst.using) for inst in result] if result else ()
 
+    # @classmethod
+    # @logger.catch
+    # def add_used(cls, proxy: str) -> bool:
+    #     proxy = cls.get_or_none(proxy=proxy)
+    #     if proxy:
+    #         proxy.using += 1
+    #         return proxy.save()
+    #
+    # @classmethod
+    # @logger.catch
+    # def del_used(cls, proxy: str) -> bool:
+    #     proxy = cls.get_or_none(proxy=proxy)
+    #     if proxy:
+    #         proxy.using -= 1
+    #         return proxy.save()
+
     @classmethod
     @logger.catch
     def get_low_used_proxy(cls: 'Proxy') -> tuple:
         """return Tuple[str, int] or ()
          TODO add to the set_proxy method in "model User" counting the number of users
          """
-        result = cls.select(fn.MIN(cls.using)).scalar()
+        result = cls.select().order_by(cls.using).execute()[:1]
         if result:
-            return result.proxy, result.using
+            return result[0].proxy
 
 
 @logger.catch
