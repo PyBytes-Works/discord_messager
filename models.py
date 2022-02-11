@@ -885,7 +885,7 @@ def drop_db() -> None:
 
     with db:
         try:
-            db.drop_tables([User, Token], safe=True)
+            db.drop_tables([User, Token, TokenPair, Proxy], safe=True)
             logger.info('DB deleted')
         except Exception as err:
             logger.error(f"Ошибка удаления таблиц БД: {err}")
@@ -898,21 +898,14 @@ def recreate_db(_db_file_name: str) -> None:
     with db:
         if os.path.exists(_db_file_name):
             drop_db()
-        db.create_tables([User, Token, TokenPair], safe=True)
+        db.create_tables([User, Token, TokenPair, Proxy], safe=True)
         logger.info('DB REcreated')
 
 
-def create_db() -> None:
-    """Creates new tables in database. Drop all data from DB if it exists."""
-
-    with db:
-        db.create_tables([Proxy], safe=True)
-
-
 if __name__ == '__main__':
-    recreate = 0
+    recreate = 1
     add_test_users = 0
-    add_admins = 0
+    add_admins = 1
     add_tokens = 0
     import random
     import string

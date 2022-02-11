@@ -36,6 +36,7 @@ class MessageReceiver:
     async def get_message(self) -> dict:
         """Получает данные из АПИ, выбирает случайное сообщение и возвращает ID сообщения
         и само сообщение"""
+
         result = {"work": True, "message": "ERROR"}
         selected_data: dict = self.__select_token_for_work()
         result_message: str = selected_data["message"]
@@ -50,7 +51,7 @@ class MessageReceiver:
         else:
             data: dict = self.__get_data_from_api()
             if data:
-                result_data: dict = self.__get_random_message_data(data.get("messages"))
+                result_data: dict = random.choice(data.get("messages"))
                 self.__datastore.current_message_id = int(result_data["id"])
                 replies: list = data.get("replies", [{}])
                 if replies:
@@ -70,6 +71,8 @@ class MessageReceiver:
 
     @logger.catch
     async def __get_user_message_from_redis(self, token: str) -> tuple:
+        """Возвращает данные из Редиса"""
+
         answer: str = ''
         message_id = 0
         redis_data: List[dict] = await load_from_redis(telegram_id=self.__datastore.telegram_id)
@@ -86,17 +89,18 @@ class MessageReceiver:
         Выбирает случайного токена дискорда из свободных, если нет свободных - пишет сообщение что
         свободных нет.
         """
+
         result: dict = {"message": "token ready"}
         all_tokens: List[dict] = Token.get_all_related_user_tokens(telegram_id=self.__datastore.telegram_id)
         current_time: int = int(datetime.datetime.now().timestamp())
-        tokens_for_job: list = [
+        workers: list = [
             key
             for elem in all_tokens
             for key, value in elem.items()
             if current_time > value["time"] + value["cooldown"]
         ]
-        if tokens_for_job:
-            random_token: str = random.choice(tokens_for_job)
+        if workers:
+            random_token: str = random.choice(workers)
             result["token"]: str = random_token
             self.__datastore.save_token_data(random_token)
         else:
@@ -124,6 +128,8 @@ class MessageReceiver:
 
     @logger.catch
     def __get_data_from_api(self) -> dict:
+        """Отправляет запрос к АПИ"""
+
         session = requests.Session()
         session.headers['authorization'] = self.__datastore.token
         limit = 100
@@ -150,6 +156,8 @@ class MessageReceiver:
 
     @logger.catch
     def __data_filter(self, data: dict) -> dict:
+        """Фильтрует полученные данные"""
+
         messages = []
         replies = [{}]
         result = {}
@@ -187,13 +195,6 @@ class MessageReceiver:
         result.update(messages=messages, replies=replies)
         print("Filtered result:", result)
         return result
-
-    @classmethod
-    @logger.catch
-    def __get_random_message_data(cls, seq: list) -> dict:
-        """Возвращает случайно выбранный словарь из списка"""
-
-        return random.choice(tuple(seq))
 
 
 class MessageSender:
