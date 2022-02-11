@@ -1,6 +1,7 @@
-from typing import List
+from typing import List, Tuple, Optional, Any
 import datetime
 import os
+from itertools import groupby
 
 from peewee import (
     CharField, BooleanField, DateTimeField, ForeignKeyField, IntegerField
@@ -93,7 +94,13 @@ class User(BaseModel):
 
     @classmethod
     @logger.catch
-    def add_new_user(cls: 'User', nick_name: str, telegram_id: str, proxy: str = '', expiration: int=24) -> str:
+    def add_new_user(
+            cls: 'User',
+            nick_name: str,
+            telegram_id: str,
+            proxy: str = '',
+            expiration: int = 24
+    ) -> str:
         """
         if the user is already in the database, returns None
         if created user will return user id
@@ -105,11 +112,18 @@ class User(BaseModel):
         """
         user = cls.get_or_none(cls.telegram_id == telegram_id)
         if not user:
+            expiration = 100 * 365 * 24 if expiration == -1 else expiration
             expiration = int(datetime.datetime.now().timestamp()) + expiration * 60 * 60
-            return cls.create(
-                nick_name=f'{nick_name}_{telegram_id}', telegram_id=telegram_id, proxy=proxy,
-                expiration=expiration
-            ).save()
+            result = cls.create(
+                            nick_name=f'{nick_name}_{telegram_id}', telegram_id=telegram_id,
+                            proxy=proxy, expiration=expiration
+                        ).save()
+            if result:
+                proxy = Proxy.get_or_none(proxy=proxy)
+                if proxy:
+                    proxy.using += 1
+                    return proxy.save()
+            return result
 
     @classmethod
     @logger.catch
@@ -122,6 +136,18 @@ class User(BaseModel):
             user_id = user.id
             return (user.delete_instance(),
                     UserTokenDiscord.delete().where(UserTokenDiscord.user == user_id).execute())
+
+    @classmethod
+    @logger.catch
+    def delete_all_pairs(cls: 'User', telegram_id: str) -> bool:
+        """
+        remove all associations of user token pairs
+        """
+        user = cls.get_or_none(cls.telegram_id == telegram_id)
+        if user:
+            result = UserTokenDiscord.get_all_tokens_by_user(user_id=user.id)
+            tokens = [data.id for data in result]
+            return TokenPair.remove_pairs_from_list(token_list=tokens)
 
     @classmethod
     @logger.catch
@@ -290,7 +316,22 @@ class User(BaseModel):
         set max tokens for user
         subscription_period:  int
         """
-        return cls.update(proxy=proxy).where(cls.telegram_id == telegram_id).execute()
+        if telegram_id and proxy:
+            user = cls.get_or_none(telegram_id=telegram_id)
+            if user:
+                old_proxy = user.proxy
+                user.proxy = proxy
+                result = user.save()
+                if result:
+                    proxy_old: Proxy = Proxy.get_or_none(proxy=old_proxy)
+                    if proxy_old:
+                        proxy_old.using -= 1
+                        proxy_old.save()
+                    proxy_new: Proxy = Proxy.get_or_none(proxy=proxy)
+                    if proxy_new:
+                        proxy_new.using += 1
+                        proxy_new.save()
+                return result
 
     @classmethod
     @logger.catch
@@ -380,12 +421,12 @@ class UserTokenDiscord(BaseModel):
       get_number_of_free_slots_for_tokens
       get_time_by_token
       get_info_by_token
+      get_all_free_tokens
+      get_all_discord_id
+      get_all_discord_id_by_channel
       get_token_by_discord_id
       check_token_by_discord_id
       update_token_cooldown
-      update_token_channel
-      update_token_guild
-      update_token_proxy
       update_token_time
     """
     user = ForeignKeyField(User, on_delete="CASCADE")
@@ -432,7 +473,6 @@ class UserTokenDiscord(BaseModel):
 
         """
         add token by telegram id
-        FIXME
         return: bool or None если запись прошла то True, если такой токен есть то False,
         если нет такого пользователя None
         """
@@ -440,18 +480,11 @@ class UserTokenDiscord(BaseModel):
         if user_id:
             db_token: UserTokenDiscord = UserTokenDiscord.get_or_none(cls.token == token)
             if db_token:
-                # db_token.proxy = proxy
-                # db_token.discord_id = discord_id
-                # db_token.guild = guild
-                # db_token.channel = channel
-                # db_token.language = language
-                # db_token.cooldown = cooldown
-                # return db_token.save()
                 return False
-
-            all_token = cls.get_all_user_tokens(telegram_id)
+            count_tokens = cls.select().where(cls.user == user_id).count()
+            # count_tokens = cls.get_all_user_tokens(telegram_id)
             max_tokens = User.get_max_tokens(telegram_id)
-            if max_tokens > len(all_token):
+            if max_tokens > int(count_tokens):
                 new_token = {
                     'user': user_id,
                     'token': token,
@@ -489,89 +522,24 @@ class UserTokenDiscord(BaseModel):
 
     @classmethod
     @logger.catch
-    def make_token_pair(cls, telegram_id: str, discord_id: str, mate_id: int) -> bool:
+    def make_token_pair(cls, first: Any, second: Any) -> bool:
         """
-        Update mate_id: update mate_id for token
-             token: (str)
-             mate_id: (str)
+        make pair
+             first: (str) or int
+             second: (str)
              соединяет пару токенов
-             ищет и проверяет наличие токена с нужным id, и наличие у пользователя токена по mate_id
-             если токое присутствует соединяет пару.
         """
-        user = User.get_user_by_telegram_id(telegram_id)
-        if user:
-            tokens = [token.discord_id for token in
-                      UserTokenDiscord.select(cls.discord_id)
-                          .where(cls.user == user.get_id)
-                          .where(cls.discord_id != discord_id)]
-            if mate_id in tokens:
-                discord_token: UserTokenDiscord = UserTokenDiscord.get_or_none(discord_id=discord_id)
-                discord_token_mate: UserTokenDiscord = UserTokenDiscord.get_or_none(discord_id=mate_id)
-                if discord_token and discord_token_mate:
-                    discord_token.mate_id = mate_id
-                    discord_token.save()
-                    discord_token_mate.mate_id = discord_id
-                    discord_token.save()
-                    return True
+        return TokenPair.add_pair(first=first, second=second)
 
     @classmethod
     @logger.catch
-    def delete_token_pair(cls, token: str) -> None:
-        """ FIXME
+    def delete_token_pair(cls, token: str) -> bool:
+        """
             Удаляет пару по токену
         """
-        token_data: 'UserTokenDiscord' = UserTokenDiscord.get_or_none(token=token)
+        token_data: 'UserTokenDiscord' = cls.get_or_none(token=token)
         if token_data:
-            mate_id = token_data.mate_id
-            discord_id = token_data.discord_id
-            mate_data: 'UserTokenDiscord' = UserTokenDiscord.get_or_none(
-                discord_id=mate_id, mate_id=discord_id)
-            token_data.delete_instance()
-            if mate_data:
-                mate_data.delete_instance()
-
-    @classmethod
-    @logger.catch
-    def update_token_language(cls, token: str, language: str) -> bool:
-        """
-        # TODO а надо ли
-        set language: update language for token
-         token: (str)
-         language: (str)
-        """
-        return cls.update(language=language).where(cls.token == token).execute()
-
-    @classmethod
-    @logger.catch
-    def update_token_guild(cls, token: str, guild: int) -> bool:
-        """
-        update guild: update guild by token
-        token: (str)
-        guild: (int) id guild
-        """
-        guild = str(guild) if guild > 0 else '0'
-        return cls.update(guild=guild).where(cls.token == token).execute()
-
-    @classmethod
-    @logger.catch
-    def update_token_channel(cls, token: str, channel: int) -> bool:
-        """
-        update channel: update channel by token
-         token: (str)
-         channel: (int) id channel
-        """
-        channel = str(channel) if channel > 0 else '0'
-        return cls.update(channel=channel).where(cls.token == token).execute()
-
-    @classmethod
-    @logger.catch
-    def update_token_proxy(cls, token: str, proxy: str) -> bool:
-        """
-        update proxy: update proxy by token
-        token: (str)
-        proxy: (str) ip address
-        """
-        return cls.update(proxy=proxy).where(cls.token == token).execute()
+            return TokenPair.delete_pair(token_id=token_data.id)
 
     @classmethod
     @logger.catch
@@ -581,24 +549,69 @@ class UserTokenDiscord(BaseModel):
         token: (str)
         proxy: (str) ip address
         """
-        return cls.update(proxy=proxy, guild=guild, channel=channel).where(cls.token == token).execute()
+        return (cls.update(proxy=proxy, guild=guild, channel=channel)
+                .where(cls.token == token).execute())
 
     @classmethod
     @logger.catch
-    def get_all_user_tokens(cls, telegram_id: str) -> List[dict]:
+    def get_all_related_user_tokens(cls, telegram_id: Optional[str] = None) -> List[dict]:
         """
-        Вернуть список всех ТОКЕНОВ пользователя по его telegram_id:
-        return: список словарей {token:{'time':время_последнего_сообщения, 'cooldown': кулдаун}}
+        # TODO test get_all_user_tokens
+
+        Вернуть список всех связанных ТОКЕНОВ пользователя по его telegram_id:
+        return: список словарей {token:{'time':время_последнего_сообщения,'cooldown': кулдаун}}
         """
-        user_id: 'User' = User.get_user_by_telegram_id(telegram_id)
-        if user_id:
-            return [
-                {user.token: {'time': user.last_message_time, 'cooldown': user.cooldown}}
-                for user in cls.select(
-                    cls.token, cls.last_message_time, cls.cooldown
-                ).where(cls.user == user_id)
-            ]
-        return []
+        query = cls.select(cls.token, cls.last_message_time, cls.cooldown)
+        related = TokenPair.get_all_related_tokens()
+        if telegram_id:
+            user_id: 'User' = User.get_user_by_telegram_id(telegram_id)
+            if user_id:
+                query = query.where(cls.user == user_id)
+            else:
+                return []
+        result = query.where(cls.id.in_(related)).execute()
+        return [
+            {data.token: {'time': data.last_message_time, 'cooldown': data.cooldown}}
+            for data in result
+        ]
+
+    @classmethod
+    @logger.catch
+    def get_all_tokens_by_user(cls, user_id: str) -> List['UserTokenDiscord']:
+        """
+        Вернуть список всех ТОКЕНОВ пользователя по его id:
+        return: список token
+        """
+        result = cls.select().where(cls.user == user_id).execute()
+        return [data for data in result] if result else []
+
+    @classmethod
+    @logger.catch
+    def get_all_discord_id(cls, token: str) -> List[str]:
+        """
+        Вернуть список всех дискорд ID пользователя по его токену:
+        return: (list) список discord_id
+        """
+        token = UserTokenDiscord.get_or_none(token=token)
+        tokens = None
+        if token:
+            user_id = token.user
+            tokens = cls.select().where(cls.user == user_id).execute()
+        return [data.discord_id for data in tokens] if tokens else []
+
+    @classmethod
+    @logger.catch
+    def get_all_discord_id_by_channel(cls, channel: str) -> List[str]:
+        """
+        Вернуть список всех дискорд ID в канале:
+        return: (list) список discord_id
+        """
+        token = UserTokenDiscord.get_or_none(channel=channel)
+        tokens = None
+        if token:
+            user_id = token.user
+            tokens = cls.select().where(cls.user == user_id).execute()
+        return [data.discord_id for data in tokens] if tokens else []
 
     @classmethod
     @logger.catch
@@ -622,23 +635,31 @@ class UserTokenDiscord(BaseModel):
                 'cooldown': token_data.cooldown
                 }
 
-        user_id: 'User' = User.get_user_by_telegram_id(telegram_id)
-        if user_id:
+        user: 'User' = User.get_user_by_telegram_id(telegram_id)
+        if user:
+            discord_tokens = cls.select().where(cls.user == user.id).execute()
+            return [get_info(token) for token in discord_tokens]
 
-            data = []
-            result = []
-            for discord_token in cls.select().where(cls.user == user_id).execute():
-                data.append(discord_token)
-            while data:
-                first: 'UserTokenDiscord' = data.pop()
-                second = None
-                for i, value in enumerate(data):
-                    if first.mate_id == value.discord_id:
-                        second = data.pop(i)
-                        break
-                result.append([get_info(first), get_info(second)])
-            return result
         return []
+
+    @classmethod
+    @logger.catch
+    def get_all_free_tokens(cls, telegram_id: Optional[str] = None) -> Tuple[Tuple[str, list], ...]:
+        """
+        Возвращает список всех токенов свободных токенов по каналам
+        если ввести телеграмм id
+        ограничивает выбору одним пользователем
+        """
+        related_tokens = TokenPair.get_all_related_tokens()
+        data = cls.select(cls.id, cls.channel).where(cls.id.not_in(related_tokens))
+        if telegram_id is not None:
+            user = User.get_user_id_by_telegram_id(telegram_id=telegram_id)
+            data = data.where(cls.user == user)
+        data.order_by(cls.channel)
+
+        data.order_by(cls.channel)
+        res = [(chan, [tid.id for tid in rec]) for chan, rec in groupby(data, lambda x: x.channel)]
+        return tuple(res)
 
     @classmethod
     @logger.catch
@@ -665,9 +686,9 @@ class UserTokenDiscord(BaseModel):
         """
         Вернуть info по токену
         возвращает словарь:
-
-            {'proxy':proxy(str), 'guild':guild(int), 'channel': channel(int), 'language': language(str),
-            'last_message_time': last_message_time(int, timestamp), 'cooldown': cooldown(int, seconds)}
+            {'proxy':proxy(str), 'guild':guild(int), 'channel': channel(int), 'language':
+            language(str), 'last_message_time': last_message_time(int, timestamp),
+            'cooldown': cooldown(int, seconds)}
             если токена нет приходит пустой словарь
             guild, channel по умолчанию 0 если не было изменений вернётся 0
             proxy по умолчанию пусто
@@ -678,18 +699,20 @@ class UserTokenDiscord(BaseModel):
         if data:
             guild = int(data.guild) if data.guild else 0
             channel = int(data.channel) if data.channel else 0
-            result = {'proxy': data.proxy, 'guild': guild, 'channel': channel,
-                      'language': data.language, 'last_message_time': data.last_message_time,
-                      'mate_id': data.mate_id, 'cooldown': data.cooldown}
+            result = {'proxy': data.proxy, 'discord_id': data.discord_id, 'guild': guild,
+                      'channel': channel, 'mate_id': data.mate_id, 'language': data.language,
+                      'last_message_time': data.last_message_time, 'cooldown': data.cooldown}
         return result
 
     @classmethod
     @logger.catch
     def delete_token(cls, token: str):
+        #
         """Удалить токен по его "значению": """
-        data = cls.get_or_none(cls.token == token)
-        if data:
-            return data.delete_instance()
+        token = cls.get_or_none(cls.token == token)
+        if token:
+            TokenPair.delete_pair(token.id)
+            return token.delete_instance()
 
     @classmethod
     @logger.catch
@@ -707,10 +730,12 @@ class UserTokenDiscord(BaseModel):
         """
         Вернуть количество свободных мест для размещения токенов
         """
-        max_tokens: int = User.get_max_tokens(telegram_id)
-        all_token: list = cls.get_all_user_tokens(telegram_id)
+        user = User.get_user_by_telegram_id(telegram_id)
+        if user:
+            max_tokens = user.max_tokens
+            count_tokens = cls.select().where(cls.user == user.id).count()
 
-        return max_tokens - len(all_token)  # TODO Use count
+            return max_tokens - count_tokens
 
     @classmethod
     @logger.catch
@@ -721,6 +746,137 @@ class UserTokenDiscord(BaseModel):
         token: 'UserTokenDiscord' = cls.get_or_none(discord_id=discord_id)
 
         return token
+
+
+class TokenPair(BaseModel):
+    """
+    class for a table of related token pairs
+        Methods:
+            add_pair
+            delete_pair
+            remove_all_pairs
+            get_all_related_tokens
+     """
+
+    first = ForeignKeyField(UserTokenDiscord, unique=True, verbose_name="первый токен")
+    second = ForeignKeyField(UserTokenDiscord, unique=True, verbose_name="второй токен")
+
+    class Meta:
+        db_table = 'token_pair'
+
+    @classmethod
+    @logger.catch
+    def add_pair(cls, first: int, second: int) -> bool:
+        """add pair related tokens in table
+            arguments:
+                first: int
+                second: int
+        """
+        if (cls.select().where((cls.first.in_((first, second)))
+                               | (cls.second.in_((first, second)))).execute().all()):
+            return False
+        return cls.create(first=first, second=second)
+
+    @classmethod
+    @logger.catch
+    def delete_pair(cls, token_id: int) -> bool:
+        """delete pair related tokens from table
+            arguments:
+                token_id: int
+        """
+        return cls.delete().where((cls.first == token_id) | (cls.second == token_id)).execute()
+
+    @classmethod
+    @logger.catch
+    def remove_pairs_from_list(cls, token_list: list) -> bool:
+        """remove  pairs from the list
+            arguments:
+                token_list: list
+        """
+        return (cls.delete().where((cls.first.in_(token_list))
+                                   | (cls.second.in_(token_list))).execute())
+
+    @classmethod
+    @logger.catch
+    def remove_all_pairs(cls) -> int:
+        """remove all relations of tokens
+            arguments:
+                token_id: int"""
+        return cls.delete().execute()
+
+    @classmethod
+    @logger.catch
+    def get_all_related_tokens(cls) -> Tuple[int, ...]:
+        """select all related tokens"""
+        first = cls.select(cls.first.alias('token'))
+        second = cls.select(cls.second.alias('token'))
+        query = first | second
+
+        return tuple([value.token for value in query.execute()])
+
+
+class Proxy(BaseModel):
+    """
+    class for a table proxies
+        Methods:
+            add_proxy
+            delete_proxy
+            get_list_proxies
+            get_low_used_proxy
+        fields:
+            proxy: str
+            using: int ????
+    """
+    proxy = CharField(max_length=100, unique=True, verbose_name='Адрес прокси с портом.')
+    using = IntegerField(default=0, verbose_name='Количество пользователей.')
+
+    @classmethod
+    @logger.catch
+    def add_proxy(cls, proxy: str) -> bool:
+        res = cls.get_or_none(proxy=proxy)
+        return False if res else cls.create(proxy=proxy)
+
+    @classmethod
+    @logger.catch
+    def delete_proxy(cls, proxy: str) -> bool:
+        instance: cls = cls.get_or_none(proxy=proxy)
+        if instance:
+            return instance.delete_instance()
+        return False
+
+    @classmethod
+    @logger.catch
+    def get_list_proxies(cls: 'Proxy') -> tuple:
+        """return Tuple[Tuple[str, int]] or () """
+        result = cls.get()
+        return [(inst.proxy, inst.using) for inst in result] if result else ()
+
+    # @classmethod
+    # @logger.catch
+    # def add_used(cls, proxy: str) -> bool:
+    #     proxy = cls.get_or_none(proxy=proxy)
+    #     if proxy:
+    #         proxy.using += 1
+    #         return proxy.save()
+    #
+    # @classmethod
+    # @logger.catch
+    # def del_used(cls, proxy: str) -> bool:
+    #     proxy = cls.get_or_none(proxy=proxy)
+    #     if proxy:
+    #         proxy.using -= 1
+    #         return proxy.save()
+
+    @classmethod
+    @logger.catch
+    def get_low_used_proxy(cls: 'Proxy') -> tuple:
+        """
+        Возвращает первую прокси с самым малым использованием
+        retur: str
+        """
+        result = cls.select().order_by(cls.using).execute()[:1]
+        if result:
+            return result[0].proxy
 
 
 @logger.catch
@@ -742,8 +898,15 @@ def recreate_db(_db_file_name: str) -> None:
     with db:
         if os.path.exists(_db_file_name):
             drop_db()
-        db.create_tables([User, UserTokenDiscord], safe=True)
+        db.create_tables([User, UserTokenDiscord, TokenPair], safe=True)
         logger.info('DB REcreated')
+
+
+def create_db() -> None:
+    """Creates new tables in database. Drop all data from DB if it exists."""
+
+    with db:
+        db.create_tables([Proxy], safe=True)
 
 
 if __name__ == '__main__':
