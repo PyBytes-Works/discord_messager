@@ -612,15 +612,16 @@ class UserTokenDiscord(BaseModel):
 
     @classmethod
     @logger.catch
-    def get_all_discord_id(cls, telegram_id: str) -> List[str]:
+    def get_all_discord_id(cls, token: str) -> List[str]:
         """
-        Вернуть список всех дискорд ID пользователя по его id:
+        Вернуть список всех дискорд ID пользователя по его токену:
         return: (list) список discord_id
         """
-        user = User.get_user_by_telegram_id(telegram_id)
-        tokens = []
-        if user:
-            tokens = cls.select().where(cls.user == user.id).execute()
+        token = UserTokenDiscord.get_or_none(token=token)
+        tokens = None
+        if token:
+            user_id = token.user
+            tokens = cls.select().where(cls.user == user_id).execute()
         return [data.discord_id for data in tokens] if tokens else []
 
     @classmethod
