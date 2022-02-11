@@ -395,13 +395,10 @@ class UserTokenDiscord(BaseModel):
       get_time_by_token
       get_info_by_token
       Todo get_all_free_tokens
-      TODO Token.get_all_discord_id(token=datastore.token) list all discord_id
+      get_all_discord_id
       get_token_by_discord_id
       check_token_by_discord_id
       update_token_cooldown
-      update_token_channel
-      update_token_guild
-      update_token_proxy
       update_token_time
     """
     user = ForeignKeyField(User, on_delete="CASCADE")
@@ -507,65 +504,15 @@ class UserTokenDiscord(BaseModel):
         """
         return TokenPair.add_pair(first=first, second=second)
 
-
     @classmethod
     @logger.catch
-    def delete_token_pair(cls, token: str) -> None:
-        """ FIXME
+    def delete_token_pair(cls, token: str) -> bool:
+        """
             Удаляет пару по токену
         """
-        token_data: 'UserTokenDiscord' = UserTokenDiscord.get_or_none(token=token)
+        token_data: 'UserTokenDiscord' = cls.get_or_none(token=token)
         if token_data:
-            mate_id = token_data.mate_id
-            discord_id = token_data.discord_id
-            mate_data: 'UserTokenDiscord' = UserTokenDiscord.get_or_none(
-                discord_id=mate_id, mate_id=discord_id)
-            token_data.delete_instance()
-            if mate_data:
-                mate_data.delete_instance()
-
-    @classmethod
-    @logger.catch
-    def update_token_language(cls, token: str, language: str) -> bool:
-        """
-        # TODO а надо ли
-        set language: update language for token
-         token: (str)
-         language: (str)
-        """
-        return cls.update(language=language).where(cls.token == token).execute()
-
-    @classmethod
-    @logger.catch
-    def update_token_guild(cls, token: str, guild: int) -> bool:
-        """
-        update guild: update guild by token
-        token: (str)
-        guild: (int) id guild
-        """
-        guild = str(guild) if guild > 0 else '0'
-        return cls.update(guild=guild).where(cls.token == token).execute()
-
-    @classmethod
-    @logger.catch
-    def update_token_channel(cls, token: str, channel: int) -> bool:
-        """
-        update channel: update channel by token
-         token: (str)
-         channel: (int) id channel
-        """
-        channel = str(channel) if channel > 0 else '0'
-        return cls.update(channel=channel).where(cls.token == token).execute()
-
-    @classmethod
-    @logger.catch
-    def update_token_proxy(cls, token: str, proxy: str) -> bool:
-        """
-        update proxy: update proxy by token
-        token: (str)
-        proxy: (str) ip address
-        """
-        return cls.update(proxy=proxy).where(cls.token == token).execute()
+            return TokenPair.delete_pair(token_id=token_data.id)
 
     @classmethod
     @logger.catch
