@@ -425,6 +425,7 @@ class UserTokenDiscord(BaseModel):
       get_all_discord_id
       get_all_discord_id_by_channel
       get_token_by_discord_id
+      get_all_user_tokens
       check_token_by_discord_id
       update_token_cooldown
       update_token_time
@@ -570,6 +571,26 @@ class UserTokenDiscord(BaseModel):
             else:
                 return []
         result = query.where(cls.id.in_(related)).execute()
+        return [
+            {data.token: {'time': data.last_message_time, 'cooldown': data.cooldown}}
+            for data in result
+        ]
+
+    @classmethod
+    @logger.catch
+    def get_all_user_tokens(cls, telegram_id: Optional[str] = None) -> List[dict]:
+        """
+        Вернуть список всех связанных ТОКЕНОВ пользователя по его telegram_id:
+        return: список словарей {token:{'time':время_последнего_сообщения,'cooldown': кулдаун}}
+        """
+        query = cls.select(cls.token, cls.last_message_time, cls.cooldown)
+        if telegram_id:
+            user_id: 'User' = User.get_user_by_telegram_id(telegram_id)
+            if user_id:
+                query = query.where(cls.user == user_id)
+            else:
+                return []
+        result = query.execute()
         return [
             {data.token: {'time': data.last_message_time, 'cooldown': data.cooldown}}
             for data in result
