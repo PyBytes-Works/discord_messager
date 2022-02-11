@@ -41,6 +41,8 @@ def check_is_int(text: str) -> int:
         if int(text) > 0:
             return int(text)
 
+    return 0
+
 
 @logger.catch
 def get_token(key: str) -> str:

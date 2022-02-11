@@ -73,7 +73,7 @@ async def request_self_token_cooldown_handler(callback: CallbackQuery, state: FS
 async def set_self_token_cooldown_handler(message: Message, state: FSMContext):
     """Получает время кулдауна в минутах, переводит в секунды, сохраняет новые данные для токена"""
 
-    cooldown = check_is_int(message.text)
+    cooldown: int = check_is_int(message.text)
     if not cooldown:
         await message.answer(
             "Время должно быть целым, положительным числом. "
@@ -108,7 +108,7 @@ async def invitation_add_discord_token_handler(message: Message) -> None:
 async def add_cooldown_handler(message: Message, state: FSMContext) -> None:
     """ Получение токена запрос ссылки на канал"""
 
-    cooldown = check_is_int(message.text)
+    cooldown: int = check_is_int(message.text)
     if not cooldown:
         await message.answer(
             "Попробуйте ещё раз cooldown должен быть целым положительным числом: ",
@@ -134,9 +134,10 @@ async def add_channel_handler(message: Message, state: FSMContext) -> None:
         guild, channel = mess.rsplit('/', maxsplit=3)[-2:]
     except ValueError as err:
         logger.error(err)
-        guild = channel = 0
-    guild = check_is_int(guild)
-    channel = check_is_int(channel)
+        guild: str = ''
+        channel: str = ''
+    guild: str = str(check_is_int(guild))
+    channel: str = str(check_is_int(channel))
     if not guild or not channel:
         await message.answer(
             "Проверьте ссылку на канал и попробуйте ещё раз", reply_markup=cancel_keyboard())
@@ -478,7 +479,7 @@ async def form_token_pairs(telegram_id: str, unpair: bool = False) -> None:
     for channel, tokens in free_tokens:
         while len(tokens) > 1:
             random.shuffle(tokens)
-            UserTokenDiscord.make_token_pair(tokens.pop(), tokens.pop())
+            UserTokenDiscord.make_tokens_pair(tokens.pop(), tokens.pop())
 
 
 @logger.catch

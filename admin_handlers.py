@@ -125,8 +125,8 @@ async def max_user_request_handler(message: Message) -> None:
 async def add_new_user_name_handler(message: Message, state: FSMContext) -> None:
     """Проверка максимального количества токенов и запрос на введение имени нового пользователя"""
 
-    max_tokens = check_is_int(message.text)
-    if max_tokens is None or max_tokens % 2:
+    max_tokens: int = check_is_int(message.text)
+    if not max_tokens or max_tokens % 2:
         await message.answer('Число должно быть четным целым положительным. Введите еще раз.: ', reply_markup=cancel_keyboard())
         return
     await state.update_data(max_tokens=max_tokens)
@@ -154,8 +154,9 @@ async def add_subscribe_time_handler(message: Message, state: FSMContext) -> Non
 @logger.catch
 async def add_new_user_handler(message: Message, state: FSMContext) -> None:
     """Проверка введенного времени подписки и создание токена для нового пользователя"""
-
-    subscribe_time = check_is_int(message.text)
+    subscribe_time: int = check_is_int(message.text)
+    if message.text == "-1":
+        subscribe_time: int = -1
     hours_in_year = 8760
     if not subscribe_time or subscribe_time > hours_in_year * 2:
         await message.answer(
