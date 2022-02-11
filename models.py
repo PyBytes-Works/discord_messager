@@ -135,7 +135,7 @@ class User(BaseModel):
         if user:
             user_id = user.id
             return (user.delete_instance(),
-                    UserTokenDiscord.delete().where(UserTokenDiscord.user == user_id).execute())
+                    Token.delete().where(Token.user == user_id).execute())
 
     @classmethod
     @logger.catch
@@ -145,7 +145,7 @@ class User(BaseModel):
         """
         user = cls.get_or_none(cls.telegram_id == telegram_id)
         if user:
-            result = UserTokenDiscord.get_all_tokens_by_user(user_id=user.id)
+            result = Token.get_all_tokens_by_user(user_id=user.id)
             tokens = [data.id for data in result]
             return TokenPair.remove_pairs_from_list(token_list=tokens)
 
@@ -410,7 +410,7 @@ class User(BaseModel):
         return user.active if user else False
 
 
-class UserTokenDiscord(BaseModel):
+class Token(BaseModel):
     """
     Model for table discord_users
       methods
@@ -478,7 +478,7 @@ class UserTokenDiscord(BaseModel):
         """
         user_id = User.get_user_by_telegram_id(telegram_id)
         if user_id:
-            db_token: UserTokenDiscord = UserTokenDiscord.get_or_none(cls.token == token)
+            db_token: Token = Token.get_or_none(cls.token == token)
             if db_token:
                 return False
             count_tokens = cls.select().where(cls.user == user_id).count()
@@ -537,7 +537,7 @@ class UserTokenDiscord(BaseModel):
         """
             Удаляет пару по токену
         """
-        token_data: 'UserTokenDiscord' = cls.get_or_none(token=token)
+        token_data: 'Token' = cls.get_or_none(token=token)
         if token_data:
             return TokenPair.delete_pair(token_id=token_data.id)
 
@@ -577,7 +577,7 @@ class UserTokenDiscord(BaseModel):
 
     @classmethod
     @logger.catch
-    def get_all_tokens_by_user(cls, user_id: str) -> List['UserTokenDiscord']:
+    def get_all_tokens_by_user(cls, user_id: str) -> List['Token']:
         """
         Вернуть список всех ТОКЕНОВ пользователя по его id:
         return: список token
@@ -592,7 +592,7 @@ class UserTokenDiscord(BaseModel):
         Вернуть список всех дискорд ID пользователя по его токену:
         return: (list) список discord_id
         """
-        token = UserTokenDiscord.get_or_none(token=token)
+        token = Token.get_or_none(token=token)
         tokens = None
         if token:
             user_id = token.user
@@ -606,7 +606,7 @@ class UserTokenDiscord(BaseModel):
         Вернуть список всех дискорд ID в канале:
         return: (list) список discord_id
         """
-        token = UserTokenDiscord.get_or_none(channel=channel)
+        token = Token.get_or_none(channel=channel)
         tokens = None
         if token:
             user_id = token.user
@@ -622,7 +622,7 @@ class UserTokenDiscord(BaseModel):
         {'token': str, 'guild':str, channel: str,
         'time':время_последнего_сообщения, 'cooldown': кулдаун}
         """
-        def get_info(token_data: 'UserTokenDiscord') -> dict:
+        def get_info(token_data: 'Token') -> dict:
             if not token_data:
                 return {}
             return {
@@ -667,7 +667,7 @@ class UserTokenDiscord(BaseModel):
         """
         Вернуть timestamp(кд) токена по его "значению":
         """
-        data: 'UserTokenDiscord' = cls.get_or_none(cls.last_message_time, cls.token == token)
+        data: 'Token' = cls.get_or_none(cls.last_message_time, cls.token == token)
         last_message_time = data.last_message_time if data else None
         return last_message_time
 
@@ -695,7 +695,7 @@ class UserTokenDiscord(BaseModel):
             cooldown по умолчанию 5 * 60
         """
         result = {}
-        data: 'UserTokenDiscord' = cls.get_or_none(cls.token == token)
+        data: 'Token' = cls.get_or_none(cls.token == token)
         if data:
             guild = int(data.guild) if data.guild else 0
             channel = int(data.channel) if data.channel else 0
@@ -739,11 +739,11 @@ class UserTokenDiscord(BaseModel):
 
     @classmethod
     @logger.catch
-    def get_token_by_discord_id(cls, discord_id: str) -> 'UserTokenDiscord':
+    def get_token_by_discord_id(cls, discord_id: str) -> 'Token':
         """
         Вернуть token по discord_id
         """
-        token: 'UserTokenDiscord' = cls.get_or_none(discord_id=discord_id)
+        token: 'Token' = cls.get_or_none(discord_id=discord_id)
 
         return token
 
@@ -758,8 +758,8 @@ class TokenPair(BaseModel):
             get_all_related_tokens
      """
 
-    first = ForeignKeyField(UserTokenDiscord, unique=True, verbose_name="первый токен")
-    second = ForeignKeyField(UserTokenDiscord, unique=True, verbose_name="второй токен")
+    first = ForeignKeyField(Token, unique=True, verbose_name="первый токен")
+    second = ForeignKeyField(Token, unique=True, verbose_name="второй токен")
 
     class Meta:
         db_table = 'token_pair'
@@ -885,7 +885,7 @@ def drop_db() -> None:
 
     with db:
         try:
-            db.drop_tables([User, UserTokenDiscord], safe=True)
+            db.drop_tables([User, Token], safe=True)
             logger.info('DB deleted')
         except Exception as err:
             logger.error(f"Ошибка удаления таблиц БД: {err}")
@@ -898,7 +898,7 @@ def recreate_db(_db_file_name: str) -> None:
     with db:
         if os.path.exists(_db_file_name):
             drop_db()
-        db.create_tables([User, UserTokenDiscord, TokenPair], safe=True)
+        db.create_tables([User, Token, TokenPair], safe=True)
         logger.info('DB REcreated')
 
 

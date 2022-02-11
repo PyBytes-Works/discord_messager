@@ -9,7 +9,7 @@ from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKe
 from aiogram.dispatcher import FSMContext
 
 from config import logger, Dispatcher
-from models import User, UserTokenDiscord
+from models import User, Token
 from keyboards import cancel_keyboard, user_menu_keyboard, all_tokens_keyboard
 from discord_handler import MessageReceiver, DataStore, users_data_storage, MessageSender
 from states import UserState
@@ -85,7 +85,7 @@ async def set_self_token_cooldown_handler(message: Message, state: FSMContext):
 
     state_data = await state.get_data()
     token = state_data["token"]
-    UserTokenDiscord.update_token_cooldown(token=token, cooldown=cooldown * 60)
+    Token.update_token_cooldown(token=token, cooldown=cooldown * 60)
     await message.answer(f"Кулдаун для токена [{token}] установлен: [{cooldown}] минут", reply_markup=user_menu_keyboard())
     await state.finish()
 
@@ -96,7 +96,7 @@ async def invitation_add_discord_token_handler(message: Message) -> None:
 
     user = message.from_user.id
     if User.is_active(telegram_id=user):
-        if UserTokenDiscord.get_number_of_free_slots_for_tokens(user):
+        if Token.get_number_of_free_slots_for_tokens(user):
             await message.answer(
                 "Введите cooldown в минутах: ", reply_markup=cancel_keyboard())
             await UserState.user_add_cooldown.set()
@@ -160,7 +160,7 @@ async def add_discord_token_handler(message: Message, state: FSMContext) -> None
     """ Получение токена запрос discord_id"""
 
     token = message.text.strip()
-    token_info = UserTokenDiscord.get_info_by_token(token)
+    token_info = Token.get_info_by_token(token)
     if token_info:
         await message.answer(
             "Такой токен токен уже есть в база данных."
@@ -208,7 +208,7 @@ async def add_discord_id_handler(message: Message, state: FSMContext) -> None:
 
     discord_id = message.text.strip()
 
-    if UserTokenDiscord.check_token_by_discord_id(discord_id=discord_id):
+    if Token.check_token_by_discord_id(discord_id=discord_id):
         await message.answer(
             "Такой discord_id уже был введен повторите ввод discord_id.",
             reply_markup=cancel_keyboard()
@@ -224,7 +224,7 @@ async def add_discord_id_handler(message: Message, state: FSMContext) -> None:
     cooldown = data.get('cooldown')
     user = message.from_user.id
 
-    token_result_complete: bool = UserTokenDiscord.add_token_by_telegram_id(
+    token_result_complete: bool = Token.add_token_by_telegram_id(
         telegram_id=user, token=token, discord_id=discord_id,
         proxy=proxy, guild=guild, channel=channel, cooldown=cooldown)
 
@@ -237,7 +237,7 @@ async def add_discord_id_handler(message: Message, state: FSMContext) -> None:
         }
         save_data_to_json(data=data, file_name="user_data.json", key='a')
     else:
-        UserTokenDiscord.delete_token(token)
+        Token.delete_token(token)
         text = "ERROR: add_discord_id_handler: Не смог добавить токен, нужно вводить данные заново."
         await message.answer(text, reply_markup=user_menu_keyboard())
         logger.error(text)
@@ -266,7 +266,7 @@ async def info_tokens_handler(message: Message) -> None:
 
         date_expiration = User.get_expiration_date(user)
         date_expiration = datetime.datetime.fromtimestamp(date_expiration)
-        data = UserTokenDiscord.get_all_info_tokens(user)
+        data = Token.get_all_info_tokens(user)
         if data:
             await UserState.user_delete_token_pair.set()
             await message.answer(
@@ -299,7 +299,7 @@ async def delete_pair_handler(callback: CallbackQuery) -> None:
         if User.get_is_work(telegram_id=user):
             await callback.message.answer("Бот запущен, сначала остановите бота.", reply_markup=cancel_keyboard())
         else:
-            UserTokenDiscord.delete_token(callback.data)
+            Token.delete_token(callback.data)
             await callback.message.delete()
             return
 
@@ -316,7 +316,7 @@ async def start_command_handler(message: Message, state: FSMContext) -> None:
     user_telegram_id = message.from_user.id
     if not User.is_active(telegram_id=user_telegram_id):
         return
-    if not UserTokenDiscord.get_all_user_tokens(user_telegram_id):
+    if not Token.get_all_user_tokens(user_telegram_id):
         await message.answer("Сначала добавьте токен.", reply_markup=user_menu_keyboard())
         await state.finish()
         return
@@ -436,7 +436,7 @@ async def api_errors_handler(message: Message, answer: dict, datastore: 'DataSto
         text = "ok"
     elif text == "API request error: 403":
         token = answer.get("token")
-        UserTokenDiscord.delete_token(token=token)
+        Token.delete_token(token=token)
         await message.answer(
             "У Вас нет прав отправлять сообщения в данный канал. (Ошибка 403). "
             "Похоже данный токен забанили/заглушили/токен сменился."
@@ -466,11 +466,11 @@ async def form_token_pairs(telegram_id: str, unpair: bool = False) -> None:
 
     if unpair:
         User.delete_all_pairs(telegram_id=telegram_id)
-    free_tokens: Tuple[tuple] = UserTokenDiscord.get_all_free_tokens(telegram_id=telegram_id)
+    free_tokens: Tuple[tuple] = Token.get_all_free_tokens(telegram_id=telegram_id)
     for channel, tokens in free_tokens:
         while len(tokens) > 1:
             random.shuffle(tokens)
-            UserTokenDiscord.make_tokens_pair(tokens.pop(), tokens.pop())
+            Token.make_tokens_pair(tokens.pop(), tokens.pop())
 
 
 @logger.catch

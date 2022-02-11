@@ -6,7 +6,7 @@ import aiohttp
 import aiohttp.client_exceptions
 
 from config import logger
-from models import UserTokenDiscord
+from models import Token
 
 
 class DataStore:
@@ -55,7 +55,7 @@ class DataStore:
 
     def save_token_data(self, token: str):
         self.token: str = token
-        token_data: dict = UserTokenDiscord.get_info_by_token(token)
+        token_data: dict = Token.get_info_by_token(token)
         self.proxy: str = token_data.get("proxy")
         self.channel: int = token_data.get("channel")
         self.guild: int = token_data.get("guild")

@@ -9,7 +9,7 @@ import requests
 import random
 from bs4 import BeautifulSoup as bs
 
-from models import UserTokenDiscord
+from models import Token
 
 
 def get_free_proxies() -> list:
@@ -36,7 +36,7 @@ def select_token_for_work(telegram_id: str):
     """
 
     cooldown = 300
-    all_user_tokens: List[dict] = UserTokenDiscord.get_all_user_tokens(telegram_id=telegram_id)
+    all_user_tokens: List[dict] = Token.get_all_user_tokens(telegram_id=telegram_id)
     current_time = int(datetime.datetime.now().timestamp())
     tokens_for_job: list = [
         key
@@ -62,7 +62,7 @@ def select_token_for_work(telegram_id: str):
 
 def do_job(random_token):
     # After sending message do this
-    UserTokenDiscord.update_token_time(random_token)
+    Token.update_token_time(random_token)
 
 
 if __name__ == '__main__':

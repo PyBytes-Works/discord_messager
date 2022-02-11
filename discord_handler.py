@@ -8,7 +8,7 @@ import asyncio
 import requests
 
 from data_classes import users_data_storage, DataStore
-from models import UserTokenDiscord
+from models import Token
 from config import logger
 from dotenv import load_dotenv
 
@@ -87,7 +87,7 @@ class MessageReceiver:
         свободных нет.
         """
         result: dict = {"message": "token ready"}
-        all_tokens: List[dict] = UserTokenDiscord.get_all_user_tokens(telegram_id=self.__datastore.telegram_id)
+        all_tokens: List[dict] = Token.get_all_related_user_tokens(telegram_id=self.__datastore.telegram_id)
         current_time: int = int(datetime.datetime.now().timestamp())
         tokens_for_job: list = [
             key
@@ -105,7 +105,7 @@ class MessageReceiver:
                 min_token_data: dict = min(elem.items(), key=lambda x: x[1].get('time'))
             token: str = tuple(min_token_data)[0]
             self.__datastore.save_token_data(token)
-            min_token_time: int = UserTokenDiscord.get_time_by_token(token)
+            min_token_time: int = Token.get_time_by_token(token)
             delay: int = self.__datastore.cooldown - abs(min_token_time - current_time)
             self.__datastore.delay = delay
             text = "секунд"
@@ -160,7 +160,7 @@ class MessageReceiver:
             mentions: tuple = tuple(filter(lambda x: x.get("id", '') == self.__datastore.my_discord_id, elem.get("mentions", [])))
             author: str = elem.get("author")
             if any(mentions) or reply == self.__datastore.my_discord_id:
-                if author not in UserTokenDiscord.get_all_discord_id(token=self.__datastore.token):
+                if author not in Token.get_all_discord_id(token=self.__datastore.token):
                     replies.append({
                         "token": self.__datastore.token,
                         "author": author,
@@ -211,7 +211,7 @@ class MessageSender:
 
         answer: str = self.__send_message_to_discord_channel(text=text)
         logger.info(f"Результат отправки сообщения в дискорд: {answer}")
-        UserTokenDiscord.update_token_time(token=self.__datastore.token)
+        Token.update_token_time(token=self.__datastore.token)
 
         return answer
 
