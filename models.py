@@ -1,4 +1,3 @@
-import token
 from typing import List, Tuple, Optional, Any
 import datetime
 import os
@@ -458,10 +457,10 @@ class UserTokenDiscord(BaseModel):
             db_token: UserTokenDiscord = UserTokenDiscord.get_or_none(cls.token == token)
             if db_token:
                 return False
-
-            all_token = cls.get_all_user_tokens(telegram_id)
+            count_tokens = cls.select().where(cls.user == user_id).count()
+            # count_tokens = cls.get_all_user_tokens(telegram_id)
             max_tokens = User.get_max_tokens(telegram_id)
-            if max_tokens > len(all_token):
+            if max_tokens > int(count_tokens):
                 new_token = {
                     'user': user_id,
                     'token': token,
@@ -580,20 +579,26 @@ class UserTokenDiscord(BaseModel):
 
     @classmethod
     @logger.catch
-    def get_all_user_tokens(cls, telegram_id: str) -> List[dict]:
+    def get_all_related_user_tokens(cls, telegram_id: Optional[str] = None) -> List[dict]:
         """
-        Вернуть список всех ТОКЕНОВ пользователя по его telegram_id:
+        # TODO test get_all_user_tokens
+
+        Вернуть список всех связанных ТОКЕНОВ пользователя по его telegram_id:
         return: список словарей {token:{'time':время_последнего_сообщения,'cooldown': кулдаун}}
         """
-        user_id: 'User' = User.get_user_by_telegram_id(telegram_id)
-        if user_id:
-            return [
-                {data.token: {'time': data.last_message_time, 'cooldown': data.cooldown}}
-                for data in cls.select(
-                    cls.token, cls.last_message_time, cls.cooldown
-                ).where(cls.user == user_id)
-            ]
-        return []
+        query = cls.select(cls.token, cls.last_message_time, cls.cooldown)
+        related = TokenPair.get_all_related_tokens()
+        if telegram_id:
+            user_id: 'User' = User.get_user_by_telegram_id(telegram_id)
+            if user_id:
+                query = query.where(cls.user == user_id)
+            else:
+                return []
+        result = query.where(cls.id.in_(related)).execute()
+        return [
+            {data.token: {'time': data.last_message_time, 'cooldown': data.cooldown}}
+            for data in result
+        ]
 
     @classmethod
     @logger.catch
@@ -604,6 +609,19 @@ class UserTokenDiscord(BaseModel):
         """
         result = cls.select().where(cls.user == user_id).execute()
         return [data for data in result] if result else []
+
+    @classmethod
+    @logger.catch
+    def get_all_discord_id(cls, telegram_id: str) -> List[str]:
+        """
+        Вернуть список всех дискорд ID пользователя по его id:
+        return: (list) список discord_id
+        """
+        user = User.get_user_by_telegram_id(telegram_id)
+        tokens = []
+        if user:
+            tokens = cls.select().where(cls.user == user.id).execute()
+        return [data.discord_id for data in tokens] if tokens else []
 
     @classmethod
     @logger.catch
@@ -733,10 +751,12 @@ class UserTokenDiscord(BaseModel):
         """
         Вернуть количество свободных мест для размещения токенов
         """
-        max_tokens: int = User.get_max_tokens(telegram_id)
-        all_token: list = cls.get_all_user_tokens(telegram_id)
+        user = User.get_user_by_telegram_id(telegram_id)
+        if user:
+            max_tokens = user.max_tokens
+            count_tokens = cls.select().where(cls.user == user.id).count()
 
-        return max_tokens - len(all_token)  # TODO Use count
+            return max_tokens - count_tokens
 
     @classmethod
     @logger.catch
