@@ -97,7 +97,7 @@ async def send_report_to_admins(text: str) -> None:
         await bot.send_message(chat_id=admin_id, text=text)
 
 
-async def save_to_redis(telegram_id: str, data: list, timeout_sec: int = 1800, redis_db: 'Redis' = None) -> int:
+async def save_to_redis(telegram_id: str, data: list, timeout_sec: int = 3600 * 3, redis_db: 'Redis' = None) -> int:
     """Сериализует данные и сохраняет в Редис. Устанавливает время хранения в секундах.
     Возвращает кол-во записей."""
 
@@ -114,7 +114,13 @@ async def load_from_redis(telegram_id: str, redis_db: 'Redis' = None) -> list:
 
     if redis_db is None:
         redis_db = aioredis.from_url("redis://localhost", decode_responses=True)
-    return json.loads(await redis_db.get(telegram_id))
+    result = await redis_db.get(telegram_id)
+    if result:
+        try:
+            return json.loads(result)
+        except TypeError as err:
+            logger.error(f"F: load_from_redis: {err}", err)
+    return []
 
 
 @logger.catch

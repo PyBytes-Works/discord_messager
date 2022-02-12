@@ -18,12 +18,13 @@ deskent = os.getenv("DESKENT_TELEGRAM_ID")
 artem = os.getenv("ARTEM_TELEGRAM_ID")
 vova = os.getenv("VOVA_TELEGRAM_ID")
 # admins_list = [deskent, artem, vova]
-admins_list = [deskent, vova]
+admins_list = [deskent]
 
 DEFAULT_PROXY = os.getenv("DEFAULT_PROXY")
 
 
-tgToken = os.getenv("ARTEM_FIRST_BOT_TOKEN")
+# tgToken = os.getenv("ARTEM_FIRST_BOT_TOKEN")
+tgToken = os.getenv("ARTEM_DISCORD_TEST_TELEGRAM_BOT_TOKEN")
 
 # configure bot
 bot = Bot(token=tgToken)

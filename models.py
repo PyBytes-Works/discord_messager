@@ -835,8 +835,16 @@ class TokenPair(BaseModel):
     @logger.catch
     def get_token_mate_id(cls, token_id: str) -> int:
         """get mate for token"""
-        pair = cls.select().where((cls.first == token_id) | (cls.second == token_id)).first()
-        return pair.first if token_id == pair.second else pair.second
+        # pair = cls.select().where((cls.first == token_id) | (cls.second == token_id)).first()
+        pair = cls.get_or_none(cls.first == token_id)
+        if pair:
+            return pair.second
+
+        pair = cls.get_or_none(cls.second == token_id)
+        if pair:
+            return pair.first
+
+        return 0
 
 
 class Proxy(BaseModel):
@@ -851,6 +859,7 @@ class Proxy(BaseModel):
             proxy: str
             using: int ????
     """
+
     proxy = CharField(max_length=100, unique=True, verbose_name='Адрес прокси с портом.')
     using = IntegerField(default=0, verbose_name='Количество пользователей.')
 
@@ -893,11 +902,12 @@ class Proxy(BaseModel):
 
     @classmethod
     @logger.catch
-    def get_low_used_proxy(cls: 'Proxy') -> tuple:
+    def get_low_used_proxy(cls: 'Proxy') -> str:
         """
         Возвращает первую прокси с самым малым использованием
-        retur: str
+            return: str
         """
+
         result = cls.select().order_by(cls.using).execute()[:1]
         if result:
             return result[0].proxy

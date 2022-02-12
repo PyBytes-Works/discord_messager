@@ -6,7 +6,7 @@ from aiogram.dispatcher import FSMContext
 from aiogram.dispatcher.filters import Text
 from aiogram.types import Message, CallbackQuery, ReplyKeyboardRemove
 
-from config import logger, bot, admins_list, DEFAULT_PROXY
+from config import logger, bot, admins_list
 from handlers import cancel_handler
 from keyboards import cancel_keyboard, users_keyboard, user_menu_keyboard
 from states import UserState
@@ -131,7 +131,7 @@ async def add_new_user_name_handler(message: Message, state: FSMContext) -> None
     """Проверка максимального количества токенов и запрос на введение имени нового пользователя"""
 
     max_tokens: int = check_is_int(message.text)
-    if not max_tokens or max_tokens % 2:
+    if not max_tokens:
         await message.answer('Число должно быть четным целым положительным. Введите еще раз.: ', reply_markup=cancel_keyboard())
         return
     await state.update_data(max_tokens=max_tokens)
@@ -262,9 +262,8 @@ async def add_user_to_db_by_token(message: Message, state: FSMContext) -> None:
     subscribe_time = user_data["subscribe_time"]
     if user_name and max_tokens and subscribe_time:
         user_telegram_id = message.from_user.id
-        # TODO здесь нужен метод получения самой низкозагруженной прокси для выдачи ее новому пользователю
-        # Proxy.get_proxy()
-        proxy = DEFAULT_PROXY
+
+        proxy: str = Proxy.get_low_used_proxy()
         user_created = User.add_new_user(
             telegram_id=user_telegram_id, nick_name=user_name,
             proxy=proxy, expiration=subscribe_time
