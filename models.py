@@ -937,9 +937,9 @@ def recreate_db(_db_file_name: str) -> None:
 
 
 if __name__ == '__main__':
-    recreate = 1
+    recreate = 0
     add_test_users = 0
-    add_admins = 1
+    add_admins = 0
     add_tokens = 0
     import random
     import string

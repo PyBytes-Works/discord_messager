@@ -91,9 +91,11 @@ class MessageReceiver:
 
     @logger.catch
     async def __save_replies(self, data: dict) -> list:
-        replies: list = data.get("replies", [])
-        if replies:
-            await save_to_redis(telegram_id=self.__datastore.telegram_id, data=replies)
+        replies = []
+        if data:
+            replies = data.get("replies", [])
+            if replies:
+                await save_to_redis(telegram_id=self.__datastore.telegram_id, data=replies)
 
         return replies
 
@@ -223,7 +225,6 @@ class MessageReceiver:
             else:
                 save_data_to_json(data=data)
                 result: dict = self.__data_filter(data=data)
-                print("LEN RESULT:", len(result))
         else:
             logger.error(f"API request error: {status_code}")
 
