@@ -49,6 +49,9 @@ async def cancel_handler(message: Message, state: FSMContext) -> None:
 async def get_all_tokens_handler(message: Message) -> None:
     """Обработчик команды /set_cooldown"""
 
+    if await delete_user_if_expired(message=message):
+        return
+
     user_telegram_id = message.from_user.id
 
     if User.is_active(telegram_id=user_telegram_id):
@@ -95,7 +98,8 @@ async def set_self_token_cooldown_handler(message: Message, state: FSMContext):
 @logger.catch
 async def invitation_add_discord_token_handler(message: Message) -> None:
     """Обработчик команды /add_token"""
-
+    if await delete_user_if_expired(message=message):
+        return
     user = message.from_user.id
     if User.is_active(telegram_id=user):
         if Token.get_number_of_free_slots_for_tokens(user):
@@ -248,7 +252,8 @@ async def info_tokens_handler(message: Message) -> None:
     """
     Выводит инфо о токенах. Обработчик кнопки /info
     """
-
+    if await delete_user_if_expired(message=message):
+        return
     user = message.from_user.id
     if User.is_active(message.from_user.id):
         def get_mess(data: dict) -> str:
@@ -315,10 +320,7 @@ async def start_command_handler(message: Message, state: FSMContext) -> None:
     user_telegram_id = message.from_user.id
     if not User.is_active(telegram_id=user_telegram_id):
         return
-    if not User.check_expiration_date(telegram_id=user_telegram_id):
-        await message.answer("Время подписки истекло. Ваш аккаунт удален.", reply_markup=ReplyKeyboardRemove())
-        User.delete_user_by_telegram_id(telegram_id=user_telegram_id)
-        logger.info(f"Время подписки {user_telegram_id} истекло, пользователь удален.")
+    if await delete_user_if_expired(message=message):
         return
     if not Token.get_all_user_tokens(user_telegram_id):
         await message.answer("Сначала добавьте токен.", reply_markup=user_menu_keyboard())
@@ -341,12 +343,7 @@ async def lets_play(message: Message):
     user_telegram_id: str = message.from_user.id
 
     while User.get_is_work(telegram_id=user_telegram_id):
-        user_active: bool = User.check_expiration_date(telegram_id=user_telegram_id)
-        user_is_admin: bool = User.is_admin(telegram_id=user_telegram_id)
-        if not user_active and not user_is_admin:
-            await message.answer("Время подписки истекло. Ваш аккаунт удален.", reply_markup=ReplyKeyboardRemove())
-            User.delete_user_by_telegram_id(telegram_id=user_telegram_id)
-            logger.info(f"Время подписки {user_telegram_id} истекло, пользователь удален.")
+        if await delete_user_if_expired(message=message):
             return
         datastore = DataStore(user_telegram_id)
         users_data_storage.add_or_update(telegram_id=user_telegram_id, data=datastore)
@@ -510,6 +507,8 @@ def form_token_pairs(telegram_id: str, unpair: bool = False) -> int:
 async def default_message(message: Message) -> None:
     """Ответ на любое необработанное действие активного пользователя."""
 
+    if await delete_user_if_expired(message=message):
+        return
     if User.is_active(message.from_user.id):
         await message.answer(
             'Доступные команды: '
@@ -519,6 +518,20 @@ async def default_message(message: Message) -> None:
             '\n/info - показать информацию по всем токенам пользователя.',
             reply_markup=user_menu_keyboard()
         )
+
+
+@logger.catch
+async def delete_user_if_expired(message: Message):
+    """Удаляет пользователя с истекшим сроком действия."""
+
+    user_telegram_id = message.from_user.id
+    user_active: bool = User.check_expiration_date(telegram_id=user_telegram_id)
+    user_is_admin: bool = User.is_admin(telegram_id=user_telegram_id)
+    if not user_active and not user_is_admin:
+        await message.answer("Время подписки истекло. Ваш аккаунт удален.", reply_markup=ReplyKeyboardRemove())
+        User.delete_user_by_telegram_id(telegram_id=user_telegram_id)
+        logger.info(f"Время подписки {user_telegram_id} истекло, пользователь удален.")
+        return True
 
 
 @logger.catch
