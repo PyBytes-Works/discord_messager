@@ -230,7 +230,6 @@ async def add_discord_id_handler(message: Message, state: FSMContext) -> None:
     token_result_complete: bool = Token.add_token_by_telegram_id(
         telegram_id=user, token=token, discord_id=discord_id,
         guild=guild, channel=channel, cooldown=cooldown)
-
     if token_result_complete:
         await message.answer(
             "Токен удачно добавлен.",
@@ -239,6 +238,7 @@ async def add_discord_id_handler(message: Message, state: FSMContext) -> None:
             user: data
         }
         save_data_to_json(data=data, file_name="user_data.json", key='a')
+        form_token_pairs(telegram_id=user, unpair=False)
     else:
         Token.delete_token(token)
         text = "ERROR: add_discord_id_handler: Не смог добавить токен, нужно вводить данные заново."
@@ -376,6 +376,61 @@ async def lets_play(message: Message):
 
 
 @logger.catch
+async def errors_handler(message: Message, answer: dict, datastore: 'DataStore') -> str:
+    """Обработка ошибок от сервера"""
+
+    user_telegram_id = message.from_user.id
+    text = answer.get("message", "ERROR")
+
+    if text == "API request error: 400":
+        await send_report_to_admins(text)
+        text = "stop"
+    elif text == "API request error: 401":
+        await message.answer(
+            "Произошла ошибка данных. Убедитесь, что вы ввели верные данные. Код ошибки - 401.",
+            reply_markup=user_menu_keyboard()
+        )
+        text = "stop"
+    elif text == "API request error: 500":
+        await send_report_to_admins(
+            "Внутренняя ошибка сервера Дискорда. Пауза 10 секунд. Код ошибки - 500.")
+        datastore.delay = 10
+        text = "ok"
+    elif text == "API request error: 403":
+        token = answer.get("token")
+        Token.delete_token(token=token)
+        await message.answer(
+            "У Вас нет прав отправлять сообщения в данный канал. (Ошибка 403). "
+            "Похоже данный токен забанили/заглушили/токен сменился."
+            f"\nТокен: {token} удален.",
+            reply_markup=user_menu_keyboard()
+        )
+        form_token_pairs(telegram_id=user_telegram_id, unpair=False)
+        text = "ok"
+    elif text == "Vocabulary error":
+        await message.answer("Ошибка словаря.", reply_markup=user_menu_keyboard())
+        await send_report_to_admins("Ошибка словаря.")
+        text = "stop"
+    elif text == "API request error: 429":
+        await send_report_to_admins(
+            "Слишком много запросов к АПИ. API request error: 429."
+            "Может еще проксей добавим?"
+        )
+        datastore.delay = 10
+        text = "ok"
+    elif text == "no pairs":
+        pairs_formed: int = form_token_pairs(telegram_id=user_telegram_id, unpair=False)
+        if not pairs_formed:
+            text = "Не смог сформировать пары токенов."
+            await message.answer(text)
+            text = "stop"
+        else:
+            text = 'ok'
+
+    return text
+
+
+@logger.catch
 async def send_replies(message: Message, replies: list):
     result = []
     answer_keyboard = InlineKeyboardMarkup(row_width=1)
@@ -429,62 +484,6 @@ async def send_message_to_reply_handler(message: Message, state: FSMContext):
     await save_to_redis(telegram_id=user_telegram_id, data=redis_data)
     await message.answer('Сообщение добавлено в очередь сообщений.', reply_markup=cancel_keyboard())
     await state.finish()
-
-
-@logger.catch
-async def errors_handler(message: Message, answer: dict, datastore: 'DataStore') -> str:
-    """Обработка ошибок от сервера"""
-
-    user_telegram_id = message.from_user.id
-    text = answer.get("message", "ERROR")
-
-    if text == "API request error: 400":
-        await send_report_to_admins(text)
-        text = "stop"
-    elif text == "API request error: 401":
-        await message.answer(
-            "Произошла ошибка данных. Убедитесь, что вы ввели верные данные. Код ошибки - 401.",
-            reply_markup=user_menu_keyboard()
-        )
-        text = "stop"
-    elif text == "API request error: 500":
-        await send_report_to_admins(
-            "Внутренняя ошибка сервера Дискорда. Пауза 10 секунд. Код ошибки - 500.")
-        datastore.delay = 10
-        text = "ok"
-    elif text == "API request error: 403":
-        token = answer.get("token")
-        Token.delete_token(token=token)
-        await message.answer(
-            "У Вас нет прав отправлять сообщения в данный канал. (Ошибка 403). "
-            "Похоже данный токен забанили/заглушили/токен сменился."
-            f"\nТокен: {token} удален.",
-            reply_markup=user_menu_keyboard()
-        )
-        form_token_pairs(telegram_id=user_telegram_id, unpair=False)
-        text = "ok"
-    elif text == "Vocabulary error":
-        await message.answer("Ошибка словаря.", reply_markup=user_menu_keyboard())
-        await send_report_to_admins("Ошибка словаря.")
-        text = "stop"
-    elif text == "API request error: 429":
-        await send_report_to_admins(
-            "Слишком много запросов к АПИ. API request error: 429."
-            "Может еще проксей добавим?"
-        )
-        datastore.delay = 10
-        text = "ok"
-    elif text == "no pairs":
-        pairs_formed: int = form_token_pairs(telegram_id=user_telegram_id, unpair=False)
-        if not pairs_formed:
-            text = "Не смог сформировать пары токенов."
-            await message.answer(text)
-            await send_report_to_admins(text)
-            text = "stop"
-        else:
-            text = 'ok'
-
-    return text
 
 
 @logger.catch
