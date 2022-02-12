@@ -90,16 +90,6 @@ class MessageReceiver:
         return message_id
 
     @logger.catch
-    async def __save_replies(self, data: dict) -> list:
-        replies = []
-        if data:
-            replies = data.get("replies", [])
-            if replies:
-                await save_to_redis(telegram_id=self.__datastore.telegram_id, data=replies)
-
-        return replies
-
-    @logger.catch
     async def get_message(self) -> dict:
         """Получает данные из АПИ, выбирает случайное сообщение и возвращает ID сообщения
         и само сообщение"""
@@ -120,18 +110,17 @@ class MessageReceiver:
         if message_id:
             self.__datastore.current_message_id = message_id
         else:
-            data: dict = self.__get_data_from_api()
-            self.__datastore.current_message_id = await self.__get_current_message_id(data=data)
-            replies: List[dict] = await self.__save_replies(data=data)
+            filtered_data: dict = self.__get_data_from_api()
+            replies: List[dict] = filtered_data.get("replies", [])
             if replies:
                 result.update({"replies": replies})
+            self.__datastore.current_message_id = await self.__get_current_message_id(data=filtered_data)
         text_to_send = user_message if user_message else ''
         answer: str = MessageSender(datastore=self.__datastore).send_message(text=text_to_send)
         self.__datastore.current_message_id = 0
         if answer != "Message sent":
             result.update({"work": False, "message": answer, "token": token})
             return result
-        # timer += random.randint(0, 6)
         logger.info(f"Пауза между отправкой сообщений: {self.__timer}")
         await asyncio.sleep(self.__timer)
 
@@ -230,28 +219,6 @@ class MessageReceiver:
 
         return result
 
-    def __replies_filter(self, elem: dict) -> dict:
-        reply_author: str = elem.get("referenced_message", {}).get("author", {}).get("id", '')
-        mentions: tuple = tuple(
-            filter(
-                lambda x: int(x.get("id", '')) == int(self.__datastore.my_discord_id),
-                elem.get("mentions", [])
-            )
-        )
-
-        author: str = elem.get("author", {}).get("username", '')
-        author_id: str = elem.get("author", {}).get("id", '')
-        if any(mentions) or reply_author == self.__datastore.my_discord_id:
-            if author_id not in Token.get_all_discord_id(token=self.__datastore.token):
-                return {
-                    "token": self.__datastore.token,
-                    "author": author,
-                    "text": elem.get("content", ''),
-                    "message_id": elem.get("id", '')
-                }
-
-        return {}
-
     @logger.catch
     def __data_filter(self, data: dict) -> dict:
         """Фильтрует полученные данные"""
@@ -269,10 +236,6 @@ class MessageReceiver:
                 filtered_replies: dict = self.__replies_filter(elem=elem)
                 if filtered_replies:
                     replies.append(filtered_replies)
-                print("AUTHOR: ", elem["author"]["id"])
-                print("MATE: ", self.__datastore.mate_id)
-                print("ME: ", self.__datastore.my_discord_id)
-
                 is_author_mate: bool = str(self.__datastore.mate_id) == str(elem["author"]["id"])
                 my_message: bool = str(elem["author"]["id"]) == str(self.__datastore.my_discord_id)
                 if is_author_mate and not my_message:
@@ -289,8 +252,45 @@ class MessageReceiver:
         if messages:
             result.update({"messages": messages})
         if replies:
+            replies: List[dict] = await self.__update_replies_to_redis(replies)
             result.update({"replies": replies})
         # print("Filtered result:", result)
+
+        return result
+
+    @logger.catch
+    async def __update_replies_to_redis(self, data: list) -> list:
+        """Возвращает разницу между старыми и новыми данными в редисе,
+        записывает полные данные в редис"""
+
+        total_replies: List[dict] = await load_from_redis(telegram_id=self.__datastore.telegram_id)
+        replies: List[dict] = [elem for elem in data if elem not in total_replies]
+        total_replies.extend(replies)
+        await save_to_redis(telegram_id=self.__datastore.telegram_id, data=total_replies)
+
+        return replies
+
+    def __replies_filter(self, elem: dict) -> dict:
+
+        reply_author: str = elem.get("referenced_message", {}).get("author", {}).get("id", '')
+        mentions: tuple = tuple(
+            filter(
+                lambda x: int(x.get("id", '')) == int(self.__datastore.my_discord_id),
+                elem.get("mentions", [])
+            )
+        )
+        result = {}
+        author: str = elem.get("author", {}).get("username", '')
+        author_id: str = elem.get("author", {}).get("id", '')
+        message_for_me: bool = reply_author == self.__datastore.my_discord_id
+        if any(mentions) or message_for_me:
+            if author_id not in Token.get_all_discord_id(token=self.__datastore.token):
+                result.update({
+                    "token": self.__datastore.token,
+                    "author": author,
+                    "text": elem.get("content", ''),
+                    "message_id": elem.get("id", '')
+                })
 
         return result
 
