@@ -4,7 +4,7 @@ from typing import List
 from aiogram.types import (
     ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton
 )
-from models import User, UserTokenDiscord
+from models import User, Token
 from config import logger
 
 
@@ -56,7 +56,7 @@ def all_tokens_keyboard(telegram_id: str) -> 'InlineKeyboardMarkup':
     """Возвращает список кнопок всех токенов пользователя"""
 
     keyboard = InlineKeyboardMarkup(row_width=1)
-    all_tokens: List[dict] = UserTokenDiscord.get_all_user_tokens(telegram_id=telegram_id)
+    all_tokens: List[dict] = Token.get_all_user_tokens(telegram_id=telegram_id)
     if all_tokens:
         for elem in all_tokens:
             token = tuple(elem.keys())[0]

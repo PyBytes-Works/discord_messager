@@ -1,12 +1,8 @@
-import asyncio
 import os
 import random
 
-import aiohttp
-import aiohttp.client_exceptions
-
 from config import logger
-from models import UserTokenDiscord
+from models import Token
 
 
 class DataStore:
@@ -17,17 +13,6 @@ class DataStore:
         check_user_data
         save_token_data
     """
-
-    __DISCORD_BASE_URL: str = f'https://discord.com/api/v9/channels/'
-    __EXCEPTIONS: tuple = (
-        asyncio.exceptions.TimeoutError,
-        aiohttp.client_exceptions.ServerDisconnectedError,
-        aiohttp.client_exceptions.ClientProxyConnectionError,
-        aiohttp.client_exceptions.ClientHttpProxyError,
-        aiohttp.client_exceptions.ClientOSError,
-        aiohttp.client_exceptions.TooManyRedirects,
-        ConnectionResetError
-    )
 
     def __init__(self, telegram_id: str):
         self.telegram_id: str = telegram_id
@@ -41,39 +26,9 @@ class DataStore:
         self.__DELAY: int = 0
         self.__MY_DISCORD_ID: str = ''
 
-    @classmethod
-    async def check_user_data(cls, token: str, proxy: str, channel: int) -> dict:
-        """Returns checked dictionary for user data
-
-        Save valid data to instance variables """
-
-        result = {"token": await cls.__check_token(token=token, proxy=proxy, channel=channel)}
-        if result["token"] != "bad token":
-            result["channel"] = channel
-
-        return result
-
-    @classmethod
-    async def __check_token(cls, token: str, proxy: str, channel: int) -> str:
-        """Returns valid token else 'bad token'"""
-        async with aiohttp.ClientSession() as session:
-            session.headers['authorization']: str = token
-            limit: int = 1
-            url: str = cls.__DISCORD_BASE_URL + f'{channel}/messages?limit={limit}'
-            result: str = 'bad token'
-            try:
-                async with session.get(url=url, proxy=f"http://{proxy}", ssl=False, timeout=3) as response:
-                # async with session.get(url=url, timeout=10) as response:
-                    if response.status == 200:
-                        result = token
-            except cls.__EXCEPTIONS as err:
-                logger.info(f"Token check Error: {err}")
-
-        return result
-
     def save_token_data(self, token: str):
         self.token: str = token
-        token_data: dict = UserTokenDiscord.get_info_by_token(token)
+        token_data: dict = Token.get_info_by_token(token)
         self.proxy: str = token_data.get("proxy")
         self.channel: int = token_data.get("channel")
         self.guild: int = token_data.get("guild")

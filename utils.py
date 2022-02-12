@@ -41,6 +41,8 @@ def check_is_int(text: str) -> int:
         if int(text) > 0:
             return int(text)
 
+    return 0
+
 
 @logger.catch
 def get_token(key: str) -> str:
@@ -95,14 +97,14 @@ async def send_report_to_admins(text: str) -> None:
         await bot.send_message(chat_id=admin_id, text=text)
 
 
-async def save_to_redis(telegram_id: str, data: list, timeout: int, redis_db: 'Redis' = None) -> int:
+async def save_to_redis(telegram_id: str, data: list, timeout_sec: int = 1800, redis_db: 'Redis' = None) -> int:
     """Сериализует данные и сохраняет в Редис. Устанавливает время хранения в секундах.
     Возвращает кол-во записей."""
 
     if redis_db is None:
         redis_db = aioredis.from_url("redis://localhost", decode_responses=True)
     count = await redis_db.set(name=telegram_id, value=json.dumps(data))
-    await redis_db.expire(name=telegram_id, time=timeout)
+    await redis_db.expire(name=telegram_id, time=timeout_sec)
 
     return count
 

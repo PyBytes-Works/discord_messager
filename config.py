@@ -18,7 +18,7 @@ deskent = os.getenv("DESKENT_TELEGRAM_ID")
 artem = os.getenv("ARTEM_TELEGRAM_ID")
 vova = os.getenv("VOVA_TELEGRAM_ID")
 # admins_list = [deskent, artem, vova]
-admins_list = [deskent]
+admins_list = [deskent, vova]
 
 DEFAULT_PROXY = os.getenv("DEFAULT_PROXY")
 

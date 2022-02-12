@@ -4,15 +4,17 @@ import random
 from typing import List
 
 import asyncio
-
+import aiohttp
 import requests
+import aiohttp.client_exceptions
+import aiohttp.http_exceptions
 
 from data_classes import users_data_storage, DataStore
-from models import UserTokenDiscord
+from models import Token
 from config import logger
 from dotenv import load_dotenv
 
-from utils import save_data_to_json, save_to_redis
+from utils import save_data_to_json, save_to_redis, load_from_redis
 
 
 load_dotenv()
@@ -23,71 +25,146 @@ PROXY_PASSWORD = os.getenv("PROXY_PASSWORD")
 
 class MessageReceiver:
 
+    __DISCORD_BASE_URL: str = f'https://discord.com/api/v9/channels/'
+    __EXCEPTIONS: tuple = (
+        asyncio.exceptions.TimeoutError,
+        aiohttp.client_exceptions.ServerDisconnectedError,
+        aiohttp.client_exceptions.ClientProxyConnectionError,
+        aiohttp.client_exceptions.ClientHttpProxyError,
+        aiohttp.client_exceptions.ClientOSError,
+        aiohttp.client_exceptions.TooManyRedirects,
+        ConnectionResetError
+    )
+
     """Выбирает токен для отправки сообщения и вызывает метод вызова сообщения,
     проверяет его ответ, и, если есть свободные токены - повторяет процесс.
     При ошибке возвращает ее в телеграм"""
 
-    @classmethod
     @logger.catch
-    async def get_message(cls, datastore: 'DataStore', timer: float = 7) -> dict:
+    def __init__(self, datastore: 'DataStore', timer: float = 7):
+        self.__datastore: 'DataStore' = datastore
+        self.__timer: float = timer
+
+    @classmethod
+    async def check_user_data(cls, token: str, proxy: str, channel: int) -> dict:
+        """Returns checked dictionary for user data
+
+        Save valid data to instance variables """
+
+        result = {"token": await cls.__check_token(token=token, proxy=proxy, channel=channel)}
+        if result["token"] != "bad token":
+            result["channel"] = channel
+
+        return result
+
+    @classmethod
+    async def __check_token(cls, token: str, proxy: str, channel: int) -> str:
+        """Returns valid token else 'bad token'"""
+
+        async with aiohttp.ClientSession() as session:
+            session.headers['authorization']: str = token
+            limit: int = 1
+            url: str = cls.__DISCORD_BASE_URL + f'{channel}/messages?limit={limit}'
+            result: str = 'bad token'
+            proxy_data = f"http://{PROXY_USER}:{PROXY_PASSWORD}@{proxy}/"
+            try:
+                async with session.get(url=url, proxy=proxy_data, ssl=False, timeout=10) as response:
+                # async with session.get(url=url, timeout=10) as response:
+                    if response.status == 200:
+                        result = token
+            except cls.__EXCEPTIONS as err:
+                logger.info(f"Token check Error: {err}")
+            except aiohttp.http_exceptions.BadHttpMessage as err:
+                logger.error("МУДАК ПРОВЕРЬ ПОРТ ПРОКСИ!!!")
+
+        return result
+
+    @logger.catch
+    async def get_message(self) -> dict:
         """Получает данные из АПИ, выбирает случайное сообщение и возвращает ID сообщения
         и само сообщение"""
+
         result = {"work": True, "message": "ERROR"}
-        selected_data: dict = cls.__select_token_for_work(datastore=datastore)
-        result_message: str = selected_data["message"]
+        selected_data: dict = self.__select_token_for_work()
+        result_message: str = selected_data.get("message")
+        if result_message == "no pairs":
+            result.update(selected_data)
+            return result
         token: str = selected_data.get("token", None)
 
         if not token:
             result.update({"work": False, "message": result_message})
             return result
-        data: dict = cls.__get_data_from_api(datastore=datastore)
-        if data:
-            result_data: dict = cls.__get_random_message(data.get("messages"))
-            datastore.current_message_id = int(result_data["id"])
-            replies: list = data.get("replies", [{}])
-            if replies:
-                await save_to_redis(telegram_id=datastore.telegram_id, data=replies, timeout=600)
-                result.update(replies=replies)
-        answer = MessageSender(datastore=datastore).send_message()
-        datastore.current_message_id = 0
+        user_message, message_id = await self.__get_user_message_from_redis(token=token)
+        if message_id:
+            self.__datastore.current_message_id = message_id
+        else:
+            data: dict = self.__get_data_from_api()
+            if data:
+                result_data: dict = random.choice(data.get("messages"))
+                self.__datastore.current_message_id = int(result_data["id"])
+                replies: list = data.get("replies", [{}])
+                if replies:
+                    await save_to_redis(telegram_id=self.__datastore.telegram_id, data=replies)
+                    result.update(replies=replies)
+        text_to_send = user_message if user_message else ''
+        answer: str = MessageSender(datastore=self.__datastore).send_message(text=text_to_send)
+        self.__datastore.current_message_id = 0
         if answer != "Message sent":
             result.update({"work": False, "message": answer, "token": token})
             return result
         # timer += random.randint(0, 4)
-        logger.info(f"Пауза между отправкой сообщений: {timer}")
-        await asyncio.sleep(timer)
+        logger.info(f"Пауза между отправкой сообщений: {self.__timer}")
+        await asyncio.sleep(self.__timer)
 
         return result
 
-    @classmethod
     @logger.catch
-    def __select_token_for_work(cls, datastore: 'DataStore') -> dict:
+    async def __get_user_message_from_redis(self, token: str) -> tuple:
+        """Возвращает данные из Редиса"""
+
+        answer: str = ''
+        message_id = 0
+        redis_data: List[dict] = await load_from_redis(telegram_id=self.__datastore.telegram_id)
+        for elem in redis_data:
+            if elem.get("token") == token:
+                message_id = elem.get("message_id", 0)
+                answer = elem.get("answer_text", '')
+                break
+        return answer, message_id
+
+    @logger.catch
+    def __select_token_for_work(self) -> dict:
         """
         Выбирает случайного токена дискорда из свободных, если нет свободных - пишет сообщение что
         свободных нет.
         """
+
         result: dict = {"message": "token ready"}
-        all_tokens: List[dict] = UserTokenDiscord.get_all_user_tokens(telegram_id=datastore.telegram_id)
+        all_tokens: List[dict] = Token.get_all_related_user_tokens(telegram_id=self.__datastore.telegram_id)
+        if not all_tokens:
+            result["message"] = "no pairs"
+            return result
         current_time: int = int(datetime.datetime.now().timestamp())
-        tokens_for_job: list = [
+        workers: list = [
             key
             for elem in all_tokens
             for key, value in elem.items()
             if current_time > value["time"] + value["cooldown"]
         ]
-        if tokens_for_job:
-            random_token: str = random.choice(tokens_for_job)
+        if workers:
+            random_token: str = random.choice(workers)
             result["token"]: str = random_token
-            datastore.save_token_data(random_token)
+            self.__datastore.save_token_data(random_token)
         else:
             min_token_data = {}
             for elem in all_tokens:
                 min_token_data: dict = min(elem.items(), key=lambda x: x[1].get('time'))
             token: str = tuple(min_token_data)[0]
-            datastore.save_token_data(token)
-            min_token_time: int = UserTokenDiscord.get_time_by_token(token)
-            delay: int = datastore.cooldown - abs(min_token_time - current_time)
-            datastore.delay = delay
+            self.__datastore.save_token_data(token)
+            min_token_time: int = Token.get_time_by_token(token)
+            delay: int = self.__datastore.cooldown - abs(min_token_time - current_time)
+            self.__datastore.delay = delay
             text = "секунд"
             if delay > 60:
                 minutes: int = delay // 60
@@ -102,15 +179,16 @@ class MessageReceiver:
 
         return result
 
-    @classmethod
     @logger.catch
-    def __get_data_from_api(cls, datastore: 'DataStore') -> dict:
+    def __get_data_from_api(self) -> dict:
+        """Отправляет запрос к АПИ"""
+
         session = requests.Session()
-        session.headers['authorization'] = datastore.token
+        session.headers['authorization'] = self.__datastore.token
         limit = 100
-        url = datastore.channel_url + f'{datastore.channel}/messages?limit={limit}'
+        url = self.__datastore.channel_url + f'{self.__datastore.channel}/messages?limit={limit}'
         proxies = {
-            "http": f"http://{PROXY_USER}:{PROXY_PASSWORD}@{datastore.proxy}/"
+            "http": f"http://{PROXY_USER}:{PROXY_PASSWORD}@{self.__datastore.proxy}/"
         }
         response = session.get(url=url, proxies=proxies)
         status_code = response.status_code
@@ -122,16 +200,17 @@ class MessageReceiver:
                 logger.error(f"JSON ERROR: {err}")
             else:
                 save_data_to_json(data=data)
-                result: dict = cls.__data_filter(data=data, datastore=datastore)
+                result: dict = self.__data_filter(data=data)
                 print("LEN RESULT:", len(result))
         else:
             logger.error(f"API request error: {status_code}")
 
         return result
 
-    @classmethod
     @logger.catch
-    def __data_filter(cls, data: dict, datastore: 'DataStore') -> dict:
+    def __data_filter(self, data: dict) -> dict:
+        """Фильтрует полученные данные"""
+
         messages = []
         replies = [{}]
         result = {}
@@ -139,12 +218,12 @@ class MessageReceiver:
 
         for elem in data:
             reply: str = elem.get("referenced_message", {}).get("author", {}).get("id", '')
-            mentions: tuple = tuple(filter(lambda x: x.get("id", '') == datastore.my_discord_id, elem.get("mentions", [])))
+            mentions: tuple = tuple(filter(lambda x: x.get("id", '') == self.__datastore.my_discord_id, elem.get("mentions", [])))
             author: str = elem.get("author")
-            if any(mentions) or reply == datastore.my_discord_id:
-                if author not in UserTokenDiscord.get_all_discord_id(token=datastore.token):
+            if any(mentions) or reply == self.__datastore.my_discord_id:
+                if author not in Token.get_all_discord_id(token=self.__datastore.token):
                     replies.append({
-                        "token": datastore.token,
+                        "token": self.__datastore.token,
                         "author": author,
                         "text": elem.get("content", ''),
                         "id":  elem.get("id", '')
@@ -153,9 +232,9 @@ class MessageReceiver:
             message = elem.get("content")
             message_time = elem.get("timestamp")
             mes_time = datetime.datetime.fromisoformat(message_time).replace(tzinfo=None)
-            if datastore.mate_id == elem["author"]["id"]:
+            if self.__datastore.mate_id == elem["author"]["id"]:
                 delta = datetime.datetime.utcnow().replace(tzinfo=None) - mes_time
-                if delta.seconds < datastore.last_message_time:
+                if delta.seconds < self.__datastore.last_message_time:
                     summa += len(message)
                     messages.append(
                         {
@@ -169,13 +248,6 @@ class MessageReceiver:
         result.update(messages=messages, replies=replies)
         print("Filtered result:", result)
         return result
-
-    @classmethod
-    @logger.catch
-    def __get_random_message(cls, seq: list) -> dict:
-        """Возвращает случайно выбранный словарь из списка"""
-
-        return random.choice(tuple(seq))
 
 
 class MessageSender:
@@ -193,7 +265,7 @@ class MessageSender:
 
         answer: str = self.__send_message_to_discord_channel(text=text)
         logger.info(f"Результат отправки сообщения в дискорд: {answer}")
-        UserTokenDiscord.update_token_time(token=self.__datastore.token)
+        Token.update_token_time(token=self.__datastore.token)
 
         return answer
 
