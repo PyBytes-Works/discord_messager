@@ -252,7 +252,7 @@ class MessageReceiver:
         if messages:
             result.update({"messages": messages})
         if replies:
-            replies: List[dict] = await self.__update_replies_to_redis(replies)
+            replies: List[dict] = asyncio.get_event_loop().run_until_complete(self.__update_replies_to_redis(replies))
             result.update({"replies": replies})
         # print("Filtered result:", result)
 
