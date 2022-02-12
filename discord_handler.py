@@ -1,7 +1,7 @@
 import datetime
 import os
 import random
-from typing import List
+from typing import List, Tuple
 
 import asyncio
 import aiohttp
@@ -25,7 +25,6 @@ PROXY_PASSWORD = os.getenv("PROXY_PASSWORD")
 
 class MessageReceiver:
 
-    __DISCORD_BASE_URL: str = f'https://discord.com/api/v9/channels/'
     __EXCEPTIONS: tuple = (
         asyncio.exceptions.TimeoutError,
         aiohttp.client_exceptions.ServerDisconnectedError,
@@ -64,7 +63,7 @@ class MessageReceiver:
         async with aiohttp.ClientSession() as session:
             session.headers['authorization']: str = token
             limit: int = 1
-            url: str = cls.__DISCORD_BASE_URL + f'{channel}/messages?limit={limit}'
+            url: str = DataStore.get_channel_url() + f'{channel}/messages?limit={limit}'
             result: str = 'bad token'
             proxy_data = f"http://{PROXY_USER}:{PROXY_PASSWORD}@{proxy}/"
             try:
@@ -79,58 +78,81 @@ class MessageReceiver:
 
         return result
 
+    @staticmethod
+    @logger.catch
+    async def __get_current_message_id(data: dict) -> int:
+        message_id = 0
+        filtered_messages: list = data.get("messages", [])
+        if filtered_messages:
+            result_data: dict = random.choice(filtered_messages)
+            message_id = int(result_data.get("id"))
+
+        return message_id
+
+    @logger.catch
+    async def __save_replies(self, data: dict) -> list:
+        replies: list = data.get("replies", [])
+        if replies:
+            await save_to_redis(telegram_id=self.__datastore.telegram_id, data=replies)
+
+        return replies
+
     @logger.catch
     async def get_message(self) -> dict:
         """Получает данные из АПИ, выбирает случайное сообщение и возвращает ID сообщения
         и само сообщение"""
 
         result = {"work": True, "message": "ERROR"}
-        selected_data: dict = self.__select_token_for_work()
-        result_message: str = selected_data.get("message")
+        token_data: dict = self.__select_token_for_work()
+        result_message: str = token_data.get("message")
         if result_message == "no pairs":
-            result.update(selected_data)
+            result.update(token_data)
             return result
-        token: str = selected_data.get("token", None)
 
+        token: str = token_data.get("token", '')
         if not token:
             result.update({"work": False, "message": result_message})
             return result
+
         user_message, message_id = await self.__get_user_message_from_redis(token=token)
         if message_id:
             self.__datastore.current_message_id = message_id
         else:
             data: dict = self.__get_data_from_api()
-            if data:
-                result_data: dict = random.choice(data.get("messages"))
-                self.__datastore.current_message_id = int(result_data["id"])
-                replies: list = data.get("replies", [{}])
-                if replies:
-                    await save_to_redis(telegram_id=self.__datastore.telegram_id, data=replies)
-                    result.update(replies=replies)
+            self.__datastore.current_message_id = await self.__get_current_message_id(data=data)
+            replies: List[dict] = await self.__save_replies(data=data)
+            if replies:
+                result.update({"replies": replies})
         text_to_send = user_message if user_message else ''
         answer: str = MessageSender(datastore=self.__datastore).send_message(text=text_to_send)
         self.__datastore.current_message_id = 0
         if answer != "Message sent":
             result.update({"work": False, "message": answer, "token": token})
             return result
-        # timer += random.randint(0, 4)
+        # timer += random.randint(0, 6)
         logger.info(f"Пауза между отправкой сообщений: {self.__timer}")
         await asyncio.sleep(self.__timer)
 
         return result
 
     @logger.catch
-    async def __get_user_message_from_redis(self, token: str) -> tuple:
+    async def __get_user_message_from_redis(self, token: str) -> Tuple[str, int]:
         """Возвращает данные из Редиса"""
 
         answer: str = ''
         message_id = 0
         redis_data: List[dict] = await load_from_redis(telegram_id=self.__datastore.telegram_id)
         for elem in redis_data:
-            if elem.get("token") == token:
-                message_id = elem.get("message_id", 0)
-                answer = elem.get("answer_text", '')
-                break
+            answered = elem.get("answered", False)
+            if not answered:
+                if elem.get("token") == token:
+                    answer = elem.get("answer_text", '')
+                    if answer:
+                        message_id = elem.get("message_id", 0)
+                        elem.update({"answered": True})
+                        await save_to_redis(telegram_id=self.__datastore.telegram_id, data=redis_data)
+                        break
+
         return answer, message_id
 
     @logger.catch
@@ -186,7 +208,7 @@ class MessageReceiver:
         session = requests.Session()
         session.headers['authorization'] = self.__datastore.token
         limit = 100
-        url = self.__datastore.channel_url + f'{self.__datastore.channel}/messages?limit={limit}'
+        url = self.__datastore.get_channel_url() + f'{self.__datastore.channel}/messages?limit={limit}'
         proxies = {
             "http": f"http://{PROXY_USER}:{PROXY_PASSWORD}@{self.__datastore.proxy}/"
         }
@@ -207,34 +229,52 @@ class MessageReceiver:
 
         return result
 
+    def __replies_filter(self, elem: dict) -> dict:
+        reply_author: str = elem.get("referenced_message", {}).get("author", {}).get("id", '')
+        mentions: tuple = tuple(
+            filter(
+                lambda x: int(x.get("id", '')) == int(self.__datastore.my_discord_id),
+                elem.get("mentions", [])
+            )
+        )
+
+        author: str = elem.get("author", {}).get("username", '')
+        author_id: str = elem.get("author", {}).get("id", '')
+        if any(mentions) or reply_author == self.__datastore.my_discord_id:
+            if author_id not in Token.get_all_discord_id(token=self.__datastore.token):
+                return {
+                    "token": self.__datastore.token,
+                    "author": author,
+                    "text": elem.get("content", ''),
+                    "message_id": elem.get("id", '')
+                }
+
+        return {}
+
     @logger.catch
     def __data_filter(self, data: dict) -> dict:
         """Фильтрует полученные данные"""
 
         messages = []
-        replies = [{}]
+        replies = []
         result = {}
         summa = 0
-
         for elem in data:
-            reply: str = elem.get("referenced_message", {}).get("author", {}).get("id", '')
-            mentions: tuple = tuple(filter(lambda x: x.get("id", '') == self.__datastore.my_discord_id, elem.get("mentions", [])))
-            author: str = elem.get("author")
-            if any(mentions) or reply == self.__datastore.my_discord_id:
-                if author not in Token.get_all_discord_id(token=self.__datastore.token):
-                    replies.append({
-                        "token": self.__datastore.token,
-                        "author": author,
-                        "text": elem.get("content", ''),
-                        "id":  elem.get("id", '')
-                    })
-
-            message = elem.get("content")
-            message_time = elem.get("timestamp")
+            message: str = elem.get("content")
+            message_time: 'datetime' = elem.get("timestamp")
             mes_time = datetime.datetime.fromisoformat(message_time).replace(tzinfo=None)
-            if self.__datastore.mate_id == elem["author"]["id"]:
-                delta = datetime.datetime.utcnow().replace(tzinfo=None) - mes_time
-                if delta.seconds < self.__datastore.last_message_time:
+            delta = datetime.datetime.utcnow().replace(tzinfo=None) - mes_time
+            if delta.seconds < self.__datastore.last_message_time:
+                filtered_replies: dict = self.__replies_filter(elem=elem)
+                if filtered_replies:
+                    replies.append(filtered_replies)
+                print("AUTHOR: ", elem["author"]["id"])
+                print("MATE: ", self.__datastore.mate_id)
+                print("ME: ", self.__datastore.my_discord_id)
+
+                is_author_mate: bool = str(self.__datastore.mate_id) == str(elem["author"]["id"])
+                my_message: bool = str(elem["author"]["id"]) == str(self.__datastore.my_discord_id)
+                if is_author_mate and not my_message:
                     summa += len(message)
                     messages.append(
                         {
@@ -245,8 +285,12 @@ class MessageReceiver:
                             "timestamp": message_time
                         }
                     )
-        result.update(messages=messages, replies=replies)
-        print("Filtered result:", result)
+        if messages:
+            result.update({"messages": messages})
+        if replies:
+            result.update({"replies": replies})
+        # print("Filtered result:", result)
+
         return result
 
 
@@ -308,7 +352,7 @@ class MessageSender:
 
         session = requests.Session()
         session.headers['authorization'] = self.__datastore.token
-        url = self.__datastore.channel_url + f'{self.__datastore.channel}/messages?'
+        url = self.__datastore.get_channel_url() + f'{self.__datastore.channel}/messages?'
         proxies = {
             "http": f"http://{PROXY_USER}:{PROXY_PASSWORD}@{self.__datastore.proxy}/",
         }

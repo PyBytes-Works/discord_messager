@@ -6,6 +6,9 @@ from models import Token
 
 
 class DataStore:
+    __DISCORD_BASE_URL: str = f'https://discord.com/api/v9/channels/'
+
+
     """
     Класс для хранения текущих данных для отправки и получения сообщений дискорда
 
@@ -26,6 +29,10 @@ class DataStore:
         self.__DELAY: int = 0
         self.__MY_DISCORD_ID: str = ''
 
+    @classmethod
+    def get_channel_url(cls) -> str:
+        return cls.__DISCORD_BASE_URL
+
     def save_token_data(self, token: str):
         self.token: str = token
         token_data: dict = Token.get_info_by_token(token)
@@ -35,6 +42,8 @@ class DataStore:
         self.cooldown: int = token_data.get("cooldown")
         self.mate_id: str = token_data.get("mate_id")
         self.my_discord_id: str = token_data.get("discord_id")
+        print("DATA: MY ID: ", self.my_discord_id)
+        print("DATA: Mate ID: ", self.mate_id)
 
     @property
     def my_discord_id(self) -> str:
@@ -54,7 +63,7 @@ class DataStore:
 
     @property
     def last_message_time(self) -> float:
-        return self.__TOKEN_COOLDOWN + 60
+        return self.__TOKEN_COOLDOWN + 120
 
     @property
     def delay(self) -> int:
@@ -71,10 +80,6 @@ class DataStore:
     @cooldown.setter
     def cooldown(self, cooldown: int):
         self.__TOKEN_COOLDOWN = cooldown
-
-    @property
-    def channel_url(self) -> str:
-        return self.__DISCORD_BASE_URL
 
     @property
     def current_message_id(self) -> int:

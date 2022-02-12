@@ -5,7 +5,7 @@ import random
 from typing import List, Tuple
 
 from aiogram.dispatcher.filters import Text
-from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeyboardRemove
 from aiogram.dispatcher import FSMContext
 
 from config import logger, Dispatcher
@@ -314,6 +314,11 @@ async def start_command_handler(message: Message, state: FSMContext) -> None:
     user_telegram_id = message.from_user.id
     if not User.is_active(telegram_id=user_telegram_id):
         return
+    if not User.check_expiration_date(telegram_id=user_telegram_id):
+        await message.answer("Время подписки истекло. Ваш аккаунт удален.", reply_markup=ReplyKeyboardRemove())
+        User.delete_user_by_telegram_id(telegram_id=user_telegram_id)
+        logger.info(f"Время подписки {user_telegram_id} истекло, пользователь удален.")
+        return
     if not Token.get_all_user_tokens(user_telegram_id):
         await message.answer("Сначала добавьте токен.", reply_markup=user_menu_keyboard())
         await state.finish()
@@ -322,6 +327,8 @@ async def start_command_handler(message: Message, state: FSMContext) -> None:
     User.set_user_is_work(telegram_id=user_telegram_id)
     await message.answer("Начинаю работу.", reply_markup=cancel_keyboard())
     await lets_play(message=message)
+    await message.answer("Закончил работу.", reply_markup=user_menu_keyboard())
+
     await state.finish()
 
 
@@ -333,9 +340,10 @@ async def lets_play(message: Message):
     user_telegram_id: str = message.from_user.id
 
     while User.get_is_work(telegram_id=user_telegram_id):
-        if (not User.check_expiration_date(telegram_id=user_telegram_id)
-                and not User.is_admin(telegram_id=user_telegram_id)):
-            await message.answer("Время подписки истекло.", reply_markup=cancel_keyboard())
+        user_active: bool = User.check_expiration_date(telegram_id=user_telegram_id)
+        user_is_admin: bool = User.is_admin(telegram_id=user_telegram_id)
+        if not user_active and not user_is_admin:
+            await message.answer("Время подписки истекло. Ваш аккаунт удален.", reply_markup=ReplyKeyboardRemove())
             User.delete_user_by_telegram_id(telegram_id=user_telegram_id)
             logger.info(f"Время подписки {user_telegram_id} истекло, пользователь удален.")
             return
@@ -347,10 +355,11 @@ async def lets_play(message: Message):
         if text == 'stop':
             return
 
-        replies: list = answer.get("replies", [{}])
+        replies: list = answer.get("replies", [])
         if replies:
-            await send_replies(message=message, replies=replies)
-
+            unanswered: list = await send_replies(message=message, replies=replies)
+            # if unanswered:
+            #     return
         token_work: bool = answer.get("work")
         if not token_work:
             if text != 'ok':
@@ -369,16 +378,27 @@ async def lets_play(message: Message):
 
 @logger.catch
 async def send_replies(message: Message, replies: list):
+    result = []
     answer_keyboard = InlineKeyboardMarkup(row_width=1)
     for reply in replies:
-        author = reply.get("author")
-        reply_id = reply.get("id")
-        reply_text = reply.get("text")
-        answer_keyboard.add(InlineKeyboardButton(
-            text=f'От: {author}\nText: {reply_text}',
-            callback_data=f'reply_{reply_id}'
-        ))
-    await message.answer(f"Вам пришли реплаи:", reply_markup=answer_keyboard)
+        answered = reply.get("answered", False)
+        if not answered:
+            author = reply.get("author")
+            reply_id = reply.get("message_id")
+            reply_text = reply.get("text")
+            answer_keyboard.add(InlineKeyboardButton(
+                text="Ответить",
+                callback_data=f'reply_{reply_id}'
+            ))
+            await message.answer(
+                f"Вам пришло сообщение из ДИСКОРДА:"
+                f"\nОт: {author}"
+                f"\nText: {reply_text}",
+                reply_markup=answer_keyboard
+            )
+            result.append(reply)
+
+    return result
 
 
 @logger.catch
@@ -399,7 +419,7 @@ async def send_message_to_reply_handler(message: Message, state: FSMContext):
     user_telegram_id = message.from_user.id
     redis_data: List[dict] = await load_from_redis(telegram_id=user_telegram_id)
     for elem in redis_data:
-        if elem.get("message_id") == message_id:
+        if str(elem.get("message_id")) == str(message_id):
             elem.update({"answer_text": message.text})
             break
     else:
@@ -429,7 +449,8 @@ async def errors_handler(message: Message, answer: dict, datastore: 'DataStore')
         )
         text = "stop"
     elif text == "API request error: 500":
-        await send_report_to_admins("Внутренняя ошибка сервера Дискорда. Пауза 10 секунд. Код ошибки - 500.")
+        await send_report_to_admins(
+            "Внутренняя ошибка сервера Дискорда. Пауза 10 секунд. Код ошибки - 500.")
         datastore.delay = 10
         text = "ok"
     elif text == "API request error: 403":
