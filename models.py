@@ -709,13 +709,14 @@ class Token(BaseModel):
         """
         result = {}
         data: 'Token' = cls.get_or_none(cls.token == token)
-        mate_id = TokenPair.get_mate_id()
         if data:
+            mate_id: int = TokenPair.get_token_mate_id(data.id)
+            mate: 'Token' = cls.get(id=mate_id)
             proxy: str = User.get(User.id == data.user).proxy
             guild = int(data.guild) if data.guild else 0
             channel = int(data.channel) if data.channel else 0
             result = {'proxy': proxy, 'discord_id': data.discord_id, 'guild': guild,
-                      'channel': channel, 'mate_id': mate_id, 'language': data.language,
+                      'channel': channel, 'mate_id': mate.discord_id, 'language': data.language,
                       'last_message_time': data.last_message_time, 'cooldown': data.cooldown}
         return result
 
@@ -770,6 +771,7 @@ class TokenPair(BaseModel):
             add_pair
             delete_pair
             remove_all_pairs
+            get_token_mate_id
             get_all_related_tokens
      """
 
@@ -828,6 +830,13 @@ class TokenPair(BaseModel):
         query = first | second
 
         return tuple([value.token for value in query.execute()])
+
+    @classmethod
+    @logger.catch
+    def get_token_mate_id(cls, token_id: str) -> int:
+        """get mate for token"""
+        pair = cls.select().where((cls.first == token_id) | (cls.second == token_id)).first()
+        return pair.first if token_id == pair.second else pair.second
 
 
 class Proxy(BaseModel):
