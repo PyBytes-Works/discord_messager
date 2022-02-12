@@ -252,6 +252,7 @@ class MessageReceiver:
         if messages:
             result.update({"messages": messages})
         if replies:
+            # TODO Подумать над асинхронноостью/синхнонностью
             replies: List[dict] = asyncio.get_event_loop().run_until_complete(self.__update_replies_to_redis(replies))
             result.update({"replies": replies})
         # print("Filtered result:", result)
