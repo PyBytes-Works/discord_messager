@@ -11,10 +11,12 @@ from aiogram.dispatcher import FSMContext
 from config import logger, Dispatcher
 from models import User, Token
 from keyboards import cancel_keyboard, user_menu_keyboard, all_tokens_keyboard
-from discord_handler import MessageReceiver, DataStore, users_data_storage, MessageSender
+from discord_handler import MessageReceiver, DataStore, users_data_storage
 from states import UserState
-from utils import check_is_int, save_data_to_json, send_report_to_admins, load_from_redis, \
+from utils import (
+    check_is_int, save_data_to_json, send_report_to_admins, load_from_redis,
     save_to_redis
+)
 
 
 @logger.catch
@@ -171,21 +173,20 @@ async def add_discord_token_handler(message: Message, state: FSMContext) -> None
 
     data = await state.get_data()
     channel = data.get('channel')
-    proxy: str = User.get_proxy(telegram_id=message.from_user.id)
-    print(token, proxy, channel)
+    proxy: str = str(User.get_proxy(telegram_id=message.from_user.id))
     result = await MessageReceiver.check_user_data(token=token, proxy=proxy, channel=channel)
 
-    # if result.get('token') == 'bad token':
-    #     await message.answer(
-    #         "Ваш токен не прошел проверку в данном канале. "
-    #         "\nЛибо канал не существует либо токен отсутствует данном канале, "
-    #         "\nЛибо токен не рабочий."
-    #         "\nВведите ссылку на канал заново:",
-    #
-    #         reply_markup=cancel_keyboard()
-    #     )
-    #     await UserState.user_add_channel.set()
-    #     return
+    if result.get('token') == 'bad token':
+        await message.answer(
+            "Ваш токен не прошел проверку в данном канале. "
+            "\nЛибо канал не существует либо токен отсутствует данном канале, "
+            "\nЛибо токен не рабочий."
+            "\nВведите ссылку на канал заново:",
+
+            reply_markup=cancel_keyboard()
+        )
+        await UserState.user_add_channel.set()
+        return
 
     await state.update_data(token=token)
 
@@ -358,6 +359,7 @@ async def lets_play(message: Message):
         replies: list = answer.get("replies", [])
         if replies:
             unanswered: list = await send_replies(message=message, replies=replies)
+            # Остановит бота при реплаях. Можно удалить.
             # if unanswered:
             #     return
         token_work: bool = answer.get("work")
@@ -369,7 +371,7 @@ async def lets_play(message: Message):
             if current_hour > work_hour:
                 work_hour: int = current_hour
                 print("Время распределять токены!")
-                await form_token_pairs(telegram_id=user_telegram_id, unpair=True)
+                form_token_pairs(telegram_id=user_telegram_id, unpair=True)
 
             await asyncio.sleep(datastore.delay + 1)
             datastore.delay = 0
@@ -462,7 +464,7 @@ async def errors_handler(message: Message, answer: dict, datastore: 'DataStore')
             f"\nТокен: {token} удален.",
             reply_markup=user_menu_keyboard()
         )
-        await form_token_pairs(telegram_id=user_telegram_id, unpair=False)
+        form_token_pairs(telegram_id=user_telegram_id, unpair=False)
         text = "ok"
     elif text == "Vocabulary error":
         await message.answer("Ошибка словаря.", reply_markup=user_menu_keyboard())
@@ -476,7 +478,8 @@ async def errors_handler(message: Message, answer: dict, datastore: 'DataStore')
         datastore.delay = 10
         text = "ok"
     elif text == "no pairs":
-        if not await form_token_pairs(telegram_id=user_telegram_id, unpair=False):
+        pairs_formed: int = form_token_pairs(telegram_id=user_telegram_id, unpair=False)
+        if not pairs_formed:
             text = "Не смог сформировать пары токенов."
             await message.answer(text)
             await send_report_to_admins(text)
@@ -488,7 +491,7 @@ async def errors_handler(message: Message, answer: dict, datastore: 'DataStore')
 
 
 @logger.catch
-async def form_token_pairs(telegram_id: str, unpair: bool = False) -> int:
+def form_token_pairs(telegram_id: str, unpair: bool = False) -> int:
     """Формирует пары из свободных токенов если они в одном канале"""
 
     if unpair:

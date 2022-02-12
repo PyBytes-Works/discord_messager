@@ -226,7 +226,6 @@ async def delete_user_handler(callback: CallbackQuery, state: FSMContext) -> Non
     user_id: str = callback.data.rsplit("_", maxsplit=1)[-1]
     user: 'User' = User.get_user_by_telegram_id(telegram_id=user_id)
     name: str = user.nick_name
-    print(user_id, name)
     if user:
         User.delete_user_by_telegram_id(user_id)
     await callback.message.answer(
