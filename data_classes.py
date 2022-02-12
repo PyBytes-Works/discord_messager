@@ -42,8 +42,6 @@ class DataStore:
         self.cooldown: int = token_data.get("cooldown")
         self.mate_id: str = token_data.get("mate_id")
         self.my_discord_id: str = token_data.get("discord_id")
-        print("DATA: MY ID: ", self.my_discord_id)
-        print("DATA: Mate ID: ", self.mate_id)
 
     @property
     def my_discord_id(self) -> str:

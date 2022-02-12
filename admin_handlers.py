@@ -22,7 +22,7 @@ async def send_message_to_all_users_handler(message: Message) -> None:
     """Обработчик команды /sendall"""
 
     data = message.text[9:]
-    user_id = message.from_user.id
+    user_id = str(message.from_user.id)
     if not data:
         await message.answer("Нет данных для отправки.")
         return
@@ -71,8 +71,7 @@ async def delete_proxy_handler(message: Message) -> None:
 async def request_user_admin_handler(message: Message) -> None:
     """Обработчик команды /add_admin"""
 
-    user_id = message.from_user.id
-    if User.is_admin(user_id) and user_id in admins_list:
+    if str(message.from_user.id) in admins_list:
         await message.answer(f'Введите имя пользователя: ', reply_markup=cancel_keyboard())
         await UserState.name_for_admin.set()
 
@@ -81,10 +80,10 @@ async def request_user_admin_handler(message: Message) -> None:
 async def set_user_admin_handler(message: Message, state: FSMContext) -> None:
     """Обработчик назначения пользователя администратором """
 
-    user_name = message.text
-    user = User.get_or_none(User.nick_name.contains(user_name))
+    user_name: str = message.text
+    user: 'User' = User.get_or_none(User.nick_name.contains(user_name))
     if user:
-        user_id = user.telegram_id
+        user_id: str = str(user.telegram_id)
         User.set_user_status_admin(telegram_id=user_id)
         await message.answer(f'{user_name} назначен администратором. ', reply_markup=user_menu_keyboard())
         await bot.send_message(chat_id=user_id, text='Вас назначили администратором.')
@@ -144,7 +143,7 @@ async def add_subscribe_time_handler(message: Message, state: FSMContext) -> Non
     """Проверка введеного имени и запрос времени подписки для нового пользователя"""
 
     name: str = message.text
-    user = User.get_or_none(User.nick_name.contains(name))
+    user: 'User' = User.get_or_none(User.nick_name.contains(name))
     if user:
         await message.answer('Такой пользователь уже существует. Введите другое имя.')
         return
@@ -162,7 +161,7 @@ async def add_new_user_handler(message: Message, state: FSMContext) -> None:
     subscribe_time: int = check_is_int(message.text)
     if message.text == "-1":
         subscribe_time: int = -1
-    hours_in_year = 8760
+    hours_in_year: int = 8760
     if not subscribe_time or subscribe_time > hours_in_year * 2:
         await message.answer(
             'Время в часах должно быть четным целым положительным. '
@@ -170,9 +169,9 @@ async def add_new_user_handler(message: Message, state: FSMContext) -> None:
             reply_markup=cancel_keyboard()
         )
         return
-    state_data = await state.get_data()
-    name = state_data.get("name")
-    max_tokens = state_data.get("max_tokens", 0)
+    state_data: dict = await state.get_data()
+    name: str = state_data.get("name")
+    max_tokens: int = state_data.get("max_tokens", 0)
     new_token: str = get_token(key="user")
     tokens: dict = {
         new_token: {
@@ -237,7 +236,7 @@ async def delete_user_handler(callback: CallbackQuery, state: FSMContext) -> Non
 @logger.catch
 async def activate_new_user_handler(message: Message) -> None:
     """Обработчик команды /ua для авторизации нового пользователя"""
-    user_telegram_id = message.from_user.id
+    user_telegram_id: str = str(message.from_user.id)
     if User.is_active(telegram_id=user_telegram_id):
         await message.answer("Вы уже есть в базе данных.", reply_markup=cancel_keyboard())
         return
@@ -293,21 +292,6 @@ async def add_user_to_db_by_token(message: Message, state: FSMContext) -> None:
 
 
 @logger.catch
-async def set_user_max_tokens_handler(message: Message) -> None:
-    """Обработчик команды /set_max_tokens"""
-    # TODO написать !!!
-    user_telegram_id = message.from_user.id
-    if user_telegram_id in admins_list:
-        users: dict = User.get_all_users()
-        user_list: str = "\n".join(tuple(users.values()))
-        await message.answer(
-            f'Список пользователей: {len(users)}',
-            reply_markup=ReplyKeyboardRemove()
-        )
-        await message.answer(user_list, reply_markup=ReplyKeyboardRemove())
-
-
-@logger.catch
 def register_admin_handlers(dp: Dispatcher) -> None:
     """
     Регистратор для функций данного модуля
@@ -331,6 +315,5 @@ def register_admin_handlers(dp: Dispatcher) -> None:
     dp.register_message_handler(set_user_admin_handler, state=UserState.name_for_admin)
     dp.register_message_handler(show_all_users_handler, commands=['show_users'])
     dp.register_message_handler(delete_user_name_handler, commands=['delete_user'])
-    dp.register_message_handler(set_user_max_tokens_handler, commands=['set_max_tokens'])
     dp.register_callback_query_handler(delete_user_handler, Text(startswith=['user_']), state=UserState.name_for_del)
     dp.register_message_handler(add_new_user_handler, state=UserState.name_for_cr)

@@ -97,7 +97,7 @@ async def send_report_to_admins(text: str) -> None:
         await bot.send_message(chat_id=admin_id, text=text)
 
 
-async def save_to_redis(telegram_id: str, data: list, timeout_sec: int = 3600 * 3, redis_db: 'Redis' = None) -> int:
+async def save_to_redis(telegram_id: str, data: list, timeout_sec: int = 3600, redis_db: 'Redis' = None) -> int:
     """Сериализует данные и сохраняет в Редис. Устанавливает время хранения в секундах.
     Возвращает кол-во записей."""
 
@@ -130,10 +130,3 @@ def add_new_proxy_handler(message: str) -> None:
     proxies: list = re.findall(r'\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}:\d{1,6}\b', message)
     for proxy in proxies:
         print(f"Добавлена прокси: {proxy}")
-
-
-
-if __name__ == '__main__':
-
-    a = '"192.168.1.1:8000" asjkdfhaksjdfh "1.1.1.1:5"'
-    add_new_proxy_handler(a)
