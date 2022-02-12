@@ -10,7 +10,7 @@ from config import logger, bot, admins_list, DEFAULT_PROXY
 from handlers import cancel_handler
 from keyboards import cancel_keyboard, users_keyboard, user_menu_keyboard
 from states import UserState
-from models import User
+from models import User, Proxy
 
 from utils import (
     get_token, add_new_token, delete_used_token, send_report_to_admins, check_is_int
@@ -35,9 +35,12 @@ async def send_message_to_all_users_handler(message: Message) -> None:
 async def request_proxies_handler(message: Message) -> None:
     """Обработчик команды /add_proxy и /delete_proxy"""
 
-    user_id = message.from_user.id
+    user_id: str = str(message.from_user.id)
     if user_id in admins_list:
-        await message.answer(f'Введите прокси в формате "123.123.123.123:5555" (можно несколько через пробел)', reply_markup=cancel_keyboard())
+        await message.answer(
+            'Введите прокси в формате "123.123.123.123:5555" (можно несколько через пробел)',
+            reply_markup=cancel_keyboard()
+        )
         if message.text == '/add_proxy':
             await UserState.user_add_proxy.set()
         elif message.text == '/delete_proxy':
@@ -50,7 +53,7 @@ async def add_new_proxy_handler(message: Message) -> None:
 
     proxies: list = re.findall(r'\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}:\d{1,6}\b', message.text)
     for proxy in proxies:
-        Proxy.add(proxy=proxy)
+        Proxy.add_proxy(proxy=proxy)
         await message.answer(f"Добавлена прокси: {proxy}")
 
 
@@ -60,7 +63,7 @@ async def delete_proxy_handler(message: Message) -> None:
 
     proxies: list = re.findall(r'\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}:\d{1,6}\b', message.text)
     for proxy in proxies:
-        Proxy.delete(proxy=proxy)
+        Proxy.delete_proxy(proxy=proxy)
         await message.answer(f"Удалена прокси: {proxy}")
 
 
@@ -103,6 +106,8 @@ async def admin_help_handler(message: Message) -> None:
             "\n/add_admin - команда для назначения пользователя администратором",
             "\n/delete_user - удалить пользователя",
             "\n/sendall 'тут текст сообщения без кавычек' - отправить сообщение всем активным пользователям",
+            "\n/add_proxy - добавить прокси",
+            "\n/delete_proxy - удалить прокси",
         )
         admin_commands: str = "".join(commands)
         await message.answer(f'Список команд администратора: {admin_commands}', reply_markup=user_menu_keyboard())

@@ -4,8 +4,10 @@ import random
 from typing import List
 
 import asyncio
-
+import aiohttp
 import requests
+import aiohttp.client_exceptions
+import aiohttp.http_exceptions
 
 from data_classes import users_data_storage, DataStore
 from models import Token
@@ -23,6 +25,17 @@ PROXY_PASSWORD = os.getenv("PROXY_PASSWORD")
 
 class MessageReceiver:
 
+    __DISCORD_BASE_URL: str = f'https://discord.com/api/v9/channels/'
+    __EXCEPTIONS: tuple = (
+        asyncio.exceptions.TimeoutError,
+        aiohttp.client_exceptions.ServerDisconnectedError,
+        aiohttp.client_exceptions.ClientProxyConnectionError,
+        aiohttp.client_exceptions.ClientHttpProxyError,
+        aiohttp.client_exceptions.ClientOSError,
+        aiohttp.client_exceptions.TooManyRedirects,
+        ConnectionResetError
+    )
+
     """Выбирает токен для отправки сообщения и вызывает метод вызова сообщения,
     проверяет его ответ, и, если есть свободные токены - повторяет процесс.
     При ошибке возвращает ее в телеграм"""
@@ -32,6 +45,40 @@ class MessageReceiver:
         self.__datastore: 'DataStore' = datastore
         self.__timer: float = timer
 
+    @classmethod
+    async def check_user_data(cls, token: str, proxy: str, channel: int) -> dict:
+        """Returns checked dictionary for user data
+
+        Save valid data to instance variables """
+
+        result = {"token": await cls.__check_token(token=token, proxy=proxy, channel=channel)}
+        if result["token"] != "bad token":
+            result["channel"] = channel
+
+        return result
+
+    @classmethod
+    async def __check_token(cls, token: str, proxy: str, channel: int) -> str:
+        """Returns valid token else 'bad token'"""
+
+        async with aiohttp.ClientSession() as session:
+            session.headers['authorization']: str = token
+            limit: int = 1
+            url: str = cls.__DISCORD_BASE_URL + f'{channel}/messages?limit={limit}'
+            result: str = 'bad token'
+            proxy_data = f"http://{PROXY_USER}:{PROXY_PASSWORD}@{proxy}/"
+            try:
+                async with session.get(url=url, proxy=proxy_data, ssl=False, timeout=10) as response:
+                # async with session.get(url=url, timeout=10) as response:
+                    if response.status == 200:
+                        result = token
+            except cls.__EXCEPTIONS as err:
+                logger.info(f"Token check Error: {err}")
+            except aiohttp.http_exceptions.BadHttpMessage as err:
+                logger.error("МУДАК ПРОВЕРЬ ПОРТ ПРОКСИ!!!")
+
+        return result
+
     @logger.catch
     async def get_message(self) -> dict:
         """Получает данные из АПИ, выбирает случайное сообщение и возвращает ID сообщения
@@ -39,7 +86,10 @@ class MessageReceiver:
 
         result = {"work": True, "message": "ERROR"}
         selected_data: dict = self.__select_token_for_work()
-        result_message: str = selected_data["message"]
+        result_message: str = selected_data.get("message")
+        if result_message == "no pairs":
+            result.update(selected_data)
+            return result
         token: str = selected_data.get("token", None)
 
         if not token:
@@ -92,6 +142,9 @@ class MessageReceiver:
 
         result: dict = {"message": "token ready"}
         all_tokens: List[dict] = Token.get_all_related_user_tokens(telegram_id=self.__datastore.telegram_id)
+        if not all_tokens:
+            result["message"] = "no pairs"
+            return result
         current_time: int = int(datetime.datetime.now().timestamp())
         workers: list = [
             key

@@ -148,11 +148,10 @@ async def add_channel_handler(message: Message, state: FSMContext) -> None:
     await UserState.user_add_token.set()
     link = "https://teletype.in/@ted_crypto/Txzfz8Vuwd2"
     await message.answer(
-        "Введите токен"
         "\nЧтобы узнать свой токен - перейдите по ссылке: "
-        f"\n{link}",
-        reply_markup=cancel_keyboard()
+        f"\n{link}"
     )
+    await message.answer("Введите токен:", reply_markup=cancel_keyboard())
 
 
 @logger.catch
@@ -173,22 +172,22 @@ async def add_discord_token_handler(message: Message, state: FSMContext) -> None
     data = await state.get_data()
     channel = data.get('channel')
     proxy: str = User.get_proxy(telegram_id=message.from_user.id)
-    result = await DataStore.check_user_data(token=token, proxy=proxy, channel=channel)
+    print(token, proxy, channel)
+    result = await MessageReceiver.check_user_data(token=token, proxy=proxy, channel=channel)
 
-    if result.get('token') == 'bad token':
-        await message.answer(
-            "Ваш токен не прошел проверку в данном канале. "
-            "\nЛибо канал не существует либо токен отсутствует данном канале, "
-            "\nЛибо токен не рабочий."
-            "\nВведите ссылку на канал заново:",
-
-            reply_markup=cancel_keyboard()
-        )
-        await UserState.user_add_channel.set()
-        return
+    # if result.get('token') == 'bad token':
+    #     await message.answer(
+    #         "Ваш токен не прошел проверку в данном канале. "
+    #         "\nЛибо канал не существует либо токен отсутствует данном канале, "
+    #         "\nЛибо токен не рабочий."
+    #         "\nВведите ссылку на канал заново:",
+    #
+    #         reply_markup=cancel_keyboard()
+    #     )
+    #     await UserState.user_add_channel.set()
+    #     return
 
     await state.update_data(token=token)
-    await state.update_data(proxb=proxy)
 
     await UserState.user_add_discord_id.set()
     link = "https://ibb.co/WHKKytW"
@@ -220,13 +219,12 @@ async def add_discord_id_handler(message: Message, state: FSMContext) -> None:
     guild = data.get('guild')
     channel = data.get('channel')
     token = data.get('token')
-    proxy = data.get('proxy')
     cooldown = data.get('cooldown')
     user = message.from_user.id
 
     token_result_complete: bool = Token.add_token_by_telegram_id(
         telegram_id=user, token=token, discord_id=discord_id,
-        proxy=proxy, guild=guild, channel=channel, cooldown=cooldown)
+        guild=guild, channel=channel, cooldown=cooldown)
 
     if token_result_complete:
         await message.answer(
@@ -344,8 +342,8 @@ async def lets_play(message: Message):
         datastore = DataStore(user_telegram_id)
         users_data_storage.add_or_update(telegram_id=user_telegram_id, data=datastore)
         message_manager = MessageReceiver(datastore=datastore)
-        answer: dict = await message_manager.get_message(datastore=datastore)
-        text: str = await api_errors_handler(telegram_id=user_telegram_id, answer=answer)
+        answer: dict = await message_manager.get_message()
+        text: str = await errors_handler(message=message, datastore=datastore, answer=answer)
         if text == 'stop':
             return
 
@@ -415,7 +413,7 @@ async def send_message_to_reply_handler(message: Message, state: FSMContext):
 
 
 @logger.catch
-async def api_errors_handler(message: Message, answer: dict, datastore: 'DataStore') -> str:
+async def errors_handler(message: Message, answer: dict, datastore: 'DataStore') -> str:
     """Обработка ошибок от сервера"""
 
     user_telegram_id = message.from_user.id
@@ -456,21 +454,32 @@ async def api_errors_handler(message: Message, answer: dict, datastore: 'DataSto
         )
         datastore.delay = 10
         text = "ok"
+    elif text == "no pairs":
+        if not await form_token_pairs(telegram_id=user_telegram_id, unpair=False):
+            text = "Не смог сформировать пары токенов."
+            await message.answer(text)
+            await send_report_to_admins(text)
+            text = "stop"
+        else:
+            text = 'ok'
 
     return text
 
 
 @logger.catch
-async def form_token_pairs(telegram_id: str, unpair: bool = False) -> None:
+async def form_token_pairs(telegram_id: str, unpair: bool = False) -> int:
     """Формирует пары из свободных токенов если они в одном канале"""
 
     if unpair:
         User.delete_all_pairs(telegram_id=telegram_id)
-    free_tokens: Tuple[tuple] = Token.get_all_free_tokens(telegram_id=telegram_id)
+    free_tokens: Tuple[Tuple[str, list]] = Token.get_all_free_tokens(telegram_id=telegram_id)
+    formed_pairs: int = 0
     for channel, tokens in free_tokens:
         while len(tokens) > 1:
             random.shuffle(tokens)
-            Token.make_tokens_pair(tokens.pop(), tokens.pop())
+            formed_pairs += Token.make_tokens_pair(tokens.pop(), tokens.pop())
+
+    return formed_pairs
 
 
 @logger.catch

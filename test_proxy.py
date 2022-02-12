@@ -5,10 +5,12 @@ import os.path
 import re
 from typing import List
 
+import aiohttp
 import requests
 import random
 from bs4 import BeautifulSoup as bs
 
+import discord_handler
 from models import Token
 
 
@@ -64,8 +66,71 @@ def do_job(random_token):
     # After sending message do this
     Token.update_token_time(random_token)
 
+async def check_token(token: str, proxy: str, channel: int) -> str:
+    """Returns valid token else 'bad token'"""
+
+    async with aiohttp.ClientSession() as session:
+        session.headers['authorization']: str = token
+        limit: int = 1
+        # url: str = f'https://discord.com/api/v9/channels/' + f'{channel}/messages?limit={limit}'
+        result: str = 'bad token'
+        user = 'Selkaifusa2000'
+        password = 'V9f3WuD'
+        url = 'http://www.google.com'
+        try:
+            proxy = f"http://{user}:{password}@{proxy}/"
+            async with session.get(url=url, proxy=proxy, ssl=False) as response:
+                print(response.url)
+            # async with session.get(url=url, timeout=10) as response:
+                if response.status == 200:
+                    print(response.status)
+                    result = token
+        except (asyncio.exceptions.TimeoutError,
+        aiohttp.client_exceptions.ServerDisconnectedError,
+        aiohttp.client_exceptions.ClientProxyConnectionError,
+        aiohttp.client_exceptions.ClientHttpProxyError,
+        aiohttp.client_exceptions.ClientOSError,
+        aiohttp.client_exceptions.TooManyRedirects,
+        ConnectionResetError) as err:
+            print(f"Token check Error: {err}")
+
+    return result
+
+
+async def text():
+    async with aiohttp.ClientSession() as session:
+        session.headers['authorization']: str = token
+
+
 
 if __name__ == '__main__':
+    PROXY_USER = discord_handler.PROXY_USER
+    # PROXY_PASSWORD = discord_handler.PROXY_PASSWORD
+    token = 'NDg3OTYyMDczNDU2ODM2NjE4.YfbEhA.gXDarmEjAxjw_d2R92oc-02xejA'
+    proxy = "191.101.121.195:45785"
+    user = 'Selkaifusa2000'
+    password = 'V9f3WuD'
+    channel = 932256559394861079
+    # asyncio.new_event_loop().run_until_complete(
+    #     check_token(token=token, proxy=proxy, channel=932256559394861079))
+    # url = 'http://ifconfig.me/ip'
+    url = 'http://www.google.com'
+
+
+    proxies = {
+        "http": f"http://{user}:{password}@{proxy}/"
+    }
+    limit = 1
+    # url: str = f'https://discord.com/api/v9/channels/' + f'{channel}/messages?limit={limit}'
+    useragentz = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/83.0.4103.61 Safari/537.36'
+    headers = {
+        # "authorization": "NDg3OTYyMDczNDU2ODM2NjE4.YfbEhA.gXDarmEjAxjw_d2R92oc-02xejA",
+        'User-agent': useragentz
+    }
+    response = requests.get(url=url, proxies=proxies, headers=headers)
+    print(response.status_code)
+    # print(response.status_code)
+
     # current_user = "test1"
     # try:
     #

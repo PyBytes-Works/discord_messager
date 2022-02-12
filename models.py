@@ -433,10 +433,6 @@ class Token(BaseModel):
     user = ForeignKeyField(User, on_delete="CASCADE")
     token = CharField(max_length=255, unique=True, verbose_name="Токен пользователя в discord")
     discord_id = CharField(max_length=255, unique=True, verbose_name="ID пользователя в discord")
-    mate_id = CharField(max_length=255, default='', verbose_name="ID напарника в discord")
-    proxy = CharField(
-        default='', max_length=25, unique=False, verbose_name="Адрес прокси сервера"
-    )
     guild = CharField(
         default='0', max_length=30, unique=False, verbose_name="Гильдия для подключения"
     )
@@ -464,8 +460,6 @@ class Token(BaseModel):
                                     telegram_id: str,
                                     token: str,
                                     discord_id: str,
-                                    mate_id: str,
-                                    proxy: str,
                                     guild: int,
                                     channel: int,
                                     language: str = 'en',
@@ -490,8 +484,6 @@ class Token(BaseModel):
                     'user': user_id,
                     'token': token,
                     'discord_id': discord_id,
-                    'mate_id': mate_id,
-                    'proxy': proxy,
                     'guild': guild,
                     'channel': channel,
                     'language': language,
@@ -523,14 +515,15 @@ class Token(BaseModel):
 
     @classmethod
     @logger.catch
-    def make_token_pair(cls, first: Any, second: Any) -> bool:
+    def make_tokens_pair(cls, first: Any, second: Any) -> bool:
         """
         make pair
              first: (str) or int
              second: (str)
              соединяет пару токенов
         """
-        return TokenPair.add_pair(first=first, second=second)
+        result = TokenPair.add_pair(first=first, second=second)
+        return result
 
     @classmethod
     @logger.catch
@@ -649,7 +642,6 @@ class Token(BaseModel):
             return {
                 'token': token_data.token,
                 'discord_id': token_data.discord_id,
-                'mate_id': token_data.mate_id,
                 'guild': token_data.guild,
                 'channel': token_data.channel,
                 'time': token_data.last_message_time,
@@ -717,11 +709,13 @@ class Token(BaseModel):
         """
         result = {}
         data: 'Token' = cls.get_or_none(cls.token == token)
+        mate_id = TokenPair.get_mate_id()
         if data:
+            proxy: str = User.get(User.id == data.user).proxy
             guild = int(data.guild) if data.guild else 0
             channel = int(data.channel) if data.channel else 0
-            result = {'proxy': data.proxy, 'discord_id': data.discord_id, 'guild': guild,
-                      'channel': channel, 'mate_id': data.mate_id, 'language': data.language,
+            result = {'proxy': proxy, 'discord_id': data.discord_id, 'guild': guild,
+                      'channel': channel, 'mate_id': mate_id, 'language': data.language,
                       'last_message_time': data.last_message_time, 'cooldown': data.cooldown}
         return result
 
@@ -794,7 +788,7 @@ class TokenPair(BaseModel):
                 second: int
         """
         if (cls.select().where((cls.first.in_((first, second)))
-                               | (cls.second.in_((first, second)))).execute().all()):
+                               | (cls.second.in_((first, second)))).execute()):
             return False
         return cls.create(first=first, second=second)
 
@@ -945,7 +939,7 @@ if __name__ == '__main__':
     if add_admins:
         for admin_id in admins_list:
             nick_name = "Admin"
-            User.add_new_user(nick_name=nick_name, telegram_id=admin_id, proxy=DEFAULT_PROXY)
+            User.add_new_user(nick_name=nick_name, telegram_id=admin_id, proxy='195.54.32.125:45785')
             User.set_user_status_admin(telegram_id=admin_id)
             User.activate_user(admin_id)
             logger.info(f"User {nick_name} with id {admin_id} created as ADMIN.")
