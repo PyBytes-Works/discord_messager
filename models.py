@@ -956,9 +956,9 @@ if __name__ == '__main__':
     if recreate:
         recreate_db(db_file_name)
     if add_admins:
-        for admin_id in admins_list:
-            nick_name = "Admin"
-            User.add_new_user(nick_name=nick_name, telegram_id=admin_id, proxy='195.54.32.125:45785')
+        for idx, admin_id in enumerate(admins_list, start=1):
+            nick_name = f"Admin_{idx}"
+            User.add_new_user(nick_name=nick_name, telegram_id=admin_id, proxy=DEFAULT_PROXY)
             User.set_user_status_admin(telegram_id=admin_id)
             User.activate_user(admin_id)
             logger.info(f"User {nick_name} with id {admin_id} created as ADMIN.")
