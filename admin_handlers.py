@@ -37,6 +37,47 @@ async def send_message_to_all_users_handler(message: Message) -> None:
 
 
 @logger.catch
+async def request_max_tokens_handler(message: Message) -> None:
+    """Обработчик команды /set_max_tokens"""
+
+    user_id: str = str(message.from_user.id)
+    if user_id in admins_list:
+        await message.answer(
+            'Введите telegram_id пользователя и количество токенов через пробел. '
+            '\nПример: "3333333 10"',
+            reply_markup=cancel_keyboard()
+        )
+        await UserState.user_set_max_tokens.set()
+
+
+@logger.catch
+async def set_max_tokens_handler(message: Message, state: FSMContext) -> None:
+    """Проверка и запись в БД нового количества токенов для пользователя"""
+
+    telegram_id = str(message.text.strip().split()[0])
+    new_tokens_count: int = check_is_int(message.text.strip().split()[-1])
+    if new_tokens_count and telegram_id:
+        if User.set_max_tokens(telegram_id=telegram_id, max_tokens=new_tokens_count):
+            await message.answer(
+                f'Для пользователя {telegram_id} установили количество токенов {new_tokens_count}',
+                reply_markup=user_menu_keyboard()
+            )
+        else:
+            text = "F: set_max_tokens_handler: Не изменилось количество токенов пользователя."
+            logger.error(text)
+            await message.answer(text, reply_markup=ReplyKeyboardRemove())
+        await state.finish()
+    else:
+        await message.answer(
+            f'Введеные неверные данные.'
+            f'Введите telegram_id пользователя и количество токенов через пробел без кавычек'
+            '\nПример: "3333333 10"',
+            reply_markup=cancel_keyboard()
+        )
+        return
+
+
+@logger.catch
 async def request_proxies_handler(message: Message) -> None:
     """Обработчик команды /add_proxy и /delete_proxy"""
 
@@ -309,19 +350,21 @@ def register_admin_handlers(dp: Dispatcher) -> None:
         cancel_handler, Text(startswith=["отмена", "cancel"], ignore_case=True), state="*")
     dp.register_message_handler(
         add_user_to_db_by_token, Text(startswith=["new_user_"]), state=UserState.name_for_activate)
-    dp.register_message_handler(send_message_to_all_users_handler, Text(startswith=["/sendall"]))
     dp.register_message_handler(max_user_request_handler, commands=['add_user', 'addu'])
     dp.register_message_handler(add_new_user_name_handler, state=UserState.max_tokens_req)
     dp.register_message_handler(add_subscribe_time_handler, state=UserState.subscribe_time)
     dp.register_message_handler(
         activate_new_user_handler, commands=['ua'])
-    dp.register_message_handler(admin_help_handler, commands=['admin', 'adm'])
     dp.register_message_handler(request_user_admin_handler, commands=['add_admin'])
+    dp.register_message_handler(set_user_admin_handler, state=UserState.name_for_admin)
     dp.register_message_handler(request_proxies_handler, commands=['add_proxy', 'delete_proxy'])
     dp.register_message_handler(add_new_proxy_handler, state=UserState.user_add_proxy)
     dp.register_message_handler(delete_proxy_handler, state=UserState.user_delete_proxy)
-    dp.register_message_handler(set_user_admin_handler, state=UserState.name_for_admin)
-    dp.register_message_handler(show_all_users_handler, commands=['show_users', 'su'])
     dp.register_message_handler(delete_user_name_handler, commands=['delete_user'])
     dp.register_callback_query_handler(delete_user_handler, Text(startswith=['user_']), state=UserState.name_for_del)
+    dp.register_message_handler(show_all_users_handler, commands=['show_users', 'su'])
+    dp.register_message_handler(admin_help_handler, commands=['admin', 'adm'])
+    dp.register_message_handler(request_max_tokens_handler, commands=['set_max_tokens'])
+    dp.register_message_handler(set_max_tokens_handler, state=UserState.user_set_max_tokens)
+    dp.register_message_handler(send_message_to_all_users_handler, Text(startswith=["/sendall"]))
     dp.register_message_handler(add_new_user_handler, state=UserState.name_for_cr)
