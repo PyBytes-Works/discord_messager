@@ -94,7 +94,7 @@ def delete_used_token(token: str) -> dict:
 
 async def send_report_to_admins(text: str) -> None:
     """Отправляет сообщение в телеграме всем администраторам из списка"""
-
+    text = f'[Рассылка][Superusers]: {text}'
     for admin_id in admins_list:
         try:
             await bot.send_message(chat_id=admin_id, text=text)
