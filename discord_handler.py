@@ -286,10 +286,13 @@ class MessageReceiver:
             reply_for_author_id: str = 'Базовая строка'
             try:
                 ref_messages: dict = elem.get("referenced_message", {})
+                print(ref_messages)
                 if ref_messages:
                     ref_messages_author: dict = ref_messages.get("author", {})
+                    print(ref_messages_author)
                     if ref_messages_author:
                         reply_for_author_id: str = ref_messages_author.get("id", '')
+                        print(reply_for_author_id)
             except AttributeError as err:
                 logger.error(f"F: __replies_filter: Ошибка какая то хер пойми."
                              f"\nreply_for_author_id: {reply_for_author_id}"
@@ -333,7 +336,7 @@ class MessageSender:
         """Отправляет данные в канал дискорда, возвращает результат отправки."""
 
         answer: str = self.__send_message_to_discord_channel(text=text)
-        logger.info(f"Результат отправки сообщения в дискорд: {answer}")
+        # logger.info(f"Результат отправки сообщения в дискорд: {answer}")
         Token.update_token_time(token=self.__datastore.token)
 
         return answer
@@ -389,14 +392,7 @@ class MessageSender:
         if status_code == 204:
             answer = "Ошибка 204, нет содержимого."
         elif status_code == 200:
-            try:
-                data = response.json()
-            except Exception as err:
-                logger.warning(err)
-                return f"JSON ERROR {err}"
-            else:
-                logger.info(f"Data received: {len(data)}")
-                answer = "Message sent"
+            answer = "Message sent"
         else:
             answer = f"API request error: {status_code}"
             logger.error(answer)
