@@ -344,14 +344,14 @@ async def lets_play(message: Message):
 
     while User.get_is_work(telegram_id=user_telegram_id):
         if await delete_user_if_expired(message=message):
-            return
+            break
         datastore = DataStore(user_telegram_id)
         users_data_storage.add_or_update(telegram_id=user_telegram_id, data=datastore)
         message_manager = MessageReceiver(datastore=datastore)
         answer: dict = await message_manager.get_message()
         text: str = await errors_handler(message=message, datastore=datastore, answer=answer)
         if text == 'stop':
-            return
+            break
 
         replies: list = answer.get("replies", [])
         if replies:
