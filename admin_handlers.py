@@ -153,6 +153,7 @@ async def admin_help_handler(message: Message) -> None:
             "\n/sendall 'тут текст сообщения без кавычек' - отправить сообщение всем активным пользователям",
             "\n/add_proxy - добавить прокси",
             "\n/delete_proxy - удалить прокси",
+            "\n/set_max_tokens - изменить кол-во токенов пользователя",
         )
         admin_commands: str = "".join(commands)
         await message.answer(f'Список команд администратора: {admin_commands}', reply_markup=user_menu_keyboard())
