@@ -204,6 +204,7 @@ class MessageReceiver:
         proxies: dict = {
             "http": f"http://{PROXY_USER}:{PROXY_PASSWORD}@{self.__datastore.proxy}/"
         }
+        print("RECEIVING PROXY:", proxies)
         response = session.get(url=url, proxies=proxies)
         status_code: int = response.status_code
         result: dict = {}
@@ -216,6 +217,8 @@ class MessageReceiver:
                 # Дебагеррный файл, можно удалять
                 # save_data_to_json(data=data)
                 result: dict = await self.__data_filter(data=data)
+        elif status_code == 429:
+            logger.warning(f"ERROR 429: {response.text}")
         else:
             logger.error(f"API request error: {status_code}")
 
@@ -362,6 +365,7 @@ class MessageSender:
         proxies = {
             "http": f"http://{PROXY_USER}:{PROXY_PASSWORD}@{self.__datastore.proxy}/",
         }
+        print("SENDING PROXY:", proxies)
         try:
             response = session.post(url=url, json=data, proxies=proxies)
         except Exception as err:
@@ -371,8 +375,11 @@ class MessageSender:
             answer = "Ошибка 204, нет содержимого."
         elif status_code == 200:
             answer = "Message sent"
+        elif status_code == 429:
+            answer = f"API request error: {status_code}"
+            logger.error(f"{answer} {response.text}")
         else:
             answer = f"API request error: {status_code}"
-            logger.error(answer)
+            logger.error(f"{answer} {response.text}")
 
         return answer
