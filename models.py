@@ -29,6 +29,7 @@ class User(BaseModel):
         deactivate_expired_users
         delete_user_by_telegram_id
         delete_status_admin
+        delete_all_tokens
         is_admin
         is_active
         get_active_users
@@ -130,12 +131,18 @@ class User(BaseModel):
     def delete_user_by_telegram_id(cls: 'User', telegram_id: str) -> tuple:
         """
         delete user by telegram id
+        #
         """
         user = cls.get_or_none(cls.telegram_id == telegram_id)
         if user:
-            user_id = user.id
-            return (user.delete_instance(),
-                    Token.delete().where(Token.user == user_id).execute())
+            return Token.delete_tokens_by_user(user=user), user.delete_instance()
+
+    @classmethod
+    @logger.catch
+    def delete_all_tokens(cls, telegram_id: str) -> int:
+        user = cls.get_or_none(cls.telegram_id == telegram_id)
+        if user:
+            return Token.delete_tokens_by_user(user=user)
 
     @classmethod
     @logger.catch
@@ -348,7 +355,7 @@ class User(BaseModel):
         # FIXME
         """
         user: User = cls.get_or_none(cls.telegram_id == telegram_id)
-        expiration = user.expiration if user else 0
+        expiration: int = user.expiration if user else 0
         return expiration > datetime.datetime.now().timestamp() if expiration else False
 
     @classmethod
@@ -357,7 +364,7 @@ class User(BaseModel):
         """
         возвращает timestamp без миллисекунд в виде целого числа
         """
-        user: User = cls.get_or_none(cls.expiration, cls.telegram_id == telegram_id)
+        user = cls.get_or_none(cls.expiration, cls.telegram_id == telegram_id)
         # print(type(result.expiration))
         if user:
             expiration = user.expiration
@@ -421,6 +428,7 @@ class Token(BaseModel):
       methods:
           add_token_by_telegram_id
           delete_inactive_tokens
+          delete_tokens_by_user
           is_token_exists
           get_all_user_tokens
           get_all_info_tokens
@@ -526,7 +534,7 @@ class Token(BaseModel):
 
     @classmethod
     @logger.catch
-    def make_tokens_pair(cls, first: Any, second: Any) -> bool:
+    def make_tokens_pair(cls, first: Any, second: Any) -> int:
         """
         make pair
              first_id: (str) or int
@@ -689,7 +697,7 @@ class Token(BaseModel):
         """
         Вернуть timestamp(кд) токена по его "значению":
         """
-        data: 'Token' = cls.get_or_none(cls.last_message_time, cls.token == token)
+        data = cls.get_or_none(cls.last_message_time, cls.token == token)
         last_message_time = data.last_message_time if data else None
         return last_message_time
 
@@ -717,7 +725,7 @@ class Token(BaseModel):
             cooldown по умолчанию 5 * 60
         """
         result = {}
-        data: 'Token' = cls.get_or_none(cls.token == token)
+        data = cls.get_or_none(cls.token == token)
         if data:
             mate: 'Token' = TokenPair.get_token_mate(data.id)
             mate_id = mate.discord_id if mate else 0
@@ -749,6 +757,18 @@ class Token(BaseModel):
         """
         users = User.get_id_inactive_users()
         return cls.delete().where(cls.user.in_(users)).execute()
+
+    @classmethod
+    @logger.catch
+    def delete_tokens_by_user(cls, user: User) -> int:
+        """
+        removes all tokens for user
+        return: number of removed tokens
+        """
+        result = Token.get_all_tokens_by_user(user_id=user.id)
+        tokens = [data.id for data in result]
+        TokenPair.remove_pairs_from_list(token_list=tokens)
+        return cls.delete().where(cls.user == user).execute()
 
     @classmethod
     @logger.catch
@@ -849,16 +869,6 @@ class TokenPair(BaseModel):
         pair = cls.select().where((cls.first_id == token_id) | (cls.second_id == token_id)).first()
         if pair:
             return pair.first_id if pair.second_id_id == int(token_id) else pair.second_id
-        # return 0
-        # pair = cls.get_or_none(cls.first_id == token_id)
-        # if pair:
-        #     return pair.second_id
-        #
-        # pair = cls.get_or_none(cls.second_id == token_id)
-        # if pair:
-        #     return pair.first_id
-        #
-        # return 0
 
 
 class Proxy(BaseModel):
