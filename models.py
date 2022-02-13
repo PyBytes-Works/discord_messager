@@ -196,10 +196,10 @@ class User(BaseModel):
                 f'{user.nick_name.rsplit("_", maxsplit=1)[0]} | '
                 f'{"Active" if user.active else "Not active"} | '
                 f'{"Admin" if user.admin else "Not admin"} | '
-                f'\nProxy: {user.proxy if user.proxy else "ЧТО ТО СЛОМАЛОСЬ"} | '
-                f'ID: {user.telegram_id if user.telegram_id else "ЧТО ТО СЛОМАЛОСЬ"} | '
-                f'N: {user.max_tokens if user.max_tokens else "ЧТО ТО СЛОМАЛОСЬ"} | '
-                f'Exp: {user.expiration if user.expiration else "ЧТО ТО СЛОМАЛОСЬ"} | '
+                f'Proxy: {user.proxy if user.proxy else "ЧТО ТО СЛОМАЛОСЬ"} | '
+                f'\nID: {user.telegram_id if user.telegram_id else "ЧТО ТО СЛОМАЛОСЬ"} | '
+                f'№: {user.max_tokens if user.max_tokens else "ЧТО ТО СЛОМАЛОСЬ"} | '
+                f'{datetime.datetime.fromtimestamp(user.expiration) if user.expiration else "ЧТО ТО СЛОМАЛОСЬ"}'
                 )
             for user in User.select().execute()
         }

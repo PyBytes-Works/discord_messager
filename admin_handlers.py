@@ -142,19 +142,24 @@ async def set_user_admin_handler(message: Message, state: FSMContext) -> None:
 async def admin_help_handler(message: Message) -> None:
     """Обработчик команды /admin"""
 
-    if User.is_admin(telegram_id=message.from_user.id):
-        commands: tuple = (
-            "\n/admin - показать список команд администратора",
-            "\n/add_user - добавить нового пользователя",
-            "\n/show_users - показать список пользователей",
-            "\n/ua - команда для пользователя, для активации по токену",
-            "\n/add_admin - команда для назначения пользователя администратором",
-            "\n/delete_user - удалить пользователя",
-            "\n/sendall 'тут текст сообщения без кавычек' - отправить сообщение всем активным пользователям",
-            "\n/add_proxy - добавить прокси",
-            "\n/delete_proxy - удалить прокси",
-            "\n/set_max_tokens - изменить кол-во токенов пользователя",
-        )
+    user_telegram_id: str = str(message.from_user.id)
+    if User.is_admin(telegram_id=user_telegram_id):
+        commands: list = [
+            "\n/ua - команда для пользователя, для активации по токену.",
+            "\n/admin - показать список команд администратора.",
+            "\n/add_user - добавить нового пользователя.",
+            "\n/show_users - показать список пользователей.",
+            "\n/delete_user - удалить пользователя."
+        ]
+        if user_telegram_id in admins_list:
+            superadmin: list = [
+                "\n/add_admin - команда для назначения пользователя администратором",
+                "\n/sendall 'тут текст сообщения без кавычек' - отправить сообщение всем активным пользователям",
+                "\n/add_proxy - добавить прокси",
+                "\n/delete_proxy - удалить прокси",
+                "\n/set_max_tokens - изменить кол-во токенов пользователя",
+            ]
+            commands.extend(superadmin)
         admin_commands: str = "".join(commands)
         await message.answer(f'Список команд администратора: {admin_commands}', reply_markup=user_menu_keyboard())
     else:
