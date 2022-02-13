@@ -1,4 +1,5 @@
 """Модуль с основными обработчиками команд, сообщений и коллбэков"""
+
 import asyncio
 import datetime
 import random
