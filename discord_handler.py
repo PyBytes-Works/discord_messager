@@ -74,7 +74,7 @@ class MessageReceiver:
             except cls.__EXCEPTIONS as err:
                 logger.info(f"Token check Error: {err}")
             except aiohttp.http_exceptions.BadHttpMessage as err:
-                logger.error("МУДАК ПРОВЕРЬ ПОРТ ПРОКСИ!!!")
+                logger.error("МУДАК ПРОВЕРЬ ПОРТ ПРОКСИ!!!", err)
 
         return result
 
@@ -107,19 +107,23 @@ class MessageReceiver:
             return result
 
         user_message, message_id = await self.__get_user_message_from_redis(token=token)
+        logger.info(f"Сообщение из редис {user_message} для {message_id}")
         if message_id:
             self.__datastore.current_message_id = message_id
         else:
             filtered_data: dict = await self.__get_data_from_api()
+            logger.info(f"Отфильтровали данные {filtered_data}")
             if not filtered_data:
                 return result
             replies: List[dict] = filtered_data.get("replies", [])
+            logger.info(f"Новые реплаи {replies}")
             if replies:
                 result.update({"replies": replies})
             self.__datastore.current_message_id = await self.__get_current_message_id(data=filtered_data)
         text_to_send = user_message if user_message else ''
         answer: str = await MessageSender(datastore=self.__datastore).send_message(text=text_to_send)
         self.__datastore.current_message_id = 0
+        logger.info(f"Ответ после отсылки сообщения {answer}")
         if answer != "Message sent":
             result.update({"work": False, "message": answer, "token": token})
             return result
@@ -280,8 +284,9 @@ class MessageReceiver:
     async def __replies_filter(self, elem: dict) -> dict:
         result = {}
         # FIXME ЗАЛИПУХА
-        if elem:
+        if elem is not None:
             reply_author: str = elem.get("referenced_message", {}).get("author", {}).get("id", '')
+            logger.info(f"AUTHOR: {reply_author}")
             mentions: tuple = tuple(
                 filter(
                     lambda x: int(x.get("id", '')) == int(self.__datastore.my_discord_id),
@@ -315,6 +320,8 @@ class MessageSender:
     @logger.catch
     async def send_message(self, text: str = '') -> str:
         """Отправляет данные в канал дискорда, возвращает результат отправки."""
+
+        await asyncio.sleep(0.5)  # FIXME
 
         answer: str = await self.__send_message_to_discord_channel(text=text)
         logger.info(f"Результат отправки сообщения в дискорд: {answer}")
