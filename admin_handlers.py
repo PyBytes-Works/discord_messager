@@ -1,4 +1,4 @@
-"""Модул    ь для обработчиков администратора"""
+"""Модуль для обработчиков администратора"""
 import re
 
 import aiogram
@@ -23,7 +23,7 @@ from utils import (
 async def send_message_to_all_users_handler(message: Message) -> None:
     """Обработчик команды /sendall"""
 
-    data = message.text[9:]
+    data = f'[Рассылка][Всем]: {message.text[9:]}'
     user_id = str(message.from_user.id)
     if not data:
         await message.answer("Нет данных для отправки.")
