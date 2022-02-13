@@ -31,6 +31,15 @@ def users_keyboard() -> 'InlineKeyboardMarkup':
 
 
 @logger.catch
+def admin_keyboard() -> 'InlineKeyboardMarkup':
+    """Возвращает список админских кнопок"""
+    # TODO сделать
+    keyboard = InlineKeyboardMarkup(row_width=1)
+
+    return keyboard
+
+
+@logger.catch
 def user_menu_keyboard() -> 'ReplyKeyboardMarkup':
     """Возвращает кнопочки из списка"""
 

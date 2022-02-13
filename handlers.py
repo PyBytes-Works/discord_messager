@@ -516,9 +516,9 @@ def form_token_pairs(telegram_id: str, unpair: bool = False) -> int:
 async def default_message(message: Message) -> None:
     """Ответ на любое необработанное действие активного пользователя."""
 
-    if await delete_user_if_expired(message=message):
-        return
     if User.is_active(message.from_user.id):
+        if await delete_user_if_expired(message=message):
+            return
         await message.answer(
             'Доступные команды: '
             '\n/start_parsing - Активирует бота.'
