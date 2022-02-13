@@ -166,10 +166,7 @@ async def add_discord_token_handler(message: Message, state: FSMContext) -> None
     """ Получение токена запрос discord_id """
 
     token: str = message.text.strip()
-    # TODO заменить на метод ПРОВЕРКИ наличия токена, а не получения всей инфы по нему.
-    # token_info: bool = Token.is_token_exists(token)
-    token_info = Token.get_info_by_token(token)
-    if token_info:
+    if Token.is_token_exists(token):
         await message.answer(
             "Такой токен токен уже есть в база данных."
             "\n Повторите ввод токена.",

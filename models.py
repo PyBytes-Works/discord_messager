@@ -413,22 +413,23 @@ class User(BaseModel):
 class Token(BaseModel):
     """
     Model for table discord_users
-      methods
-      add_token_by_telegram_id
-      delete_inactive_tokens
-      get_all_user_tokens
-      get_all_info_tokens
-      get_number_of_free_slots_for_tokens
-      get_time_by_token
-      get_info_by_token
-      get_all_free_tokens
-      get_all_discord_id
-      get_all_discord_id_by_channel
-      get_token_by_discord_id
-      get_all_user_tokens
-      check_token_by_discord_id
-      update_token_cooldown
-      update_token_time
+      methods:
+          add_token_by_telegram_id
+          delete_inactive_tokens
+          is_token_exists
+          get_all_user_tokens
+          get_all_info_tokens
+          get_number_of_free_slots_for_tokens
+          get_time_by_token
+          get_info_by_token
+          get_all_free_tokens
+          get_all_discord_id
+          get_all_discord_id_by_channel
+          get_token_by_discord_id
+          get_all_user_tokens
+          check_token_by_discord_id
+          update_token_cooldown
+          update_token_time
     """
     user = ForeignKeyField(User, on_delete="CASCADE")
     token = CharField(max_length=255, unique=True, verbose_name="Токен пользователя в discord")
@@ -452,6 +453,11 @@ class Token(BaseModel):
 
     class Meta:
         db_table = "user_token_discord"
+
+    @classmethod
+    @logger.catch
+    def is_token_exists(cls, token: str) -> bool:
+        return True if cls.select().where(cls.token == token).count() else False
 
     @classmethod
     @logger.catch
@@ -710,13 +716,14 @@ class Token(BaseModel):
         result = {}
         data: 'Token' = cls.get_or_none(cls.token == token)
         if data:
-            mate_id: int = TokenPair.get_token_mate_id(data.id)
-            mate: 'Token' = cls.get(id=mate_id)
+            mate: 'Token' = TokenPair.get_token_mate(data.id)
+            mate_id = mate.discord_id if mate else 0
+            # mate: 'Token' = cls.get(id=mate_id)
             proxy: str = User.get(User.id == data.user).proxy
             guild = int(data.guild) if data.guild else 0
             channel = int(data.channel) if data.channel else 0
             result = {'proxy': proxy, 'discord_id': data.discord_id, 'guild': guild,
-                      'channel': channel, 'mate_id': mate.discord_id, 'language': data.language,
+                      'channel': channel, 'mate_id': mate_id, 'language': data.language,
                       'last_message_time': data.last_message_time, 'cooldown': data.cooldown}
         return result
 
@@ -771,7 +778,7 @@ class TokenPair(BaseModel):
             add_pair
             delete_pair
             remove_all_pairs
-            get_token_mate_id
+            get_token_mate
             get_all_related_tokens
      """
 
@@ -792,7 +799,7 @@ class TokenPair(BaseModel):
         if (cls.select().where((cls.first_id.in_((first, second)))
                                | (cls.second_id.in_((first, second)))).execute()):
             return False
-        pair = cls.create(first=first, second=second)
+        pair = cls.create(first_id=first, second_id=second)
         return 1 if pair else 0
 
     @classmethod
@@ -834,17 +841,21 @@ class TokenPair(BaseModel):
 
     @classmethod
     @logger.catch
-    def get_token_mate_id(cls, token_id: str) -> int:
+    def get_token_mate(cls, token_id: str) -> Token:
         """get mate for token"""
-        pair = cls.get_or_none(cls.first_id == token_id)
+        pair = cls.select().where((cls.first_id == token_id) | (cls.second_id == token_id)).first()
         if pair:
-            return pair.second_id
-
-        pair = cls.get_or_none(cls.second_id == token_id)
-        if pair:
-            return pair.first_id
-
-        return 0
+            return pair.first_id if pair.second_id_id == int(token_id) else pair.second_id
+        # return 0
+        # pair = cls.get_or_none(cls.first_id == token_id)
+        # if pair:
+        #     return pair.second_id
+        #
+        # pair = cls.get_or_none(cls.second_id == token_id)
+        # if pair:
+        #     return pair.first_id
+        #
+        # return 0
 
 
 class Proxy(BaseModel):
