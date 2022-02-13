@@ -945,6 +945,8 @@ if __name__ == '__main__':
     add_test_users = 0
     add_admins = 0
     add_tokens = 0
+    set_max_tokens = 0
+    set_proxy = 0
     import random
     import string
     test_user_list = (
@@ -959,6 +961,7 @@ if __name__ == '__main__':
     #     ]
     if recreate:
         recreate_db(db_file_name)
+
     if add_admins:
         for idx, admin_id in enumerate(admins_list, start=1):
             nick_name = f"Admin_{idx}"
@@ -966,3 +969,13 @@ if __name__ == '__main__':
             User.set_user_status_admin(telegram_id=admin_id)
             User.activate_user(admin_id)
             logger.info(f"User {nick_name} with id {admin_id} created as ADMIN.")
+
+    if set_max_tokens:
+        telegram_id = ''
+        max_tokens = 0
+        User.set_max_tokens(telegram_id=telegram_id, max_tokens=max_tokens)
+
+    if set_proxy:
+        telegram_id = ''
+        proxy = ""
+        User.set_proxy_by_telegram_id(telegram_id=telegram_id, proxy=proxy)
