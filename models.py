@@ -193,9 +193,13 @@ class User(BaseModel):
         """
         return {
             user.telegram_id: (f'{user.nick_name.rsplit("_", maxsplit=1)[0]} | '
-                               f'{"Active" if user.active else "Not active"} | '
-                               # f'{"Work" if user.is_work else "Not work"} | '
-                               f'{"Admin" if user.admin else "Not admin"} | ')
+                               f'{"Active:" if user.active else "Not active"} | '
+                               f'{"Admin:" if user.admin else "Not admin"} | '
+                               f'{"Proxy:" if user.proxy else "ЧТО ТО СЛОМАЛОСЬ"} | '
+                               f'{"Telegram_id:" if user.telegram_id else "ЧТО ТО СЛОМАЛОСЬ"} | '
+                               f'{"Tokens:" if user.max_tokens else "ЧТО ТО СЛОМАЛОСЬ"} | '
+                               f'{"Expiration:" if user.expiration else "ЧТО ТО СЛОМАЛОСЬ"} | '
+                               )
             for user in User.select().execute()
         }
 
