@@ -111,6 +111,8 @@ class MessageReceiver:
             self.__datastore.current_message_id = message_id
         else:
             filtered_data: dict = await self.__get_data_from_api()
+            if not filtered_data:
+                return result
             replies: List[dict] = filtered_data.get("replies", [])
             if replies:
                 result.update({"replies": replies})
@@ -222,10 +224,12 @@ class MessageReceiver:
     @logger.catch
     async def __data_filter(self, data: List[dict]) -> dict:
         """Фильтрует полученные данные"""
-
         messages = []
         replies = []
         result = {}
+        # FIXME ЗАЛИПУХА
+        if not data:
+            return result
         summa = 0
         for elem in data:
             # FIXME ЗАЛИПУХА
@@ -274,26 +278,27 @@ class MessageReceiver:
         return replies
 
     async def __replies_filter(self, elem: dict) -> dict:
-
-        reply_author: str = elem.get("referenced_message", {}).get("author", {}).get("id", '')
-        mentions: tuple = tuple(
-            filter(
-                lambda x: int(x.get("id", '')) == int(self.__datastore.my_discord_id),
-                elem.get("mentions", [])
-            )
-        )
         result = {}
-        author: str = elem.get("author", {}).get("username", '')
-        author_id: str = elem.get("author", {}).get("id", '')
-        message_for_me: bool = reply_author == self.__datastore.my_discord_id
-        if any(mentions) or message_for_me:
-            if author_id not in Token.get_all_discord_id(token=self.__datastore.token):
-                result.update({
-                    "token": self.__datastore.token,
-                    "author": author,
-                    "text": elem.get("content", ''),
-                    "message_id": elem.get("id", '')
-                })
+        # FIXME ЗАЛИПУХА
+        if elem:
+            reply_author: str = elem.get("referenced_message", {}).get("author", {}).get("id", '')
+            mentions: tuple = tuple(
+                filter(
+                    lambda x: int(x.get("id", '')) == int(self.__datastore.my_discord_id),
+                    elem.get("mentions", [])
+                )
+            )
+            author: str = elem.get("author", {}).get("username", '')
+            author_id: str = elem.get("author", {}).get("id", '')
+            message_for_me: bool = reply_author == self.__datastore.my_discord_id
+            if any(mentions) or message_for_me:
+                if author_id not in Token.get_all_discord_id(token=self.__datastore.token):
+                    result.update({
+                        "token": self.__datastore.token,
+                        "author": author,
+                        "text": elem.get("content", ''),
+                        "message_id": elem.get("id", '')
+                    })
 
         return result
 
