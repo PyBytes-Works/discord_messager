@@ -32,7 +32,6 @@ storage = MemoryStorage()
 dp = Dispatcher(bot, storage=storage)
 
 
-
 #  ********** LOGGER CONFIG ********************************
 
 PATH = os.getcwd()

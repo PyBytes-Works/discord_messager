@@ -124,6 +124,9 @@ async def max_user_request_handler(message: Message) -> None:
     """Обработчик для создания нового пользователя. Команда /add_user"""
 
     if User.is_admin(telegram_id=message.from_user.id):
+        if not Proxy.get_proxy_count():
+            await message.answer("Нет ни одной прокси. Добавьте хотя бы одну.", reply_markup=user_menu_keyboard())
+            return
         await message.answer('Сколько максимум токенов будет у пользователя?', reply_markup=cancel_keyboard())
         await UserState.max_tokens_req.set()
     else:
