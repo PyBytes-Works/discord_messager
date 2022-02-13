@@ -51,7 +51,6 @@ async def get_all_tokens_handler(message: Message) -> None:
 
     if await delete_user_if_expired(message=message):
         return
-
     user_telegram_id = message.from_user.id
 
     if User.is_active(telegram_id=user_telegram_id):
@@ -98,6 +97,7 @@ async def set_self_token_cooldown_handler(message: Message, state: FSMContext):
 @logger.catch
 async def invitation_add_discord_token_handler(message: Message) -> None:
     """Обработчик команды /add_token"""
+
     if await delete_user_if_expired(message=message):
         return
     user = message.from_user.id
@@ -133,7 +133,7 @@ async def add_cooldown_handler(message: Message, state: FSMContext) -> None:
 @logger.catch
 async def add_channel_handler(message: Message, state: FSMContext) -> None:
     """
-        Получения ссылки на канал, запрос tokenа
+        Получения ссылки на канал, запрос токена
     """
 
     mess = message.text
@@ -162,7 +162,7 @@ async def add_channel_handler(message: Message, state: FSMContext) -> None:
 
 @logger.catch
 async def add_discord_token_handler(message: Message, state: FSMContext) -> None:
-    """ Получение токена запрос discord_id"""
+    """ Получение токена запрос discord_id """
 
     token = message.text.strip()
     token_info = Token.get_info_by_token(token)
@@ -207,7 +207,7 @@ async def add_discord_token_handler(message: Message, state: FSMContext) -> None
 @logger.catch
 async def add_discord_id_handler(message: Message, state: FSMContext) -> None:
     """
-        Проверяет оба токена и добавляет их в БД
+        Проверяет данные токена и добавляет его в БД
     """
 
     discord_id = message.text.strip()
@@ -252,6 +252,7 @@ async def info_tokens_handler(message: Message) -> None:
     """
     Выводит инфо о токенах. Обработчик кнопки /info
     """
+
     if await delete_user_if_expired(message=message):
         return
     user = message.from_user.id
@@ -337,7 +338,8 @@ async def start_command_handler(message: Message, state: FSMContext) -> None:
 
 @logger.catch
 async def lets_play(message: Message):
-    """Show must go on"""
+    """Show must go on
+    Запускает рабочий цикл бота, проверяет ошибки."""
 
     work_hour: int = datetime.datetime.now().hour
     user_telegram_id: str = message.from_user.id
@@ -432,6 +434,8 @@ async def errors_handler(message: Message, answer: dict, datastore: 'DataStore')
 
 @logger.catch
 async def send_replies(message: Message, replies: list):
+    """Отправляет реплаи из дискорда в телеграм с кнопкой Ответить"""
+
     result = []
     answer_keyboard = InlineKeyboardMarkup(row_width=1)
     for reply in replies:
@@ -457,8 +461,10 @@ async def send_replies(message: Message, replies: list):
 
 @logger.catch
 async def answer_to_reply_handler(callback: CallbackQuery, state: FSMContext):
+    """Запрашивает текст ответа на реплай для отправки в дискорд"""
+
     message_id = callback.data.rsplit("_", maxsplit=1)[-1]
-    await callback.message.answer('Что ответить?', reply_markup=cancel_keyboard())
+    await callback.message.answer('Введите текст ответа:', reply_markup=cancel_keyboard())
     await UserState.answer_to_reply.set()
     await state.update_data(message_id=message_id)
     await callback.answer()
@@ -481,6 +487,7 @@ async def send_message_to_reply_handler(message: Message, state: FSMContext):
         await message.answer('Время хранения данных истекло.', reply_markup=cancel_keyboard())
         await state.finish()
         return
+    await message.answer('Добавляю сообщение в очередь. Это займет несколько секунд.', reply_markup=ReplyKeyboardRemove())
     await save_to_redis(telegram_id=user_telegram_id, data=redis_data)
     await message.answer('Сообщение добавлено в очередь сообщений.', reply_markup=cancel_keyboard())
     await state.finish()

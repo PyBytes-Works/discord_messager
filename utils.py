@@ -1,11 +1,13 @@
 import re
 
+import aiogram
 import aioredis
 from aioredis import Redis
 import json
 import os
 import random
 import string
+import aiogram.utils.exceptions
 
 from typing import Union
 from config import logger, bot, admins_list
@@ -94,7 +96,10 @@ async def send_report_to_admins(text: str) -> None:
     """Отправляет сообщение в телеграме всем администраторам из списка"""
 
     for admin_id in admins_list:
-        await bot.send_message(chat_id=admin_id, text=text)
+        try:
+            await bot.send_message(chat_id=admin_id, text=text)
+        except aiogram.utils.exceptions.ChatNotFound as err:
+            logger.error(f"Не смог отправить сообщение пользователю {admin_id}.", err)
 
 
 async def save_to_redis(telegram_id: str, data: list, timeout_sec: int = 3600, redis_db: 'Redis' = None) -> int:

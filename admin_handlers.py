@@ -1,6 +1,8 @@
 """Модул    ь для обработчиков администратора"""
 import re
 
+import aiogram
+import aiogram.utils.exceptions
 from aiogram import Dispatcher
 from aiogram.dispatcher import FSMContext
 from aiogram.dispatcher.filters import Text
@@ -28,7 +30,10 @@ async def send_message_to_all_users_handler(message: Message) -> None:
         return
     if user_id in admins_list:
         for user in User.get_active_users():
-            await bot.send_message(chat_id=user, text=data)
+            try:
+                await bot.send_message(chat_id=user, text=data)
+            except aiogram.utils.exceptions.ChatNotFound as err:
+                logger.error(f"Не смог отправить сообщение пользователю {user}.", err)
 
 
 @logger.catch
@@ -302,18 +307,18 @@ def register_admin_handlers(dp: Dispatcher) -> None:
     dp.register_message_handler(
         add_user_to_db_by_token, Text(startswith=["new_user_"]), state=UserState.name_for_activate)
     dp.register_message_handler(send_message_to_all_users_handler, Text(startswith=["/sendall"]))
-    dp.register_message_handler(max_user_request_handler, commands=['add_user'])
+    dp.register_message_handler(max_user_request_handler, commands=['add_user', 'addu'])
     dp.register_message_handler(add_new_user_name_handler, state=UserState.max_tokens_req)
     dp.register_message_handler(add_subscribe_time_handler, state=UserState.subscribe_time)
     dp.register_message_handler(
         activate_new_user_handler, commands=['ua'])
-    dp.register_message_handler(admin_help_handler, commands=['admin'])
+    dp.register_message_handler(admin_help_handler, commands=['admin', 'adm'])
     dp.register_message_handler(request_user_admin_handler, commands=['add_admin'])
     dp.register_message_handler(request_proxies_handler, commands=['add_proxy', 'delete_proxy'])
     dp.register_message_handler(add_new_proxy_handler, state=UserState.user_add_proxy)
     dp.register_message_handler(delete_proxy_handler, state=UserState.user_delete_proxy)
     dp.register_message_handler(set_user_admin_handler, state=UserState.name_for_admin)
-    dp.register_message_handler(show_all_users_handler, commands=['show_users'])
+    dp.register_message_handler(show_all_users_handler, commands=['show_users', 'su'])
     dp.register_message_handler(delete_user_name_handler, commands=['delete_user'])
     dp.register_callback_query_handler(delete_user_handler, Text(startswith=['user_']), state=UserState.name_for_del)
     dp.register_message_handler(add_new_user_handler, state=UserState.name_for_cr)
