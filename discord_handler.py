@@ -285,8 +285,15 @@ class MessageReceiver:
         """Возвращает реплаи не из нашего села."""
 
         result = {}
-        if isinstance(elem, dict):
-            reply_for_author: str = elem.get("referenced_message", {}).get("author", {}).get("id", '')
+        if isinstance(elem, dict) and elem:
+            reply_for_author: str = 'Базовая строка'
+            try:
+                reply_for_author: str = elem.get("referenced_message", {}).get("author", {}).get("id", '')
+            except AttributeError as err:
+                logger.error(f"F: __replies_filter: Ошибка какая то хер пойми."
+                             f"\nreply_for_author: {reply_for_author}"
+                             f"\nelem: {elem}", err)
+                return result
             mentions: tuple = tuple(
                 filter(
                     lambda x: int(x.get("id", '')) == int(self.__datastore.my_discord_id),
