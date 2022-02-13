@@ -518,8 +518,8 @@ class Token(BaseModel):
     def make_tokens_pair(cls, first: Any, second: Any) -> bool:
         """
         make pair
-             first: (str) or int
-             second: (str)
+             first_id: (str) or int
+             second_id: (str)
              соединяет пару токенов
         """
         result = TokenPair.add_pair(first=first, second=second)
@@ -775,24 +775,25 @@ class TokenPair(BaseModel):
             get_all_related_tokens
      """
 
-    first = ForeignKeyField(Token, unique=True, verbose_name="первый токен")
-    second = ForeignKeyField(Token, unique=True, verbose_name="второй токен")
+    first_id = ForeignKeyField(Token, unique=True, verbose_name="первый токен")
+    second_id = ForeignKeyField(Token, unique=True, verbose_name="второй токен")
 
     class Meta:
         db_table = 'token_pair'
 
     @classmethod
     @logger.catch
-    def add_pair(cls, first: int, second: int) -> bool:
+    def add_pair(cls, first: int, second: int) -> int:
         """add pair related tokens in table
             arguments:
-                first: int
-                second: int
+                first_id: int
+                second_id: int
         """
-        if (cls.select().where((cls.first.in_((first, second)))
-                               | (cls.second.in_((first, second)))).execute()):
+        if (cls.select().where((cls.first_id.in_((first, second)))
+                               | (cls.second_id.in_((first, second)))).execute()):
             return False
-        return cls.create(first=first, second=second)
+        pair = cls.create(first=first, second=second)
+        return 1 if pair else 0
 
     @classmethod
     @logger.catch
@@ -801,7 +802,7 @@ class TokenPair(BaseModel):
             arguments:
                 token_id: int
         """
-        return cls.delete().where((cls.first == token_id) | (cls.second == token_id)).execute()
+        return cls.delete().where((cls.first_id == token_id) | (cls.second_id == token_id)).execute()
 
     @classmethod
     @logger.catch
@@ -810,8 +811,8 @@ class TokenPair(BaseModel):
             arguments:
                 token_list: list
         """
-        return (cls.delete().where((cls.first.in_(token_list))
-                                   | (cls.second.in_(token_list))).execute())
+        return (cls.delete().where((cls.first_id.in_(token_list))
+                                   | (cls.second_id.in_(token_list))).execute())
 
     @classmethod
     @logger.catch
@@ -825,8 +826,8 @@ class TokenPair(BaseModel):
     @logger.catch
     def get_all_related_tokens(cls) -> Tuple[int, ...]:
         """select all related tokens"""
-        first = cls.select(cls.first.alias('token'))
-        second = cls.select(cls.second.alias('token'))
+        first = cls.select(cls.first_id.alias('token'))
+        second = cls.select(cls.second_id.alias('token'))
         query = first | second
 
         return tuple([value.token for value in query.execute()])
@@ -835,14 +836,13 @@ class TokenPair(BaseModel):
     @logger.catch
     def get_token_mate_id(cls, token_id: str) -> int:
         """get mate for token"""
-        # pair = cls.select().where((cls.first == token_id) | (cls.second == token_id)).first()
-        pair = cls.get_or_none(cls.first == token_id)
+        pair = cls.get_or_none(cls.first_id == token_id)
         if pair:
-            return pair.second
+            return pair.second_id
 
-        pair = cls.get_or_none(cls.second == token_id)
+        pair = cls.get_or_none(cls.second_id == token_id)
         if pair:
-            return pair.first
+            return pair.first_id
 
         return 0
 
