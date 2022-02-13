@@ -95,7 +95,7 @@ class MessageReceiver:
         и само сообщение"""
 
         result = {"work": True, "message": "ERROR"}
-        token_data: dict = self.__select_token_for_work()
+        token_data: dict = await self.__select_token_for_work()
         result_message: str = token_data.get("message")
         if result_message == "no pairs":
             result.update(token_data)
@@ -110,13 +110,13 @@ class MessageReceiver:
         if message_id:
             self.__datastore.current_message_id = message_id
         else:
-            filtered_data: dict = self.__get_data_from_api()
+            filtered_data: dict = await self.__get_data_from_api()
             replies: List[dict] = filtered_data.get("replies", [])
             if replies:
                 result.update({"replies": replies})
             self.__datastore.current_message_id = await self.__get_current_message_id(data=filtered_data)
         text_to_send = user_message if user_message else ''
-        answer: str = MessageSender(datastore=self.__datastore).send_message(text=text_to_send)
+        answer: str = await MessageSender(datastore=self.__datastore).send_message(text=text_to_send)
         self.__datastore.current_message_id = 0
         if answer != "Message sent":
             result.update({"work": False, "message": answer, "token": token})
@@ -147,7 +147,7 @@ class MessageReceiver:
         return answer, message_id
 
     @logger.catch
-    def __select_token_for_work(self) -> dict:
+    async def __select_token_for_work(self) -> dict:
         """
         Выбирает случайного токена дискорда из свободных, если нет свободных - пишет сообщение что
         свободных нет.
@@ -193,7 +193,7 @@ class MessageReceiver:
         return result
 
     @logger.catch
-    def __get_data_from_api(self) -> dict:
+    async def __get_data_from_api(self) -> dict:
         """Отправляет запрос к АПИ"""
 
         session = requests.Session()
@@ -213,14 +213,14 @@ class MessageReceiver:
                 logger.error(f"JSON ERROR: {err}")
             else:
                 save_data_to_json(data=data)
-                result: dict = self.__data_filter(data=data)
+                result: dict = await self.__data_filter(data=data)
         else:
             logger.error(f"API request error: {status_code}")
 
         return result
 
     @logger.catch
-    def __data_filter(self, data: dict) -> dict:
+    async def __data_filter(self, data: dict) -> dict:
         """Фильтрует полученные данные"""
 
         messages = []
@@ -233,7 +233,7 @@ class MessageReceiver:
             mes_time = datetime.datetime.fromisoformat(message_time).replace(tzinfo=None)
             delta = datetime.datetime.utcnow().replace(tzinfo=None) - mes_time
             if delta.seconds < self.__datastore.last_message_time:
-                filtered_replies: dict = self.__replies_filter(elem=elem)
+                filtered_replies: dict = await self.__replies_filter(elem=elem)
                 if filtered_replies:
                     replies.append(filtered_replies)
                 is_author_mate: bool = str(self.__datastore.mate_id) == str(elem["author"]["id"])
@@ -270,7 +270,7 @@ class MessageReceiver:
 
         return replies
 
-    def __replies_filter(self, elem: dict) -> dict:
+    async def __replies_filter(self, elem: dict) -> dict:
 
         reply_author: str = elem.get("referenced_message", {}).get("author", {}).get("id", '')
         mentions: tuple = tuple(
@@ -305,17 +305,17 @@ class MessageSender:
         self.__datastore: 'DataStore' = datastore
 
     @logger.catch
-    def send_message(self, text: str = '') -> str:
+    async def send_message(self, text: str = '') -> str:
         """Отправляет данные в канал дискорда, возвращает результат отправки."""
 
-        answer: str = self.__send_message_to_discord_channel(text=text)
+        answer: str = await self.__send_message_to_discord_channel(text=text)
         logger.info(f"Результат отправки сообщения в дискорд: {answer}")
         Token.update_token_time(token=self.__datastore.token)
 
         return answer
 
     @logger.catch
-    def __send_message_to_discord_channel(self, text: str = '') -> str:
+    async def __send_message_to_discord_channel(self, text: str = '') -> str:
         """Формирует данные для отправки, возвращает результат отправки."""
 
         if not text:
@@ -345,10 +345,10 @@ class MessageSender:
                     }
             })
 
-        return self.__send_data_to_api(data=data)
+        return await self.__send_data_to_api(data=data)
 
     @logger.catch
-    def __send_data_to_api(self, data):
+    async def __send_data_to_api(self, data):
         """Отправляет данные в дискорд канал"""
 
         session = requests.Session()
