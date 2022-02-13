@@ -9,7 +9,7 @@ from aiogram.dispatcher.filters import Text
 from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeyboardRemove
 from aiogram.dispatcher import FSMContext
 
-from config import logger, Dispatcher
+from config import logger, Dispatcher, admins_list
 from models import User, Token
 from keyboards import cancel_keyboard, user_menu_keyboard, all_tokens_keyboard
 from discord_handler import MessageReceiver, DataStore, users_data_storage
@@ -103,7 +103,8 @@ async def invitation_add_discord_token_handler(message: Message) -> None:
         return
     user: str = str(message.from_user.id)
     if User.is_active(telegram_id=user):
-        if Token.get_number_of_free_slots_for_tokens(user):
+        is_superadmin: bool = user in admins_list
+        if Token.get_number_of_free_slots_for_tokens(user) or is_superadmin:
             await message.answer(
                 "Введите cooldown в минутах: ", reply_markup=cancel_keyboard())
             await UserState.user_add_cooldown.set()
@@ -536,6 +537,8 @@ async def delete_user_if_expired(message: Message):
     if not user_active and not user_is_admin:
         await message.answer("Время подписки истекло. Ваш аккаунт удален.", reply_markup=ReplyKeyboardRemove())
         User.delete_user_by_telegram_id(telegram_id=user_telegram_id)
+        # User.delete_all_tokens(telegram_id=user_telegram_id)
+        # User.deactivate_user(telegram_id=user_telegram_id)
         logger.info(f"Время подписки {user_telegram_id} истекло, пользователь удален.")
         return True
 

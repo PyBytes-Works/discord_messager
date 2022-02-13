@@ -74,13 +74,13 @@ class MessageReceiver:
             except cls.__EXCEPTIONS as err:
                 logger.info(f"Token check Error: {err}")
             except aiohttp.http_exceptions.BadHttpMessage as err:
-                logger.error("МУДАК ПРОВЕРЬ ПОРТ ПРОКСИ!!!")
+                logger.error("МУДАК ПРОВЕРЬ ПОРТ ПРОКСИ!!!", err)
 
         return result
 
     @staticmethod
     @logger.catch
-    async def __get_current_message_id(data: dict) -> int:
+    def __get_current_message_id(data: dict) -> int:
         message_id = 0
         filtered_messages: list = data.get("messages", [])
         if filtered_messages:
@@ -107,19 +107,22 @@ class MessageReceiver:
             return result
 
         user_message, message_id = await self.__get_user_message_from_redis(token=token)
+        logger.info(f"Сообщение из редис {user_message} для {message_id}")
         if message_id:
             self.__datastore.current_message_id = message_id
         else:
             filtered_data: dict = await self.__get_data_from_api()
-            if not filtered_data:
-                return result
-            replies: List[dict] = filtered_data.get("replies", [])
-            if replies:
-                result.update({"replies": replies})
-            self.__datastore.current_message_id = await self.__get_current_message_id(data=filtered_data)
+            logger.info(f"Отфильтровали данные {filtered_data}")
+            if filtered_data:
+                replies: List[dict] = filtered_data.get("replies", [])
+                logger.info(f"Новые реплаи {replies}")
+                if replies:
+                    result.update({"replies": replies})
+                self.__datastore.current_message_id = self.__get_current_message_id(data=filtered_data)
         text_to_send = user_message if user_message else ''
-        answer: str = await MessageSender(datastore=self.__datastore).send_message(text=text_to_send)
+        answer: str = MessageSender(datastore=self.__datastore).send_message(text=text_to_send)
         self.__datastore.current_message_id = 0
+        logger.info(f"Ответ после отсылки сообщения {answer}")
         if answer != "Message sent":
             result.update({"work": False, "message": answer, "token": token})
             return result
@@ -214,7 +217,7 @@ class MessageReceiver:
             except Exception as err:
                 logger.error(f"JSON ERROR: {err}")
             else:
-                save_data_to_json(data=data)
+                # save_data_to_json(data=data)
                 result: dict = await self.__data_filter(data=data)
         else:
             logger.error(f"API request error: {status_code}")
@@ -234,13 +237,14 @@ class MessageReceiver:
         for elem in data:
             # FIXME ЗАЛИПУХА
             if not isinstance(elem, dict):
+                logger.error(f"F: __data_filter: elem is not dict")
                 continue
             message: str = elem.get("content")
             message_time: 'datetime' = elem.get("timestamp")
             mes_time = datetime.datetime.fromisoformat(message_time).replace(tzinfo=None)
             delta = datetime.datetime.utcnow().replace(tzinfo=None) - mes_time
             if delta.seconds < self.__datastore.last_message_time:
-                filtered_replies: dict = await self.__replies_filter(elem=elem)
+                filtered_replies: dict = self.__replies_filter(elem=elem)
                 if filtered_replies:
                     replies.append(filtered_replies)
                 is_author_mate: bool = str(self.__datastore.mate_id) == str(elem["author"]["id"])
@@ -261,7 +265,6 @@ class MessageReceiver:
         if replies:
             replies: List[dict] = await self.__update_replies_to_redis(replies)
             result.update({"replies": replies})
-        # print("Filtered result:", result)
 
         return result
 
@@ -274,14 +277,23 @@ class MessageReceiver:
         replies: List[dict] = [elem for elem in data if elem not in total_replies]
         total_replies.extend(replies)
         await save_to_redis(telegram_id=self.__datastore.telegram_id, data=total_replies)
-
+        logger.info(f"Total replies: {total_replies}"
+                    f"\nReplies: {replies}")
         return replies
 
-    async def __replies_filter(self, elem: dict) -> dict:
+    def __replies_filter(self, elem: dict) -> dict:
+        """Возвращает реплаи не из нашего села."""
+
         result = {}
-        # FIXME ЗАЛИПУХА
-        if elem:
-            reply_author: str = elem.get("referenced_message", {}).get("author", {}).get("id", '')
+        if isinstance(elem, dict) and elem:
+            reply_for_author: str = 'Базовая строка'
+            try:
+                reply_for_author: str = elem.get("referenced_message", {}).get("author", {}).get("id", '')
+            except AttributeError as err:
+                logger.error(f"F: __replies_filter: Ошибка какая то хер пойми."
+                             f"\nreply_for_author: {reply_for_author}"
+                             f"\nelem: {elem}", err)
+                return result
             mentions: tuple = tuple(
                 filter(
                     lambda x: int(x.get("id", '')) == int(self.__datastore.my_discord_id),
@@ -290,7 +302,7 @@ class MessageReceiver:
             )
             author: str = elem.get("author", {}).get("username", '')
             author_id: str = elem.get("author", {}).get("id", '')
-            message_for_me: bool = reply_author == self.__datastore.my_discord_id
+            message_for_me: bool = reply_for_author == self.__datastore.my_discord_id
             if any(mentions) or message_for_me:
                 if author_id not in Token.get_all_discord_id(token=self.__datastore.token):
                     result.update({
@@ -313,17 +325,17 @@ class MessageSender:
         self.__datastore: 'DataStore' = datastore
 
     @logger.catch
-    async def send_message(self, text: str = '') -> str:
+    def send_message(self, text: str = '') -> str:
         """Отправляет данные в канал дискорда, возвращает результат отправки."""
 
-        answer: str = await self.__send_message_to_discord_channel(text=text)
+        answer: str = self.__send_message_to_discord_channel(text=text)
         logger.info(f"Результат отправки сообщения в дискорд: {answer}")
         Token.update_token_time(token=self.__datastore.token)
 
         return answer
 
     @logger.catch
-    async def __send_message_to_discord_channel(self, text: str = '') -> str:
+    def __send_message_to_discord_channel(self, text: str = '') -> str:
         """Формирует данные для отправки, возвращает результат отправки."""
 
         if not text:
@@ -353,10 +365,10 @@ class MessageSender:
                     }
             })
 
-        return await self.__send_data_to_api(data=data)
+        return self.__send_data_to_api(data=data)
 
     @logger.catch
-    async def __send_data_to_api(self, data):
+    def __send_data_to_api(self, data):
         """Отправляет данные в дискорд канал"""
 
         session = requests.Session()

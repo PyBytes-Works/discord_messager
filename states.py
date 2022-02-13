@@ -15,6 +15,7 @@ class UserState(StatesGroup):
     user_add_language = State()
     user_delete_token_pair = State()
     user_start_game = State()
+    user_set_max_tokens = State()
     name_for_cr = State()
     name_for_del = State()
     name_for_activate = State()
