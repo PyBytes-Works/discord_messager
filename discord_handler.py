@@ -68,7 +68,6 @@ class MessageReceiver:
             proxy_data = f"http://{PROXY_USER}:{PROXY_PASSWORD}@{proxy}/"
             try:
                 async with session.get(url=url, proxy=proxy_data, ssl=False, timeout=10) as response:
-                # async with session.get(url=url, timeout=10) as response:
                     if response.status == 200:
                         result = token
             except cls.__EXCEPTIONS as err:
@@ -107,12 +106,10 @@ class MessageReceiver:
             return result
 
         user_message, message_id = await self.__get_user_message_from_redis(token=token)
-        # logger.info(f"Сообщение из редис {user_message} для {message_id}")
         if message_id:
             self.__datastore.current_message_id = message_id
         else:
             filtered_data: dict = await self.__get_data_from_api()
-            # logger.info(f"Отфильтровали данные {filtered_data}")
             if filtered_data:
                 replies: List[dict] = filtered_data.get("replies", [])
                 logger.info(f"Новые реплаи {replies}")
@@ -122,11 +119,10 @@ class MessageReceiver:
         text_to_send = user_message if user_message else ''
         answer: str = MessageSender(datastore=self.__datastore).send_message(text=text_to_send)
         self.__datastore.current_message_id = 0
-        # logger.info(f"Ответ после отсылки сообщения {answer}")
         if answer != "Message sent":
             result.update({"work": False, "message": answer, "token": token})
             return result
-        # logger.info(f"Пауза между отправкой сообщений: {self.__timer}")
+        logger.info(f"Пауза между отправкой сообщений: {self.__timer}")
         await asyncio.sleep(self.__timer)
 
         return result
@@ -217,6 +213,7 @@ class MessageReceiver:
             except Exception as err:
                 logger.error(f"JSON ERROR: {err}")
             else:
+                # Дебагеррный файл, можно удалять
                 # save_data_to_json(data=data)
                 result: dict = await self.__data_filter(data=data)
         else:
@@ -227,12 +224,10 @@ class MessageReceiver:
     @logger.catch
     async def __data_filter(self, data: List[dict]) -> dict:
         """Фильтрует полученные данные"""
+
         messages = []
         replies = []
         result = {}
-        # FIXME ЗАЛИПУХА
-        if not data:
-            return result
         summa = 0
         for elem in data:
             message: str = elem.get("content")
@@ -240,7 +235,7 @@ class MessageReceiver:
             mes_time = datetime.datetime.fromisoformat(message_time).replace(tzinfo=None)
             delta = datetime.datetime.utcnow().replace(tzinfo=None) - mes_time
             if delta.seconds < self.__datastore.last_message_time:
-                filtered_replies: dict = self.__replies_filter(data=elem)
+                filtered_replies: dict = self.__replies_filter(elem=elem)
                 if filtered_replies:
                     replies.append(filtered_replies)
                 is_author_mate: bool = str(self.__datastore.mate_id) == str(elem["author"]["id"])
@@ -276,50 +271,32 @@ class MessageReceiver:
 
         return replies
 
-    def __replies_filter(self, data: dict) -> dict:
+    def __replies_filter(self, elem: dict) -> dict:
         """Возвращает реплаи не из нашего села."""
 
-        import copy
         result = {}
-        elem = copy.deepcopy(data)
-        print("DATA:", data)
-        print("ELEM:", elem)
-        if isinstance(elem, dict) and elem:
-            reply_for_author_id: str = 'Базовая строка'
-            try:
-                ref_messages: dict = elem.get("referenced_message", {})
-                print(ref_messages)
-                if ref_messages:
-                    ref_messages_author: dict = ref_messages.get("author", {})
-                    print(ref_messages_author)
-                    if ref_messages_author:
-                        reply_for_author_id: str = ref_messages_author.get("id", '')
-                        print(reply_for_author_id)
-            except AttributeError as err:
-                logger.error(f"F: __replies_filter: Ошибка какая то хер пойми."
-                             f"\nreply_for_author_id: {reply_for_author_id}"
-                             f"\nelem: {elem}", err)
-            except KeyError as err:
-                logger.error(f"F: __replies_filter: Ошибка какая то хер пойми. ТЕПЕРЬ С КЛЮЧЕМ:"
-                             f"\n", err)
-                return result
-            mentions: tuple = tuple(
-                filter(
-                    lambda x: int(x.get("id", '')) == int(self.__datastore.my_discord_id),
-                    elem.get("mentions", [])
+        ref_messages: dict = elem.get("referenced_message", {})
+        if ref_messages:
+            ref_messages_author: dict = ref_messages.get("author", {})
+            if ref_messages_author:
+                reply_for_author_id: str = ref_messages_author.get("id", '')
+                mentions: tuple = tuple(
+                    filter(
+                        lambda x: int(x.get("id", '')) == int(self.__datastore.my_discord_id),
+                        elem.get("mentions", [])
+                    )
                 )
-            )
-            author: str = elem.get("author", {}).get("username", '')
-            author_id: str = elem.get("author", {}).get("id", '')
-            message_for_me: bool = reply_for_author_id == self.__datastore.my_discord_id
-            if any(mentions) or message_for_me:
-                if author_id not in Token.get_all_discord_id(token=self.__datastore.token):
-                    result.update({
-                        "token": self.__datastore.token,
-                        "author": author,
-                        "text": elem.get("content", ''),
-                        "message_id": elem.get("id", '')
-                    })
+                author: str = elem.get("author", {}).get("username", '')
+                author_id: str = elem.get("author", {}).get("id", '')
+                message_for_me: bool = reply_for_author_id == self.__datastore.my_discord_id
+                if any(mentions) or message_for_me:
+                    if author_id not in Token.get_all_discord_id(token=self.__datastore.token):
+                        result.update({
+                            "token": self.__datastore.token,
+                            "author": author,
+                            "text": elem.get("content", ''),
+                            "message_id": elem.get("id", '')
+                        })
 
         return result
 
@@ -338,7 +315,6 @@ class MessageSender:
         """Отправляет данные в канал дискорда, возвращает результат отправки."""
 
         answer: str = self.__send_message_to_discord_channel(text=text)
-        # logger.info(f"Результат отправки сообщения в дискорд: {answer}")
         Token.update_token_time(token=self.__datastore.token)
 
         return answer
