@@ -80,7 +80,7 @@ class MessageReceiver:
 
     @staticmethod
     @logger.catch
-    async def __get_current_message_id(data: dict) -> int:
+    def __get_current_message_id(data: dict) -> int:
         message_id = 0
         filtered_messages: list = data.get("messages", [])
         if filtered_messages:
@@ -118,9 +118,9 @@ class MessageReceiver:
                 logger.info(f"Новые реплаи {replies}")
                 if replies:
                     result.update({"replies": replies})
-                self.__datastore.current_message_id = await self.__get_current_message_id(data=filtered_data)
+                self.__datastore.current_message_id = self.__get_current_message_id(data=filtered_data)
         text_to_send = user_message if user_message else ''
-        answer: str = await MessageSender(datastore=self.__datastore).send_message(text=text_to_send)
+        answer: str = MessageSender(datastore=self.__datastore).send_message(text=text_to_send)
         self.__datastore.current_message_id = 0
         logger.info(f"Ответ после отсылки сообщения {answer}")
         if answer != "Message sent":
@@ -244,7 +244,7 @@ class MessageReceiver:
             mes_time = datetime.datetime.fromisoformat(message_time).replace(tzinfo=None)
             delta = datetime.datetime.utcnow().replace(tzinfo=None) - mes_time
             if delta.seconds < self.__datastore.last_message_time:
-                filtered_replies: dict = await self.__replies_filter(elem=elem)
+                filtered_replies: dict = self.__replies_filter(elem=elem)
                 if filtered_replies:
                     replies.append(filtered_replies)
                 is_author_mate: bool = str(self.__datastore.mate_id) == str(elem["author"]["id"])
@@ -281,10 +281,11 @@ class MessageReceiver:
                     f"\nReplies: {replies}")
         return replies
 
-    async def __replies_filter(self, elem: dict) -> dict:
+    def __replies_filter(self, elem: dict) -> dict:
+        """Возвращает реплаи не из нашего села."""
+
         result = {}
-        # FIXME ЗАЛИПУХА
-        if elem is not None:
+        if isinstance(elem, dict):
             reply_for_author: str = elem.get("referenced_message", {}).get("author", {}).get("id", '')
             mentions: tuple = tuple(
                 filter(
@@ -296,9 +297,6 @@ class MessageReceiver:
             author_id: str = elem.get("author", {}).get("id", '')
             message_for_me: bool = reply_for_author == self.__datastore.my_discord_id
             if any(mentions) or message_for_me:
-                logger.info(f"REPLY FOR AUTHOR: {reply_for_author}")
-                logger.info(f"REPLY AUTHOR: {author}")
-                logger.info(f"REPLY AUTHOR_ID: {author_id}")
                 if author_id not in Token.get_all_discord_id(token=self.__datastore.token):
                     result.update({
                         "token": self.__datastore.token,
@@ -320,19 +318,17 @@ class MessageSender:
         self.__datastore: 'DataStore' = datastore
 
     @logger.catch
-    async def send_message(self, text: str = '') -> str:
+    def send_message(self, text: str = '') -> str:
         """Отправляет данные в канал дискорда, возвращает результат отправки."""
 
-        await asyncio.sleep(0.5)  # FIXME
-
-        answer: str = await self.__send_message_to_discord_channel(text=text)
+        answer: str = self.__send_message_to_discord_channel(text=text)
         logger.info(f"Результат отправки сообщения в дискорд: {answer}")
         Token.update_token_time(token=self.__datastore.token)
 
         return answer
 
     @logger.catch
-    async def __send_message_to_discord_channel(self, text: str = '') -> str:
+    def __send_message_to_discord_channel(self, text: str = '') -> str:
         """Формирует данные для отправки, возвращает результат отправки."""
 
         if not text:
@@ -362,10 +358,10 @@ class MessageSender:
                     }
             })
 
-        return await self.__send_data_to_api(data=data)
+        return self.__send_data_to_api(data=data)
 
     @logger.catch
-    async def __send_data_to_api(self, data):
+    def __send_data_to_api(self, data):
         """Отправляет данные в дискорд канал"""
 
         session = requests.Session()
