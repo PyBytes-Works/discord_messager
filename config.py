@@ -24,7 +24,7 @@ DEFAULT_PROXY = os.getenv("DEFAULT_PROXY")
 
 
 # tgToken = os.getenv("ARTEM_FIRST_BOT_TOKEN")
-tgToken = os.getenv("ARTEM_DISCORD_TEST_TELEGRAM_BOT_TOKEN")
+tgToken = os.getenv("DESKENT_TEST_BOT")
 
 # configure bot
 bot = Bot(token=tgToken)
