@@ -282,6 +282,8 @@ class MessageReceiver:
         import copy
         result = {}
         elem = copy.deepcopy(data)
+        print("DATA:", data)
+        print("ELEM:", elem)
         if isinstance(elem, dict) and elem:
             reply_for_author_id: str = 'Базовая строка'
             try:
