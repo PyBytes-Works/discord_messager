@@ -174,7 +174,7 @@ async def max_user_request_handler(message: Message) -> None:
         if not Proxy.get_proxy_count():
             await message.answer("Нет ни одной прокси. Добавьте хотя бы одну.", reply_markup=user_menu_keyboard())
             return
-        await message.answer('Сколько максимум токенов будет у пользователя?', reply_markup=cancel_keyboard())
+        await message.answer('Введите количество токенов для пользователя?', reply_markup=cancel_keyboard())
         await UserState.max_tokens_req.set()
     else:
         logger.info(f'{message.from_user.id}:{message.from_user.username}: NOT AUTORIZATED')

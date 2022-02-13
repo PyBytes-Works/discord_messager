@@ -280,8 +280,9 @@ class MessageReceiver:
     async def __replies_filter(self, elem: dict) -> dict:
         result = {}
         # FIXME ЗАЛИПУХА
-        if elem:
+        if elem is not None:
             reply_author: str = elem.get("referenced_message", {}).get("author", {}).get("id", '')
+            logger.info(f"AUTHOR: {reply_author}")
             mentions: tuple = tuple(
                 filter(
                     lambda x: int(x.get("id", '')) == int(self.__datastore.my_discord_id),
@@ -315,6 +316,8 @@ class MessageSender:
     @logger.catch
     async def send_message(self, text: str = '') -> str:
         """Отправляет данные в канал дискорда, возвращает результат отправки."""
+
+        await asyncio.sleep(0.5)  # FIXME
 
         answer: str = await self.__send_message_to_discord_channel(text=text)
         logger.info(f"Результат отправки сообщения в дискорд: {answer}")
