@@ -107,12 +107,12 @@ class MessageReceiver:
             return result
 
         user_message, message_id = await self.__get_user_message_from_redis(token=token)
-        logger.info(f"Сообщение из редис {user_message} для {message_id}")
+        # logger.info(f"Сообщение из редис {user_message} для {message_id}")
         if message_id:
             self.__datastore.current_message_id = message_id
         else:
             filtered_data: dict = await self.__get_data_from_api()
-            logger.info(f"Отфильтровали данные {filtered_data}")
+            # logger.info(f"Отфильтровали данные {filtered_data}")
             if filtered_data:
                 replies: List[dict] = filtered_data.get("replies", [])
                 logger.info(f"Новые реплаи {replies}")
@@ -122,11 +122,11 @@ class MessageReceiver:
         text_to_send = user_message if user_message else ''
         answer: str = MessageSender(datastore=self.__datastore).send_message(text=text_to_send)
         self.__datastore.current_message_id = 0
-        logger.info(f"Ответ после отсылки сообщения {answer}")
+        # logger.info(f"Ответ после отсылки сообщения {answer}")
         if answer != "Message sent":
             result.update({"work": False, "message": answer, "token": token})
             return result
-        logger.info(f"Пауза между отправкой сообщений: {self.__timer}")
+        # logger.info(f"Пауза между отправкой сообщений: {self.__timer}")
         await asyncio.sleep(self.__timer)
 
         return result
@@ -235,16 +235,12 @@ class MessageReceiver:
             return result
         summa = 0
         for elem in data:
-            # FIXME ЗАЛИПУХА
-            if not isinstance(elem, dict):
-                logger.error(f"F: __data_filter: elem is not dict")
-                continue
             message: str = elem.get("content")
             message_time: 'datetime' = elem.get("timestamp")
             mes_time = datetime.datetime.fromisoformat(message_time).replace(tzinfo=None)
             delta = datetime.datetime.utcnow().replace(tzinfo=None) - mes_time
             if delta.seconds < self.__datastore.last_message_time:
-                filtered_replies: dict = self.__replies_filter(elem=elem)
+                filtered_replies: dict = self.__replies_filter(data=elem)
                 if filtered_replies:
                     replies.append(filtered_replies)
                 is_author_mate: bool = str(self.__datastore.mate_id) == str(elem["author"]["id"])
@@ -277,22 +273,30 @@ class MessageReceiver:
         replies: List[dict] = [elem for elem in data if elem not in total_replies]
         total_replies.extend(replies)
         await save_to_redis(telegram_id=self.__datastore.telegram_id, data=total_replies)
-        logger.info(f"Total replies: {total_replies}"
-                    f"\nReplies: {replies}")
+
         return replies
 
-    def __replies_filter(self, elem: dict) -> dict:
+    def __replies_filter(self, data: dict) -> dict:
         """Возвращает реплаи не из нашего села."""
 
+        import copy
         result = {}
+        elem = copy.deepcopy(data)
         if isinstance(elem, dict) and elem:
-            reply_for_author: str = 'Базовая строка'
+            reply_for_author_id: str = 'Базовая строка'
             try:
-                reply_for_author: str = elem.get("referenced_message", {}).get("author", {}).get("id", '')
+                ref_messages: dict = elem.get("referenced_message", {})
+                if ref_messages:
+                    ref_messages_author: dict = ref_messages.get("author", {})
+                    if ref_messages_author:
+                        reply_for_author_id: str = ref_messages_author.get("id", '')
             except AttributeError as err:
                 logger.error(f"F: __replies_filter: Ошибка какая то хер пойми."
-                             f"\nreply_for_author: {reply_for_author}"
+                             f"\nreply_for_author_id: {reply_for_author_id}"
                              f"\nelem: {elem}", err)
+            except KeyError as err:
+                logger.error(f"F: __replies_filter: Ошибка какая то хер пойми. ТЕПЕРЬ С КЛЮЧЕМ:"
+                             f"\n", err)
                 return result
             mentions: tuple = tuple(
                 filter(
@@ -302,7 +306,7 @@ class MessageReceiver:
             )
             author: str = elem.get("author", {}).get("username", '')
             author_id: str = elem.get("author", {}).get("id", '')
-            message_for_me: bool = reply_for_author == self.__datastore.my_discord_id
+            message_for_me: bool = reply_for_author_id == self.__datastore.my_discord_id
             if any(mentions) or message_for_me:
                 if author_id not in Token.get_all_discord_id(token=self.__datastore.token):
                     result.update({
