@@ -901,22 +901,6 @@ class Proxy(BaseModel):
         result = cls.get()
         return [(inst.proxy, inst.using) for inst in result] if result else ()
 
-    # @classmethod
-    # @logger.catch
-    # def add_used(cls, proxy: str) -> bool:
-    #     proxy = cls.get_or_none(proxy=proxy)
-    #     if proxy:
-    #         proxy.using += 1
-    #         return proxy.save()
-    #
-    # @classmethod
-    # @logger.catch
-    # def del_used(cls, proxy: str) -> bool:
-    #     proxy = cls.get_or_none(proxy=proxy)
-    #     if proxy:
-    #         proxy.using -= 1
-    #         return proxy.save()
-
     @classmethod
     @logger.catch
     def get_low_used_proxy(cls: 'Proxy') -> str:
