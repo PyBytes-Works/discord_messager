@@ -799,7 +799,7 @@ class TokenPair(BaseModel):
         if (cls.select().where((cls.first_id.in_((first, second)))
                                | (cls.second_id.in_((first, second)))).execute()):
             return False
-        pair = cls.create(first=first, second=second)
+        pair = cls.create(first_id=first, second_id=second)
         return 1 if pair else 0
 
     @classmethod
