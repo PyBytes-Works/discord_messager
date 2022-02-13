@@ -197,18 +197,18 @@ class MessageReceiver:
         """Отправляет запрос к АПИ"""
 
         session = requests.Session()
-        session.headers['authorization'] = self.__datastore.token
-        limit = 100
-        url = self.__datastore.get_channel_url() + f'{self.__datastore.channel}/messages?limit={limit}'
-        proxies = {
+        session.headers['authorization']: str = self.__datastore.token
+        limit: int = 100
+        url: str = self.__datastore.get_channel_url() + f'{self.__datastore.channel}/messages?limit={limit}'
+        proxies: dict = {
             "http": f"http://{PROXY_USER}:{PROXY_PASSWORD}@{self.__datastore.proxy}/"
         }
         response = session.get(url=url, proxies=proxies)
-        status_code = response.status_code
-        result = {}
+        status_code: int = response.status_code
+        result: dict = {}
         if status_code == 200:
             try:
-                data = response.json()
+                data: List[dict] = response.json()
             except Exception as err:
                 logger.error(f"JSON ERROR: {err}")
             else:
@@ -220,7 +220,7 @@ class MessageReceiver:
         return result
 
     @logger.catch
-    async def __data_filter(self, data: dict) -> dict:
+    async def __data_filter(self, data: List[dict]) -> dict:
         """Фильтрует полученные данные"""
 
         messages = []
@@ -228,6 +228,9 @@ class MessageReceiver:
         result = {}
         summa = 0
         for elem in data:
+            # FIXME ЗАЛИПУХА
+            if not isinstance(elem, dict):
+                continue
             message: str = elem.get("content")
             message_time: 'datetime' = elem.get("timestamp")
             mes_time = datetime.datetime.fromisoformat(message_time).replace(tzinfo=None)
