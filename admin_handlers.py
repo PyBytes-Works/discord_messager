@@ -21,10 +21,15 @@ from utils import (
 
 @logger.catch
 async def send_message_to_all_users_handler(message: Message) -> None:
-    """Обработчик команды /sendall"""
-
-    data = f'[Рассылка][Всем]: {message.text[9:]}'
-    user_id = str(message.from_user.id)
+    """Обработчик команд /sendall, /su"""
+    index: int = 0
+    text: str = message.text
+    if text.startswith("/sendall"):
+        index = 9
+    elif text.startswith("/su"):
+        index = 4
+    data: str = f'[Рассылка][Всем]: {text[index:]}'
+    user_id: str = str(message.from_user.id)
     if not data:
         await message.answer("Нет данных для отправки.")
         return
@@ -372,5 +377,5 @@ def register_admin_handlers(dp: Dispatcher) -> None:
     dp.register_message_handler(admin_help_handler, commands=['admin', 'adm'])
     dp.register_message_handler(request_max_tokens_handler, commands=['set_max_tokens'])
     dp.register_message_handler(set_max_tokens_handler, state=UserState.user_set_max_tokens)
-    dp.register_message_handler(send_message_to_all_users_handler, Text(startswith=["/sendall"]))
+    dp.register_message_handler(send_message_to_all_users_handler, Text(startswith=["/sendall", "/su"]))
     dp.register_message_handler(add_new_user_handler, state=UserState.name_for_cr)
