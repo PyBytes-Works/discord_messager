@@ -113,13 +113,12 @@ class MessageReceiver:
         else:
             filtered_data: dict = await self.__get_data_from_api()
             logger.info(f"Отфильтровали данные {filtered_data}")
-            if not filtered_data:
-                return result
-            replies: List[dict] = filtered_data.get("replies", [])
-            logger.info(f"Новые реплаи {replies}")
-            if replies:
-                result.update({"replies": replies})
-            self.__datastore.current_message_id = await self.__get_current_message_id(data=filtered_data)
+            if filtered_data:
+                replies: List[dict] = filtered_data.get("replies", [])
+                logger.info(f"Новые реплаи {replies}")
+                if replies:
+                    result.update({"replies": replies})
+                self.__datastore.current_message_id = await self.__get_current_message_id(data=filtered_data)
         text_to_send = user_message if user_message else ''
         answer: str = await MessageSender(datastore=self.__datastore).send_message(text=text_to_send)
         self.__datastore.current_message_id = 0
@@ -218,7 +217,7 @@ class MessageReceiver:
             except Exception as err:
                 logger.error(f"JSON ERROR: {err}")
             else:
-                save_data_to_json(data=data)
+                # save_data_to_json(data=data)
                 result: dict = await self.__data_filter(data=data)
         else:
             logger.error(f"API request error: {status_code}")
@@ -238,6 +237,7 @@ class MessageReceiver:
         for elem in data:
             # FIXME ЗАЛИПУХА
             if not isinstance(elem, dict):
+                logger.error(f"F: __data_filter: elem is not dict")
                 continue
             message: str = elem.get("content")
             message_time: 'datetime' = elem.get("timestamp")
@@ -265,7 +265,6 @@ class MessageReceiver:
         if replies:
             replies: List[dict] = await self.__update_replies_to_redis(replies)
             result.update({"replies": replies})
-        # print("Filtered result:", result)
 
         return result
 
@@ -278,15 +277,15 @@ class MessageReceiver:
         replies: List[dict] = [elem for elem in data if elem not in total_replies]
         total_replies.extend(replies)
         await save_to_redis(telegram_id=self.__datastore.telegram_id, data=total_replies)
-
+        logger.info(f"Total replies: {total_replies}"
+                    f"\nReplies: {replies}")
         return replies
 
     async def __replies_filter(self, elem: dict) -> dict:
         result = {}
         # FIXME ЗАЛИПУХА
         if elem is not None:
-            reply_author: str = elem.get("referenced_message", {}).get("author", {}).get("id", '')
-            logger.info(f"AUTHOR: {reply_author}")
+            reply_for_author: str = elem.get("referenced_message", {}).get("author", {}).get("id", '')
             mentions: tuple = tuple(
                 filter(
                     lambda x: int(x.get("id", '')) == int(self.__datastore.my_discord_id),
@@ -295,8 +294,11 @@ class MessageReceiver:
             )
             author: str = elem.get("author", {}).get("username", '')
             author_id: str = elem.get("author", {}).get("id", '')
-            message_for_me: bool = reply_author == self.__datastore.my_discord_id
+            message_for_me: bool = reply_for_author == self.__datastore.my_discord_id
             if any(mentions) or message_for_me:
+                logger.info(f"REPLY FOR AUTHOR: {reply_for_author}")
+                logger.info(f"REPLY AUTHOR: {author}")
+                logger.info(f"REPLY AUTHOR_ID: {author_id}")
                 if author_id not in Token.get_all_discord_id(token=self.__datastore.token):
                     result.update({
                         "token": self.__datastore.token,

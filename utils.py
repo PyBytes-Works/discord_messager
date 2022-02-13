@@ -107,9 +107,10 @@ async def save_to_redis(telegram_id: str, data: list, timeout_sec: int = 3600, r
     Возвращает кол-во записей."""
 
     if redis_db is None:
-        redis_db = aioredis.from_url("redis://localhost", decode_responses=True)
-    count = await redis_db.set(name=telegram_id, value=json.dumps(data))
-    await redis_db.expire(name=telegram_id, time=timeout_sec)
+        redis_db = aioredis.from_url("redis://localhost", encoding="utf-8", decode_responses=True)
+    async with redis_db.client() as conn:
+        count = await conn.set(name=telegram_id, value=json.dumps(data))
+        await conn.expire(name=telegram_id, time=timeout_sec)
 
     return count
 
@@ -118,8 +119,9 @@ async def load_from_redis(telegram_id: str, redis_db: 'Redis' = None) -> list:
     """Возвращает десериализованные данные из Редис"""
 
     if redis_db is None:
-        redis_db = aioredis.from_url("redis://localhost", decode_responses=True)
-    result = await redis_db.get(telegram_id)
+        redis_db = aioredis.from_url("redis://localhost", encoding="utf-8", decode_responses=True)
+    async with redis_db.client() as conn:
+        result = await conn.get(telegram_id)
     if result:
         try:
             return json.loads(result)
