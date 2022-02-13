@@ -866,6 +866,7 @@ class Proxy(BaseModel):
             delete_proxy
             get_list_proxies
             get_low_used_proxy
+            get_proxy_count
         fields:
             proxy: str
             using: int ????
@@ -879,6 +880,11 @@ class Proxy(BaseModel):
     def add_proxy(cls, proxy: str) -> bool:
         res = cls.get_or_none(proxy=proxy)
         return False if res else cls.create(proxy=proxy)
+
+    @classmethod
+    @logger.catch
+    def get_proxy_count(cls) -> bool:
+        return cls.select().count()
 
     @classmethod
     @logger.catch
