@@ -292,7 +292,7 @@ async def add_user_to_db_by_token(message: Message, state: FSMContext) -> None:
                 await send_report_to_admins(
                     text=f"Пользователь {user_name} : ID: {user_telegram_id} добавлен в БД."
                          f"\r\nМаксимальное количество токенов: {max_tokens}"
-                         f"\r\nВремя подписки: {subscribe_time}",
+                         f"\r\nВремя подписки: {subscribe_time} часов.",
                 )
             else:
                 await send_report_to_admins("Произошла ошибка при добавлении нового пользователя.")
