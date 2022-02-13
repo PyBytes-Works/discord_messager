@@ -358,10 +358,7 @@ async def lets_play(message: Message):
 
         replies: List[dict] = answer.get("replies", [])
         if replies:
-            unanswered: list = await send_replies(message=message, replies=replies)
-            # Остановит бота при реплаях. Можно удалить.
-            # if unanswered:
-            #     return
+            await send_replies(message=message, replies=replies)
         token_work: bool = answer.get("work")
         if not token_work:
             if text != 'ok':
@@ -536,9 +533,8 @@ async def delete_user_if_expired(message: Message):
     user_is_admin: bool = User.is_admin(telegram_id=user_telegram_id)
     if not user_active and not user_is_admin:
         await message.answer("Время подписки истекло. Ваш аккаунт удален.", reply_markup=ReplyKeyboardRemove())
-        User.delete_user_by_telegram_id(telegram_id=user_telegram_id)
-        # User.delete_all_tokens(telegram_id=user_telegram_id)
-        # User.deactivate_user(telegram_id=user_telegram_id)
+        User.delete_all_tokens(telegram_id=user_telegram_id)
+        User.deactivate_user(telegram_id=user_telegram_id)
         logger.info(f"Время подписки {user_telegram_id} истекло, пользователь удален.")
         return True
 
