@@ -389,7 +389,7 @@ async def get_error_text(message: Message, discord_data: dict, datastore: 'Token
     answer: dict = discord_data.get("answer", {})
     data: dict = answer.get("data", {})
 
-    print(f"User: {user_telegram_id}\r\tSend result: {data}")
+    print(f"User: {user_telegram_id}    Send result: {data}")
 
     status_code: int = answer.get("status_code", 0)
     sender_text: str = answer.get("message", "ERROR")
