@@ -323,7 +323,7 @@ class MessageSender:
         """Отправляет данные в канал дискорда, возвращает результат отправки."""
 
         data: dict = await self.__prepare_data(text=text)
-        await self.__send_data_to_api(data=data)
+        await self.__send_data(data=data)
         Token.update_token_time(token=self.__datastore.token)
 
         return self.__answer
@@ -333,7 +333,7 @@ class MessageSender:
         """Возвращает сформированные данные для отправки в дискорд"""
 
         if not text:
-            text = Vocabulary.get_message()
+            text: str = Vocabulary.get_message()
             if text == "Vocabulary error":
                 self.__answer = {"status_code": -2, "data": {"message": text}}
         data = {
@@ -364,7 +364,7 @@ class MessageSender:
         return data
 
     @logger.catch
-    async def __send_data_to_api(self, data) -> None:
+    async def __send_data(self, data) -> None:
         """Отправляет данные в дискорд канал"""
 
         session = requests.Session()
