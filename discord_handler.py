@@ -106,19 +106,21 @@ class MessageReceiver:
             result.update({"work": False, "message": result_message})
             return result
 
+        logger.info(f"Пауза между отправкой сообщений: {self.__timer}")
+        await asyncio.sleep(self.__timer)
+
         user_message, message_id = await self.__get_user_message_from_redis(token=token)
         if message_id:
             self.__datastore.current_message_id = message_id
         else:
-            # filtered_data: dict = await self.__get_data_from_api()
-            filtered_data: dict = await self.__get_data_from_api_aiohttp()
+            filtered_data: dict = await self.__get_filtered_data()
             if filtered_data:
                 replies: List[dict] = filtered_data.get("replies", [])
                 if replies:
                     result.update({"replies": replies})
                 self.__datastore.current_message_id = await self.__get_current_message_id(data=filtered_data)
         text_to_send = user_message if user_message else ''
-        answer: dict = await MessageSender(datastore=self.__datastore).send_message(text=text_to_send)
+        answer: dict = MessageSender(datastore=self.__datastore).send_message(text=text_to_send)
         if not answer:
             logger.error("F: get_message ERROR: NO ANSWER ERROR")
             result.update({"work": False, "message": "ERROR"})
@@ -127,9 +129,6 @@ class MessageReceiver:
             result.update({"work": False, "answer": answer, "token": token})
             return result
         self.__datastore.current_message_id = 0
-
-        logger.info(f"Пауза между отправкой сообщений: {self.__timer}")
-        await asyncio.sleep(self.__timer)
 
         return result
 
@@ -200,11 +199,11 @@ class MessageReceiver:
         return result
 
     @logger.catch
-    async def __get_data_from_api_aiohttp(self) -> dict:
+    async def __get_filtered_data(self) -> dict:
         """Отправляет запрос к АПИ"""
 
         result: dict = {}
-
+        await asyncio.sleep(1 // 100)
         async with aiohttp.ClientSession() as session:
             session.headers['authorization']: str = self.__datastore.token
             limit: int = 100
@@ -244,7 +243,7 @@ class MessageReceiver:
             mes_time = datetime.datetime.fromisoformat(message_time).replace(tzinfo=None)
             delta = datetime.datetime.utcnow().replace(tzinfo=None) - mes_time
             if delta.seconds < self.__datastore.last_message_time:
-                filtered_replies: dict = await self.__replies_filter(elem=elem)
+                filtered_replies: dict = self.__replies_filter(elem=elem)
                 if filtered_replies:
                     replies.append(filtered_replies)
                 is_author_mate: bool = str(self.__datastore.mate_id) == str(elem["author"]["id"])
@@ -280,7 +279,7 @@ class MessageReceiver:
 
         return replies
 
-    async def __replies_filter(self, elem: dict) -> dict:
+    def __replies_filter(self, elem: dict) -> dict:
         """Возвращает реплаи не из нашего села."""
 
         result = {}
@@ -321,17 +320,17 @@ class MessageSender:
         self.__answer: dict = {}
 
     @logger.catch
-    async def send_message(self, text: str = '') -> dict:
+    def send_message(self, text: str = '') -> dict:
         """Отправляет данные в канал дискорда, возвращает результат отправки."""
 
-        data: dict = await self.__prepare_data(text=text)
-        await self.__send_data(data=data)
+        data: dict = self.__prepare_data(text=text)
+        self.__send_data(data=data)
         Token.update_token_time(token=self.__datastore.token)
 
         return self.__answer
 
     @logger.catch
-    async def __prepare_data(self, text: str = '') -> dict:
+    def __prepare_data(self, text: str = '') -> dict:
         """Возвращает сформированные данные для отправки в дискорд"""
 
         if not text:
@@ -366,7 +365,7 @@ class MessageSender:
         return data
 
     @logger.catch
-    async def __send_data(self, data) -> None:
+    def __send_data(self, data) -> None:
         """Отправляет данные в дискорд канал"""
 
         session = requests.Session()
