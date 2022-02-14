@@ -537,12 +537,22 @@ class Token(BaseModel):
     @logger.catch
     def update_token_cooldown(cls, token: str, cooldown: int) -> bool:
         """
-        set cooldown: update cooldown for token
+        set cooldown: update cooldown in seconds for token
          token: (str)
          cooldown: (int) seconds
         """
+
         cooldown = cooldown if cooldown > 0 else 5 * 60
         return cls.update(cooldown=cooldown).where(cls.token == token).execute()
+
+    @classmethod
+    @logger.catch
+    def update_mate_cooldown(cls, token: str, cooldown: int) -> bool:
+        """set cooldown in seconds to token mate"""
+        # TODO Переписать логически
+        my_token: 'Token' = cls.get_or_none(cls.token == token)
+        mate: 'TokenPair' = TokenPair.get_token_mate(my_token.id)
+        return cls.update_token_cooldown(token=mate.token, cooldown=cooldown)
 
     @classmethod
     @logger.catch
