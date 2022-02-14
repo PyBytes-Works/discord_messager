@@ -306,7 +306,8 @@ async def delete_pair_handler(callback: CallbackQuery) -> None:
             await callback.message.answer("Бот запущен, сначала остановите бота.", reply_markup=cancel_keyboard())
         else:
             Token.delete_token(callback.data)
-            await callback.message.delete()
+            # Вызвало ошибку aiogram.utils.exceptions.MessageToDeleteNotFound: Message to delete not found
+            # await callback.message.delete()
             return
 
     await callback.answer()
@@ -351,17 +352,16 @@ async def lets_play(message: Message):
         datastore: 'DataStore' = DataStore(user_telegram_id)
         users_data_storage.add_or_update(telegram_id=user_telegram_id, data=datastore)
         message_manager: 'MessageReceiver' = MessageReceiver(datastore=datastore)
-        answer: dict = await message_manager.get_message()
-        text: str = await errors_handler(message=message, datastore=datastore, answer=answer)
-        if text == 'stop':
-            break
-
-        replies: List[dict] = answer.get("replies", [])
-        if replies:
-            await send_replies(message=message, replies=replies)
-        token_work: bool = answer.get("work")
+        discord_data: dict = await message_manager.get_message()
+        token_work: bool = discord_data.get("work")
+        replies: List[dict] = discord_data.get("replies", [])
         if not token_work:
-            if text != 'ok':
+            text: str = await errors_handler(
+                message=message, datastore=datastore, discord_data=discord_data
+            )
+            if text == 'stop':
+                break
+            elif text != 'ok':
                 await message.answer(text, reply_markup=cancel_keyboard())
             logger.info(f"PAUSE: {datastore.delay + 1}")
             current_hour: int = datetime.datetime.now().hour
@@ -369,65 +369,102 @@ async def lets_play(message: Message):
                 work_hour: int = current_hour
                 print("Время распределять токены!")
                 form_token_pairs(telegram_id=user_telegram_id, unpair=True)
-
+            if replies:
+                await send_replies(message=message, replies=replies)
             await asyncio.sleep(datastore.delay + 1)
             datastore.delay = 0
             await message.answer("Начинаю работу.", reply_markup=cancel_keyboard())
 
 
 @logger.catch
-async def errors_handler(message: Message, answer: dict, datastore: 'DataStore') -> str:
+async def errors_handler(message: Message, discord_data: dict, datastore: 'DataStore') -> str:
     """Обработка ошибок от сервера"""
 
     user_telegram_id: str = str(message.from_user.id)
-    text: str = answer.get("message", "ERROR")
+    text: str = discord_data.get("message", "ERROR")
+    token: str = discord_data.get("token")
 
-    if text == "API request error: 400":
-        await send_report_to_admins(text)
-        text = "stop"
-    elif text == "API request error: 401":
-        await message.answer(
-            "Произошла ошибка данных. Убедитесь, что вы ввели верные данные. Код ошибки - 401.",
-            reply_markup=user_menu_keyboard()
-        )
-        text = "stop"
-    elif text == "API request error: 500":
-        await send_report_to_admins(
-            "Внутренняя ошибка сервера Дискорда. Пауза 10 секунд. Код ошибки - 500.")
-        datastore.delay = 10
-        text = "ok"
-    elif text == "API request error: 403":
-        token: str = answer.get("token")
-        Token.delete_token(token=token)
-        await message.answer(
-            "У Вас нет прав отправлять сообщения в данный канал. (Ошибка 403). "
-            "Похоже данный токен забанили/заглушили/токен сменился."
-            f"\nТокен: {token} удален.",
-            reply_markup=user_menu_keyboard()
-        )
-        form_token_pairs(telegram_id=user_telegram_id, unpair=False)
-        text = "ok"
-    elif text == "Vocabulary error":
+    answer: dict = discord_data.get("answer", {})
+    data: dict = answer.get("data", {})
+    print("Send result:", data)
+    status_code: int = answer.get("status_code", 0)
+    sender_text: str = answer.get("message", "ERROR")
+    discord_code_error: int = answer.get("data", {}).get("code", 0)
+
+    result: str = 'ok'
+
+    if status_code == -1:
+        error_text = sender_text
+        await message.answer("Ошибка десериализации отправки ответа.")
+        await send_report_to_admins(error_text)
+        result = "stop"
+    elif status_code == -2:
         await message.answer("Ошибка словаря.", reply_markup=user_menu_keyboard())
         await send_report_to_admins("Ошибка словаря.")
-        text = "stop"
-    elif text == "API request error: 429":
-        await send_report_to_admins(
-            "Слишком много запросов к АПИ. API request error: 429."
-            "Может еще проксей добавим?"
+        result = "stop"
+    elif status_code == 400:
+        await send_report_to_admins(sender_text)
+        result = "stop"
+    elif status_code == 401:
+        if discord_code_error == 0:
+            await message.answer("Сменился токен."
+                                 f"\nToken: {token}")
+        else:
+            await message.answer(
+                "Произошла ошибка данных. Убедитесь, что вы ввели верные данные. Код ошибки - 401.",
+                reply_markup=user_menu_keyboard()
+            )
+        result = "stop"
+    elif status_code == 403:
+        if discord_code_error == 50013:
+            await message.answer(
+                "Не могу отправить сообщение для токена. (Ошибка 403 - 50013)"
+                "Токен в муте."
+                f"\nToken: {token}"
+                # f"\nGuild: {datastore.guild}"
+                # f"\nChannel: {datastore.channel}"
+            )
+        elif discord_code_error == 50001:
+            Token.delete_token(token=token)
+            await message.answer(
+                "Не могу отправить сообщение для токена. (Ошибка 403 - 50001)"
+                "Токен забанили."
+                f"\nТокен: {token} удален."
+                f"\nФормирую новые пары.",
+                reply_markup=user_menu_keyboard()
+            )
+            form_token_pairs(telegram_id=user_telegram_id, unpair=False)
+        else:
+            await message.answer(f"Ошибка {status_code}: {data}")
+    elif status_code == 404:
+        if discord_code_error == 10003:
+            await message.answer("Ошибка отправки сообщения. Неверный канал. (Ошибка 404 - 10003)"
+                                 f"\nToken: {token}"
+            )
+        else:
+            await message.answer(f"Ошибка {status_code}: {data}")
+    elif status_code == 429:
+        await message.answer(
+            "Для данного токена сообщения отправляются чаще, чем разрешено в канале."
+            "Исправьте кулдаун через "
+            "\n/set_cooldown"
+            f"\nToken: {token}"
         )
         datastore.delay = 10
-        text = "ok"
+    elif status_code == 500:
+        error_text = "Внутренняя ошибка сервера Дискорда. Пауза 10 секунд. Код ошибки - 500."
+        await message.answer(error_text)
+        await send_report_to_admins(error_text)
+        datastore.delay = 10
     elif text == "no pairs":
         pairs_formed: int = form_token_pairs(telegram_id=user_telegram_id, unpair=False)
         if not pairs_formed:
-            text = "Не смог сформировать пары токенов."
-            await message.answer(text)
-            text = "stop"
-        else:
-            text = 'ok'
+            await message.answer("Не смог сформировать пары токенов.")
+            result = "stop"
+    else:
+        result = text
 
-    return text
+    return result
 
 
 @logger.catch

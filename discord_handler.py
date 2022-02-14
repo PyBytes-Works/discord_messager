@@ -1,7 +1,8 @@
 import datetime
 import os
 import random
-from typing import List, Tuple
+from json import JSONDecodeError
+from typing import List, Tuple, Dict
 
 import asyncio
 import aiohttp
@@ -93,7 +94,7 @@ class MessageReceiver:
         """Получает данные из АПИ, выбирает случайное сообщение и возвращает ID сообщения
         и само сообщение"""
 
-        result = {"work": True, "message": "ERROR"}
+        result = {"work": True}
         token_data: dict = await self.__select_token_for_work()
         result_message: str = token_data.get("message")
         if result_message == "no pairs":
@@ -112,16 +113,20 @@ class MessageReceiver:
             filtered_data: dict = await self.__get_data_from_api()
             if filtered_data:
                 replies: List[dict] = filtered_data.get("replies", [])
-                logger.info(f"Новые реплаи {replies}")
                 if replies:
                     result.update({"replies": replies})
                 self.__datastore.current_message_id = self.__get_current_message_id(data=filtered_data)
         text_to_send = user_message if user_message else ''
-        answer: str = MessageSender(datastore=self.__datastore).send_message(text=text_to_send)
-        self.__datastore.current_message_id = 0
-        if answer != "Message sent":
-            result.update({"work": False, "message": answer, "token": token})
+        answer: dict = MessageSender(datastore=self.__datastore).send_message(text=text_to_send)
+        if not answer:
+            logger.error("F: get_message ERROR: NO ANSWER ERROR")
+            result.update({"work": False, "message": "ERROR"})
             return result
+        elif answer.get("status_code") != 200:
+            result.update({"work": False, "answer": answer, "token": token})
+            return result
+        self.__datastore.current_message_id = 0
+
         logger.info(f"Пауза между отправкой сообщений: {self.__timer}")
         await asyncio.sleep(self.__timer)
 
@@ -204,7 +209,6 @@ class MessageReceiver:
         proxies: dict = {
             "http": f"http://{PROXY_USER}:{PROXY_PASSWORD}@{self.__datastore.proxy}/"
         }
-        print("RECEIVING PROXY:", proxies)
         response = session.get(url=url, proxies=proxies)
         status_code: int = response.status_code
         result: dict = {}
@@ -312,22 +316,26 @@ class MessageSender:
     @logger.catch
     def __init__(self, datastore: 'DataStore'):
         self.__datastore: 'DataStore' = datastore
+        self.__answer: dict = {}
 
     @logger.catch
-    def send_message(self, text: str = '') -> str:
+    def send_message(self, text: str = '') -> dict:
         """Отправляет данные в канал дискорда, возвращает результат отправки."""
 
-        answer: str = self.__send_message_to_discord_channel(text=text)
+        data: dict = self.__prepare_data(text=text)
+        self.__send_data_to_api(data=data)
         Token.update_token_time(token=self.__datastore.token)
 
-        return answer
+        return self.__answer
 
     @logger.catch
-    def __send_message_to_discord_channel(self, text: str = '') -> str:
-        """Формирует данные для отправки, возвращает результат отправки."""
+    def __prepare_data(self, text: str = '') -> dict:
+        """Возвращает сформированные данные для отправки в дискорд"""
 
         if not text:
             text = users_data_storage.get_random_message_from_vocabulary()
+            if text == "Vocabulary error":
+                self.__answer = {"status_code": -2, "data": {"message": text}}
         data = {
             "content": text,
             "tts": "false",
@@ -353,10 +361,10 @@ class MessageSender:
                     }
             })
 
-        return self.__send_data_to_api(data=data)
+        return data
 
     @logger.catch
-    def __send_data_to_api(self, data):
+    def __send_data_to_api(self, data) -> None:
         """Отправляет данные в дискорд канал"""
 
         session = requests.Session()
@@ -365,21 +373,18 @@ class MessageSender:
         proxies = {
             "http": f"http://{PROXY_USER}:{PROXY_PASSWORD}@{self.__datastore.proxy}/",
         }
-        print("SENDING PROXY:", proxies)
-        try:
-            response = session.post(url=url, json=data, proxies=proxies)
-        except Exception as err:
-            return f'Ошибка отправки сообщения: {err}'
+        response = session.post(url=url, json=data, proxies=proxies)
         status_code = response.status_code
-        if status_code == 204:
-            answer = "Ошибка 204, нет содержимого."
-        elif status_code == 200:
-            answer = "Message sent"
-        elif status_code == 429:
-            answer = f"API request error: {status_code}"
-            logger.error(f"{answer} {response.text}")
+        if status_code == 200:
+            data: dict = {}
         else:
-            answer = f"API request error: {status_code}"
-            logger.error(f"{answer} {response.text}")
+            logger.error(f"F: __send_data_to_api error: {status_code}: {response.text}")
+            try:
+                data: dict = response.json()
+            except JSONDecodeError as err:
+                error_text = "F: __send_data_to_api: JSON ERROR:"
+                logger.error(error_text, err)
+                status_code = -1
+                data: dict = {"message": error_text}
 
-        return answer
+        self.__answer = {"status_code": status_code, "data": data}
