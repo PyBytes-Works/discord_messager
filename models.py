@@ -179,6 +179,18 @@ class User(BaseModel):
 
     @classmethod
     @logger.catch
+    def get_all_inactive_users(cls: 'User') -> dict:
+        """
+        return dict of NOT active users
+        return: dict
+        """
+        return {
+            user.telegram_id: user
+            for user in cls.select().where(cls.active == False).execute()
+        }
+
+    @classmethod
+    @logger.catch
     def get_active_users_not_admins(cls: 'User') -> list:
         """
         return list of telegram ids for active users without admins
@@ -950,10 +962,17 @@ def recreate_db(_db_file_name: str) -> None:
         logger.info('DB REcreated')
 
 
+def test():
+    a = User.get_all_inactive_users()
+    for user in a:
+        print(user.proxy)
+
+
 if __name__ == '__main__':
-    recreate = 1
+    # test()
+    recreate = 0
     add_test_users = 0
-    add_admins = 1
+    add_admins = 0
     add_tokens = 0
     set_max_tokens = 0
     set_proxy = 0
