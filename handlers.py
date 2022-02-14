@@ -451,13 +451,17 @@ async def get_error_text(message: Message, discord_data: dict, datastore: 'Token
         else:
             await message.answer(f"Ошибка {status_code}: {data}")
     elif status_code == 429:
-        await message.answer(
-            "Для данного токена сообщения отправляются чаще, чем разрешено в канале."
-            "Исправьте кулдаун через "
-            "\n/set_cooldown"
-            f"\nToken: {token}"
-        )
-        datastore.delay = 10
+        if discord_code_error == 20016:
+            cooldown: int = int(data.get("retry_after", None))
+            if cooldown:
+                Token.update_token_cooldown(token=token, cooldown=cooldown + datastore.cooldown + 1)
+                datastore.delay = 5
+            await message.answer(
+                "Для данного токена сообщения отправляются чаще, чем разрешено в канале."
+                f"\nToken: {token}"
+            )
+        else:
+            await message.answer(f"Ошибка: {status_code}:{discord_code_error}:{sender_text}")
     elif status_code == 500:
         error_text = "Внутренняя ошибка сервера Дискорда. Пауза 10 секунд. Код ошибки - 500."
         await message.answer(error_text)

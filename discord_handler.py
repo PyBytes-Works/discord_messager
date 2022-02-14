@@ -200,36 +200,6 @@ class MessageReceiver:
         return result
 
     @logger.catch
-    async def __get_data_from_api(self) -> dict:
-        """Отправляет запрос к АПИ"""
-
-        session = requests.Session()
-        session.headers['authorization']: str = self.__datastore.token
-        limit: int = 100
-        url: str = self.__datastore.get_channel_url() + f'{self.__datastore.channel}/messages?limit={limit}'
-        proxies: dict = {
-            "http": f"http://{PROXY_USER}:{PROXY_PASSWORD}@{self.__datastore.proxy}/"
-        }
-        response = session.get(url=url, proxies=proxies)
-        status_code: int = response.status_code
-        result: dict = {}
-        if status_code == 200:
-            try:
-                data: List[dict] = response.json()
-            except Exception as err:
-                logger.error(f"JSON ERROR: {err}")
-            else:
-                # Дебагеррный файл, можно удалять
-                # save_data_to_json(data=data)
-                result: dict = await self.__data_filter(data=data)
-        elif status_code == 429:
-            logger.warning(f"ERROR 429: {response.text}")
-        else:
-            logger.error(f"API request error: {status_code}")
-
-        return result
-
-    @logger.catch
     async def __get_data_from_api_aiohttp(self) -> dict:
         """Отправляет запрос к АПИ"""
 
@@ -245,8 +215,6 @@ class MessageReceiver:
                     status_code = response.status
                     if status_code == 200:
                         data: List[dict] = await response.json()
-                        if data:
-                            print(len(data))
                     else:
                         logger.error(f"F: __get_data_from_api_aiohttp error: {status_code}: {response.text()}")
             except MessageReceiver.__EXCEPTIONS as err:
@@ -257,7 +225,7 @@ class MessageReceiver:
                 logger.error("F: __send_data_to_api: JSON ERROR:", err)
             else:
                 # Дебагеррный файл, можно удалять
-                save_data_to_json(data=data)
+                # save_data_to_json(data=data)
                 result: dict = await self.__data_filter(data=data)
 
         return result
