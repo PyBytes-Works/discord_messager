@@ -142,7 +142,7 @@ async def add_channel_handler(message: Message, state: FSMContext) -> None:
     try:
         guild, channel = mess.rsplit('/', maxsplit=3)[-2:]
     except ValueError as err:
-        logger.error(err)
+        logger.error("F: add_channel_handler error: err", err)
         guild: str = ''
         channel: str = ''
     guild: str = str(check_is_int(guild))
