@@ -198,7 +198,7 @@ async def tokens_and_hours_request_callback_handler(callback: CallbackQuery, sta
     if User.get_user_by_telegram_id(telegram_id=user_telegram_id):
         await callback.message.answer(
             "Введите количество часов и количество токенов для активации через пробел."
-            "\r\nНапример: '24 10'",
+            "\nНапример: '24 10'",
             reply_markup=cancel_keyboard()
         )
         await state.update_data(activate_user=user_telegram_id)
@@ -235,8 +235,8 @@ async def activate_user_handler(message: Message, state: FSMContext) -> None:
         User.activate_user(telegram_id=user_telegram_id)
         await message.answer(
             f"Для пользователя {user_telegram_id} установлено:"
-            f"\r\nТокенов: {max_tokens}"
-            f"\r\nЧасов: {hours}",
+            f"\nТокенов: {max_tokens}"
+            f"\nЧасов: {hours}",
             reply_markup=user_menu_keyboard()
         )
         await state.finish()
@@ -387,9 +387,9 @@ async def add_user_to_db_by_token(message: Message, state: FSMContext) -> None:
     user_data: dict = delete_used_token(message.text)
     if not user_data:
         await send_report_to_admins("Пользователь ошибочно или повторно ввел токен."
-                                    "\r\nПри чтении токена для создания нового пользователя из файла произошла ошибка."
-                                    f"\r\nUser: {message.from_user.id}"
-                                    f"\r\nData: {message}")
+                                    "\nПри чтении токена для создания нового пользователя из файла произошла ошибка."
+                                    f"\nUser: {message.from_user.id}"
+                                    f"\nData: {message}")
         return
     user_name = user_data["name"]
     max_tokens = user_data["max_tokens"]
@@ -419,8 +419,8 @@ async def add_user_to_db_by_token(message: Message, state: FSMContext) -> None:
                 )
                 await send_report_to_admins(
                     text=f"Пользователь {user_name} : ID: {user_telegram_id} добавлен в БД."
-                         f"\r\nМаксимальное количество токенов: {max_tokens}"
-                         f"\r\nВремя подписки: {subscribe_time} часов.",
+                         f"\nМаксимальное количество токенов: {max_tokens}"
+                         f"\nВремя подписки: {subscribe_time} часов.",
                 )
             else:
                 await send_report_to_admins("Произошла ошибка при добавлении нового пользователя.")
