@@ -656,9 +656,12 @@ class Token(BaseModel):
         def get_info(token_data: 'Token') -> dict:
             if not token_data:
                 return {}
+            mate_token = TokenPair.get_token_mate(token_id=token_data.id)
+            mate_discord_id = mate_token.discord_id if mate_token else None
             return {
                 'token': token_data.token,
                 'discord_id': token_data.discord_id,
+                'mate_id': mate_discord_id,
                 'guild': token_data.guild,
                 'channel': token_data.channel,
                 'time': token_data.last_message_time,

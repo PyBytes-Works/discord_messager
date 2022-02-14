@@ -264,10 +264,12 @@ async def info_tokens_handler(message: Message) -> None:
             token: str = data.get('token')
             channel: int = data.get('channel')
             discord_id: int = data.get('discord_id')
+            mate_id: int = data.get('mate_id')
             cooldown: int = data.get('cooldown')
             return (f"Токен: {token}"
                     f"\nКанал {channel}"
                     f"\nДискорд id {discord_id}"
+                    f"\nДискорд id напарника {mate_id}"
                     f"\nКуллдаун {cooldown}")
 
         date_expiration = User.get_expiration_date(user)
