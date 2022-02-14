@@ -10,7 +10,7 @@ from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKe
 from aiogram.dispatcher import FSMContext
 
 from config import logger, Dispatcher, admins_list
-from models import User, Token
+from models import User, Token, TokenPair
 from keyboards import cancel_keyboard, user_menu_keyboard, all_tokens_keyboard
 from discord_handler import MessageReceiver, TokenDataStore, users_data_storage
 from states import UserState
@@ -454,7 +454,9 @@ async def get_error_text(message: Message, discord_data: dict, datastore: 'Token
         if discord_code_error == 20016:
             cooldown: int = int(data.get("retry_after", None))
             if cooldown:
-                Token.update_token_cooldown(token=token, cooldown=cooldown + datastore.cooldown + 1)
+                cooldown += datastore.cooldown
+                Token.update_token_cooldown(token=token, cooldown=cooldown)
+                Token.update_mate_cooldown(token=token, cooldown=cooldown)
                 datastore.delay = 5
             await message.answer(
                 "Для данного токена сообщения отправляются чаще, чем разрешено в канале."
