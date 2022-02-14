@@ -10,7 +10,7 @@ import requests
 import aiohttp.client_exceptions
 import aiohttp.http_exceptions
 
-from data_classes import users_data_storage, DataStore
+from data_classes import users_data_storage, TokenDataStore, Vocabulary
 from models import Token
 from config import logger
 from dotenv import load_dotenv
@@ -41,8 +41,8 @@ class MessageReceiver:
     При ошибке возвращает ее в телеграм"""
 
     @logger.catch
-    def __init__(self, datastore: 'DataStore', timer: float = 7):
-        self.__datastore: 'DataStore' = datastore
+    def __init__(self, datastore: 'TokenDataStore', timer: float = 7):
+        self.__datastore: 'TokenDataStore' = datastore
         self.__timer: float = timer
 
     @classmethod
@@ -64,7 +64,7 @@ class MessageReceiver:
         async with aiohttp.ClientSession() as session:
             session.headers['authorization']: str = token
             limit: int = 1
-            url: str = DataStore.get_channel_url() + f'{channel}/messages?limit={limit}'
+            url: str = TokenDataStore.get_channel_url() + f'{channel}/messages?limit={limit}'
             result: str = 'bad token'
             proxy_data = f"http://{PROXY_USER}:{PROXY_PASSWORD}@{proxy}/"
             try:
@@ -80,7 +80,7 @@ class MessageReceiver:
 
     @staticmethod
     @logger.catch
-    def __get_current_message_id(data: dict) -> int:
+    async def __get_current_message_id(data: dict) -> int:
         message_id = 0
         filtered_messages: list = data.get("messages", [])
         if filtered_messages:
@@ -110,14 +110,15 @@ class MessageReceiver:
         if message_id:
             self.__datastore.current_message_id = message_id
         else:
-            filtered_data: dict = await self.__get_data_from_api()
+            # filtered_data: dict = await self.__get_data_from_api()
+            filtered_data: dict = await self.__get_data_from_api_aiohttp()
             if filtered_data:
                 replies: List[dict] = filtered_data.get("replies", [])
                 if replies:
                     result.update({"replies": replies})
-                self.__datastore.current_message_id = self.__get_current_message_id(data=filtered_data)
+                self.__datastore.current_message_id = await self.__get_current_message_id(data=filtered_data)
         text_to_send = user_message if user_message else ''
-        answer: dict = MessageSender(datastore=self.__datastore).send_message(text=text_to_send)
+        answer: dict = await MessageSender(datastore=self.__datastore).send_message(text=text_to_send)
         if not answer:
             logger.error("F: get_message ERROR: NO ANSWER ERROR")
             result.update({"work": False, "message": "ERROR"})
@@ -174,13 +175,13 @@ class MessageReceiver:
         if workers:
             random_token: str = random.choice(workers)
             result["token"]: str = random_token
-            self.__datastore.save_token_data(random_token)
+            self.__datastore.create_datastore_data(random_token)
         else:
             min_token_data = {}
             for elem in all_tokens:
                 min_token_data: dict = min(elem.items(), key=lambda x: x[1].get('time'))
             token: str = tuple(min_token_data)[0]
-            self.__datastore.save_token_data(token)
+            self.__datastore.create_datastore_data(token)
             min_token_time: int = Token.get_time_by_token(token)
             delay: int = self.__datastore.cooldown - abs(min_token_time - current_time)
             self.__datastore.delay = delay
@@ -229,6 +230,39 @@ class MessageReceiver:
         return result
 
     @logger.catch
+    async def __get_data_from_api_aiohttp(self) -> dict:
+        """Отправляет запрос к АПИ"""
+
+        result: dict = {}
+
+        async with aiohttp.ClientSession() as session:
+            session.headers['authorization']: str = self.__datastore.token
+            limit: int = 100
+            url: str = self.__datastore.get_channel_url() + f'{self.__datastore.channel}/messages?limit={limit}'
+            proxy_data = f"http://{PROXY_USER}:{PROXY_PASSWORD}@{self.__datastore.proxy}/"
+            try:
+                async with session.get(url=url, proxy=proxy_data, ssl=False, timeout=10) as response:
+                    status_code = response.status
+                    if status_code == 200:
+                        data: List[dict] = await response.json()
+                        if data:
+                            print(len(data))
+                    else:
+                        logger.error(f"F: __get_data_from_api_aiohttp error: {status_code}: {response.text()}")
+            except MessageReceiver.__EXCEPTIONS as err:
+                logger.error(f"F: __get_data_from_api_aiohttp error: {err}", err)
+            except aiohttp.http_exceptions.BadHttpMessage as err:
+                logger.error("МУДАК ПРОВЕРЬ ПОРТ ПРОКСИ!!!", err)
+            except JSONDecodeError as err:
+                logger.error("F: __send_data_to_api: JSON ERROR:", err)
+            else:
+                # Дебагеррный файл, можно удалять
+                save_data_to_json(data=data)
+                result: dict = await self.__data_filter(data=data)
+
+        return result
+
+    @logger.catch
     async def __data_filter(self, data: List[dict]) -> dict:
         """Фильтрует полученные данные"""
 
@@ -242,7 +276,7 @@ class MessageReceiver:
             mes_time = datetime.datetime.fromisoformat(message_time).replace(tzinfo=None)
             delta = datetime.datetime.utcnow().replace(tzinfo=None) - mes_time
             if delta.seconds < self.__datastore.last_message_time:
-                filtered_replies: dict = self.__replies_filter(elem=elem)
+                filtered_replies: dict = await self.__replies_filter(elem=elem)
                 if filtered_replies:
                     replies.append(filtered_replies)
                 is_author_mate: bool = str(self.__datastore.mate_id) == str(elem["author"]["id"])
@@ -278,7 +312,7 @@ class MessageReceiver:
 
         return replies
 
-    def __replies_filter(self, elem: dict) -> dict:
+    async def __replies_filter(self, elem: dict) -> dict:
         """Возвращает реплаи не из нашего села."""
 
         result = {}
@@ -314,26 +348,26 @@ class MessageSender:
     Возвращает сообщение об ошибке или об успехе"""
 
     @logger.catch
-    def __init__(self, datastore: 'DataStore'):
-        self.__datastore: 'DataStore' = datastore
+    def __init__(self, datastore: 'TokenDataStore'):
+        self.__datastore: 'TokenDataStore' = datastore
         self.__answer: dict = {}
 
     @logger.catch
-    def send_message(self, text: str = '') -> dict:
+    async def send_message(self, text: str = '') -> dict:
         """Отправляет данные в канал дискорда, возвращает результат отправки."""
 
-        data: dict = self.__prepare_data(text=text)
-        self.__send_data_to_api(data=data)
+        data: dict = await self.__prepare_data(text=text)
+        await self.__send_data(data=data)
         Token.update_token_time(token=self.__datastore.token)
 
         return self.__answer
 
     @logger.catch
-    def __prepare_data(self, text: str = '') -> dict:
+    async def __prepare_data(self, text: str = '') -> dict:
         """Возвращает сформированные данные для отправки в дискорд"""
 
         if not text:
-            text = users_data_storage.get_random_message_from_vocabulary()
+            text: str = Vocabulary.get_message()
             if text == "Vocabulary error":
                 self.__answer = {"status_code": -2, "data": {"message": text}}
         data = {
@@ -364,7 +398,7 @@ class MessageSender:
         return data
 
     @logger.catch
-    def __send_data_to_api(self, data) -> None:
+    async def __send_data(self, data) -> None:
         """Отправляет данные в дискорд канал"""
 
         session = requests.Session()

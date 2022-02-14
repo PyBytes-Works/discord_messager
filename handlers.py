@@ -12,7 +12,7 @@ from aiogram.dispatcher import FSMContext
 from config import logger, Dispatcher, admins_list
 from models import User, Token
 from keyboards import cancel_keyboard, user_menu_keyboard, all_tokens_keyboard
-from discord_handler import MessageReceiver, DataStore, users_data_storage
+from discord_handler import MessageReceiver, TokenDataStore, users_data_storage
 from states import UserState
 from utils import (
     check_is_int, save_data_to_json, send_report_to_admins, load_from_redis,
@@ -29,7 +29,7 @@ async def cancel_handler(message: Message, state: FSMContext) -> None:
     """
 
     user_telegram_id: str = str(message.from_user.id)
-    datastore: 'DataStore' = users_data_storage.get_instance(telegram_id=user_telegram_id)
+    datastore: 'TokenDataStore' = users_data_storage.get_instance(telegram_id=user_telegram_id)
     time_to_over: int = 0
     if datastore:
         time_to_over = datastore.delay
@@ -351,14 +351,14 @@ async def lets_play(message: Message):
     while User.get_is_work(telegram_id=user_telegram_id):
         if await delete_user_if_expired(message=message):
             break
-        datastore: 'DataStore' = DataStore(user_telegram_id)
+        datastore: 'TokenDataStore' = TokenDataStore(user_telegram_id)
         users_data_storage.add_or_update(telegram_id=user_telegram_id, data=datastore)
         message_manager: 'MessageReceiver' = MessageReceiver(datastore=datastore)
         discord_data: dict = await message_manager.get_message()
         token_work: bool = discord_data.get("work")
         replies: List[dict] = discord_data.get("replies", [])
         if not token_work:
-            text: str = await errors_handler(
+            text: str = await get_error_text(
                 message=message, datastore=datastore, discord_data=discord_data
             )
             if text == 'stop':
@@ -369,8 +369,8 @@ async def lets_play(message: Message):
             current_hour: int = datetime.datetime.now().hour
             if current_hour > work_hour:
                 work_hour: int = current_hour
-                print("Время распределять токены!")
-                form_token_pairs(telegram_id=user_telegram_id, unpair=True)
+                formed: int = form_token_pairs(telegram_id=user_telegram_id, unpair=True)
+                logger.info(f"Время распределять токены! Сформировал {formed} пар.")
             if replies:
                 await send_replies(message=message, replies=replies)
             await asyncio.sleep(datastore.delay + 1)
@@ -379,7 +379,7 @@ async def lets_play(message: Message):
 
 
 @logger.catch
-async def errors_handler(message: Message, discord_data: dict, datastore: 'DataStore') -> str:
+async def get_error_text(message: Message, discord_data: dict, datastore: 'TokenDataStore') -> str:
     """Обработка ошибок от сервера"""
 
     user_telegram_id: str = str(message.from_user.id)
@@ -388,7 +388,9 @@ async def errors_handler(message: Message, discord_data: dict, datastore: 'DataS
 
     answer: dict = discord_data.get("answer", {})
     data: dict = answer.get("data", {})
-    print("Send result:", data)
+
+    print(f"User: {user_telegram_id}\r\tSend result: {data}")
+
     status_code: int = answer.get("status_code", 0)
     sender_text: str = answer.get("message", "ERROR")
     discord_code_error: int = answer.get("data", {}).get("code", 0)
@@ -423,8 +425,8 @@ async def errors_handler(message: Message, discord_data: dict, datastore: 'DataS
                 "Не могу отправить сообщение для токена. (Ошибка 403 - 50013)"
                 "Токен в муте."
                 f"\nToken: {token}"
-                # f"\nGuild: {datastore.guild}"
-                # f"\nChannel: {datastore.channel}"
+                f"\nGuild: {datastore.guild}"
+                f"\nChannel: {datastore.channel}"
             )
         elif discord_code_error == 50001:
             Token.delete_token(token=token)

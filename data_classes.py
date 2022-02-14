@@ -5,10 +5,7 @@ from config import logger
 from models import Token
 
 
-class DataStore:
-    __DISCORD_BASE_URL: str = f'https://discord.com/api/v9/channels/'
-
-
+class TokenDataStore:
     """
     Класс для хранения текущих данных для отправки и получения сообщений дискорда
 
@@ -16,6 +13,8 @@ class DataStore:
         check_user_data
         save_token_data
     """
+
+    __DISCORD_BASE_URL: str = f'https://discord.com/api/v9/channels/'
 
     def __init__(self, telegram_id: str):
         self.telegram_id: str = telegram_id
@@ -29,11 +28,7 @@ class DataStore:
         self.__DELAY: int = 0
         self.__MY_DISCORD_ID: str = ''
 
-    @classmethod
-    def get_channel_url(cls) -> str:
-        return cls.__DISCORD_BASE_URL
-
-    def save_token_data(self, token: str):
+    def create_datastore_data(self, token: str):
         self.token: str = token
         token_data: dict = Token.get_info_by_token(token)
         self.proxy: str = token_data.get("proxy")
@@ -42,6 +37,10 @@ class DataStore:
         self.cooldown: int = token_data.get("cooldown")
         self.mate_id: str = token_data.get("mate_id")
         self.my_discord_id: str = token_data.get("discord_id")
+
+    @classmethod
+    def get_channel_url(cls) -> str:
+        return cls.__DISCORD_BASE_URL
 
     @property
     def my_discord_id(self) -> str:
@@ -126,25 +125,24 @@ class DataStore:
         self.__PROXY = proxy
 
 
-class UserDataStore:
+class InstancesStorage:
     """
     Класс для хранения экземпляров классов данных (ID сообщения в дискорде, время и прочая)
     для каждого пользователя телеграма.
     Инициализируется при запуске бота.
     """
-    __VOCABULARY: list = []
 
     def __init__(self):
         self.__instance = {}
 
     @logger.catch
-    def get_instance(self, telegram_id: str) -> 'DataStore':
+    def get_instance(self, telegram_id: str) -> 'TokenDataStore':
         """Возвращает текущий экземпляр класса для пользователя'"""
 
         return self.__instance.get(telegram_id, {})
 
     @logger.catch
-    def add_or_update(self, telegram_id: str, data: 'DataStore') -> None:
+    def add_or_update(self, telegram_id: str, data: 'TokenDataStore') -> None:
         """Сохраняет экземпляр класса пользователя"""
 
         self.__instance.update(
@@ -153,9 +151,15 @@ class UserDataStore:
             }
         )
 
+
+class Vocabulary:
+    """Работает с файлом фраз для отправки в дискорд"""
+
+    __VOCABULARY: list = []
+
     @classmethod
     @logger.catch
-    def get_random_message_from_vocabulary(cls) -> str:
+    def get_message(cls) -> str:
         vocabulary: list = cls.__get_vocabulary()
 
         length: int = len(vocabulary)
@@ -199,4 +203,4 @@ class UserDataStore:
 
 
 # initialization user data storage
-users_data_storage = UserDataStore()
+users_data_storage = InstancesStorage()
