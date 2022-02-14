@@ -110,7 +110,8 @@ class MessageReceiver:
         if message_id:
             self.__datastore.current_message_id = message_id
         else:
-            filtered_data: dict = await self.__get_data_from_api()
+            # filtered_data: dict = await self.__get_data_from_api()
+            filtered_data: dict = await self.__get_data_from_api_aiohttp()
             if filtered_data:
                 replies: List[dict] = filtered_data.get("replies", [])
                 if replies:
@@ -225,6 +226,39 @@ class MessageReceiver:
             logger.warning(f"ERROR 429: {response.text}")
         else:
             logger.error(f"API request error: {status_code}")
+
+        return result
+
+    @logger.catch
+    async def __get_data_from_api_aiohttp(self) -> dict:
+        """Отправляет запрос к АПИ"""
+
+        result: dict = {}
+
+        async with aiohttp.ClientSession() as session:
+            session.headers['authorization']: str = self.__datastore.token
+            limit: int = 100
+            url: str = self.__datastore.get_channel_url() + f'{self.__datastore.channel}/messages?limit={limit}'
+            proxy_data = f"http://{PROXY_USER}:{PROXY_PASSWORD}@{self.__datastore.proxy}/"
+            try:
+                async with session.get(url=url, proxy=proxy_data, ssl=False, timeout=10) as response:
+                    status_code = response.status
+                    if status_code == 200:
+                        data: List[dict] = await response.json()
+                        if data:
+                            print(len(data))
+                    else:
+                        logger.error(f"F: __get_data_from_api_aiohttp error: {status_code}: {response.text()}")
+            except MessageReceiver.__EXCEPTIONS as err:
+                logger.error(f"F: __get_data_from_api_aiohttp error: {err}", err)
+            except aiohttp.http_exceptions.BadHttpMessage as err:
+                logger.error("МУДАК ПРОВЕРЬ ПОРТ ПРОКСИ!!!", err)
+            except JSONDecodeError as err:
+                logger.error("F: __send_data_to_api: JSON ERROR:", err)
+            else:
+                # Дебагеррный файл, можно удалять
+                save_data_to_json(data=data)
+                result: dict = await self.__data_filter(data=data)
 
         return result
 
