@@ -356,7 +356,7 @@ async def lets_play(message: Message):
         token_work: bool = discord_data.get("work")
         replies: List[dict] = discord_data.get("replies", [])
         if not token_work:
-            text: str = await errors_handler(
+            text: str = await get_error_text(
                 message=message, datastore=datastore, discord_data=discord_data
             )
             if text == 'stop':
@@ -367,8 +367,8 @@ async def lets_play(message: Message):
             current_hour: int = datetime.datetime.now().hour
             if current_hour > work_hour:
                 work_hour: int = current_hour
-                print("Время распределять токены!")
-                form_token_pairs(telegram_id=user_telegram_id, unpair=True)
+                formed: int = form_token_pairs(telegram_id=user_telegram_id, unpair=True)
+                logger.info(f"Время распределять токены! Сформировал {formed} пар.")
             if replies:
                 await send_replies(message=message, replies=replies)
             await asyncio.sleep(datastore.delay + 1)
@@ -377,7 +377,7 @@ async def lets_play(message: Message):
 
 
 @logger.catch
-async def errors_handler(message: Message, discord_data: dict, datastore: 'DataStore') -> str:
+async def get_error_text(message: Message, discord_data: dict, datastore: 'DataStore') -> str:
     """Обработка ошибок от сервера"""
 
     user_telegram_id: str = str(message.from_user.id)
@@ -421,8 +421,8 @@ async def errors_handler(message: Message, discord_data: dict, datastore: 'DataS
                 "Не могу отправить сообщение для токена. (Ошибка 403 - 50013)"
                 "Токен в муте."
                 f"\nToken: {token}"
-                # f"\nGuild: {datastore.guild}"
-                # f"\nChannel: {datastore.channel}"
+                f"\nGuild: {datastore.guild}"
+                f"\nChannel: {datastore.channel}"
             )
         elif discord_code_error == 50001:
             Token.delete_token(token=token)
