@@ -110,7 +110,9 @@ async def invitation_add_discord_token_handler(message: Message) -> None:
             await UserState.user_add_cooldown.set()
             return
         await message.answer(
-            "Максимальное количество discord-токенов уже добавлено", reply_markup=user_menu_keyboard())
+            "Максимальное количество discord-токенов уже добавлено",
+            reply_markup=user_menu_keyboard()
+        )
 
 
 @logger.catch
@@ -126,7 +128,8 @@ async def add_cooldown_handler(message: Message, state: FSMContext) -> None:
 
     await state.update_data(cooldown=cooldown * 60)
     await message.answer(
-        "Введите ссылку на канал в виде: https://discord.com/channels/932034587264167975/932034858906401842",
+        "Введите ссылку на канал в виде: "
+        "https://discord.com/channels/932034587264167975/932034858906401842",
         reply_markup=cancel_keyboard()
     )
     await UserState.user_add_channel.set()
