@@ -144,6 +144,8 @@ class User(BaseModel):
         if user:
             return Token.delete_tokens_by_user(user=user)
 
+        return 0
+
     @classmethod
     @logger.catch
     def delete_all_pairs(cls: 'User', telegram_id: str) -> bool:
@@ -355,6 +357,7 @@ class User(BaseModel):
                     if proxy_new:
                         proxy_new.using += 1
                         proxy_new.save()
+
                 return result
 
     @classmethod
@@ -364,10 +367,11 @@ class User(BaseModel):
         возвращает статус подписки пользователя,
         True если подписка ещё действует
         False если срок подписки истёк
-        # FIXME
         """
+
         user: User = cls.get_or_none(cls.telegram_id == telegram_id)
         expiration: int = user.expiration if user else 0
+
         return expiration > datetime.datetime.now().timestamp() if expiration else False
 
     @classmethod
@@ -380,6 +384,7 @@ class User(BaseModel):
         # print(type(result.expiration))
         if user:
             expiration = user.expiration
+
             return expiration
 
     @classmethod
