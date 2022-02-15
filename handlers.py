@@ -352,7 +352,7 @@ async def lets_play(message: Message):
     Запускает рабочий цикл бота, проверяет ошибки."""
 
     work_hour: int = datetime.datetime.now().hour
-    user_telegram_id: str = message.from_user.id
+    user_telegram_id: str = str(message.from_user.id)
 
     while User.get_is_work(telegram_id=user_telegram_id):
         if await delete_user_if_expired(message=message):
