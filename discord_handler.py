@@ -57,38 +57,6 @@ class MessageReceiver:
 
         return result
 
-    @classmethod
-    async def __check_token(cls, token: str, proxy: str, channel: int) -> str:
-        """Returns valid token else 'bad token'"""
-
-        async with aiohttp.ClientSession() as session:
-            session.headers['authorization']: str = token
-            limit: int = 1
-            url: str = TokenDataStore.get_channel_url() + f'{channel}/messages?limit={limit}'
-            result: str = 'bad token'
-            proxy_data = f"http://{PROXY_USER}:{PROXY_PASSWORD}@{proxy}/"
-            try:
-                async with session.get(url=url, proxy=proxy_data, ssl=False, timeout=10) as response:
-                    if response.status == 200:
-                        result = token
-            except cls.__EXCEPTIONS as err:
-                logger.info(f"Token check Error: {err}")
-            except aiohttp.http_exceptions.BadHttpMessage as err:
-                logger.error("МУДАК ПРОВЕРЬ ПОРТ ПРОКСИ!!!", err)
-
-        return result
-
-    @staticmethod
-    @logger.catch
-    async def __get_current_message_id(data: dict) -> int:
-        message_id = 0
-        filtered_messages: list = data.get("messages", [])
-        if filtered_messages:
-            result_data: dict = random.choice(filtered_messages)
-            message_id = int(result_data.get("id"))
-
-        return message_id
-
     @logger.catch
     async def get_message(self) -> dict:
         """Получает данные из АПИ, выбирает случайное сообщение и возвращает ID сообщения
@@ -119,6 +87,7 @@ class MessageReceiver:
                 if replies:
                     result.update({"replies": replies})
                 self.__datastore.current_message_id = await self.__get_current_message_id(data=filtered_data)
+        print(f"token: {token}, mes_id: {self.__datastore.current_message_id}")
         text_to_send = user_message if user_message else ''
         answer: dict = MessageSender(datastore=self.__datastore).send_message(text=text_to_send)
         if not answer:
@@ -131,6 +100,17 @@ class MessageReceiver:
         self.__datastore.current_message_id = 0
 
         return result
+
+    @staticmethod
+    @logger.catch
+    async def __get_current_message_id(data: dict) -> int:
+        message_id = 0
+        filtered_messages: list = data.get("messages", [])
+        if filtered_messages:
+            result_data: dict = random.choice(filtered_messages)
+            message_id = int(result_data.get("id"))
+
+        return message_id
 
     @logger.catch
     async def __get_user_message_from_redis(self, token: str) -> Tuple[str, int]:
@@ -305,6 +285,27 @@ class MessageReceiver:
                             "text": elem.get("content", ''),
                             "message_id": elem.get("id", '')
                         })
+
+        return result
+
+    @classmethod
+    async def __check_token(cls, token: str, proxy: str, channel: int) -> str:
+        """Returns valid token else 'bad token'"""
+
+        async with aiohttp.ClientSession() as session:
+            session.headers['authorization']: str = token
+            limit: int = 1
+            url: str = TokenDataStore.get_channel_url() + f'{channel}/messages?limit={limit}'
+            result: str = 'bad token'
+            proxy_data = f"http://{PROXY_USER}:{PROXY_PASSWORD}@{proxy}/"
+            try:
+                async with session.get(url=url, proxy=proxy_data, ssl=False, timeout=10) as response:
+                    if response.status == 200:
+                        result = token
+            except cls.__EXCEPTIONS as err:
+                logger.info(f"Token check Error: {err}")
+            except aiohttp.http_exceptions.BadHttpMessage as err:
+                logger.error("МУДАК ПРОВЕРЬ ПОРТ ПРОКСИ!!!", err)
 
         return result
 
