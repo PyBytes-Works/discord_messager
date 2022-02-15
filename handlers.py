@@ -458,13 +458,14 @@ async def get_error_text(message: Message, discord_data: dict, datastore: 'Token
         if discord_code_error == 20016:
             cooldown: int = int(data.get("retry_after", None))
             if cooldown:
-                cooldown += datastore.cooldown
+                cooldown += datastore.cooldown + 2
                 Token.update_token_cooldown(token=token, cooldown=cooldown)
                 Token.update_mate_cooldown(token=token, cooldown=cooldown)
                 datastore.delay = cooldown
             await message.answer(
                 "Для данного токена сообщения отправляются чаще, чем разрешено в канале."
                 f"\nToken: {token}"
+                f"\nВремя скорректировано. Кулдаун установлен: {cooldown}"
             )
         else:
             await message.answer(f"Ошибка: {status_code}:{discord_code_error}:{sender_text}")
