@@ -373,8 +373,8 @@ async def lets_play(message: Message):
             current_hour: int = datetime.datetime.now().hour
             if current_hour > work_hour:
                 work_hour: int = current_hour
-                formed: int = form_token_pairs(telegram_id=user_telegram_id, unpair=True)
-                logger.info(f"Время распределять токены! Сформировал {formed} пар.")
+                form_token_pairs(telegram_id=user_telegram_id, unpair=True)
+                logger.info(f"Время распределять токены!")
 
             await asyncio.sleep(datastore.delay + 1)
             datastore.delay = 0
@@ -462,7 +462,7 @@ async def get_error_text(message: Message, discord_data: dict, datastore: 'Token
             await message.answer(
                 "Для данного токена сообщения отправляются чаще, чем разрешено в канале."
                 f"\nToken: {token}"
-                f"\nВремя скорректировано. Кулдаун установлен: {cooldown}"
+                f"\nВремя скорректировано. Кулдаун установлен: {cooldown} секунд"
             )
         else:
             await message.answer(f"Ошибка: {status_code}:{discord_code_error}:{sender_text}")
@@ -556,6 +556,7 @@ def form_token_pairs(telegram_id: str, unpair: bool = False) -> int:
         while len(tokens) > 1:
             random.shuffle(tokens)
             formed_pairs += Token.make_tokens_pair(tokens.pop(), tokens.pop())
+    logger.info(f"Pairs formed: {formed_pairs}")
 
     return formed_pairs
 
