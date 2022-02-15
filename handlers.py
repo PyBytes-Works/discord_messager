@@ -467,7 +467,11 @@ async def get_error_text(message: Message, discord_data: dict, datastore: 'Token
         else:
             await message.answer(f"Ошибка: {status_code}:{discord_code_error}:{sender_text}")
     elif status_code == 500:
-        error_text = "Внутренняя ошибка сервера Дискорда. Пауза 10 секунд. Код ошибки - 500."
+        error_text = (
+            f"Внутренняя ошибка сервера Дискорда. "
+            f"\nГильдия:Канал: {datastore.guild}:{datastore.channel} "
+            f"\nПауза 10 секунд. Код ошибки - 500."
+        )
         await message.answer(error_text)
         await send_report_to_admins(error_text)
         datastore.delay = 10
