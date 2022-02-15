@@ -52,7 +52,7 @@ async def cancel_handler(message: Message, state: FSMContext) -> None:
 async def get_all_tokens_handler(message: Message) -> None:
     """Обработчик команды /set_cooldown"""
 
-    if await delete_user_if_expired(message=message):
+    if await deactivate_user_if_expired(message=message):
         return
     user_telegram_id: str = str(message.from_user.id)
 
@@ -102,7 +102,7 @@ async def set_self_token_cooldown_handler(message: Message, state: FSMContext):
 async def invitation_add_discord_token_handler(message: Message) -> None:
     """Обработчик команды /add_token"""
 
-    if await delete_user_if_expired(message=message):
+    if await deactivate_user_if_expired(message=message):
         return
     user: str = str(message.from_user.id)
     if User.is_active(telegram_id=user):
@@ -260,7 +260,7 @@ async def info_tokens_handler(message: Message) -> None:
     Выводит инфо о токенах. Обработчик кнопки /info
     """
 
-    if await delete_user_if_expired(message=message):
+    if await deactivate_user_if_expired(message=message):
         return
     user: str = str(message.from_user.id)
     if User.is_active(message.from_user.id):
@@ -282,7 +282,7 @@ async def info_tokens_handler(message: Message) -> None:
         date_expiration = datetime.datetime.fromtimestamp(date_expiration)
         all_tokens: list = Token.get_all_info_tokens(user)
         if all_tokens:
-            await UserState.user_delete_token_pair.set()
+            await UserState.user_delete_token.set()
             await message.answer(
                 f'Подписка истекает  {date_expiration}'
                 f'\nТокены:',
@@ -305,7 +305,7 @@ async def info_tokens_handler(message: Message) -> None:
 
 
 @logger.catch
-async def delete_pair_handler(callback: CallbackQuery) -> None:
+async def delete_token_handler(callback: CallbackQuery, state: FSMContext) -> None:
     """Хэндлер для нажатия на кнопку "Удалить токен" """
 
     user: str = str(callback.from_user.id)
@@ -314,36 +314,32 @@ async def delete_pair_handler(callback: CallbackQuery) -> None:
             await callback.message.answer("Бот запущен, сначала остановите бота.", reply_markup=cancel_keyboard())
         else:
             Token.delete_token(callback.data)
-            # Вызвало ошибку aiogram.utils.exceptions.MessageToDeleteNotFound: Message to delete not found
-            # await callback.message.delete()
-            return
-
+            await callback.message.answer("Токен удален.", reply_markup=user_menu_keyboard())
+            await state.finish()
     await callback.answer()
 
 
 @logger.catch
-async def start_command_handler(message: Message, state: FSMContext) -> None:
+async def start_command_handler(message: Message) -> None:
     """Получает случайное сообщение из дискорда, ставит машину состояний в положение
     'жду ответа пользователя'
     Обработчик команды /start_parsing
     """
 
     user_telegram_id: str = str(message.from_user.id)
-    if not User.is_active(telegram_id=user_telegram_id):
-        return
-    if await delete_user_if_expired(message=message):
+    user_is_active: bool = User.is_active(telegram_id=user_telegram_id)
+    if not user_is_active or await deactivate_user_if_expired(message=message):
         return
     if not Token.get_all_user_tokens(user_telegram_id):
         await message.answer("Сначала добавьте токен.", reply_markup=user_menu_keyboard())
-        await state.finish()
         return
-
+    if User.get_is_work(telegram_id=user_telegram_id):
+        await message.answer("Бот уже запущен.")
+        return
     User.set_user_is_work(telegram_id=user_telegram_id)
     await message.answer("Начинаю работу.", reply_markup=cancel_keyboard())
     await lets_play(message=message)
     await message.answer("Закончил работу.", reply_markup=user_menu_keyboard())
-
-    await state.finish()
 
 
 @logger.catch
@@ -355,7 +351,7 @@ async def lets_play(message: Message):
     user_telegram_id: str = str(message.from_user.id)
 
     while User.get_is_work(telegram_id=user_telegram_id):
-        if await delete_user_if_expired(message=message):
+        if await deactivate_user_if_expired(message=message):
             break
         datastore: 'TokenDataStore' = TokenDataStore(user_telegram_id)
         users_data_storage.add_or_update(telegram_id=user_telegram_id, data=datastore)
@@ -569,7 +565,7 @@ async def default_message(message: Message) -> None:
     """Ответ на любое необработанное действие активного пользователя."""
 
     if User.is_active(message.from_user.id):
-        if await delete_user_if_expired(message=message):
+        if await deactivate_user_if_expired(message=message):
             return
         await message.answer(
             'Доступные команды: '
@@ -582,18 +578,21 @@ async def default_message(message: Message) -> None:
 
 
 @logger.catch
-async def delete_user_if_expired(message: Message):
-    """Удаляет пользователя с истекшим сроком действия."""
+async def deactivate_user_if_expired(message: Message) -> bool:
+    """Удаляет пользователя с истекшим сроком действия.
+    Возвращает True если деактивирован."""
 
     user_telegram_id: str = str(message.from_user.id)
     user_active: bool = User.check_expiration_date(telegram_id=user_telegram_id)
     user_is_admin: bool = User.is_admin(telegram_id=user_telegram_id)
     if not user_active and not user_is_admin:
-        await message.answer("Время подписки истекло. Ваш аккаунт удален.", reply_markup=ReplyKeyboardRemove())
+        await message.answer("Время подписки истекло. Ваш аккаунт деактивирован.", reply_markup=ReplyKeyboardRemove())
         User.delete_all_tokens(telegram_id=user_telegram_id)
         User.deactivate_user(telegram_id=user_telegram_id)
         logger.info(f"Время подписки {user_telegram_id} истекло, пользователь удален.")
         return True
+
+    return False
 
 
 @logger.catch
@@ -622,5 +621,5 @@ def register_handlers(dp: Dispatcher) -> None:
     dp.register_message_handler(add_channel_handler, state=UserState.user_add_channel)
     dp.register_message_handler(add_discord_token_handler, state=UserState.user_add_token)
     dp.register_message_handler(add_discord_id_handler, state=UserState.user_add_discord_id)
-    dp.register_callback_query_handler(delete_pair_handler, state=UserState.user_delete_token_pair)
+    dp.register_callback_query_handler(delete_token_handler, state=UserState.user_delete_token)
     dp.register_message_handler(default_message)
