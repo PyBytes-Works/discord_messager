@@ -87,7 +87,7 @@ class MessageReceiver:
 
         if message_id:
             self.__datastore.current_message_id = message_id
-        else:
+        elif filtered_data:
             self.__datastore.current_message_id = await self.__get_current_message_id(data=filtered_data)
         print(f"token: {token}, mes_id: {self.__datastore.current_message_id}")
         text_to_send: str = user_message if user_message else ''
@@ -194,11 +194,11 @@ class MessageReceiver:
             try:
                 async with session.get(url=url, proxy=proxy_data, ssl=False, timeout=10) as response:
                     status_code = response.status
-                if status_code == 200:
-                    data: List[dict] = await response.json()
-                else:
-                    logger.error(f"F: __get_data_from_api_aiohttp error: {status_code}: {response.text()}")
-                    data: dict = {}
+                    if status_code == 200:
+                        data: List[dict] = await response.json()
+                    else:
+                        logger.error(f"F: __get_data_from_api_aiohttp error: {status_code}: {response.text()}")
+                        data: dict = {}
             except MessageReceiver.__EXCEPTIONS as err:
                 logger.error(f"F: __get_data_from_api_aiohttp error: {err}", err)
             except aiohttp.http_exceptions.BadHttpMessage as err:
@@ -245,22 +245,28 @@ class MessageReceiver:
         if messages:
             result.update({"messages": messages})
         if replies:
-            replies: List[dict] = await self.__update_replies_to_redis(replies)
+            replies: List[dict] = await self.__update_replies_to_redis(new_replies=replies)
             result.update({"replies": replies})
 
         return result
 
     @logger.catch
-    async def __update_replies_to_redis(self, data: list) -> list:
+    async def __update_replies_to_redis(self, new_replies: list) -> list:
         """Возвращает разницу между старыми и новыми данными в редисе,
         записывает полные данные в редис"""
 
         total_replies: List[dict] = await load_from_redis(telegram_id=self.__datastore.telegram_id)
-        replies: List[dict] = [elem for elem in data if elem not in total_replies]
-        total_replies.extend(replies)
+        old_messages: list = list(map(lambda x: x.get("message_id"), total_replies))
+        result: List[dict] = [
+            elem
+            for elem in new_replies
+            if elem.get("message_id") not in old_messages
+        ]
+
+        total_replies.extend(result)
         await save_to_redis(telegram_id=self.__datastore.telegram_id, data=total_replies)
 
-        return replies
+        return result
 
     def __replies_filter(self, elem: dict) -> dict:
         """Возвращает реплаи не из нашего села."""
@@ -393,3 +399,17 @@ class MessageSender:
                 data: dict = {"message": error_text}
 
         self.__answer = {"status_code": status_code, "data": data}
+
+
+
+
+if __name__ == '__main__':
+    old = [{2:2}, {3:3}, {4:4}]
+    new = [{1:1}, {3:3}, {5:5}]
+    result = [elem
+              for elem in new
+              if elem not in old]
+    print(result)
+
+    old.extend(result)
+    print(old)

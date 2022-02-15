@@ -487,11 +487,10 @@ async def send_replies(message: Message, replies: list):
     """Отправляет реплаи из дискорда в телеграм с кнопкой Ответить"""
 
     result = []
-    answer_keyboard: 'InlineKeyboardMarkup' = InlineKeyboardMarkup(row_width=1)
     for reply in replies:
-        print("REPLY:", reply)
         answered: bool = reply.get("answered", False)
         if not answered:
+            answer_keyboard: 'InlineKeyboardMarkup' = InlineKeyboardMarkup(row_width=1)
             author: str = reply.get("author")
             reply_id: str = reply.get("message_id")
             reply_text: str = reply.get("text")
