@@ -57,8 +57,9 @@ async def get_all_tokens_handler(message: Message) -> None:
 
     if User.is_active(telegram_id=user_telegram_id):
         keyboard: 'InlineKeyboardMarkup' = all_tokens_keyboard(user_telegram_id)
+        keyboard.add(InlineKeyboardButton(text="Отмена", callback_data="отмена"))
         if not keyboard:
-            await message.answer("Токенов нет. Нужно ввести хотя бы один.", reply_markup=user_menu_keyboard())
+            await message.answer("Токенов нет. Нужно ввести хотя бы один.", reply_markup=cancel_keyboard())
         else:
             await message.answer("Выберите токен: ", reply_markup=keyboard)
             await UserState.select_token.set()
@@ -602,6 +603,8 @@ def register_handlers(dp: Dispatcher) -> None:
     dp.register_message_handler(
         cancel_handler, commands=['отмена', 'cancel'], state="*")
     dp.register_message_handler(
+        cancel_handler, Text(startswith=["отмена", "cancel"], ignore_case=True), state="*")
+    dp.register_callback_query_handler(
         cancel_handler, Text(startswith=["отмена", "cancel"], ignore_case=True), state="*")
     dp.register_message_handler(start_command_handler, commands=["start_parsing"])
     dp.register_message_handler(info_tokens_handler, commands=["info"])
