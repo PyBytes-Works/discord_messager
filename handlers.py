@@ -33,6 +33,7 @@ async def cancel_handler(message: Message, state: FSMContext) -> None:
     time_to_over: int = 0
     if datastore:
         time_to_over = datastore.delay
+        print(f"Datastore delay = {datastore.delay}")
     logger.info(f'CANCELED')
     text: str = ''
     if User.get_is_work(telegram_id=user_telegram_id):
@@ -360,6 +361,8 @@ async def lets_play(message: Message):
         discord_data: dict = await message_manager.get_message()
         token_work: bool = discord_data.get("work")
         replies: List[dict] = discord_data.get("replies", [])
+        if replies:
+            await send_replies(message=message, replies=replies)
         if not token_work:
             text: str = await get_error_text(
                 message=message, datastore=datastore, discord_data=discord_data
@@ -374,8 +377,7 @@ async def lets_play(message: Message):
                 work_hour: int = current_hour
                 formed: int = form_token_pairs(telegram_id=user_telegram_id, unpair=True)
                 logger.info(f"Время распределять токены! Сформировал {formed} пар.")
-            if replies:
-                await send_replies(message=message, replies=replies)
+
             await asyncio.sleep(datastore.delay + 1)
             datastore.delay = 0
             await message.answer("Начинаю работу.", reply_markup=cancel_keyboard())
@@ -445,8 +447,9 @@ async def get_error_text(message: Message, discord_data: dict, datastore: 'Token
             await message.answer(f"Ошибка {status_code}: {data}")
     elif status_code == 404:
         if discord_code_error == 10003:
-            await message.answer("Ошибка отправки сообщения. Неверный канал. (Ошибка 404 - 10003)"
-                                 f"\nToken: {token}"
+            await message.answer(
+                "Ошибка отправки сообщения. Неверный канал. (Ошибка 404 - 10003)"
+                f"\nToken: {token}"
             )
         else:
             await message.answer(f"Ошибка {status_code}: {data}")
@@ -457,7 +460,7 @@ async def get_error_text(message: Message, discord_data: dict, datastore: 'Token
                 cooldown += datastore.cooldown
                 Token.update_token_cooldown(token=token, cooldown=cooldown)
                 Token.update_mate_cooldown(token=token, cooldown=cooldown)
-                datastore.delay = 5
+                datastore.delay = cooldown
             await message.answer(
                 "Для данного токена сообщения отправляются чаще, чем разрешено в канале."
                 f"\nToken: {token}"
@@ -487,6 +490,7 @@ async def send_replies(message: Message, replies: list):
     result = []
     answer_keyboard: 'InlineKeyboardMarkup' = InlineKeyboardMarkup(row_width=1)
     for reply in replies:
+        print("REPLY:", reply)
         answered: bool = reply.get("answered", False)
         if not answered:
             author: str = reply.get("author")
