@@ -30,6 +30,7 @@ async def cancel_handler(message: Message, state: FSMContext) -> None:
 
     user_telegram_id: str = str(message.from_user.id)
     datastore: 'TokenDataStore' = users_data_storage.get_instance(telegram_id=user_telegram_id)
+    print(datastore)
     time_to_over: int = 0
     if datastore:
         time_to_over = datastore.delay
@@ -57,11 +58,11 @@ async def get_all_tokens_handler(message: Message) -> None:
 
     if User.is_active(telegram_id=user_telegram_id):
         keyboard: 'InlineKeyboardMarkup' = all_tokens_keyboard(user_telegram_id)
-        keyboard.add(InlineKeyboardButton(text="Отмена", callback_data="отмена"))
         if not keyboard:
             await message.answer("Токенов нет. Нужно ввести хотя бы один.", reply_markup=cancel_keyboard())
         else:
             await message.answer("Выберите токен: ", reply_markup=keyboard)
+            await message.answer("Или нажмите отмену.", reply_markup=cancel_keyboard())
             await UserState.select_token.set()
 
 
