@@ -1,18 +1,18 @@
+import asyncio
 import datetime
+import re
+
+import aiogram
+import aioredis
+from aioredis import Redis
 import json
 import os
 import random
 import string
+import aiogram.utils.exceptions
 
 from typing import Union
 from config import logger, bot, admins_list
-
-
-def get_random_proxy() -> list:
-    """Возвращает случайную проксю из списка"""
-    proxies = []
-
-    return proxies.pop(random.randint(0, len(proxies) - 1))
 
 
 def save_data_to_json(data, file_name: str = "data.json", key: str = 'w'):
@@ -42,8 +42,10 @@ def check_is_int(text: str) -> int:
     """Проверяет что в строке пришло положительное число и возвращает его обратно если да"""
 
     if text.isdigit():
-        if int(text) >= 0:
+        if int(text) > 0:
             return int(text)
+
+    return 0
 
 
 @logger.catch
@@ -94,11 +96,46 @@ def delete_used_token(token: str) -> dict:
 
 async def send_report_to_admins(text: str) -> None:
     """Отправляет сообщение в телеграме всем администраторам из списка"""
-
+    text = f'[Рассылка][Superusers]: {text}'
     for admin_id in admins_list:
-        await bot.send_message(chat_id=admin_id, text=text)
+        try:
+            await bot.send_message(chat_id=admin_id, text=text)
+        except aiogram.utils.exceptions.ChatNotFound as err:
+            logger.error(f"Не смог отправить сообщение пользователю {admin_id}.", err)
 
 
+async def save_to_redis(telegram_id: str, data: list, timeout_sec: int = 3600, redis_db: 'Redis' = None) -> int:
+    """Сериализует данные и сохраняет в Редис. Устанавливает время хранения в секундах.
+    Возвращает кол-во записей."""
 
-if __name__ == '__main__':
-    print(datetime.datetime.utcnow().isoformat())
+    if redis_db is None:
+        redis_db = aioredis.from_url("redis://localhost", encoding="utf-8", decode_responses=True)
+    async with redis_db.client() as conn:
+        count = await conn.set(name=telegram_id, value=json.dumps(data))
+        await conn.expire(name=telegram_id, time=timeout_sec)
+
+    return count
+
+
+async def load_from_redis(telegram_id: str, redis_db: 'Redis' = None) -> list:
+    """Возвращает десериализованные данные из Редис"""
+
+    if redis_db is None:
+        redis_db = aioredis.from_url("redis://localhost", encoding="utf-8", decode_responses=True)
+    async with redis_db.client() as conn:
+        result = await conn.get(telegram_id)
+    if result:
+        try:
+            return json.loads(result)
+        except TypeError as err:
+            logger.error(f"F: load_from_redis: {err}", err)
+    return []
+
+
+@logger.catch
+def add_new_proxy_handler(message: str) -> None:
+    """Обработчик введенной прокси"""
+
+    proxies: list = re.findall(r'\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}:\d{1,6}\b', message)
+    for proxy in proxies:
+        print(f"Добавлена прокси: {proxy}")

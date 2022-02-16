@@ -23,13 +23,13 @@ admins_list = [deskent]
 DEFAULT_PROXY = os.getenv("DEFAULT_PROXY")
 
 
-tgToken = os.getenv("TELEBOT_TOKEN")
+# tgToken = os.getenv("ARTEM_FIRST_BOT_TOKEN")
+tgToken = os.getenv("DESKENT_TEST_BOT")
 
 # configure bot
 bot = Bot(token=tgToken)
 storage = MemoryStorage()
 dp = Dispatcher(bot, storage=storage)
-
 
 
 #  ********** LOGGER CONFIG ********************************

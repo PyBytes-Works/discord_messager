@@ -4,7 +4,7 @@ from typing import List
 from aiogram.types import (
     ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton
 )
-from models import User, UserTokenDiscord
+from models import User, Token
 from config import logger
 
 
@@ -19,13 +19,33 @@ def cancel_keyboard() -> 'ReplyKeyboardMarkup':
 
 
 @logger.catch
-def users_keyboard() -> 'InlineKeyboardMarkup':
+def all_users_keyboard() -> 'InlineKeyboardMarkup':
     """Возвращает список кнопок с пользователями"""
 
     keyboard = InlineKeyboardMarkup(row_width=1)
-    users = User.get_all_users()
+    users: dict = User.get_all_users()
     for telegram_id, name in users.items():
         keyboard.add(InlineKeyboardButton(text=name, callback_data=f'user_{telegram_id}'))
+
+    return keyboard
+
+
+@logger.catch
+def inactive_users_keyboard(users: dict) -> 'InlineKeyboardMarkup':
+    """Возвращает список кнопок с пользователями"""
+
+    keyboard = InlineKeyboardMarkup(row_width=1)
+    for telegram_id, user in users.items():
+        keyboard.add(InlineKeyboardButton(text=f"Name: {user.nick_name}  Telegram_id: {user.telegram_id}", callback_data=f'activate_{user.telegram_id}'))
+
+    return keyboard
+
+
+@logger.catch
+def admin_keyboard() -> 'InlineKeyboardMarkup':
+    """Возвращает список админских кнопок"""
+    # TODO сделать
+    keyboard = InlineKeyboardMarkup(row_width=1)
 
     return keyboard
 
@@ -46,8 +66,8 @@ def user_menu_keyboard() -> 'ReplyKeyboardMarkup':
     keyboard.row(
         KeyboardButton("/add_token"),
         KeyboardButton("/set_cooldown"),
-        # KeyboardButton("/add_target"),
         KeyboardButton("/info"),
+        KeyboardButton("/cancel")
     )
     return keyboard
 
@@ -56,7 +76,7 @@ def all_tokens_keyboard(telegram_id: str) -> 'InlineKeyboardMarkup':
     """Возвращает список кнопок всех токенов пользователя"""
 
     keyboard = InlineKeyboardMarkup(row_width=1)
-    all_tokens: List[dict] = UserTokenDiscord.get_all_user_tokens(telegram_id=telegram_id)
+    all_tokens: List[dict] = Token.get_all_user_tokens(telegram_id=telegram_id)
     if all_tokens:
         for elem in all_tokens:
             token = tuple(elem.keys())[0]
@@ -64,6 +84,7 @@ def all_tokens_keyboard(telegram_id: str) -> 'InlineKeyboardMarkup':
             keyboard.add(InlineKeyboardButton(text=f'CD: {cooldown // 60} - tkn: {token}', callback_data=f"{token}"))
 
         return keyboard
+
 
 
 

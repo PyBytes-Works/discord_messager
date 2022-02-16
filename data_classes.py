@@ -1,13 +1,11 @@
-import asyncio
-
-import aiohttp
-import aiohttp.client_exceptions
+import os
+import random
 
 from config import logger
-from models import UserTokenDiscord
+from models import Token
 
 
-class DataStore:
+class TokenDataStore:
     """
     Класс для хранения текущих данных для отправки и получения сообщений дискорда
 
@@ -17,15 +15,6 @@ class DataStore:
     """
 
     __DISCORD_BASE_URL: str = f'https://discord.com/api/v9/channels/'
-    __EXCEPTIONS: tuple = (
-        asyncio.exceptions.TimeoutError,
-        aiohttp.client_exceptions.ServerDisconnectedError,
-        aiohttp.client_exceptions.ClientProxyConnectionError,
-        aiohttp.client_exceptions.ClientHttpProxyError,
-        aiohttp.client_exceptions.ClientOSError,
-        aiohttp.client_exceptions.TooManyRedirects,
-        ConnectionResetError
-    )
 
     def __init__(self, telegram_id: str):
         self.telegram_id: str = telegram_id
@@ -37,80 +26,29 @@ class DataStore:
         self.__TOKEN_COOLDOWN: int = 0
         self.__MATE_DISCORD_ID: str = ''
         self.__DELAY: int = 0
+        self.__MY_DISCORD_ID: str = ''
 
-    @classmethod
-    async def check_user_data(cls, token: str, proxy: str, channel: int) -> dict:
-        """Returns checked dictionary for user data
-
-        Save valid data to instance variables """
-
-        result = {}
-        async with aiohttp.ClientSession() as session:
-            session.headers['authorization'] = token
-            result["token"] = await cls.__check_token(
-                session=session, token=token, proxy=proxy, channel=channel
-            )
-            if result["token"] != "bad token":
-                result["channel"] = channel
-
-        return result
-
-    @classmethod
-    async def __check_channel(cls, session, token: str, channel: int) -> str:
-        """Returns valid channel else 'bad channel'"""
-
-        session.headers['authorization'] = token
-        limit = 1
-        url = cls.__DISCORD_BASE_URL + f'{channel}/messages?limit={limit}'
-        result = 'bad channel'
-        try:
-            async with session.get(url=url, timeout=3) as response:
-                if response.status == 200:
-                    result = channel
-        except cls.__EXCEPTIONS as err:
-            logger.info(f"Channel check Error: {err}")
-        print(f"CHECK CHANNEL RESULT: {result}")
-        return result
-
-    @classmethod
-    async def __check_proxy(cls, session, proxy: str) -> str:
-        """Returns valid proxy else 'bad proxy'"""
-
-        url = "http://icanhazip.com"
-        result = 'bad proxy'
-        try:
-            async with session.get(url=url, proxy=f"http://{proxy}", ssl=False, timeout=3) as response:
-                if response.status == 200:
-                    result = proxy
-        except cls.__EXCEPTIONS as err:
-            logger.info(f"Proxy check Error: {err}")
-
-        return result
-
-    @classmethod
-    async def __check_token(cls, session, token: str, proxy: str, channel: int) -> str:
-        """Returns valid token else 'bad token'"""
-        session.headers['authorization'] = token
-        limit = 1
-        url = cls.__DISCORD_BASE_URL + f'{channel}/messages?limit={limit}'
-        result = 'bad token'
-        try:
-            # async with session.get(url=url, proxy=f"http://{proxy}", ssl=False, timeout=3) as response:
-            async with session.get(url=url) as response:
-                if response.status == 200:
-                    result = token
-        except cls.__EXCEPTIONS as err:
-            logger.info(f"Token check Error: {err}")
-        return result
-
-    def save_token_data(self, token: str):
-        self.token = token
-        token_data = UserTokenDiscord.get_info_by_token(token)
-        self.proxy = token_data.get("proxy")
-        self.channel = token_data.get("channel")
+    def create_datastore_data(self, token: str):
+        self.token: str = token
+        token_data: dict = Token.get_info_by_token(token)
+        self.proxy: str = token_data.get("proxy")
+        self.channel: int = token_data.get("channel")
         self.guild: int = token_data.get("guild")
         self.cooldown: int = token_data.get("cooldown")
         self.mate_id: str = token_data.get("mate_id")
+        self.my_discord_id: str = token_data.get("discord_id")
+
+    @classmethod
+    def get_channel_url(cls) -> str:
+        return cls.__DISCORD_BASE_URL
+
+    @property
+    def my_discord_id(self) -> str:
+        return self.__MY_DISCORD_ID
+
+    @my_discord_id.setter
+    def my_discord_id(self, my_discord_id: str):
+        self.__MY_DISCORD_ID = my_discord_id
 
     @property
     def mate_id(self) -> str:
@@ -122,7 +60,7 @@ class DataStore:
 
     @property
     def last_message_time(self) -> float:
-        return self.__TOKEN_COOLDOWN + 180
+        return self.__TOKEN_COOLDOWN + 120
 
     @property
     def delay(self) -> int:
@@ -139,10 +77,6 @@ class DataStore:
     @cooldown.setter
     def cooldown(self, cooldown: int):
         self.__TOKEN_COOLDOWN = cooldown
-
-    @property
-    def channel_url(self) -> str:
-        return self.__DISCORD_BASE_URL
 
     @property
     def current_message_id(self) -> int:
@@ -191,48 +125,24 @@ class DataStore:
         self.__PROXY = proxy
 
 
-class UserDataStore:
+class InstancesStorage:
     """
     Класс для хранения экземпляров классов данных (ID сообщения в дискорде, время и прочая)
     для каждого пользователя телеграма.
     Инициализируется при запуске бота.
     """
-    __VOCABULARY: list = []
 
     def __init__(self):
         self.__instance = {}
 
-    @classmethod
     @logger.catch
-    def __update_vocabulary(cls, file_name: str = "vocabulary_en.txt"):
-        with open(file_name, 'r', encoding='utf-8') as f:
-            cls.__VOCABULARY = f.readlines()
-
-    @classmethod
-    @logger.catch
-    def get_vocabulary(cls) -> list:
-        if not cls.__VOCABULARY:
-            cls.__update_vocabulary()
-
-        return cls.__VOCABULARY
-
-    @classmethod
-    @logger.catch
-    def set_vocabulary(cls, vocabulary: list):
-        if isinstance(vocabulary, list):
-            if not vocabulary:
-                cls.__update_vocabulary()
-            else:
-                cls.__VOCABULARY = vocabulary
-
-    @logger.catch
-    def get_instance(self, telegram_id: str) -> 'DataStore':
+    def get_instance(self, telegram_id: str) -> 'TokenDataStore':
         """Возвращает текущий экземпляр класса для пользователя'"""
 
         return self.__instance.get(telegram_id, {})
 
     @logger.catch
-    def add_or_update(self, telegram_id: str, data: 'DataStore') -> None:
+    def add_or_update(self, telegram_id: str, data: 'TokenDataStore') -> None:
         """Сохраняет экземпляр класса пользователя"""
 
         self.__instance.update(
@@ -242,5 +152,55 @@ class UserDataStore:
         )
 
 
+class Vocabulary:
+    """Работает с файлом фраз для отправки в дискорд"""
+
+    __VOCABULARY: list = []
+
+    @classmethod
+    @logger.catch
+    def get_message(cls) -> str:
+        vocabulary: list = cls.__get_vocabulary()
+
+        length: int = len(vocabulary)
+        try:
+            index = random.randint(0, length - 1)
+            text = vocabulary.pop(index)
+            cls.__set_vocabulary(vocabulary)
+        except (ValueError, TypeError, FileNotFoundError) as err:
+            logger.error(f"ERROR: __get_random_message_from_vocabulary: {err}")
+            return "Vocabulary error"
+
+        return text
+
+    @classmethod
+    @logger.catch
+    def __get_vocabulary(cls) -> list:
+        if not cls.__VOCABULARY:
+            cls.__update_vocabulary()
+
+        return cls.__VOCABULARY
+
+    @classmethod
+    @logger.catch
+    def __set_vocabulary(cls, vocabulary: list):
+        if isinstance(vocabulary, list):
+            if not vocabulary:
+                cls.__update_vocabulary()
+            else:
+                cls.__VOCABULARY = vocabulary
+        else:
+            raise TypeError("__set_vocabulary error: ")
+
+    @classmethod
+    @logger.catch
+    def __update_vocabulary(cls, file_name: str = "vocabulary_en.txt"):
+        if os.path.exists(file_name):
+            with open(file_name, 'r', encoding='utf-8') as f:
+                cls.__VOCABULARY = f.readlines()
+        else:
+            raise FileNotFoundError(f"__update_vocabulary: {file_name} error: ")
+
+
 # initialization user data storage
-users_data_storage = UserDataStore()
+users_data_storage = InstancesStorage()

@@ -9,7 +9,7 @@
 /data.json
 /formed.json
 /dis_tokens.json
-*__pycache__
+*__pycache__/
 env
 iam_token.json
 /tokens.json
@@ -24,3 +24,5 @@ iam_token.json
 /tests/
 /discord_mailer.conf
 /help.txt
+/help.jpg
+/.idea
