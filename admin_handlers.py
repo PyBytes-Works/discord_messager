@@ -335,11 +335,11 @@ async def show_all_users_handler(message: Message) -> None:
         lenght: int = len(total_values)
         for shift in range(0, lenght, 10):
             user_list: str = "\n".join(total_values[shift:shift + 10])
-            await message.answer(
-                f'Список пользователей: {len(users)}',
-                reply_markup=ReplyKeyboardRemove()
-            )
             await message.answer(user_list, reply_markup=ReplyKeyboardRemove())
+        await message.answer(
+            f'Список пользователей: {len(users)}',
+            reply_markup=ReplyKeyboardRemove()
+        )
     else:
         logger.info(f'{message.from_user.id}:{message.from_user.username}: NOT AUTORIZATED')
 
