@@ -89,7 +89,7 @@ class MessageReceiver:
             self.__datastore.current_message_id = message_id
         elif filtered_data:
             self.__datastore.current_message_id = await self.__get_current_message_id(data=filtered_data)
-        print(f"token: {token}, mes_id: {self.__datastore.current_message_id}")
+        # print(f"token: {token}, mes_id: {self.__datastore.current_message_id}")
         text_to_send: str = user_message if user_message else ''
         answer: dict = MessageSender(datastore=self.__datastore).send_message(text=text_to_send)
         if not answer:

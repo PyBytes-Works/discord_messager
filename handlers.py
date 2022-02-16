@@ -30,12 +30,9 @@ async def cancel_handler(message: Message, state: FSMContext) -> None:
 
     user_telegram_id: str = str(message.from_user.id)
     datastore: 'TokenDataStore' = users_data_storage.get_instance(telegram_id=user_telegram_id)
-    print(datastore)
     time_to_over: int = 0
     if datastore:
         time_to_over = datastore.delay
-        print(f"Datastore delay = {datastore.delay}")
-    logger.info(f'CANCELED')
     text: str = ''
     if User.get_is_work(telegram_id=user_telegram_id):
         text = ("\nДождитесь завершения работы бота..."
@@ -351,14 +348,26 @@ async def lets_play(message: Message):
     user_telegram_id: str = str(message.from_user.id)
 
     while User.get_is_work(telegram_id=user_telegram_id):
+        print("Цикл стартанул.")
         if await deactivate_user_if_expired(message=message):
             break
+
         datastore: 'TokenDataStore' = TokenDataStore(user_telegram_id)
+        print(f"Datastore {datastore}")
         users_data_storage.add_or_update(telegram_id=user_telegram_id, data=datastore)
         message_manager: 'MessageReceiver' = MessageReceiver(datastore=datastore)
+        print(f"message_manager {message_manager}")
+
         discord_data: dict = await message_manager.get_message()
+        print(f"discord_data {discord_data}")
+        if not discord_data:
+            await send_report_to_admins("Произошла какая то чудовищная ошибка в функции lets_play.")
+            break
         token_work: bool = discord_data.get("work")
+        print(f"token_work {token_work}")
+
         replies: List[dict] = discord_data.get("replies", [])
+        print(f"replies {replies}")
         if replies:
             await send_replies(message=message, replies=replies)
         if not token_work:
@@ -379,6 +388,8 @@ async def lets_play(message: Message):
             await asyncio.sleep(datastore.delay + 1)
             datastore.delay = 0
             await message.answer("Начинаю работу.", reply_markup=cancel_keyboard())
+        print("Цикл завершился.")
+
 
 
 @logger.catch
@@ -392,7 +403,7 @@ async def get_error_text(message: Message, discord_data: dict, datastore: 'Token
     answer: dict = discord_data.get("answer", {})
     data: dict = answer.get("data", {})
 
-    print(f"User: {user_telegram_id}    Send result: {data}")
+    # print(f"User: {user_telegram_id}    Send result: {data}")
 
     status_code: int = answer.get("status_code", 0)
     sender_text: str = answer.get("message", "ERROR")
