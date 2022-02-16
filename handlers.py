@@ -318,7 +318,7 @@ async def delete_token_handler(callback: CallbackQuery, state: FSMContext) -> No
 
 
 @logger.catch
-async def start_command_handler(message: Message) -> None:
+async def start_parsing_command_handler(message: Message) -> None:
     """Получает случайное сообщение из дискорда, ставит машину состояний в положение
     'жду ответа пользователя'
     Обработчик команды /start_parsing
@@ -591,16 +591,34 @@ async def deactivate_user_if_expired(message: Message) -> bool:
     Возвращает True если деактивирован."""
 
     user_telegram_id: str = str(message.from_user.id)
-    user_active: bool = User.check_expiration_date(telegram_id=user_telegram_id)
+    user_not_expired: bool = User.check_expiration_date(telegram_id=user_telegram_id)
     user_is_admin: bool = User.is_admin(telegram_id=user_telegram_id)
-    if not user_active and not user_is_admin:
-        await message.answer("Время подписки истекло. Ваш аккаунт деактивирован.", reply_markup=ReplyKeyboardRemove())
+    if not user_not_expired and not user_is_admin:
+        await message.answer(
+            "Время подписки истекло. Ваш аккаунт деактивирован, токены удалены.",
+            reply_markup=ReplyKeyboardRemove()
+        )
         User.delete_all_tokens(telegram_id=user_telegram_id)
         User.deactivate_user(telegram_id=user_telegram_id)
-        logger.info(f"Время подписки {user_telegram_id} истекло, пользователь удален.")
+        logger.info(
+            f"Время подписки {user_telegram_id} истекло, "
+            f"пользователь декативирован, его токены удалены"
+        )
         return True
 
     return False
+
+
+@logger.catch
+async def start_command_handler(message: Message):
+    """Активирует пользователя если он валидный"""
+
+    user_telegram_id: str = str(message.from_user.id)
+    user_not_expired: bool = User.check_expiration_date(telegram_id=user_telegram_id)
+    user_activated: bool = User.is_active(telegram_id=user_telegram_id)
+    if user_not_expired and not user_activated:
+        User.activate_user(telegram_id=user_telegram_id)
+        await message.answer("Аккаунт активирован.")
 
 
 @logger.catch
@@ -615,7 +633,8 @@ def register_handlers(dp: Dispatcher) -> None:
         cancel_handler, Text(startswith=["отмена", "cancel"], ignore_case=True), state="*")
     dp.register_callback_query_handler(
         cancel_handler, Text(startswith=["отмена", "cancel"], ignore_case=True), state="*")
-    dp.register_message_handler(start_command_handler, commands=["start_parsing"])
+    dp.register_message_handler(start_parsing_command_handler, commands=["start_parsing"])
+    dp.register_message_handler(start_command_handler, commands=["start"])
     dp.register_message_handler(info_tokens_handler, commands=["info"])
     dp.register_message_handler(get_all_tokens_handler, commands=["set_cooldown"])
     dp.register_callback_query_handler(request_self_token_cooldown_handler, state=UserState.select_token)
