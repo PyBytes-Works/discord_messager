@@ -135,6 +135,10 @@ class User(BaseModel):
         """
         user = cls.get_or_none(cls.telegram_id == telegram_id)
         if user:
+            proxy = Proxy.get_or_none(proxy=user.proxy)
+            if proxy:
+                proxy.using -= 1
+                proxy.save()
             return Token.delete_tokens_by_user(user=user), user.delete_instance()
 
     @classmethod
@@ -922,7 +926,7 @@ class Proxy(BaseModel):
     @logger.catch
     def add_proxy(cls, proxy: str) -> bool:
         res = cls.get_or_none(proxy=proxy)
-        return False if res else cls.create(proxy=proxy)
+        return False if res else cls.create(proxy=proxy).save()
 
     @classmethod
     @logger.catch

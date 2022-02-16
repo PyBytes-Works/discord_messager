@@ -4,10 +4,22 @@ from itertools import cycle
 
 from config import PATH, logger, SqliteDatabase
 from models import db, User, Token, Proxy, TokenPair, BaseModel
+"""
+Instruction:
+    Остановить бота
+        создать паку old в проекте,
+        скопировать туда файл discord_mailer.db
+            сделать еще одну резервную копию базы данных с другим именем)
+        помолится
+        прочитать мантру
+        очистить сознание
+        приготовить справочник матерных слов
+    запустить скрипт copy_code.py
+"""
 
 
 pragmas = dict(db._pragmas)
-print(pragmas)
+
 PROXIES = [
             '80.82.222.148:45785',
             '191.101.121.195:45785',
@@ -18,7 +30,7 @@ PROXIES = [
             '62.113.216.198:45785',
             '179.61.174.120:45785',
             '213.202.255.50:45785',
-            '54.38.154.163:45785'
+            '54.38.154.163:45785',
 ]
 
 if __name__ == '__main__':
@@ -54,14 +66,49 @@ if __name__ == '__main__':
         user['proxy'] = proxy
         new_user = User.create(**user)
         new_user.save()
+        proxy, is_new_record = Proxy.get_or_create(proxy=proxy)
+        proxy.using += 1
+        proxy.save()
+    logger.info('Was copied records of Users table and Proxy || copy_data.py' )
+
+    proxies = set([user.proxy for user in User.select().execute()])
+    all_proxies = set(PROXIES)
+    not_added_proxies = all_proxies - proxies
+    if not_added_proxies:
+        Proxy.bulk_create([Proxy(proxy=proxy) for proxy in not_added_proxies])
+        logger.info('Was add unadded proxies || copy_data.py')
 
     # User.bulk_create(res_users)
     Token.bulk_create(tokens)
+    logger.info('Was copied records of Tokens table || copy_data.py')
 
 
+#----------------------------------end---------------------------------------------
 
-
-
+    """переключение между бд через peewee.Proxy"""
+    # import peewee
+    #
+    # db = peewee.Proxy()
+    # first = peewee.SqliteDatabase('first.db')
+    # second = peewee.SqliteDatabase('second.db')
+    #
+    #
+    # class Test(peewee.Model):
+    #     name = peewee.CharField()
+    #
+    #     class Meta:
+    #         database = db
+    #         db_table = 'test'
+    #
+    #     @classmethod
+    #     def using(cls, db):
+    #         cls._meta.database.initialize(db)
+    #         return cls
+    #
+    # db.initialize(first)
+    # Test.create_table(fail_silently=True)
+    # db.initialize(second)
+    # Test.create_table(fail_silently=True)
     # source_db = SqliteDatabase(source_path, pragmas=pragmas)
     # target_db = recreate_db(target_path)
     # BaseModel.using(source_db)
