@@ -396,17 +396,3 @@ class MessageSender:
                 data: dict = {"message": error_text}
 
         self.__answer = {"status_code": status_code, "data": data}
-
-
-
-
-if __name__ == '__main__':
-    old = [{2:2}, {3:3}, {4:4}]
-    new = [{1:1}, {3:3}, {5:5}]
-    result = [elem
-              for elem in new
-              if elem not in old]
-    print(result)
-
-    old.extend(result)
-    print(old)
