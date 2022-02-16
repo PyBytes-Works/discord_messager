@@ -144,6 +144,8 @@ class User(BaseModel):
         if user:
             return Token.delete_tokens_by_user(user=user)
 
+        return 0
+
     @classmethod
     @logger.catch
     def delete_all_pairs(cls: 'User', telegram_id: str) -> bool:
@@ -355,6 +357,7 @@ class User(BaseModel):
                     if proxy_new:
                         proxy_new.using += 1
                         proxy_new.save()
+
                 return result
 
     @classmethod
@@ -364,10 +367,11 @@ class User(BaseModel):
         возвращает статус подписки пользователя,
         True если подписка ещё действует
         False если срок подписки истёк
-        # FIXME
         """
+
         user: User = cls.get_or_none(cls.telegram_id == telegram_id)
         expiration: int = user.expiration if user else 0
+
         return expiration > datetime.datetime.now().timestamp() if expiration else False
 
     @classmethod
@@ -380,6 +384,7 @@ class User(BaseModel):
         # print(type(result.expiration))
         if user:
             expiration = user.expiration
+
             return expiration
 
     @classmethod
@@ -537,12 +542,22 @@ class Token(BaseModel):
     @logger.catch
     def update_token_cooldown(cls, token: str, cooldown: int) -> bool:
         """
-        set cooldown: update cooldown for token
+        set cooldown: update cooldown in seconds for token
          token: (str)
          cooldown: (int) seconds
         """
+
         cooldown = cooldown if cooldown > 0 else 5 * 60
         return cls.update(cooldown=cooldown).where(cls.token == token).execute()
+
+    @classmethod
+    @logger.catch
+    def update_mate_cooldown(cls, token: str, cooldown: int) -> bool:
+        """set cooldown in seconds to token mate"""
+        # TODO Переписать логически
+        my_token: 'Token' = cls.get_or_none(cls.token == token)
+        mate: 'TokenPair' = TokenPair.get_token_mate(my_token.id)
+        return cls.update_token_cooldown(token=mate.token, cooldown=cooldown)
 
     @classmethod
     @logger.catch
@@ -668,8 +683,8 @@ class Token(BaseModel):
         def get_info(token_data: 'Token') -> dict:
             if not token_data:
                 return {}
-            mate_token = TokenPair.get_token_mate(token_id=token_data.id)
-            mate_discord_id = mate_token.discord_id if mate_token else None
+            mate_token: 'TokenPair' = TokenPair.get_token_mate(token_id=token_data.id)
+            mate_discord_id: int = mate_token.discord_id if mate_token else None
             return {
                 'token': token_data.token,
                 'discord_id': token_data.discord_id,

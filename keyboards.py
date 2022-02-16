@@ -66,8 +66,8 @@ def user_menu_keyboard() -> 'ReplyKeyboardMarkup':
     keyboard.row(
         KeyboardButton("/add_token"),
         KeyboardButton("/set_cooldown"),
-        # KeyboardButton("/add_target"),
         KeyboardButton("/info"),
+        KeyboardButton("/cancel")
     )
     return keyboard
 
