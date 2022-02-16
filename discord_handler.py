@@ -10,7 +10,7 @@ import requests
 import aiohttp.client_exceptions
 import aiohttp.http_exceptions
 
-from data_classes import users_data_storage, TokenDataStore, Vocabulary
+from data_classes import TokenDataStore, Vocabulary
 from models import Token
 from config import logger
 from dotenv import load_dotenv
@@ -41,9 +41,8 @@ class MessageReceiver:
     При ошибке возвращает ее в телеграм"""
 
     @logger.catch
-    def __init__(self, datastore: 'TokenDataStore', timer: float = 7):
+    def __init__(self, datastore: 'TokenDataStore'):
         self.__datastore: 'TokenDataStore' = datastore
-        self.__timer: float = timer
 
     @classmethod
     async def check_user_data(cls, token: str, proxy: str, channel: int) -> dict:
@@ -73,9 +72,6 @@ class MessageReceiver:
         if not token:
             result.update({"message": result_message})
             return result
-
-        logger.info(f"Пауза между отправкой сообщений: {self.__timer}")
-        await asyncio.sleep(self.__timer)
 
         user_message, message_id = await self.__get_user_message_from_redis(token=token)
 

@@ -346,10 +346,13 @@ async def lets_play(message: Message):
 
     work_hour: int = datetime.datetime.now().hour
     user_telegram_id: str = str(message.from_user.id)
-
+    timer: float = 7
     while User.get_is_work(telegram_id=user_telegram_id):
         if await deactivate_user_if_expired(message=message):
             break
+
+        logger.info(f"Пауза между отправкой сообщений: {timer}")
+        await asyncio.sleep(timer)
 
         datastore: 'TokenDataStore' = TokenDataStore(user_telegram_id)
         users_data_storage.add_or_update(telegram_id=user_telegram_id, data=datastore)
