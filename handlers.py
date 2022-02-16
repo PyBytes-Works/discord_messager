@@ -399,7 +399,7 @@ async def get_error_text(message: Message, discord_data: dict, datastore: 'Token
     answer: dict = discord_data.get("answer", {})
     data: dict = answer.get("data", {})
     status_code: int = answer.get("status_code", 0)
-    sender_text: str = answer.get("message", "ERROR")
+    sender_text: str = answer.get("message", "SEND_ERROR")
     discord_code_error: int = answer.get("data", {}).get("code", 0)
 
     result: str = 'ok'
@@ -419,8 +419,11 @@ async def get_error_text(message: Message, discord_data: dict, datastore: 'Token
         await send_report_to_admins("Ошибка словаря.")
         result = "stop"
     elif status_code == 400:
+        if discord_code_error == 50035:
+            sender_text = 'Сообщение для ответа удалено из дискорд канала.'
+        else:
+            result = "stop"
         await send_report_to_admins(sender_text)
-        result = "stop"
     elif status_code == 401:
         if discord_code_error == 0:
             await message.answer("Сменился токен."
