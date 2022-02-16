@@ -62,7 +62,7 @@ class MessageReceiver:
         """Получает данные из АПИ, выбирает случайное сообщение и возвращает ID сообщения
         и само сообщение"""
 
-        result = {"work": True}
+        result = {"work": False}
         token_data: dict = await self.__select_token_for_work()
         result_message: str = token_data.get("message")
         if result_message == "no pairs":
@@ -71,7 +71,7 @@ class MessageReceiver:
 
         token: str = token_data.get("token", '')
         if not token:
-            result.update({"work": False, "message": result_message})
+            result.update({"message": result_message})
             return result
 
         logger.info(f"Пауза между отправкой сообщений: {self.__timer}")
@@ -89,17 +89,18 @@ class MessageReceiver:
             self.__datastore.current_message_id = message_id
         elif filtered_data:
             self.__datastore.current_message_id = await self.__get_current_message_id(data=filtered_data)
-        # print(f"token: {token}, mes_id: {self.__datastore.current_message_id}")
         text_to_send: str = user_message if user_message else ''
         answer: dict = MessageSender(datastore=self.__datastore).send_message(text=text_to_send)
         if not answer:
             logger.error("F: get_message ERROR: NO ANSWER ERROR")
-            result.update({"work": False, "message": "ERROR"})
+            result.update({"message": "ERROR"})
             return result
         elif answer.get("status_code") != 200:
-            result.update({"work": False, "answer": answer, "token": token})
+            result.update({"answer": answer, "token": token})
             return result
+
         self.__datastore.current_message_id = 0
+        result.update({"work": True})
 
         return result
 

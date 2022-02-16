@@ -348,26 +348,20 @@ async def lets_play(message: Message):
     user_telegram_id: str = str(message.from_user.id)
 
     while User.get_is_work(telegram_id=user_telegram_id):
-        print("Цикл стартанул.")
         if await deactivate_user_if_expired(message=message):
             break
 
         datastore: 'TokenDataStore' = TokenDataStore(user_telegram_id)
-        print(f"Datastore {datastore}")
         users_data_storage.add_or_update(telegram_id=user_telegram_id, data=datastore)
         message_manager: 'MessageReceiver' = MessageReceiver(datastore=datastore)
-        print(f"message_manager {message_manager}")
 
         discord_data: dict = await message_manager.get_message()
-        print(f"discord_data {discord_data}")
         if not discord_data:
             await send_report_to_admins("Произошла какая то чудовищная ошибка в функции lets_play.")
             break
         token_work: bool = discord_data.get("work")
-        print(f"token_work {token_work}")
 
         replies: List[dict] = discord_data.get("replies", [])
-        print(f"replies {replies}")
         if replies:
             await send_replies(message=message, replies=replies)
         if not token_work:
@@ -388,8 +382,6 @@ async def lets_play(message: Message):
             await asyncio.sleep(datastore.delay + 1)
             datastore.delay = 0
             await message.answer("Начинаю работу.", reply_markup=cancel_keyboard())
-        print("Цикл завершился.")
-
 
 
 @logger.catch
@@ -402,16 +394,18 @@ async def get_error_text(message: Message, discord_data: dict, datastore: 'Token
 
     answer: dict = discord_data.get("answer", {})
     data: dict = answer.get("data", {})
-
-    # print(f"User: {user_telegram_id}    Send result: {data}")
-
     status_code: int = answer.get("status_code", 0)
     sender_text: str = answer.get("message", "ERROR")
     discord_code_error: int = answer.get("data", {}).get("code", 0)
 
     result: str = 'ok'
 
-    if status_code == -1:
+    if text == "no pairs":
+        pairs_formed: int = form_token_pairs(telegram_id=user_telegram_id, unpair=False)
+        if not pairs_formed:
+            await message.answer("Не смог сформировать пары токенов.")
+            result = 'stop'
+    elif status_code == -1:
         error_text = sender_text
         await message.answer("Ошибка десериализации отправки ответа.")
         await send_report_to_admins(error_text)
@@ -486,11 +480,6 @@ async def get_error_text(message: Message, discord_data: dict, datastore: 'Token
         await message.answer(error_text)
         await send_report_to_admins(error_text)
         datastore.delay = 10
-    elif text == "no pairs":
-        pairs_formed: int = form_token_pairs(telegram_id=user_telegram_id, unpair=False)
-        if not pairs_formed:
-            await message.answer("Не смог сформировать пары токенов.")
-            result = "stop"
     else:
         result = text
 
