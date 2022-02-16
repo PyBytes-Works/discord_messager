@@ -98,59 +98,60 @@ async def check_token(token: str, proxy: str, channel: int) -> str:
 
 
 if __name__ == '__main__':
-    PROXY_USER = discord_handler.PROXY_USER
-    # PROXY_PASSWORD = discord_handler.PROXY_PASSWORD
-    # token = 'NDg3OTYyMDczNDU2ODM2NjE4.YfbEhA.gXDarmEjAxjw_d2R92oc-02xejA'
-    token = 'OTMzMTE5MDEzNzc1NjI2MzAy.YfFAmw._X2-nZ6_knM7pK3081hqjdYHrn4'
-    proxy = "191.101.121.195:45785"
-    user = 'Selkaifusa2000'
-    password = 'V9f3WuD'
-    channel = 93225655939486107
-    # channel = 932256392822284321
-    # asyncio.new_event_loop().run_until_complete(
-    #     check_token(token=token, proxy=proxy, channel=channel))
-    # url = 'http://ifconfig.me/ip'
-    # url = 'http://www.google.com'
-    #
-    #
-    proxies = {
-        "http": f"http://{user}:{password}@{proxy}/"
-    }
-    limit = 1
-    url: str = f'https://discord.com/api/v9/channels/' + f'{channel}/messages?limit={limit}'
-    useragentz = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/83.0.4103.61 Safari/537.36'
-    headers = {
-        "authorization": token
-    }
-    response = requests.get(url=url, proxies=proxies, headers=headers)
-    print(response.status_code)
-    #
-    current_user = "test1"
-    data = response.json()
-    if data.get("code") == 50001:
-        print("ЭТО БАН")
-    elif data.get("code") == 50013:
-        print("Это МУТ")
-    else:
-        print(data)
-    # try:
-    #
-    #     select_token_for_work(current_user)
-    # except KeyboardInterrupt:
-    #     print("END")
-    # pass
-#
-#
-    result = {
-        "work": False,
-        "answer": {
-            "status_code": 0,
-            "data": {
-                "message": '',
-                "code": 0
-            }
-        },
-        "message": '',
-        "token": '',
-        "replies": []
-    }
+    pass
+#     PROXY_USER = discord_handler.PROXY_USER
+#     # PROXY_PASSWORD = discord_handler.PROXY_PASSWORD
+#     # token = 'NDg3OTYyMDczNDU2ODM2NjE4.YfbEhA.gXDarmEjAxjw_d2R92oc-02xejA'
+#     token = 'OTMzMTE5MDEzNzc1NjI2MzAy.YfFAmw._X2-nZ6_knM7pK3081hqjdYHrn4'
+#     proxy = "191.101.121.195:45785"
+#     user = 'Selkaifusa2000'
+#     password = 'V9f3WuD'
+#     channel = 93225655939486107
+#     # channel = 932256392822284321
+#     # asyncio.new_event_loop().run_until_complete(
+#     #     check_token(token=token, proxy=proxy, channel=channel))
+#     # url = 'http://ifconfig.me/ip'
+#     # url = 'http://www.google.com'
+#     #
+#     #
+#     proxies = {
+#         "http": f"http://{user}:{password}@{proxy}/"
+#     }
+#     limit = 1
+#     url: str = f'https://discord.com/api/v9/channels/' + f'{channel}/messages?limit={limit}'
+#     useragentz = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/83.0.4103.61 Safari/537.36'
+#     headers = {
+#         "authorization": token
+#     }
+#     response = requests.get(url=url, proxies=proxies, headers=headers)
+#     print(response.status_code)
+#     #
+#     current_user = "test1"
+#     data = response.json()
+#     if data.get("code") == 50001:
+#         print("ЭТО БАН")
+#     elif data.get("code") == 50013:
+#         print("Это МУТ")
+#     else:
+#         print(data)
+#     # try:
+#     #
+#     #     select_token_for_work(current_user)
+#     # except KeyboardInterrupt:
+#     #     print("END")
+#     # pass
+# #
+# #
+#     result = {
+#         "work": False,
+#         "answer": {
+#             "status_code": 0,
+#             "data": {
+#                 "message": '',
+#                 "code": 0
+#             }
+#         },
+#         "message": '',
+#         "token": '',
+#         "replies": []
+#     }
