@@ -10,9 +10,10 @@ from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKe
 from aiogram.dispatcher import FSMContext
 
 from config import logger, Dispatcher, admins_list
-from models import User, Token, TokenPair
+from data_classes import users_data_storage
+from models import User, Token
 from keyboards import cancel_keyboard, user_menu_keyboard, all_tokens_keyboard
-from discord_handler import MessageReceiver, TokenDataStore, users_data_storage
+from discord_handler import MessageReceiver, TokenDataStore
 from states import UserState
 from utils import (
     check_is_int, save_data_to_json, send_report_to_admins, load_from_redis,
