@@ -600,10 +600,12 @@ async def deactivate_user_if_expired(message: Message) -> bool:
         )
         User.delete_all_tokens(telegram_id=user_telegram_id)
         User.deactivate_user(telegram_id=user_telegram_id)
-        logger.info(
+        text = (
             f"Время подписки {user_telegram_id} истекло, "
             f"пользователь декативирован, его токены удалены"
         )
+        logger.info(text)
+        await send_report_to_admins(text)
         return True
 
     return False
