@@ -2,7 +2,7 @@ import datetime
 import os
 import random
 from json import JSONDecodeError
-from typing import List, Tuple, Dict
+from typing import List, Tuple
 
 import asyncio
 import aiohttp

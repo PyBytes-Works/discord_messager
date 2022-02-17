@@ -11,8 +11,7 @@ from aiogram.types import Message, CallbackQuery, ReplyKeyboardRemove, InlineKey
 
 from config import logger, bot, admins_list
 from handlers import cancel_handler
-from keyboards import cancel_keyboard, all_users_keyboard, user_menu_keyboard, \
-    inactive_users_keyboard
+from keyboards import cancel_keyboard, user_menu_keyboard, inactive_users_keyboard
 from states import UserState
 from models import User, Proxy
 
