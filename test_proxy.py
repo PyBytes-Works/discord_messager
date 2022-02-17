@@ -10,7 +10,6 @@ import requests
 import random
 from bs4 import BeautifulSoup as bs
 
-import discord_handler
 from models import Token
 
 
@@ -98,6 +97,28 @@ async def check_token(token: str, proxy: str, channel: int) -> str:
 
 
 if __name__ == '__main__':
+    from timeit import timeit
+
+
+    def calculate():
+        return [i for i in range(1000)]
+
+
+    def test_l():
+        return calculate()[:500]
+
+
+    def create():
+        return tuple(i for i in range(1000))
+
+
+    def test_t():
+        return create()[:500]
+
+
+    print(timeit("test_l()", setup="from __main__ import test_l", number=1000000))
+    print(timeit("test_t()", setup="from __main__ import test_t", number=1000000))
+
     pass
 #     PROXY_USER = discord_handler.PROXY_USER
 #     # PROXY_PASSWORD = discord_handler.PROXY_PASSWORD
