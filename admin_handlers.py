@@ -6,12 +6,12 @@ import aiogram.utils.exceptions
 from aiogram import Dispatcher
 from aiogram.dispatcher import FSMContext
 from aiogram.dispatcher.filters import Text
-from aiogram.types import Message, CallbackQuery, ReplyKeyboardRemove
+from aiogram.types import Message, CallbackQuery, ReplyKeyboardRemove, InlineKeyboardMarkup, \
+    InlineKeyboardButton
 
 from config import logger, bot, admins_list
 from handlers import cancel_handler
-from keyboards import cancel_keyboard, all_users_keyboard, user_menu_keyboard, \
-    inactive_users_keyboard
+from keyboards import cancel_keyboard, user_menu_keyboard, inactive_users_keyboard
 from states import UserState
 from models import User, Proxy
 
@@ -355,11 +355,17 @@ async def delete_user_name_handler(message: Message) -> None:
     """Обработчик для удаления пользователя. Команда /delete_user"""
 
     if User.is_admin(telegram_id=message.from_user.id):
-        await message.answer('Выберите пользователя для удаления: ', reply_markup=all_users_keyboard())
+        all_users: dict = User.get_all_users()
+        users_keys: list = list(all_users.keys())
+        lenght: int = len(users_keys)
+        for index in range(0, lenght, 10):
+            keyboard = InlineKeyboardMarkup(row_width=1)
+            slice: list = users_keys[index: index + 10]
+            for telegram_id in slice:
+                keyboard.add(InlineKeyboardButton(text=all_users[telegram_id], callback_data=f'user_{telegram_id}'))
+            await message.answer(f'Выберите пользователя для удаления: {index}/{lenght}', reply_markup=keyboard)
         await message.answer("Для отмены нажмите кнопку Отмена", reply_markup=cancel_keyboard())
         await UserState.name_for_del.set()
-    else:
-        logger.info(f'{message.from_user.id}:{message.from_user.username}: NOT AUTORIZATED')
 
 
 @logger.catch
