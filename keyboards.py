@@ -19,18 +19,6 @@ def cancel_keyboard() -> 'ReplyKeyboardMarkup':
 
 
 @logger.catch
-def all_users_keyboard() -> 'InlineKeyboardMarkup':
-    """Возвращает список кнопок с пользователями"""
-
-    keyboard = InlineKeyboardMarkup(row_width=1)
-    users: dict = User.get_all_users()
-    for telegram_id, name in users.items():
-        keyboard.add(InlineKeyboardButton(text=name, callback_data=f'user_{telegram_id}'))
-
-    return keyboard
-
-
-@logger.catch
 def inactive_users_keyboard(users: dict) -> 'InlineKeyboardMarkup':
     """Возвращает список кнопок с пользователями"""
 
