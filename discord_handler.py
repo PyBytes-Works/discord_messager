@@ -98,6 +98,10 @@ class MessageReceiver:
         self.__datastore.current_message_id = 0
         result.update({"work": True})
 
+        timer: float = 7 + random.randint(0, 6)
+        logger.info(f"Пауза между отправкой сообщений: {timer}")
+        await asyncio.sleep(timer)
+
         return result
 
     @staticmethod
