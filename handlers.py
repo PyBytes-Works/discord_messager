@@ -105,7 +105,8 @@ async def invitation_add_discord_token_handler(message: Message) -> None:
     user: str = str(message.from_user.id)
     if User.is_active(telegram_id=user):
         is_superadmin: bool = user in admins_list
-        if Token.get_number_of_free_slots_for_tokens(user) or is_superadmin:
+        is_free_slots: bool = Token.get_number_of_free_slots_for_tokens(user) > 0
+        if is_free_slots or is_superadmin:
             await message.answer(
                 "Введите cooldown в минутах: ", reply_markup=cancel_keyboard())
             await UserState.user_add_cooldown.set()
@@ -262,36 +263,33 @@ async def info_tokens_handler(message: Message) -> None:
         return
     user: str = str(message.from_user.id)
     if User.is_active(message.from_user.id):
-        def get_mess(data: dict) -> str:
-            if not data:
-                return ''
-            token: str = data.get('token')
-            channel: int = data.get('channel')
-            discord_id: int = data.get('discord_id')
-            mate_id: int = data.get('mate_id')
-            cooldown: int = data.get('cooldown')
-            return (f"Токен: {token}"
-                    f"\nКанал {channel}"
-                    f"\nДискорд id {discord_id}"
-                    f"\nДискорд id напарника {mate_id}"
-                    f"\nКуллдаун {cooldown}")
 
         date_expiration = User.get_expiration_date(user)
         date_expiration = datetime.datetime.fromtimestamp(date_expiration)
         all_tokens: list = Token.get_all_info_tokens(user)
+        count_tokens: int = len(all_tokens)
+        free_slots: int = Token.get_number_of_free_slots_for_tokens(telegram_id=user)
         if all_tokens:
             await UserState.user_delete_token.set()
             await message.answer(
-                f'Подписка истекает  {date_expiration}'
+                f'Подписка истекает:  {date_expiration}'
+                f'\nВсего токенов: {count_tokens}'
+                f'\nСвободно слотов: {free_slots}'
                 f'\nТокены:',
                 reply_markup=cancel_keyboard()
             )
 
             for token_info in all_tokens:
-                token: str = token_info.get('token')
-                mess: str = f'{get_mess(token_info)}'
+                token_id: int = token_info.get('token_id')
+                mess: str = (
+                    f"Токен: {token_info.get('token')}"
+                    f"\nКанал: {token_info.get('channel')}"
+                    f"\nДискорд id: {token_info.get('discord_id')}"
+                    f"\nДискорд id напарника: {token_info.get('mate_id', 'Напарника отсутствует.')}"
+                    f"\nКуллдаун: {token_info.get('cooldown')} сек."
+                )
                 keyboard: 'InlineKeyboardMarkup' = InlineKeyboardMarkup(row_width=1)
-                keyboard.add(InlineKeyboardButton(text="Удалить токен.", callback_data=f"{token}"))
+                keyboard.add(InlineKeyboardButton(text="Удалить токен.", callback_data=f"{token_id}"))
                 await message.answer(
                         mess,
                         reply_markup=keyboard
@@ -311,8 +309,9 @@ async def delete_token_handler(callback: CallbackQuery, state: FSMContext) -> No
         if User.get_is_work(telegram_id=user):
             await callback.message.answer("Бот запущен, сначала остановите бота.", reply_markup=cancel_keyboard())
         else:
-            Token.delete_token(callback.data)
+            Token.delete_token_by_id(token_id=callback.data)
             await callback.message.answer("Токен удален.", reply_markup=user_menu_keyboard())
+            await callback.message.delete()
             await state.finish()
     await callback.answer()
 
