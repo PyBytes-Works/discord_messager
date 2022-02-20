@@ -1,7 +1,7 @@
 /discordmsgparser.py
 /.env
 /logs
-/discord_mailer.db
+/11/discord_mailer.db
 /discord_mailer.db-shm
 /discord_mailer.db-wal
 /answer.json

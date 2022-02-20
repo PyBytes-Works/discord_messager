@@ -690,6 +690,7 @@ class Token(BaseModel):
             mate_token: 'TokenPair' = TokenPair.get_token_mate(token_id=token_data.id)
             mate_discord_id: int = mate_token.discord_id if mate_token else None
             return {
+                'token_id': token_data.id,
                 'token': token_data.token,
                 'discord_id': token_data.discord_id,
                 'mate_id': mate_discord_id,
@@ -778,6 +779,15 @@ class Token(BaseModel):
         #
         """Удалить токен по его "значению": """
         token = cls.get_or_none(cls.token == token)
+        if token:
+            TokenPair.delete_pair(token.id)
+            return token.delete_instance()
+
+    @classmethod
+    @logger.catch
+    def delete_token_by_id(cls, token_id: str):
+        """Удалить токен по его "pk": """
+        token = cls.get_or_none(cls.id == token_id)
         if token:
             TokenPair.delete_pair(token.id)
             return token.delete_instance()
