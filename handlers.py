@@ -345,7 +345,6 @@ async def lets_play(message: Message):
     """Show must go on
     Запускает рабочий цикл бота, проверяет ошибки."""
 
-    work_hour: int = datetime.datetime.now().hour
     user_telegram_id: str = str(message.from_user.id)
     while User.get_is_work(telegram_id=user_telegram_id):
         if await deactivate_user_if_expired(message=message):
@@ -372,9 +371,7 @@ async def lets_play(message: Message):
             elif text != 'ok':
                 await message.answer(text, reply_markup=cancel_keyboard())
             logger.info(f"PAUSE: {datastore.delay + 1}")
-            current_hour: int = datetime.datetime.now().hour
-            if current_hour > work_hour:
-                work_hour: int = current_hour
+            if not datetime.datetime.now().minute % 10:
                 form_token_pairs(telegram_id=user_telegram_id, unpair=True)
                 logger.info(f"Время распределять токены!")
 
