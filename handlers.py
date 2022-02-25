@@ -269,35 +269,36 @@ async def info_tokens_handler(message: Message) -> None:
         all_tokens: list = Token.get_all_info_tokens(user)
         count_tokens: int = len(all_tokens)
         free_slots: int = Token.get_number_of_free_slots_for_tokens(telegram_id=user)
-        if all_tokens:
-            await UserState.user_delete_token.set()
-            await message.answer(
-                f'Подписка истекает:  {date_expiration}'
-                f'\nВсего токенов: {count_tokens}'
-                f'\nСвободно слотов: {free_slots}'
-                f'\nТокены:',
-                reply_markup=cancel_keyboard()
-            )
-
-            for token_info in all_tokens:
-                token_id: int = token_info.get('token_id')
-                mess: str = (
-                    f"Токен: {token_info.get('token')}"
-                    f"\nКанал: {token_info.get('channel')}"
-                    f"\nДискорд id: {token_info.get('discord_id')}"
-                    f"\nДискорд id напарника: {token_info.get('mate_id', 'Напарника отсутствует.')}"
-                    f"\nКуллдаун: {token_info.get('cooldown')} сек."
-                )
-                keyboard: 'InlineKeyboardMarkup' = InlineKeyboardMarkup(row_width=1)
-                keyboard.add(InlineKeyboardButton(text="Удалить токен.", callback_data=f"{token_id}"))
-                await message.answer(
-                        mess,
-                        reply_markup=keyboard
-                    )
-        else:
+        if not all_tokens:
             await message.answer(
                 f'Подписка истекает  {date_expiration}'
                 'Данных о токенах нет.', reply_markup=user_menu_keyboard())
+            return
+
+        await UserState.user_delete_token.set()
+        await message.answer(
+            f'Подписка истекает:  {date_expiration}'
+            f'\nВсего токенов: {count_tokens}'
+            f'\nСвободно слотов: {free_slots}'
+            f'\nТокены:',
+            reply_markup=cancel_keyboard()
+        )
+
+        for token_info in all_tokens:
+            token_id: int = token_info.get('token_id')
+            mess: str = (
+                f"Токен: {token_info.get('token')}"
+                f"\nКанал: {token_info.get('channel')}"
+                f"\nДискорд id: {token_info.get('discord_id')}"
+                f"\nДискорд id напарника: {token_info.get('mate_id', 'Напарника отсутствует.')}"
+                f"\nКуллдаун: {token_info.get('cooldown')} сек."
+            )
+            keyboard: 'InlineKeyboardMarkup' = InlineKeyboardMarkup(row_width=1)
+            keyboard.add(InlineKeyboardButton(text="Удалить токен.", callback_data=f"{token_id}"))
+            await message.answer(
+                    mess,
+                    reply_markup=keyboard
+                )
 
 
 @logger.catch
