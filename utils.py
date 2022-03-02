@@ -108,22 +108,15 @@ async def save_to_redis(telegram_id: str, data: list, timeout_sec: int = 3600, r
     """Сериализует данные и сохраняет в Редис. Устанавливает время хранения в секундах.
     Возвращает кол-во записей."""
 
-    count = 0
     try:
         if redis_db is None:
             redis_db = aioredis.from_url(
                 url="redis://localhost", encoding="utf-8", decode_responses=True)
 
         async with redis_db.client() as conn:
-            count = await conn.set(name=telegram_id, value=json.dumps(data))
-            if count:
-                await conn.expire(name=telegram_id, time=timeout_sec)
-                return count
-            else:
-                return 0
+            return await conn.set(name=telegram_id, value=json.dumps(data), ex=timeout_sec)
     except ConnectionRefusedError as err:
         logger.error(f"Unable to connect to redis, data: '{data}' not saved!", err)
-    await redis_db.close()
 
 
 async def load_from_redis(telegram_id: str, redis_db: 'Redis' = None) -> list:
@@ -143,6 +136,5 @@ async def load_from_redis(telegram_id: str, redis_db: 'Redis' = None) -> list:
                 logger.error(f"F: load_from_redis: {err}", err)
     except ConnectionRefusedError as err:
         logger.error(f"Unable to connect to redis, telegram_id: '{telegram_id}' not loaded!", err)
-    await redis_db.close()
 
     return result
