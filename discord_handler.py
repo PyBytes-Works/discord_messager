@@ -11,7 +11,7 @@ import aiohttp.client_exceptions
 import aiohttp.http_exceptions
 
 from data_classes import TokenDataStore, Vocabulary
-from models import Token
+from models import Token, User, Proxy
 from config import logger
 from dotenv import load_dotenv
 
@@ -43,6 +43,27 @@ class MessageReceiver:
     @logger.catch
     def __init__(self, datastore: 'TokenDataStore'):
         self.__datastore: 'TokenDataStore' = datastore
+
+    @classmethod
+    async def _is_proxy_work(cls, proxy: str) -> bool:
+        """Проверяет прокси на работоспособность"""
+
+        if await cls._send_get_request(proxy=proxy) == 200:
+            return True
+
+    @classmethod
+    async def get_proxy(cls, telegram_id: str) -> str:
+        """Возвращает рабочую прокси из базы данных, если нет рабочих возвращает 'no proxies'"""
+
+        if not Proxy.get_proxy_count():
+            return 'no proxies'
+        proxy: str = str(User.get_proxy(telegram_id=telegram_id))
+        if cls._is_proxy_work(proxy=proxy):
+            return proxy
+        if not Proxy.update_proxies_for_owners(proxy=proxy):
+            return 'no proxies'
+
+        return await cls.get_proxy(telegram_id=telegram_id)
 
     @classmethod
     async def check_user_data(cls, token: str, proxy: str, channel: int) -> dict:
@@ -302,25 +323,35 @@ class MessageReceiver:
     async def __check_token(cls, token: str, proxy: str, channel: int) -> str:
         """Returns valid token else 'bad token'"""
 
+        result: str = 'bad token'
+        status: int = await cls._send_get_request(token=token, proxy=proxy, channel=channel)
+        if status == 407:
+            return "proxy expired"
+        if status == 200:
+            result = token
+
+        return result
+
+    @classmethod
+    async def _send_get_request(cls, proxy: str, token: str = '', channel: int = 0) -> int:
+        """Отправляет запрос через прокси, возвращает статус код ответа"""
+
         async with aiohttp.ClientSession() as session:
-            session.headers['authorization']: str = token
-            limit: int = 1
-            url: str = TokenDataStore.get_channel_url() + f'{channel}/messages?limit={limit}'
-            result: str = 'bad token'
+            url: str = "https://www.google.com"
+            if token:
+                session.headers['authorization']: str = token
+                limit: int = 1
+                url: str = TokenDataStore.get_channel_url() + f'{channel}/messages?limit={limit}'
             proxy_data = f"http://{PROXY_USER}:{PROXY_PASSWORD}@{proxy}/"
             try:
                 async with session.get(url=url, proxy=proxy_data, ssl=False, timeout=10) as response:
-                    status: int = response.status
-                    if status == 407:
-                        return "proxy expired"
-                    if status == 200:
-                        result = token
+                    return response.status
             except cls.__EXCEPTIONS as err:
                 logger.info(f"Token check Error: {err}")
+                return int(str(err).split(",")[0])
             except aiohttp.http_exceptions.BadHttpMessage as err:
                 logger.error("МУДАК ПРОВЕРЬ ПОРТ ПРОКСИ!!!", err)
-
-        return result
+                return int(str(err).split(",")[0])
 
 
 class MessageSender:
@@ -392,6 +423,8 @@ class MessageSender:
         status_code = response.status_code
         if status_code == 200:
             data: dict = {}
+        elif status_code == 407:
+            Proxy.update_proxies_for_owners(self.__datastore.proxy)
         else:
             logger.error(f"F: __send_data_to_api error: {status_code}: {response.text}")
             try:

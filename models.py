@@ -395,7 +395,7 @@ class User(BaseModel):
     @logger.catch
     def get_proxy(cls: 'User', telegram_id: str) -> CharField:
         """
-        возвращает timestamp без миллисекунд в виде целого числа
+        возвращает прокси пользователя
         """
         user: User = cls.get_or_none(cls.proxy, cls.telegram_id == telegram_id)
         # print(type(result.expiration))
