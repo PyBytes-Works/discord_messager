@@ -167,6 +167,14 @@ async def add_channel_handler(message: Message, state: FSMContext) -> None:
     await message.answer("Введите токен:", reply_markup=cancel_keyboard())
 
 
+async def is_proxy_valid(message: Message, proxy: str) -> bool:
+    if proxy != 'no proxies':
+        return True
+    text: str = "Ошибка прокси. Нет доступных прокси."
+    await message.answer(text, reply_markup=ReplyKeyboardRemove())
+    await send_report_to_admins(text)
+
+
 @logger.catch
 async def add_discord_token_handler(message: Message, state: FSMContext) -> None:
     """ Получение токена запрос discord_id """
@@ -183,22 +191,15 @@ async def add_discord_token_handler(message: Message, state: FSMContext) -> None
 
     data: dict = await state.get_data()
     channel: int = data.get('channel')
+
     proxy: str = await MessageReceiver.get_proxy(telegram_id=message.from_user.id)
-    if not proxy:
-        text: str = "Ошибка прокси. Нет доступных прокси."
-        await message.answer(text, reply_markup=ReplyKeyboardRemove())
-        await send_report_to_admins(text)
+    if not await is_proxy_valid(message=message, proxy=proxy):
         await state.finish()
         return
+
     result: dict = await MessageReceiver.check_user_data(token=token, proxy=proxy, channel=channel)
-    request_result = result.get('token')
-    logger.info(f"REQUEST: {request_result}")
-    if request_result == "proxy expired":
-        await message.answer(
-            "Ошибка прокси. Обратитесь к администратору. Код ошибки 407.",
-            reply_markup=ReplyKeyboardRemove()
-        )
-        await send_report_to_admins(f"Ошибка прокси. Время действия {proxy} истекло.")
+    request_result: str = result.get('token')
+    if not await is_proxy_valid(message=message, proxy=request_result):
         await state.finish()
         return
 

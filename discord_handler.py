@@ -72,8 +72,10 @@ class MessageReceiver:
         Save valid data to instance variables """
         request_result: str = await cls.__check_token(token=token, proxy=proxy, channel=channel)
         result = {"token": request_result}
-        if request_result not in ("bad token", "proxy expired"):
+        if request_result != "bad token":
             result["channel"] = channel
+        elif request_result == 'no proxies':
+            return {"token": request_result}
 
         return result
 
@@ -325,10 +327,11 @@ class MessageReceiver:
 
         result: str = 'bad token'
         status: int = await cls._send_get_request(token=token, proxy=proxy, channel=channel)
-        if status == 407:
-            return "proxy expired"
         if status == 200:
             result = token
+        elif status == 407:
+            if not Proxy.update_proxies_for_owners(proxy):
+                return 'no proxies'
 
         return result
 
