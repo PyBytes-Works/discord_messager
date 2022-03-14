@@ -179,6 +179,7 @@ async def is_proxy_valid(message: Message, proxy: str) -> bool:
 async def add_discord_token_handler(message: Message, state: FSMContext) -> None:
     """ Получение токена запрос discord_id """
 
+    await message.answer("Проверяю данные.")
     token: str = message.text.strip()
     if Token.is_token_exists(token):
         await message.answer(
