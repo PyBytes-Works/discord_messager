@@ -978,11 +978,13 @@ class Proxy(BaseModel):
         перезаписывает прокси для всех пользователей
         """
         cls.delete_proxy(proxy=proxy)
+        if not cls.get_proxy_count():
+            return 0
         users = User.select().where(User.proxy == proxy).execute()
         count = 0
         for user in users:
-            count += 1
             new_proxy = cls.get_low_used_proxy()
+            count += 1
             User.set_proxy_by_telegram_id(telegram_id=user.telegram_id, proxy=new_proxy)
         return count
 
