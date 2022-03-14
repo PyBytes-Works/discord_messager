@@ -1,6 +1,7 @@
 import datetime
 import os
 import random
+import ssl
 from json import JSONDecodeError
 from typing import List, Tuple
 
@@ -58,7 +59,7 @@ class MessageReceiver:
         if not Proxy.get_proxy_count():
             return 'no proxies'
         proxy: str = str(User.get_proxy(telegram_id=telegram_id))
-        if cls._is_proxy_work(proxy=proxy):
+        if await cls._is_proxy_work(proxy=proxy):
             return proxy
         if not Proxy.update_proxies_for_owners(proxy=proxy):
             return 'no proxies'
@@ -351,11 +352,15 @@ class MessageReceiver:
                     return response.status
             except cls.__EXCEPTIONS as err:
                 logger.info(f"Token check Error: {err}")
-                return int(str(err).split(",")[0])
             except aiohttp.http_exceptions.BadHttpMessage as err:
                 logger.error("МУДАК ПРОВЕРЬ ПОРТ ПРОКСИ!!!", err)
-                return int(str(err).split(",")[0])
-
+                if "Proxy Authentication Required" in err:
+                    return 407
+            except (ssl.SSLError, OSError) as err:
+                logger.error("Ошибка авторизации прокси:", err)
+                if "Proxy Authentication Required" in err:
+                    return 407
+        return 0
 
 class MessageSender:
     """Отправляет сообщение в дискорд-канал в ответ на сообщение
@@ -422,20 +427,24 @@ class MessageSender:
         proxies = {
             "http": f"http://{PROXY_USER}:{PROXY_PASSWORD}@{self.__datastore.proxy}/",
         }
-        response = session.post(url=url, json=data, proxies=proxies)
-        status_code = response.status_code
-        if status_code == 200:
-            data: dict = {}
-        elif status_code == 407:
-            Proxy.update_proxies_for_owners(self.__datastore.proxy)
-        else:
-            logger.error(f"F: __send_data_to_api error: {status_code}: {response.text}")
-            try:
-                data: dict = response.json()
-            except JSONDecodeError as err:
-                error_text = "F: __send_data_to_api: JSON ERROR:"
-                logger.error(error_text, err)
-                status_code = -1
-                data: dict = {"message": error_text}
+        try:
+            response = session.post(url=url, json=data, proxies=proxies)
+            status_code = response.status_code
+            if status_code == 200:
+                data: dict = {}
+            elif status_code == 407:
+                Proxy.update_proxies_for_owners(self.__datastore.proxy)
+            else:
+                logger.error(f"F: __send_data_to_api error: {status_code}: {response.text}")
+                try:
+                    data: dict = response.json()
+                except JSONDecodeError as err:
+                    error_text = "F: __send_data_to_api: JSON ERROR:"
+                    logger.error(error_text, err)
+                    status_code = -1
+                    data: dict = {"message": error_text}
+        except requests.exceptions.ProxyError as err:
+            logger.error(f"F: _send_data Error: {err}")
+            status_code = 407
 
         self.__answer = {"status_code": status_code, "data": data}
