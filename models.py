@@ -924,6 +924,7 @@ class Proxy(BaseModel):
             get_list_proxies
             get_low_used_proxy
             get_proxy_count
+            update_proxies_for_owners
         fields:
             proxy: str
             using: int ????
@@ -965,10 +966,27 @@ class Proxy(BaseModel):
         Возвращает первую прокси с самым малым использованием
             return: str
         """
-
         result = cls.select().order_by(cls.using).execute()[:1]
         if result:
             return result[0].proxy
+
+    @classmethod
+    @logger.catch
+    def update_proxies_for_owners(cls: 'Proxy', proxy: str) -> int:
+        """
+        Метод получает не рабочую порокси, удаляет ее и
+        перезаписывает прокси для всех пользователей
+        """
+        cls.delete_proxy(proxy=proxy)
+        if not cls.get_proxy_count():
+            return 0
+        users = User.select().where(User.proxy == proxy).execute()
+        count = 0
+        for user in users:
+            new_proxy = cls.get_low_used_proxy()
+            count += 1
+            User.set_proxy_by_telegram_id(telegram_id=user.telegram_id, proxy=new_proxy)
+        return count
 
 
 @logger.catch
