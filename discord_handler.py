@@ -15,7 +15,7 @@ from models import Token
 from config import logger
 from dotenv import load_dotenv
 
-from utils import save_data_to_json, save_to_redis, load_from_redis
+from utils import save_data_to_json, save_to_redis, load_from_redis, send_report_to_admins
 
 
 load_dotenv()
@@ -49,9 +49,9 @@ class MessageReceiver:
         """Returns checked dictionary for user data
 
         Save valid data to instance variables """
-
-        result = {"token": await cls.__check_token(token=token, proxy=proxy, channel=channel)}
-        if result["token"] != "bad token":
+        request_result: str = await cls.__check_token(token=token, proxy=proxy, channel=channel)
+        result = {"token": request_result}
+        if request_result not in ("bad token", "proxy expired"):
             result["channel"] = channel
 
         return result
@@ -310,7 +310,10 @@ class MessageReceiver:
             proxy_data = f"http://{PROXY_USER}:{PROXY_PASSWORD}@{proxy}/"
             try:
                 async with session.get(url=url, proxy=proxy_data, ssl=False, timeout=10) as response:
-                    if response.status == 200:
+                    status: int = response.status
+                    if status == 407:
+                        return "proxy expired"
+                    if status == 200:
                         result = token
             except cls.__EXCEPTIONS as err:
                 logger.info(f"Token check Error: {err}")

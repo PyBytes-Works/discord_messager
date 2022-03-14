@@ -185,8 +185,13 @@ async def add_discord_token_handler(message: Message, state: FSMContext) -> None
     channel: int = data.get('channel')
     proxy: str = str(User.get_proxy(telegram_id=message.from_user.id))
     result: dict = await MessageReceiver.check_user_data(token=token, proxy=proxy, channel=channel)
-
-    if result.get('token') == 'bad token':
+    request_result = result.get('token')
+    if request_result == "proxy expired":
+        await message.answer("Ошибка прокси. Обратитесь к администратору. Код ошибки 407.", reply_markup=ReplyKeyboardRemove())
+        await send_report_to_admins(f"Ошибка прокси. Время действия {proxy} истекло.")
+        await state.finish()
+        return
+    if request_result == 'bad token':
         await message.answer(
             "Ваш токен не прошел проверку в данном канале. "
             "\nЛибо канал не существует либо токен отсутствует данном канале, "
