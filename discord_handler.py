@@ -55,13 +55,13 @@ class MessageReceiver:
     async def get_proxy(cls, telegram_id: str) -> str:
         """Возвращает рабочую прокси из базы данных, если нет рабочих возвращает 'no proxies'"""
 
-        proxy: str = str(User.get_proxy(telegram_id=telegram_id))
-        if not proxy:
+        if not Proxy.get_proxy_count():
             return 'no proxies'
-
+        proxy: str = str(User.get_proxy(telegram_id=telegram_id))
         if cls._is_proxy_work(proxy=proxy):
             return proxy
-        Proxy.update_proxies_for_owners(proxy=proxy)
+        if not Proxy.update_proxies_for_owners(proxy=proxy):
+            return 'no proxies'
 
         return await cls.get_proxy(telegram_id=telegram_id)
 
@@ -333,13 +333,14 @@ class MessageReceiver:
         return result
 
     @classmethod
-    async def _send_get_request(cls, proxy: str, token: str = '', channel: int = 0, limit: int = 1) -> int:
+    async def _send_get_request(cls, proxy: str, token: str = '', channel: int = 0) -> int:
         """Отправляет запрос через прокси, возвращает статус код ответа"""
 
         async with aiohttp.ClientSession() as session:
             url: str = "https://www.google.com"
             if token:
                 session.headers['authorization']: str = token
+                limit: int = 1
                 url: str = TokenDataStore.get_channel_url() + f'{channel}/messages?limit={limit}'
             proxy_data = f"http://{PROXY_USER}:{PROXY_PASSWORD}@{proxy}/"
             try:
@@ -422,6 +423,8 @@ class MessageSender:
         status_code = response.status_code
         if status_code == 200:
             data: dict = {}
+        elif status_code == 407:
+            Proxy.update_proxies_for_owners(self.__datastore.proxy)
         else:
             logger.error(f"F: __send_data_to_api error: {status_code}: {response.text}")
             try:
