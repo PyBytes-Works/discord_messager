@@ -183,14 +183,25 @@ async def add_discord_token_handler(message: Message, state: FSMContext) -> None
 
     data: dict = await state.get_data()
     channel: int = data.get('channel')
-    proxy: str = str(User.get_proxy(telegram_id=message.from_user.id))
+    proxy: str = await MessageReceiver.get_proxy(telegram_id=message.from_user.id)
+    if not proxy:
+        text: str = "Ошибка прокси. Нет доступных прокси."
+        await message.answer(text, reply_markup=ReplyKeyboardRemove())
+        await send_report_to_admins(text)
+        await state.finish()
+        return
     result: dict = await MessageReceiver.check_user_data(token=token, proxy=proxy, channel=channel)
     request_result = result.get('token')
+    logger.info(f"REQUEST: {request_result}")
     if request_result == "proxy expired":
-        await message.answer("Ошибка прокси. Обратитесь к администратору. Код ошибки 407.", reply_markup=ReplyKeyboardRemove())
+        await message.answer(
+            "Ошибка прокси. Обратитесь к администратору. Код ошибки 407.",
+            reply_markup=ReplyKeyboardRemove()
+        )
         await send_report_to_admins(f"Ошибка прокси. Время действия {proxy} истекло.")
         await state.finish()
         return
+
     if request_result == 'bad token':
         await message.answer(
             "Ваш токен не прошел проверку в данном канале. "
@@ -461,6 +472,10 @@ async def get_error_text(message: Message, discord_data: dict, datastore: 'Token
             )
         else:
             await message.answer(f"Ошибка {status_code}: {data}")
+    elif status_code == 407:
+        await message.answer("Ошибка прокси. Обратитесь к администратору. Код ошибки 407.", reply_markup=ReplyKeyboardRemove())
+        await send_report_to_admins(f"Ошибка прокси. Время действия proxy истекло.")
+        result = "stop"
     elif status_code == 429:
         if discord_code_error == 20016:
             cooldown: int = int(data.get("retry_after", None))
