@@ -62,7 +62,7 @@ print('Start logging to:', file_path)
 
 #  ********** DATABASE CONFIG *************************
 
-db_file_name = 'discord_mailer.db'
+db_file_name = 'db/discord_mailer.db'
 full_path = os.path.join(PATH, db_file_name)
 db = SqliteDatabase(
     full_path,

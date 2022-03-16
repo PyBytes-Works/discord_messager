@@ -11,15 +11,12 @@ import requests
 import aiohttp.client_exceptions
 import aiohttp.http_exceptions
 
+from config import logger
 from data_classes import TokenDataStore, Vocabulary
 from models import Token, User, Proxy
-from config import logger
-from dotenv import load_dotenv
 
 from utils import save_data_to_json, save_to_redis, load_from_redis, send_report_to_admins
 
-
-load_dotenv()
 
 PROXY_USER = os.getenv("PROXY_USER")
 PROXY_PASSWORD = os.getenv("PROXY_PASSWORD")
