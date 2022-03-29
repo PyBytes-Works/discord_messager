@@ -520,12 +520,16 @@ async def send_replies(message: Message, replies: list):
             author: str = reply.get("author")
             reply_id: str = reply.get("message_id")
             reply_text: str = reply.get("text")
+            reply_to_author: str = reply.get("to_user")
+            reply_to_message: str = reply.get("to_message")
             answer_keyboard.add(InlineKeyboardButton(
                 text="Ответить",
                 callback_data=f'reply_{reply_id}'
             ))
             await message.answer(
                 f"Вам пришло сообщение из ДИСКОРДА:"
+                f"\nКому: {reply_to_author}"
+                f"\nНа сообщение: {reply_to_message}"
                 f"\nОт: {author}"
                 f"\nText: {reply_text}",
                 reply_markup=answer_keyboard

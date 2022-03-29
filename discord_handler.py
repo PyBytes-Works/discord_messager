@@ -11,6 +11,7 @@ import requests
 import aiohttp.client_exceptions
 import aiohttp.http_exceptions
 
+import utils
 from config import logger
 from data_classes import TokenDataStore, Vocabulary
 from models import Token, User, Proxy
@@ -144,7 +145,6 @@ class MessageReceiver:
         message_id = 0
         redis_data: List[dict] = await load_from_redis(telegram_id=self.__datastore.telegram_id)
         for elem in redis_data:
-            # if isinstance(elem, dict):
             answered = elem.get("answered", False)
             if not answered:
                 if elem.get("token") == token:
@@ -262,7 +262,9 @@ class MessageReceiver:
                             "message": message,
                             "channel_id": elem.get("channel_id"),
                             "author": elem.get("author"),
-                            "timestamp": message_time
+                            "timestamp": message_time,
+                            "to_message": elem.get("referenced_message").get("content"),
+                            "to_user": elem.get("referenced_message").get("author").get("username")
                         }
                     )
         if messages:

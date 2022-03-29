@@ -156,7 +156,7 @@ class Vocabulary:
     """Работает с файлом фраз для отправки в дискорд"""
 
     __VOCABULARY: list = []
-    __PATH_TO_FILE: str = "../db/vocabulary_en.txt"
+    __PATH_TO_FILE: str = "./db/vocabulary_en.txt"
 
     @classmethod
     @logger.catch
