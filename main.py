@@ -1,6 +1,8 @@
+#!/usr/local/bin/python
+
 """
-Python 3.8
-Главный модуль бота
+Python 3.8 or higher
+Version 3.1.5
 """
 
 import os.path
@@ -30,7 +32,7 @@ async def on_startup(_) -> None:
 
     try:
         # Отправляет сообщение админам при запуске бота
-        await send_report_to_admins(text="Я заработал")
+        await send_report_to_admins(text="Discord_mailer started.")
     except Exception:
         pass
     if not os.path.exists(db_file_name):
@@ -45,7 +47,7 @@ async def on_startup(_) -> None:
 async def on_shutdown(dp) -> None:
     """Действия при отключении бота."""
     try:
-        await send_report_to_admins(text="Я выключаюсь")
+        await send_report_to_admins(text="Discord_mailer stopping.")
     except Exception:
         pass
     logger.warning("BOT shutting down.")
