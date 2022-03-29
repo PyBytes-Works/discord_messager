@@ -69,18 +69,18 @@ if __name__ == '__main__':
         proxy, is_new_record = Proxy.get_or_create(proxy=proxy)
         proxy.using += 1
         proxy.save()
-    logger.info('Was copied records of Users table and Proxy || copy_data.py' )
+    logger.info('Was copied records of Users table and Proxy || database_copy.py' )
 
     proxies = set([user.proxy for user in User.select().execute()])
     all_proxies = set(PROXIES)
     not_added_proxies = all_proxies - proxies
     if not_added_proxies:
         Proxy.bulk_create([Proxy(proxy=proxy) for proxy in not_added_proxies])
-        logger.info('Was add unadded proxies || copy_data.py')
+        logger.info('Was add unadded proxies || database_copy.py')
 
     # User.bulk_create(res_users)
     Token.bulk_create(tokens)
-    logger.info('Was copied records of Tokens table || copy_data.py')
+    logger.info('Was copied records of Tokens table || database_copy.py')
 
 
 #----------------------------------end---------------------------------------------

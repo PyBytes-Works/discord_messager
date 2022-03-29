@@ -164,14 +164,15 @@ class Vocabulary:
 
         length: int = len(vocabulary)
         try:
-            index = random.randint(0, length - 1)
-            text = vocabulary.pop(index)
+            string_index: int = random.randint(0, length - 1)
+            message_text: str = vocabulary.pop(string_index)
             cls.__set_vocabulary(vocabulary)
         except (ValueError, TypeError, FileNotFoundError) as err:
             logger.error(f"ERROR: __get_random_message_from_vocabulary: {err}")
             return "Vocabulary error"
-
-        return text
+        if len(message_text) > 40:
+            return cls.get_message()
+        return message_text
 
     @classmethod
     @logger.catch

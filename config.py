@@ -23,8 +23,7 @@ admins_list = [deskent]
 DEFAULT_PROXY = os.getenv("DEFAULT_PROXY")
 
 
-# tgToken = os.getenv("ARTEM_FIRST_BOT_TOKEN")
-tgToken = os.getenv("DESKENT_TEST_BOT")
+tgToken = os.getenv("TELEBOT_TOKEN")
 
 # configure bot
 bot = Bot(token=tgToken)
@@ -44,7 +43,7 @@ logger_cfg = {
        {
            "sink": sys.stdout,
            "level": "INFO",
-           "format": "{time:YYYY-MM-DD HH:mm:ss} - {level}: || {message} ||"
+           "format": "<white>{time:YYYY-MM-DD HH:mm:ss}</white> - <yellow>{level}:</yellow> || <green>{message}</green>"
        },
        {
             "sink": file_path, "level": LOG_LEVEL,

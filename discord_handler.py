@@ -107,7 +107,7 @@ class MessageReceiver:
         elif filtered_data:
             self.__datastore.current_message_id = await self.__get_current_message_id(data=filtered_data)
         text_to_send: str = user_message if user_message else ''
-        answer: dict = MessageSender(datastore=self.__datastore).send_message(text=text_to_send)
+        answer: dict = await MessageSender(datastore=self.__datastore).send_message(text=text_to_send)
         if not answer:
             logger.error("F: get_message ERROR: NO ANSWER ERROR")
             result.update({"message": "ERROR"})
@@ -144,6 +144,7 @@ class MessageReceiver:
         message_id = 0
         redis_data: List[dict] = await load_from_redis(telegram_id=self.__datastore.telegram_id)
         for elem in redis_data:
+            # if isinstance(elem, dict):
             answered = elem.get("answered", False)
             if not answered:
                 if elem.get("token") == token:
@@ -359,6 +360,7 @@ class MessageReceiver:
                     return 407
         return 0
 
+
 class MessageSender:
     """Отправляет сообщение в дискорд-канал в ответ на сообщение
     связанного токена
@@ -370,17 +372,17 @@ class MessageSender:
         self.__answer: dict = {}
 
     @logger.catch
-    def send_message(self, text: str = '') -> dict:
+    async def send_message(self, text: str = '') -> dict:
         """Отправляет данные в канал дискорда, возвращает результат отправки."""
 
-        data: dict = self.__prepare_data(text=text)
-        self.__send_data(data=data)
+        data: dict = await self.__prepare_data(text=text)
+        await self.__send_data(data=data)
         Token.update_token_time(token=self.__datastore.token)
 
         return self.__answer
 
     @logger.catch
-    def __prepare_data(self, text: str = '') -> dict:
+    async def __prepare_data(self, text: str = '') -> dict:
         """Возвращает сформированные данные для отправки в дискорд"""
 
         if not text:
@@ -414,8 +416,19 @@ class MessageSender:
 
         return data
 
+    async def __typing(self, proxies: dict) -> None:
+        """Имитирует "Пользователь печатает" в чате дискорда."""
+
+        response = requests.post(f'https://discord.com/api/v9/channels/{self.__datastore.channel}/typing', headers={
+            "Authorization": self.__datastore.token,
+            "Content-Length": "0"
+        }, proxies=proxies)
+        if response.status_code != 204:
+            logger.warning(f"Typing: {response.status_code}")
+        await asyncio.sleep(2)
+
     @logger.catch
-    def __send_data(self, data) -> None:
+    async def __send_data(self, data) -> None:
         """Отправляет данные в дискорд канал"""
 
         session = requests.Session()
@@ -425,6 +438,7 @@ class MessageSender:
             "http": f"http://{PROXY_USER}:{PROXY_PASSWORD}@{self.__datastore.proxy}/",
         }
         try:
+            await self.__typing(proxies=proxies)
             response = session.post(url=url, json=data, proxies=proxies)
             status_code = response.status_code
             if status_code == 200:
