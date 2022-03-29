@@ -156,6 +156,7 @@ class Vocabulary:
     """Работает с файлом фраз для отправки в дискорд"""
 
     __VOCABULARY: list = []
+    __PATH_TO_FILE: str = "../db/vocabulary_en.txt"
 
     @classmethod
     @logger.catch
@@ -195,7 +196,9 @@ class Vocabulary:
 
     @classmethod
     @logger.catch
-    def __update_vocabulary(cls, file_name: str = "vocabulary_en.txt"):
+    def __update_vocabulary(cls, file_name: str = None):
+        if not file_name:
+            file_name = cls.__PATH_TO_FILE
         if os.path.exists(file_name):
             with open(file_name, 'r', encoding='utf-8') as f:
                 cls.__VOCABULARY = f.readlines()
