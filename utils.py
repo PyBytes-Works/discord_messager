@@ -1,3 +1,5 @@
+import datetime
+
 import aiogram
 import aioredis
 import json
@@ -10,6 +12,7 @@ from typing import Union, Optional, List
 from config import logger, bot, admins_list, REDIS_DB
 
 
+@logger.catch
 def save_data_to_json(data, file_name: str = "data.json", key: str = 'w'):
     if key == 'w':
         with open(file_name, 'w', encoding='utf-8') as f:
@@ -25,6 +28,7 @@ def save_data_to_json(data, file_name: str = "data.json", key: str = 'w'):
     # print(file_name, "saved.")
 
 
+@logger.catch
 def save_data_to_txt(data: Union[dict, list], file_name: str = "data.json"):
     with open(file_name, 'w', encoding='utf-8') as f:
         data = "\n".join(data)
@@ -33,6 +37,7 @@ def save_data_to_txt(data: Union[dict, list], file_name: str = "data.json"):
     print(file_name, "saved.")
 
 
+@logger.catch
 def check_is_int(text: str) -> int:
     """Проверяет что в строке пришло положительное число и возвращает его обратно если да"""
 
@@ -89,6 +94,7 @@ def delete_used_token(token: str) -> dict:
     return user_data
 
 
+@logger.catch
 async def send_report_to_admins(text: str) -> None:
     """Отправляет сообщение в телеграме всем администраторам из списка"""
 
@@ -104,14 +110,16 @@ class RedisInterface:
     """Сохраняет и загружает данные из редис."""
 
     def __init__(self, telegram_id: str):
-        self.redis_db = aioredis.Redis.from_url(url=REDIS_DB, encoding="utf-8", decode_responses=True)
+        self.redis_db = aioredis.from_url(url=REDIS_DB, encoding="utf-8", decode_responses=True)
         self.telegram_id: str = telegram_id
         self.data: list = []
         self.timeout_sec = 0
 
+    @logger.catch
     async def __get_or_set_from_db(self, key: str) -> Optional[list]:
-        result: List[dict] = []
+        """Запрашивает или записывает данные в редис, возвращает список если запрашивали"""
 
+        result: List[dict] = []
         try:
             async with self.redis_db.client() as conn:
                 if key == "set":
@@ -133,6 +141,7 @@ class RedisInterface:
 
         return result
 
+    @logger.catch
     async def save(self, data: list, timeout_sec: int = 3600) -> None:
         """Сериализует данные и сохраняет в Редис. Устанавливает время хранения в секундах.
         Возвращает кол-во записей."""
@@ -142,7 +151,8 @@ class RedisInterface:
 
         await self.__get_or_set_from_db(key="set")
 
+    @logger.catch
     async def load(self) -> List[dict]:
-        """Возвращает десериализованные данные из Редис"""
+        """Возвращает десериализованные данные из Редис (список)"""
 
         return await self.__get_or_set_from_db(key="get")

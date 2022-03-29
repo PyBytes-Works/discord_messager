@@ -335,7 +335,7 @@ async def delete_token_handler(callback: CallbackQuery, state: FSMContext) -> No
 
 
 @logger.catch
-async def start_parsing_command_handler(message: Message) -> None:
+async def start_parsing_command_handler(message: Message, state: FSMContext) -> None:
     """Получает случайное сообщение из дискорда, ставит машину состояний в положение
     'жду ответа пользователя'
     Обработчик команды /start_parsing
@@ -349,7 +349,7 @@ async def start_parsing_command_handler(message: Message) -> None:
         await message.answer("Сначала добавьте токен.", reply_markup=user_menu_keyboard())
         return
     if User.get_is_work(telegram_id=user_telegram_id):
-        await message.answer("Бот уже запущен.")
+        await message.answer("Бот уже запущен.", reply_markup=cancel_keyboard())
         return
     User.set_user_is_work(telegram_id=user_telegram_id)
     await message.answer("Начинаю работу.", reply_markup=cancel_keyboard())

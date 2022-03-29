@@ -13,7 +13,7 @@ from peewee import SqliteDatabase
 
 load_dotenv()
 
-# redis config
+# # redis init
 REDIS_DB = os.environ.get("REDIS_DB", "redis://127.0.0.1:6379/0")
 
 # initialization admins list
@@ -35,7 +35,6 @@ dp = Dispatcher(bot, storage=storage)
 
 
 #  ********** LOGGER CONFIG ********************************
-
 PATH = os.getcwd()
 today = datetime.datetime.today().strftime("%Y-%m-%d")
 file_path = os.path.join(os.path.relpath(PATH, start=None), 'logs', today, 'discord_mailer.log')
@@ -45,25 +44,26 @@ logger_cfg = {
    "handlers": [
        {
            "sink": sys.stdout,
+           "level": "ERROR",
+           "format": "<white>{time:HH:mm:ss}</white> - <lr>{level}</lr> | <green>{message}</green>"
+       },
+       {
+           "sink": sys.stdout,
            "level": "INFO",
            "format": "<white>{time:HH:mm:ss}</white> - <yellow>{level}</yellow> | <green>{message}</green>"
        },
        {
             "sink": file_path, "level": LOG_LEVEL,
-            "format": "{time:YYYY-MM-DD HH:mm:ss} - {level}: | {message}",
+            "format": "{time:YYYY-MM-DD HH:mm:ss} - {level} | {message}",
             "rotation": "50 MB"
        },
     ]
 }
 logger.configure(**logger_cfg)
 print('Start logging to:', file_path)
-
 #  ********** END OF LOGGER CONFIG *************************
 
-
-
 #  ********** DATABASE CONFIG *************************
-
 db_file_name = 'db/discord_mailer.db'
 full_path = os.path.join(PATH, db_file_name)
 db = SqliteDatabase(
@@ -76,5 +76,4 @@ db = SqliteDatabase(
         'synchronous': 0
     }
 )
-
 #  ********** END OF DATABASE CONFIG *************************
