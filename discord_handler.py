@@ -11,12 +11,11 @@ import requests
 import aiohttp.client_exceptions
 import aiohttp.http_exceptions
 
-import utils
 from config import logger
 from data_classes import TokenDataStore, Vocabulary
 from models import Token, User, Proxy
 
-from utils import save_data_to_json, save_to_redis, load_from_redis, send_report_to_admins
+from utils import RedisInterface
 
 
 PROXY_USER = os.getenv("PROXY_USER")
@@ -143,8 +142,12 @@ class MessageReceiver:
 
         answer: str = ''
         message_id = 0
-        redis_data: List[dict] = await load_from_redis(telegram_id=self.__datastore.telegram_id)
+        redis_data: List[dict] = await RedisInterface(telegram_id=self.__datastore.telegram_id).load()
+        if not redis_data:
+            return answer, message_id
         for elem in redis_data:
+            if not isinstance(elem, dict):
+                continue
             answered = elem.get("answered", False)
             if not answered:
                 if elem.get("token") == token:
@@ -152,7 +155,7 @@ class MessageReceiver:
                     if answer:
                         message_id = elem.get("message_id", 0)
                         elem.update({"answered": True})
-                        await save_to_redis(telegram_id=self.__datastore.telegram_id, data=redis_data)
+                        await RedisInterface(telegram_id=self.__datastore.telegram_id).save(data=redis_data)
                         break
 
         return answer, message_id
@@ -263,8 +266,8 @@ class MessageReceiver:
                             "channel_id": elem.get("channel_id"),
                             "author": elem.get("author"),
                             "timestamp": message_time,
-                            "to_message": elem.get("referenced_message").get("content"),
-                            "to_user": elem.get("referenced_message").get("author").get("username")
+                            "to_message": elem.get("referenced_message", {}).get("content"),
+                            "to_user": elem.get("referenced_message", {}).get("author", {}).get("username")
                         }
                     )
         if messages:
@@ -280,7 +283,7 @@ class MessageReceiver:
         """Возвращает разницу между старыми и новыми данными в редисе,
         записывает полные данные в редис"""
 
-        total_replies: List[dict] = await load_from_redis(telegram_id=self.__datastore.telegram_id)
+        total_replies: List[dict] = await RedisInterface(telegram_id=self.__datastore.telegram_id).load()
         old_messages: list = list(map(lambda x: x.get("message_id"), total_replies))
         result: List[dict] = [
             elem
@@ -289,7 +292,7 @@ class MessageReceiver:
         ]
 
         total_replies.extend(result)
-        await save_to_redis(telegram_id=self.__datastore.telegram_id, data=total_replies)
+        await RedisInterface(telegram_id=self.__datastore.telegram_id).save(data=total_replies)
 
         return result
 

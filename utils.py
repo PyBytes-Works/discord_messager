@@ -1,18 +1,13 @@
-import asyncio
-import datetime
-import re
-
 import aiogram
 import aioredis
-from aioredis import Redis
 import json
 import os
 import random
 import string
 import aiogram.utils.exceptions
 
-from typing import Union
-from config import logger, bot, admins_list
+from typing import Union, Optional, List
+from config import logger, bot, admins_list, REDIS_DB
 
 
 def save_data_to_json(data, file_name: str = "data.json", key: str = 'w'):
@@ -105,37 +100,48 @@ async def send_report_to_admins(text: str) -> None:
             logger.error(f"Не смог отправить сообщение пользователю {admin_id}.", err)
 
 
-async def save_to_redis(telegram_id: str, data: list, timeout_sec: int = 3600, redis_db: 'Redis' = None) -> int:
-    """Сериализует данные и сохраняет в Редис. Устанавливает время хранения в секундах.
-    Возвращает кол-во записей."""
+class RedisInterface:
+    """Сохраняет и загружает данные из редис."""
 
-    try:
-        if redis_db is None:
-            redis_db = aioredis.from_url(
-                url="redis://localhost", encoding="utf-8", decode_responses=True)
+    def __init__(self, telegram_id: str):
+        self.redis_db = aioredis.from_url(url=REDIS_DB, encoding="utf-8", decode_responses=True)
+        self.telegram_id: str = telegram_id
+        self.data: list = []
+        self.timeout_sec = 0
 
-        async with redis_db.client() as conn:
-            return await conn.set(name=telegram_id, value=json.dumps(data), ex=timeout_sec)
-    except ConnectionRefusedError as err:
-        logger.error(f"Unable to connect to redis, data: '{data}' not saved!", err)
+    async def __get_or_set_from_db(self, key: str) -> Optional[list]:
+        result: List[dict] = []
+        try:
+            async with self.redis_db.client() as conn:
+                if key == "set":
+                    await conn.set(
+                        name=self.telegram_id, value=json.dumps(self.data), ex=self.timeout_sec)
+                elif key == "get":
+                    data = await conn.get(self.telegram_id)
+                    if data:
+                        try:
+                            result: List[dict] = json.loads(data)
+                        except TypeError as err:
+                            logger.error(f"F: load_from_redis: {err}", err)
+                else:
+                    raise ValueError("RedisInterface.__get_or_set_from_db(key=???) error")
+        except ConnectionRefusedError as err:
+            logger.error(f"Unable to connect to redis, data: '{self.data}' not saved!", err)
+        except aioredis.exceptions.ConnectionError as err:
+            logger.error(f"RedisInterface.__get_or_set_from_db(): Connection error: {err}")
 
+        return result
 
-async def load_from_redis(telegram_id: str, redis_db: 'Redis' = None) -> list:
-    """Возвращает десериализованные данные из Редис"""
+    async def save(self, data: list, timeout_sec: int = 3600) -> None:
+        """Сериализует данные и сохраняет в Редис. Устанавливает время хранения в секундах.
+        Возвращает кол-во записей."""
 
-    result = []
-    try:
-        if redis_db is None:
-            redis_db = aioredis.from_url(
-                url="redis://localhost", encoding="utf-8", decode_responses=True)
-        async with redis_db.client() as conn:
-            data = await conn.get(telegram_id)
-        if data:
-            try:
-                return json.loads(data)
-            except TypeError as err:
-                logger.error(f"F: load_from_redis: {err}", err)
-    except ConnectionRefusedError as err:
-        logger.error(f"Unable to connect to redis, telegram_id: '{telegram_id}' not loaded!", err)
+        self.data: list = data
+        self.timeout_sec: int = timeout_sec
 
-    return result
+        await self.__get_or_set_from_db(key="set")
+
+    async def load(self) -> List[dict]:
+        """Возвращает десериализованные данные из Редис"""
+
+        return await self.__get_or_set_from_db(key="get")

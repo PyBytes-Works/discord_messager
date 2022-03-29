@@ -13,6 +13,9 @@ from peewee import SqliteDatabase
 
 load_dotenv()
 
+# redis config
+REDIS_DB = os.environ.get("REDIS_DB", "redis://127.0.0.1:6379/0")
+
 # initialization admins list
 deskent = os.getenv("DESKENT_TELEGRAM_ID")
 artem = os.getenv("ARTEM_TELEGRAM_ID")
@@ -43,11 +46,11 @@ logger_cfg = {
        {
            "sink": sys.stdout,
            "level": "INFO",
-           "format": "<white>{time:YYYY-MM-DD HH:mm:ss}</white> - <yellow>{level}:</yellow> || <green>{message}</green>"
+           "format": "<white>{time:HH:mm:ss}</white> - <yellow>{level}</yellow> | <green>{message}</green>"
        },
        {
             "sink": file_path, "level": LOG_LEVEL,
-            "format": "{time:YYYY-MM-DD HH:mm:ss} - {level}: || {message} ||",
+            "format": "{time:YYYY-MM-DD HH:mm:ss} - {level}: | {message}",
             "rotation": "50 MB"
        },
     ]
