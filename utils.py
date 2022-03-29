@@ -104,13 +104,14 @@ class RedisInterface:
     """Сохраняет и загружает данные из редис."""
 
     def __init__(self, telegram_id: str):
-        self.redis_db = aioredis.from_url(url=REDIS_DB, encoding="utf-8", decode_responses=True)
+        self.redis_db = aioredis.Redis.from_url(url=REDIS_DB, encoding="utf-8", decode_responses=True)
         self.telegram_id: str = telegram_id
         self.data: list = []
         self.timeout_sec = 0
 
     async def __get_or_set_from_db(self, key: str) -> Optional[list]:
         result: List[dict] = []
+
         try:
             async with self.redis_db.client() as conn:
                 if key == "set":
