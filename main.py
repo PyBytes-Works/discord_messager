@@ -6,7 +6,7 @@ Docker version 20.10.13 +
 Redis server v=5.0.14 +
 
 
-Current version 3.1.5
+Current version 3.1.6
 """
 
 import os.path
