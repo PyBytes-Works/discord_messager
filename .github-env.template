@@ -1,0 +1,4 @@
+DOCKER_ACCESS_TOKEN = docker_hub_token_or_password
+HOST = 111.111.111.111
+USERNAME = user
+SSH_KEY = private_server_ssh_key

@@ -13,3 +13,6 @@ test*
 *.txt
 *.json
 
+/.github-env
+/docker-compose.yml
+/.github.env
