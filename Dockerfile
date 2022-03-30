@@ -1,5 +1,7 @@
 FROM python:3.9-slim
 
+EXPOSE 6379
+
 WORKDIR /app
 
 ADD requirements.txt .
