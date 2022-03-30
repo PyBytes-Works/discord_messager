@@ -16,7 +16,7 @@ load_dotenv()
 # # redis init
 REDIS_DB = os.environ.get("REDIS_DB", "redis://127.0.0.1:6379/0")
 
-# initialization admins list
+# initialization admins list1
 deskent = os.getenv("DESKENT_TELEGRAM_ID")
 artem = os.getenv("ARTEM_TELEGRAM_ID")
 vova = os.getenv("VOVA_TELEGRAM_ID")
