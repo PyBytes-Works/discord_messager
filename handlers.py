@@ -1,9 +1,7 @@
 """Модуль с основными обработчиками команд, сообщений и коллбэков"""
 
-import asyncio
 import datetime
-import random
-from typing import List, Tuple
+from typing import List
 
 from aiogram.dispatcher.filters import Text
 from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeyboardRemove
@@ -15,6 +13,7 @@ from models import User, Token
 from keyboards import cancel_keyboard, user_menu_keyboard, all_tokens_keyboard
 from discord_handler import MessageReceiver, TokenDataStore
 from states import UserState
+from userdata_class import UserData
 from utils import (
     check_is_int, save_data_to_json, send_report_to_admins, RedisInterface
 )
@@ -49,7 +48,7 @@ async def cancel_handler(message: Message, state: FSMContext) -> None:
 async def get_all_tokens_handler(message: Message) -> None:
     """Обработчик команды /set_cooldown"""
 
-    if await deactivate_user_if_expired(message=message):
+    if await UserData(message=message).deactivate_user_if_expired():
         return
     user_telegram_id: str = str(message.from_user.id)
 
@@ -99,7 +98,7 @@ async def set_self_token_cooldown_handler(message: Message, state: FSMContext):
 async def invitation_add_discord_token_handler(message: Message) -> None:
     """Обработчик команды /add_token"""
 
-    if await deactivate_user_if_expired(message=message):
+    if await UserData(message=message).deactivate_user_if_expired():
         return
     user: str = str(message.from_user.id)
     if User.is_active(telegram_id=user):
@@ -261,7 +260,7 @@ async def add_discord_id_handler(message: Message, state: FSMContext) -> None:
             user: data
         }
         save_data_to_json(data=data, file_name="user_data.json", key='a')
-        form_token_pairs(telegram_id=user, unpair=False)
+        UserData(message=message).form_token_pairs(telegram_id=user, unpair=False)
     else:
         Token.delete_token(token)
         text: str = "ERROR: add_discord_id_handler: Не смог добавить токен, нужно вводить данные заново."
@@ -276,7 +275,7 @@ async def info_tokens_handler(message: Message) -> None:
     Выводит инфо о токенах. Обработчик кнопки /info
     """
 
-    if await deactivate_user_if_expired(message=message):
+    if await UserData(message=message).deactivate_user_if_expired():
         return
     user: str = str(message.from_user.id)
     if User.is_active(message.from_user.id):
@@ -335,15 +334,32 @@ async def delete_token_handler(callback: CallbackQuery, state: FSMContext) -> No
 
 
 @logger.catch
-async def start_parsing_command_handler(message: Message, state: FSMContext) -> None:
+async def set_silence_mode(message: Message) -> None:
+    """Обработчик Mute/Unmute"""
+
+    # TODO Реализовать функцию User.set_silence(telegram_id=user_telegram_id, silence=BOOL)
+    user_telegram_id: str = str(message.from_user.id)
+    user_is_active: bool = User.is_active(telegram_id=user_telegram_id)
+    if await UserData(message=message).deactivate_user_if_expired():
+        return
+    if message.text == "Mute":
+        User.set_silence(telegram_id=user_telegram_id, silence=True)
+        await message.answer("Установлен тихий режим.")
+    elif message.text == "Unmute":
+        User.set_silence(telegram_id=user_telegram_id, silence=False)
+        await message.answer("Тихий режим отключен.")
+
+
+@logger.catch
+async def start_parsing_command_handler(message: Message) -> None:
     """Получает случайное сообщение из дискорда, ставит машину состояний в положение
     'жду ответа пользователя'
-    Обработчик команды /start_parsing
+    Обработчик нажатия на кнопку "Старт"
     """
 
     user_telegram_id: str = str(message.from_user.id)
     user_is_active: bool = User.is_active(telegram_id=user_telegram_id)
-    if not user_is_active or await deactivate_user_if_expired(message=message):
+    if await UserData(message=message).deactivate_user_if_expired():
         return
     if not Token.get_all_user_tokens(user_telegram_id):
         await message.answer("Сначала добавьте токен.", reply_markup=user_menu_keyboard())
@@ -353,189 +369,8 @@ async def start_parsing_command_handler(message: Message, state: FSMContext) -> 
         return
     User.set_user_is_work(telegram_id=user_telegram_id)
     await message.answer("Начинаю работу.", reply_markup=cancel_keyboard())
-    await lets_play(message=message)
+    await UserData(message=message).lets_play()
     await message.answer("Закончил работу.", reply_markup=user_menu_keyboard())
-
-
-@logger.catch
-async def lets_play(message: Message):
-    """Show must go on
-    Запускает рабочий цикл бота, проверяет ошибки."""
-
-    user_telegram_id: str = str(message.from_user.id)
-    while User.get_is_work(telegram_id=user_telegram_id):
-        if await deactivate_user_if_expired(message=message):
-            break
-        datastore: 'TokenDataStore' = TokenDataStore(user_telegram_id)
-        users_data_storage.add_or_update(telegram_id=user_telegram_id, data=datastore)
-        message_manager: 'MessageReceiver' = MessageReceiver(datastore=datastore)
-
-        discord_data: dict = await message_manager.get_message()
-        if not discord_data:
-            await send_report_to_admins("Произошла какая то чудовищная ошибка в функции lets_play.")
-            break
-        token_work: bool = discord_data.get("work")
-
-        replies: List[dict] = discord_data.get("replies", [])
-        if replies:
-            await send_replies(message=message, replies=replies)
-        if not token_work:
-            text: str = await get_error_text(
-                message=message, datastore=datastore, discord_data=discord_data
-            )
-            if text == 'stop':
-                break
-            elif text != 'ok':
-                await message.answer(text, reply_markup=cancel_keyboard())
-            logger.info(f"PAUSE: {datastore.delay + 1}")
-            if not datetime.datetime.now().minute % 10:
-                form_token_pairs(telegram_id=user_telegram_id, unpair=True)
-                logger.info(f"Время распределять токены!")
-
-            await asyncio.sleep(datastore.delay + 1)
-            datastore.delay = 0
-            await message.answer("Начинаю работу.", reply_markup=cancel_keyboard())
-        await asyncio.sleep(1 / 1000)
-
-
-@logger.catch
-async def get_error_text(message: Message, discord_data: dict, datastore: 'TokenDataStore') -> str:
-    """Обработка ошибок от сервера"""
-
-    user_telegram_id: str = str(message.from_user.id)
-    text: str = discord_data.get("message", "ERROR")
-    token: str = discord_data.get("token")
-
-    answer: dict = discord_data.get("answer", {})
-    data: dict = answer.get("data", {})
-    status_code: int = answer.get("status_code", 0)
-    sender_text: str = answer.get("message", "SEND_ERROR")
-    discord_code_error: int = answer.get("data", {}).get("code", 0)
-
-    result: str = 'ok'
-
-    if text == "no pairs":
-        pairs_formed: int = form_token_pairs(telegram_id=user_telegram_id, unpair=False)
-        if not pairs_formed:
-            await message.answer("Не смог сформировать пары токенов.")
-            result = 'stop'
-    elif status_code == -1:
-        error_text = sender_text
-        await message.answer("Ошибка десериализации отправки ответа.")
-        await send_report_to_admins(error_text)
-        result = "stop"
-    elif status_code == -2:
-        await message.answer("Ошибка словаря.", reply_markup=user_menu_keyboard())
-        await send_report_to_admins("Ошибка словаря.")
-        result = "stop"
-    elif status_code == 400:
-        if discord_code_error == 50035:
-            sender_text = 'Сообщение для ответа удалено из дискорд канала.'
-        else:
-            result = "stop"
-        await send_report_to_admins(sender_text)
-    elif status_code == 401:
-        if discord_code_error == 0:
-            await message.answer("Сменился токен."
-                                 f"\nToken: {token}")
-        else:
-            await message.answer(
-                "Произошла ошибка данных. Убедитесь, что вы ввели верные данные. Код ошибки - 401.",
-                reply_markup=user_menu_keyboard()
-            )
-        result = "stop"
-    elif status_code == 403:
-        if discord_code_error == 50013:
-            await message.answer(
-                "Не могу отправить сообщение для токена. (Ошибка 403 - 50013)"
-                "Токен в муте."
-                f"\nToken: {token}"
-                f"\nGuild: {datastore.guild}"
-                f"\nChannel: {datastore.channel}"
-            )
-        elif discord_code_error == 50001:
-            Token.delete_token(token=token)
-            await message.answer(
-                "Не могу отправить сообщение для токена. (Ошибка 403 - 50001)"
-                "Токен забанили."
-                f"\nТокен: {token} удален."
-                f"\nФормирую новые пары.",
-                reply_markup=user_menu_keyboard()
-            )
-            form_token_pairs(telegram_id=user_telegram_id, unpair=False)
-        else:
-            await message.answer(f"Ошибка {status_code}: {data}")
-    elif status_code == 404:
-        if discord_code_error == 10003:
-            await message.answer(
-                "Ошибка отправки сообщения. Неверный канал. (Ошибка 404 - 10003)"
-                f"\nToken: {token}"
-            )
-        else:
-            await message.answer(f"Ошибка {status_code}: {data}")
-    elif status_code == 407:
-        await message.answer("Ошибка прокси. Обратитесь к администратору. Код ошибки 407.", reply_markup=ReplyKeyboardRemove())
-        await send_report_to_admins(f"Ошибка прокси. Время действия proxy истекло.")
-        result = "stop"
-    elif status_code == 429:
-        if discord_code_error == 20016:
-            cooldown: int = int(data.get("retry_after", None))
-            if cooldown:
-                cooldown += datastore.cooldown + 2
-                Token.update_token_cooldown(token=token, cooldown=cooldown)
-                Token.update_mate_cooldown(token=token, cooldown=cooldown)
-                datastore.delay = cooldown
-            await message.answer(
-                "Для данного токена сообщения отправляются чаще, чем разрешено в канале."
-                f"\nToken: {token}"
-                f"\nВремя скорректировано. Кулдаун установлен: {cooldown} секунд"
-            )
-        else:
-            await message.answer(f"Ошибка: {status_code}:{discord_code_error}:{sender_text}")
-    elif status_code == 500:
-        error_text = (
-            f"Внутренняя ошибка сервера Дискорда. "
-            f"\nГильдия:Канал: {datastore.guild}:{datastore.channel} "
-            f"\nПауза 10 секунд. Код ошибки - 500."
-        )
-        await message.answer(error_text)
-        await send_report_to_admins(error_text)
-        datastore.delay = 10
-    else:
-        result = text
-
-    return result
-
-
-@logger.catch
-async def send_replies(message: Message, replies: list):
-    """Отправляет реплаи из дискорда в телеграм с кнопкой Ответить"""
-
-    result = []
-    for reply in replies:
-        answered: bool = reply.get("answered", False)
-        if not answered:
-            answer_keyboard: 'InlineKeyboardMarkup' = InlineKeyboardMarkup(row_width=1)
-            author: str = reply.get("author")
-            reply_id: str = reply.get("message_id")
-            reply_text: str = reply.get("text")
-            reply_to_author: str = reply.get("to_user")
-            reply_to_message: str = reply.get("to_message")
-            answer_keyboard.add(InlineKeyboardButton(
-                text="Ответить",
-                callback_data=f'reply_{reply_id}'
-            ))
-            await message.answer(
-                f"Вам пришло сообщение из ДИСКОРДА:"
-                f"\nКому: {reply_to_author}"
-                f"\nНа сообщение: {reply_to_message}"
-                f"\nОт: {author}"
-                f"\nText: {reply_text}",
-                reply_markup=answer_keyboard
-            )
-            result.append(reply)
-
-    return result
 
 
 @logger.catch
@@ -573,28 +408,11 @@ async def send_message_to_reply_handler(message: Message, state: FSMContext):
 
 
 @logger.catch
-def form_token_pairs(telegram_id: str, unpair: bool = False) -> int:
-    """Формирует пары из свободных токенов если они в одном канале"""
-
-    if unpair:
-        User.delete_all_pairs(telegram_id=telegram_id)
-    free_tokens: Tuple[Tuple[str, list]] = Token.get_all_free_tokens(telegram_id=telegram_id)
-    formed_pairs: int = 0
-    for channel, tokens in free_tokens:
-        while len(tokens) > 1:
-            random.shuffle(tokens)
-            formed_pairs += Token.make_tokens_pair(tokens.pop(), tokens.pop())
-    logger.info(f"Pairs formed: {formed_pairs}")
-
-    return formed_pairs
-
-
-@logger.catch
 async def default_message(message: Message) -> None:
     """Ответ на любое необработанное действие активного пользователя."""
 
     if User.is_active(message.from_user.id):
-        if await deactivate_user_if_expired(message=message):
+        if await UserData(message=message).deactivate_user_if_expired():
             return
         await message.answer(
             'Доступные команды: '
@@ -604,32 +422,6 @@ async def default_message(message: Message) -> None:
             '\n/info - показать информацию по всем токенам пользователя.',
             reply_markup=user_menu_keyboard()
         )
-
-
-@logger.catch
-async def deactivate_user_if_expired(message: Message) -> bool:
-    """Удаляет пользователя с истекшим сроком действия.
-    Возвращает True если деактивирован."""
-
-    user_telegram_id: str = str(message.from_user.id)
-    user_not_expired: bool = User.check_expiration_date(telegram_id=user_telegram_id)
-    user_is_admin: bool = User.is_admin(telegram_id=user_telegram_id)
-    if not user_not_expired and not user_is_admin:
-        await message.answer(
-            "Время подписки истекло. Ваш аккаунт деактивирован, токены удалены.",
-            reply_markup=ReplyKeyboardRemove()
-        )
-        User.delete_all_tokens(telegram_id=user_telegram_id)
-        User.deactivate_user(telegram_id=user_telegram_id)
-        text = (
-            f"Время подписки {user_telegram_id} истекло, "
-            f"пользователь декативирован, его токены удалены"
-        )
-        logger.info(text)
-        await send_report_to_admins(text)
-        return True
-
-    return False
 
 
 @logger.catch
@@ -656,7 +448,9 @@ def register_handlers(dp: Dispatcher) -> None:
         cancel_handler, Text(startswith=["отмена", "cancel"], ignore_case=True), state="*")
     dp.register_callback_query_handler(
         cancel_handler, Text(startswith=["отмена", "cancel"], ignore_case=True), state="*")
-    dp.register_message_handler(start_parsing_command_handler, commands=["start_parsing"])
+    dp.register_message_handler(start_parsing_command_handler, Text(equals=["Старт"]))
+    dp.register_message_handler(set_silence_mode, Text(equals=["Mute"]))
+    dp.register_message_handler(set_silence_mode, Text(equals=["Unmute"]))
     dp.register_message_handler(start_command_handler, commands=["start"])
     dp.register_message_handler(info_tokens_handler, commands=["info"])
     dp.register_message_handler(get_all_tokens_handler, commands=["set_cooldown"])

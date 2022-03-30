@@ -27,6 +27,7 @@ class TokenDataStore:
         self.__MATE_DISCORD_ID: str = ''
         self.__DELAY: int = 0
         self.__MY_DISCORD_ID: str = ''
+        self.__silence: bool = False
 
     def create_datastore_data(self, token: str):
         self.token: str = token
@@ -49,6 +50,16 @@ class TokenDataStore:
     @my_discord_id.setter
     def my_discord_id(self, my_discord_id: str):
         self.__MY_DISCORD_ID = my_discord_id
+
+    @property
+    def silence(self) -> bool:
+        return self.__silence
+
+    @silence.setter
+    def silence(self, silence: bool):
+        if not isinstance(silence, bool):
+            raise TypeError("Silence must be boolean.")
+        self.__silence = silence
 
     @property
     def mate_id(self) -> str:
