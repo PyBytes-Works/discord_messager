@@ -215,7 +215,3 @@ class Vocabulary:
                 cls.__VOCABULARY = f.readlines()
         else:
             raise FileNotFoundError(f"__update_vocabulary: {file_name} error: ")
-
-
-# initialization user data storage
-users_data_storage = InstancesStorage()

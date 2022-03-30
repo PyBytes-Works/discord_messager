@@ -52,10 +52,10 @@ def user_menu_keyboard() -> 'ReplyKeyboardMarkup':
         # KeyboardButton("/stop"),
     )
     keyboard.row(
-        KeyboardButton("/add_token"),
-        KeyboardButton("/set_cooldown"),
-        KeyboardButton("/info"),
-        KeyboardButton("/cancel")
+        KeyboardButton("Добавить токен"),
+        KeyboardButton("Установить кулдаун"),
+        KeyboardButton("Информация"),
+        KeyboardButton("Отмена")
     )
     return keyboard
 

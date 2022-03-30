@@ -8,10 +8,9 @@ from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKe
 from aiogram.dispatcher import FSMContext
 
 from config import logger, Dispatcher, admins_list
-from data_classes import users_data_storage
 from models import User, Token
 from keyboards import cancel_keyboard, user_menu_keyboard, all_tokens_keyboard
-from discord_handler import MessageReceiver, TokenDataStore
+from discord_handler import MessageReceiver
 from states import UserState
 from userdata_class import UserData
 from utils import (
@@ -28,14 +27,9 @@ async def cancel_handler(message: Message, state: FSMContext) -> None:
     """
 
     user_telegram_id: str = str(message.from_user.id)
-    datastore: 'TokenDataStore' = users_data_storage.get_instance(telegram_id=user_telegram_id)
-    time_to_over: int = 0
-    if datastore:
-        time_to_over = datastore.delay
     text: str = ''
     if User.get_is_work(telegram_id=user_telegram_id):
-        text = ("\nДождитесь завершения работы бота..."
-                f"\nОсталось: {time_to_over} секунд")
+        text = ("\nДождитесь завершения работы бота...")
     await message.answer(
         "Вы отменили текущую команду." + text,
         reply_markup=user_menu_keyboard()
@@ -46,9 +40,9 @@ async def cancel_handler(message: Message, state: FSMContext) -> None:
 
 @logger.catch
 async def get_all_tokens_handler(message: Message) -> None:
-    """Обработчик команды /set_cooldown"""
+    """Обработчик команды "Установить кулдаун"""""
 
-    if await UserData(message=message).deactivate_user_if_expired():
+    if await UserData(message=message).is_expired_user_deactivated():
         return
     user_telegram_id: str = str(message.from_user.id)
 
@@ -98,7 +92,7 @@ async def set_self_token_cooldown_handler(message: Message, state: FSMContext):
 async def invitation_add_discord_token_handler(message: Message) -> None:
     """Обработчик команды /add_token"""
 
-    if await UserData(message=message).deactivate_user_if_expired():
+    if await UserData(message=message).is_expired_user_deactivated():
         return
     user: str = str(message.from_user.id)
     if User.is_active(telegram_id=user):
@@ -272,10 +266,10 @@ async def add_discord_id_handler(message: Message, state: FSMContext) -> None:
 @logger.catch
 async def info_tokens_handler(message: Message) -> None:
     """
-    Выводит инфо о токенах. Обработчик кнопки /info
+    Выводит инфо о токенах. Обработчик кнопки "Информация"
     """
 
-    if await UserData(message=message).deactivate_user_if_expired():
+    if await UserData(message=message).is_expired_user_deactivated():
         return
     user: str = str(message.from_user.id)
     if User.is_active(message.from_user.id):
@@ -340,7 +334,7 @@ async def set_silence_mode(message: Message) -> None:
     # TODO Реализовать функцию User.set_silence(telegram_id=user_telegram_id, silence=BOOL)
     user_telegram_id: str = str(message.from_user.id)
     user_is_active: bool = User.is_active(telegram_id=user_telegram_id)
-    if await UserData(message=message).deactivate_user_if_expired():
+    if await UserData(message=message).is_expired_user_deactivated():
         return
     if message.text == "Mute":
         User.set_silence(telegram_id=user_telegram_id, silence=True)
@@ -359,7 +353,8 @@ async def start_parsing_command_handler(message: Message) -> None:
 
     user_telegram_id: str = str(message.from_user.id)
     user_is_active: bool = User.is_active(telegram_id=user_telegram_id)
-    if await UserData(message=message).deactivate_user_if_expired():
+    user_expired: bool = await UserData(message=message).is_expired_user_deactivated()
+    if not user_is_active or user_expired:
         return
     if not Token.get_all_user_tokens(user_telegram_id):
         await message.answer("Сначала добавьте токен.", reply_markup=user_menu_keyboard())
@@ -412,7 +407,7 @@ async def default_message(message: Message) -> None:
     """Ответ на любое необработанное действие активного пользователя."""
 
     if User.is_active(message.from_user.id):
-        if await UserData(message=message).deactivate_user_if_expired():
+        if await UserData(message=message).is_expired_user_deactivated():
             return
         await message.answer(
             'Доступные команды: '
@@ -452,13 +447,17 @@ def register_handlers(dp: Dispatcher) -> None:
     dp.register_message_handler(set_silence_mode, Text(equals=["Mute"]))
     dp.register_message_handler(set_silence_mode, Text(equals=["Unmute"]))
     dp.register_message_handler(start_command_handler, commands=["start"])
-    dp.register_message_handler(info_tokens_handler, commands=["info"])
-    dp.register_message_handler(get_all_tokens_handler, commands=["set_cooldown"])
+    dp.register_message_handler(info_tokens_handler, commands=["Информация"])
+    dp.register_message_handler(get_all_tokens_handler, commands=["Установить кулдаун"])
     dp.register_callback_query_handler(request_self_token_cooldown_handler, state=UserState.select_token)
     dp.register_callback_query_handler(answer_to_reply_handler, Text(startswith=["reply_"]))
     dp.register_message_handler(send_message_to_reply_handler, state=UserState.answer_to_reply)
     dp.register_message_handler(set_self_token_cooldown_handler, state=UserState.set_user_self_cooldown)
-    dp.register_message_handler(invitation_add_discord_token_handler, commands=["at", "addtoken", "add_token"])
+    dp.register_message_handler(
+        invitation_add_discord_token_handler,
+        Text(equals=["Добавить токен"]),
+        commands=["at", "addtoken", "add_token"]
+    )
     dp.register_message_handler(add_cooldown_handler, state=UserState.user_add_cooldown)
     dp.register_message_handler(add_discord_token_handler, state=UserState.user_add_token)
     dp.register_message_handler(add_discord_token_handler, state=UserState.user_add_token)

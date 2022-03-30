@@ -9,7 +9,7 @@ env:
   COUNT: "1.0"
 on:
   push:
-    branches: [ deskent ]
+    branches: [ develop ]
 jobs:
   create_docker_build:
     runs-on: ubuntu-latest

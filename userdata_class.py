@@ -7,10 +7,14 @@ import asyncio
 
 from config import logger
 from discord_handler import MessageReceiver, TokenDataStore
-from data_classes import users_data_storage
+from data_classes import InstancesStorage
 from models import User, Token
 from utils import send_report_to_admins
 from keyboards import cancel_keyboard, user_menu_keyboard
+
+
+# initialization user data storage
+users_data_storage = InstancesStorage()
 
 
 class UserData:
@@ -18,15 +22,14 @@ class UserData:
     def __init__(self, message: Message) -> None:
         self.message: Message = message
         self.user_telegram_id: str = str(self.message.from_user.id)
-        self.deactivate_user_if_expired()
 
     @logger.catch
-    async def lets_play(self):
+    async def lets_play(self) -> None:
         """Show must go on
         Запускает рабочий цикл бота, проверяет ошибки."""
 
         while User.get_is_work(telegram_id=self.user_telegram_id):
-            if await self.deactivate_user_if_expired():
+            if await self.is_expired_user_deactivated():
                 break
             datastore: 'TokenDataStore' = TokenDataStore(self.user_telegram_id)
             users_data_storage.add_or_update(telegram_id=self.user_telegram_id, data=datastore)
@@ -44,9 +47,7 @@ class UserData:
             if replies:
                 await self.send_replies(message=self.message, replies=replies)
             if not token_work:
-                text: str = await self.get_error_text(
-                    message=self.message, datastore=datastore, discord_data=discord_data
-                )
+                text: str = await self.get_error_text(datastore=datastore, discord_data=discord_data)
                 if text == 'stop':
                     break
                 elif text != 'ok':
@@ -96,10 +97,8 @@ class UserData:
     async def get_error_text(self, discord_data: dict, datastore: 'TokenDataStore') -> str:
         """Обработка ошибок от сервера"""
 
-
         text: str = discord_data.get("message", "ERROR")
         token: str = discord_data.get("token")
-
         answer: dict = discord_data.get("answer", {})
         data: dict = answer.get("data", {})
         status_code: int = answer.get("status_code", 0)
@@ -220,7 +219,7 @@ class UserData:
         return formed_pairs
 
     @logger.catch
-    async def deactivate_user_if_expired(self) -> bool:
+    async def is_expired_user_deactivated(self) -> bool:
         """Удаляет пользователя с истекшим сроком действия.
         Возвращает True если деактивирован."""
 
