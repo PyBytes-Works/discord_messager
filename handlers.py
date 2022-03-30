@@ -10,7 +10,7 @@ from aiogram.dispatcher import FSMContext
 from config import logger, Dispatcher, admins_list
 from models import User, Token
 from keyboards import cancel_keyboard, user_menu_keyboard, all_tokens_keyboard
-from classes.discord_classes import MessageReceiver, UserData, users_data_storage
+from classes.discord_classes import MessageReceiver, UserData
 from states import UserState
 from utils import (
     check_is_int, save_data_to_json, send_report_to_admins, RedisInterface
@@ -290,7 +290,7 @@ async def info_tokens_handler(message: Message) -> None:
             f'\nВсего токенов: {count_tokens}'
             f'\nСвободно слотов: {free_slots}'
             f'\nТокены:',
-            reply_markup=cancel_keyboard()
+            reply_markup=user_menu_keyboard()
         )
 
         for token_info in all_tokens:
@@ -327,7 +327,7 @@ async def delete_token_handler(callback: CallbackQuery, state: FSMContext) -> No
 
 
 @logger.catch
-async def start_parsing_command_handler(message: Message) -> None:
+async def start_parsing_command_handler(message: Message, state: FSMContext) -> None:
     """Получает случайное сообщение из дискорда, ставит машину состояний в положение
     'жду ответа пользователя'
     Обработчик нажатия на кнопку "Старт"
@@ -351,8 +351,10 @@ async def start_parsing_command_handler(message: Message) -> None:
         mute_text: str = "в тихом режиме."
         mute = True
     await message.answer("Запускаю бота " + mute_text, reply_markup=cancel_keyboard())
+    await UserState.in_work.set()
     await UserData(message=message, mute=mute).lets_play()
     await message.answer("Закончил работу.", reply_markup=user_menu_keyboard())
+    await state.finish()
 
 
 @logger.catch
