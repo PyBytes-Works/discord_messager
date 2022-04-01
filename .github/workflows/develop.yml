@@ -1,7 +1,7 @@
 name: discord_mailer
 env:
-  DOCKER_USER: "deskent"
-  DOCKER_REPOSITORY_NAME: "deskent"
+  DOCKER_USER: "palmershow"
+  DOCKER_REPOSITORY_NAME: "palmershow"
   PROJECT_NAME: "discord_mailer"
   STAGE: "dev"
   WORK_DIR: "/home/deskent/deploy"
@@ -9,7 +9,7 @@ env:
   COUNT: "3.0"
 on:
   push:
-    branches: [ develop ]
+    branches: [ old_version ]
 jobs:
   create_docker_build:
     runs-on: ubuntu-latest

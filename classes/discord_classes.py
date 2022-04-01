@@ -684,6 +684,7 @@ class UserData:
                 self.datastore.delay = 0
                 if not self.__silence:
                     await self.message.answer("Начинаю работу.", reply_markup=cancel_keyboard())
+                self.form_token_pairs(unpair=True)
             await asyncio.sleep(1 / 1000)
 
     @logger.catch
