@@ -4,7 +4,6 @@ env:
   DOCKER_REPOSITORY_NAME: "deskent"
   PROJECT_NAME: "discord_mailer"
   STAGE: "dev"
-  WORK_DIR: "/home/deskent/deploy"
   VERSION: "ver-${{ github.sha }}"
   COUNT: "3.0"
 on:
@@ -30,6 +29,8 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     needs: [create_docker_build]
+    env:
+      WORK_DIR: "/home/${{ secrets.USERNAME }}/deploy"
     steps:
       - name: Executing remote ssh commands using ssh key
         uses: appleboy/ssh-action@master
