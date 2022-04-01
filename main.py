@@ -1,12 +1,8 @@
 #!/usr/local/bin/python
-
 """
 Python 3.8 or higher
 Docker version 20.10.13 +
 Redis server v=5.0.14 +
-
-
-Current version 3.1.6
 """
 
 import os.path
@@ -15,7 +11,7 @@ import datetime
 from aiogram import executor
 
 from admin_handlers import register_admin_handlers
-from config import dp, logger, admins_list, bot, db_file_name
+from config import dp, logger, admins_list, bot, db_file_name, VERSION
 from handlers import register_handlers
 from models import recreate_db
 
@@ -36,7 +32,8 @@ async def on_startup(_) -> None:
 
     try:
         # Отправляет сообщение админам при запуске бота
-        await send_report_to_admins(text="Discord_mailer started.")
+        await send_report_to_admins(text="Discord_mailer started."
+                                         f"\nVersion: {VERSION}")
     except Exception:
         pass
     if not os.path.exists(db_file_name):
