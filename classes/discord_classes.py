@@ -839,7 +839,13 @@ class UserData:
         for channel, tokens in free_tokens:
             while len(tokens) > 1:
                 random.shuffle(tokens)
-                formed_pairs += Token.make_tokens_pair(tokens.pop(), tokens.pop())
+                first_token = tokens.pop()
+                second_token = tokens.pop()
+                logger.info(f"Pairs formed: "
+                            f"\nFirst: {first_token}"
+                            f"\nSecond: {second_token}")
+                formed_pairs += Token.make_tokens_pair(first_token, second_token)
+
         logger.info(f"Pairs formed: {formed_pairs}")
 
         return formed_pairs
