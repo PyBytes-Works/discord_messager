@@ -268,8 +268,6 @@ class MessageReceiver:
                             "channel_id": elem.get("channel_id"),
                             "author": elem.get("author"),
                             "timestamp": message_time,
-                            "to_message": elem.get("referenced_message", {}).get("content"),
-                            "to_user": elem.get("referenced_message", {}).get("author", {}).get("username")
                         }
                     )
         if messages:
@@ -303,27 +301,31 @@ class MessageReceiver:
 
         result = {}
         ref_messages: dict = elem.get("referenced_message", {})
-        if ref_messages:
-            ref_messages_author: dict = ref_messages.get("author", {})
-            if ref_messages_author:
-                reply_for_author_id: str = ref_messages_author.get("id", '')
-                mentions: tuple = tuple(
-                    filter(
-                        lambda x: int(x.get("id", '')) == int(self.__datastore.my_discord_id),
-                        elem.get("mentions", [])
-                    )
-                )
-                author: str = elem.get("author", {}).get("username", '')
-                author_id: str = elem.get("author", {}).get("id", '')
-                message_for_me: bool = reply_for_author_id == self.__datastore.my_discord_id
-                if any(mentions) or message_for_me:
-                    if author_id not in Token.get_all_discord_id(token=self.__datastore.token):
-                        result.update({
-                            "token": self.__datastore.token,
-                            "author": author,
-                            "text": elem.get("content", ''),
-                            "message_id": elem.get("id", '')
-                        })
+        if not ref_messages:
+            return result
+        ref_messages_author: dict = ref_messages.get("author", {})
+        if not ref_messages_author:
+            return result
+        reply_for_author_id: str = ref_messages_author.get("id", '')
+        mentions: tuple = tuple(
+            filter(
+                lambda x: int(x.get("id", '')) == int(self.__datastore.my_discord_id),
+                elem.get("mentions", [])
+            )
+        )
+        author: str = elem.get("author", {}).get("username", '')
+        author_id: str = elem.get("author", {}).get("id", '')
+        message_for_me: bool = reply_for_author_id == self.__datastore.my_discord_id
+        if any(mentions) or message_for_me:
+            if author_id not in Token.get_all_discord_id(token=self.__datastore.token):
+                result.update({
+                    "token": self.__datastore.token,
+                    "author": author,
+                    "text": elem.get("content", ''),
+                    "message_id": elem.get("id", ''),
+                    "to_message": ref_messages.get("content"),
+                    "to_user": ref_messages.get("author", {}).get("username")
+                })
 
         return result
 
@@ -664,7 +666,7 @@ class UserData:
 
             replies: List[dict] = discord_data.get("replies", [])
             if replies:
-                await self.send_replies(message=self.message, replies=replies)
+                await self.send_replies(replies=replies)
             if not token_work:
                 text: str = await self.get_error_text(
                     datastore=self.datastore, discord_data=discord_data)
@@ -682,6 +684,7 @@ class UserData:
                 self.datastore.delay = 0
                 if not self.__silence:
                     await self.message.answer("Начинаю работу.", reply_markup=cancel_keyboard())
+                self.form_token_pairs(unpair=True)
             await asyncio.sleep(1 / 1000)
 
     @logger.catch
