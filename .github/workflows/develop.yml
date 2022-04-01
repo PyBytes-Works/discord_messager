@@ -27,18 +27,18 @@ jobs:
       - name: Docker push
         run: |
           docker push ${{ env.DOCKER_USER }}/${{ env.DOCKER_REPOSITORY_NAME }}:${{ env.PROJECT_NAME}}-${{ env.COUNT }}
-#  deploy:
-#    runs-on: ubuntu-latest
-#    needs: [create_docker_build]
-#    steps:
-#      - name: Executing remote ssh commands using ssh key
-#        uses: appleboy/ssh-action@master
-#        with:
-#          host: ${{ secrets.HOST }}
-#          username: ${{ secrets.USERNAME }}
-#          key: ${{ secrets.SSH_KEY }}
-#          script: |
-#            cd ${{ env.WORK_DIR }}
-#            docker-compose stop ${{ env.PROJECT_NAME }}
-#            docker rmi ${{ env.DOCKER_USER }}/${{ env.DOCKER_REPOSITORY_NAME }}:${{ env.PROJECT_NAME}}-${{ env.COUNT }} -f
-#            docker-compose up -d --build ${{ env.PROJECT_NAME }}
+  deploy:
+    runs-on: ubuntu-latest
+    needs: [create_docker_build]
+    steps:
+      - name: Executing remote ssh commands using ssh key
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USERNAME }}
+          key: ${{ secrets.SSH_KEY }}
+          script: |
+            cd ${{ env.WORK_DIR }}
+            docker-compose stop ${{ env.PROJECT_NAME }}
+            docker rmi ${{ env.DOCKER_USER }}/${{ env.DOCKER_REPOSITORY_NAME }}:${{ env.PROJECT_NAME}}-${{ env.COUNT }} -f
+            docker-compose up -d --build ${{ env.PROJECT_NAME }}
