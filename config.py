@@ -13,6 +13,7 @@ from peewee import SqliteDatabase
 
 load_dotenv()
 
+
 VERSION = os.getenv("VERSION")
 
 # # redis init
@@ -22,12 +23,16 @@ REDIS_DB = os.environ.get("REDIS_DB", "redis://127.0.0.1:6379/0")
 deskent = os.getenv("DESKENT_TELEGRAM_ID")
 artem = os.getenv("ARTEM_TELEGRAM_ID")
 vova = os.getenv("VOVA_TELEGRAM_ID")
-admins_list = [deskent, artem, vova]
-# admins_list = [deskent]
+
+# set admins list
+admins_list = [deskent]
+DEBUG = int(os.getenv("DEBUG"))
+if not DEBUG:
+    admins_list = [deskent, artem, vova]
 
 DEFAULT_PROXY = os.getenv("DEFAULT_PROXY")
-
-
+if not DEFAULT_PROXY:
+    raise ValueError("Config: DEFAULT_PROXY not found in file .env")
 tgToken = os.getenv("TELEBOT_TOKEN")
 
 # configure bot
