@@ -841,9 +841,11 @@ class UserData:
                 random.shuffle(tokens)
                 first_token = tokens.pop()
                 second_token = tokens.pop()
+                first_token_instance: 'Token' = Token.get_by_id(first_token)
+                second_token_instance: 'Token' = Token.get_by_id(second_token)
                 logger.info(f"Pairs formed: "
-                            f"\nFirst: {first_token}"
-                            f"\nSecond: {second_token}")
+                            f"\nFirst: {first_token_instance.token}"
+                            f"\nSecond: {second_token_instance.token}")
                 formed_pairs += Token.make_tokens_pair(first_token, second_token)
 
         logger.info(f"Pairs formed: {formed_pairs}")
