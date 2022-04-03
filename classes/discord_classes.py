@@ -13,7 +13,7 @@ import aiohttp.http_exceptions
 from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeyboardRemove
 
 from classes.vocabulary import Vocabulary
-from config import logger
+from config import logger, DEBUG
 from utils import send_report_to_admins
 from keyboards import cancel_keyboard, user_menu_keyboard
 from utils import RedisInterface
@@ -85,18 +85,18 @@ class MessageReceiver:
         и само сообщение"""
 
         result = {"work": False}
-        token_data: dict = await self.__select_token_for_work()
-        result_message: str = token_data.get("message")
-        if result_message == "no pairs":
-            result.update(token_data)
-            return result
+        # token_data: dict = await self.__select_token_for_work()
+        # result_message: str = token_data.get("message")
+        # if result_message == "no pairs":
+        #     result.update(token_data)
+        #     return result
+        #
+        # token: str = token_data.get("token", '')
+        # if not token:
+        #     result.update({"message": result_message})
+        #     return result
 
-        token: str = token_data.get("token", '')
-        if not token:
-            result.update({"message": result_message})
-            return result
-
-        user_message, message_id = await self.__get_user_message_from_redis(token=token)
+        user_message, message_id = await self.__get_user_message_from_redis()
 
         filtered_data: dict = await self.__get_filtered_data()
         if filtered_data:
@@ -115,7 +115,7 @@ class MessageReceiver:
             result.update({"message": "ERROR"})
             return result
         elif answer.get("status_code") != 200:
-            result.update({"answer": answer, "token": token})
+            result.update({"answer": answer, "token": self.__datastore.token})
             return result
 
         self.__datastore.current_message_id = 0
@@ -139,7 +139,7 @@ class MessageReceiver:
         return message_id
 
     @logger.catch
-    async def __get_user_message_from_redis(self, token: str) -> Tuple[str, int]:
+    async def __get_user_message_from_redis(self) -> Tuple[str, int]:
         """Возвращает данные из Редиса"""
 
         answer: str = ''
@@ -152,7 +152,7 @@ class MessageReceiver:
                 continue
             answered = elem.get("answered", False)
             if not answered:
-                if elem.get("token") == token:
+                if elem.get("token") == self.__datastore.token:
                     answer = elem.get("answer_text", '')
                     if answer:
                         message_id = elem.get("message_id", 0)
@@ -161,52 +161,6 @@ class MessageReceiver:
                         break
 
         return answer, message_id
-
-    @logger.catch
-    async def __select_token_for_work(self) -> dict:
-        """
-        Выбирает случайного токена дискорда из свободных, если нет свободных - пишет сообщение что
-        свободных нет.
-        """
-
-        result: dict = {"message": "token ready"}
-        all_tokens: List[dict] = Token.get_all_related_user_tokens(telegram_id=self.__datastore.telegram_id)
-        if not all_tokens:
-            result["message"] = "no pairs"
-            return result
-        current_time: int = int(datetime.datetime.now().timestamp())
-        workers: list = [
-            key
-            for elem in all_tokens
-            for key, value in elem.items()
-            if current_time > value["time"] + value["cooldown"]
-        ]
-        if workers:
-            random_token: str = random.choice(workers)
-            result["token"]: str = random_token
-            self.__datastore.create_datastore_data(random_token)
-        else:
-            min_token_data = {}
-            for elem in all_tokens:
-                min_token_data: dict = min(elem.items(), key=lambda x: x[1].get('time'))
-            token: str = tuple(min_token_data)[0]
-            self.__datastore.create_datastore_data(token)
-            min_token_time: int = Token.get_time_by_token(token)
-            delay: int = self.__datastore.cooldown - abs(min_token_time - current_time)
-            self.__datastore.delay = delay
-            text = "секунд"
-            if delay > 60:
-                minutes: int = delay // 60
-                seconds: int = delay % 60
-                if minutes < 10:
-                    minutes: str = f"0{minutes}"
-                if seconds < 10:
-                    seconds: str = f'0{seconds}'
-                delay: str = f"{minutes}:{seconds}"
-                text = "минут"
-            result["message"] = f"Все токены отработали. Следующий старт через {delay} {text}."
-
-        return result
 
     @logger.catch
     async def __get_filtered_data(self) -> dict:
@@ -225,7 +179,7 @@ class MessageReceiver:
                     if status_code == 200:
                         data: List[dict] = await response.json()
                     else:
-                        logger.error(f"F: __get_data_from_api_aiohttp error: {status_code}: {response.text()}")
+                        logger.error(f"F: __get_data_from_api_aiohttp error: {status_code}: {await response.text()}")
                         data: dict = {}
             except MessageReceiver.__EXCEPTIONS as err:
                 logger.error(f"F: __get_data_from_api_aiohttp error: {err}", err)
@@ -439,7 +393,7 @@ class MessageSender:
             proxies=proxies
         )
         if response.status_code != 204:
-            logger.warning(f"Typing: {response.status_code}")
+            logger.warning(f"Typing: {response.status_code}: {response.text}")
         await asyncio.sleep(2)
 
     @logger.catch
@@ -453,6 +407,7 @@ class MessageSender:
             "http": f"http://{PROXY_USER}:{PROXY_PASSWORD}@{self.__datastore.proxy}/",
         }
         try:
+            await self.__typing(proxies=proxies)
             await self.__typing(proxies=proxies)
             response = session.post(url=url, json=data, proxies=proxies)
             status_code = response.status_code
@@ -642,7 +597,65 @@ class UserData:
         self.message: 'Message' = message
         self.user_telegram_id: str = str(self.message.from_user.id)
         self.__silence: bool = mute
-        self.datastore: Optional['TokenDataStore'] = None
+        self.__current_tokens_list: List[dict] = []
+        self.__datastore: Optional['TokenDataStore'] = None
+
+    async def __form_tokens_list(self) -> dict:
+        """Возвращает сообщение об отсутствии токенов пользователя. Если токены есть - возвращает
+        пустой словарь"""
+
+        all_user_tokens = []
+        if not self.__current_tokens_list:
+            all_user_tokens: List[dict] = Token.get_all_related_user_tokens(telegram_id=self.__datastore.telegram_id)
+            if not all_user_tokens:
+                return {"message": "no pairs"}
+        self.__current_tokens_list: List[dict] = all_user_tokens[:]
+
+        return {}
+
+    @logger.catch
+    async def __select_token_for_work(self) -> dict:
+        """
+        Выбирает случайного токена дискорда из свободных, если нет свободных - пишет сообщение что
+        свободных нет.
+        """
+
+        result: dict = {}
+
+        current_time: int = int(datetime.datetime.now().timestamp())
+        workers: list = [
+            key
+            for elem in self.__current_tokens_list
+            for key, value in elem.items()
+            if current_time > value["time"] + value["cooldown"]
+        ]
+        # TODO
+        if workers:
+            random_token: str = random.choice(workers)
+            result["token"]: str = random_token
+            self.__datastore.create_datastore_data(random_token)
+        else:
+            min_token_data = {}
+            for elem in self.__current_tokens_list:
+                min_token_data: dict = min(elem.items(), key=lambda x: x[1].get('time'))
+            token: str = tuple(min_token_data)[0]
+            self.__datastore.create_datastore_data(token)
+            min_token_time: int = Token.get_time_by_token(token)
+            delay: int = self.__datastore.cooldown - abs(min_token_time - current_time)
+            self.__datastore.delay = delay
+            text = "секунд"
+            if delay > 60:
+                minutes: int = delay // 60
+                seconds: int = delay % 60
+                if minutes < 10:
+                    minutes: str = f"0{minutes}"
+                if seconds < 10:
+                    seconds: str = f'0{seconds}'
+                delay: str = f"{minutes}:{seconds}"
+                text = "минут"
+            result["message"] = f"Все токены отработали. Следующий старт через {delay} {text}."
+
+        return result
 
     @logger.catch
     async def lets_play(self) -> None:
@@ -652,12 +665,17 @@ class UserData:
         while User.get_is_work(telegram_id=self.user_telegram_id):
             if await self.is_expired_user_deactivated():
                 break
-            self.datastore: 'TokenDataStore' = TokenDataStore(self.user_telegram_id)
+            self.__datastore: 'TokenDataStore' = TokenDataStore(self.user_telegram_id)
             users_data_storage.add_or_update(telegram_id=self.user_telegram_id, data=self)
-            self.datastore.silence = False
-            message_manager: 'MessageReceiver' = MessageReceiver(datastore=self.datastore)
+            # TODO получить токен либо сообщение почему нет
+            discord_data = {}
+            if not self.__current_tokens_list:
+                discord_data: dict = await self.__form_tokens_list()
 
-            discord_data: dict = await message_manager.get_message()
+            discord_data: dict = await self.__select_token_for_work()
+            message_manager: 'MessageReceiver' = MessageReceiver(datastore=self.__datastore)
+            if discord_data.get("token"):
+                discord_data: dict = await message_manager.get_message()
             if not discord_data:
                 await send_report_to_admins(
                     "Произошла какая то чудовищная ошибка в функции lets_play.")
@@ -669,19 +687,19 @@ class UserData:
                 await self.send_replies(replies=replies)
             if not token_work:
                 text: str = await self.get_error_text(
-                    datastore=self.datastore, discord_data=discord_data)
+                    datastore=self.__datastore, discord_data=discord_data)
                 if text == 'stop':
                     break
                 elif text != 'ok':
                     if not self.__silence:
                         await self.message.answer(text, reply_markup=cancel_keyboard())
-                logger.info(f"PAUSE: {self.datastore.delay + 1}")
+                logger.info(f"PAUSE: {self.__datastore.delay + 1}")
                 if not datetime.datetime.now().minute % 10:
                     self.form_token_pairs(unpair=True)
                     logger.info(f"Время распределять токены!")
 
-                await asyncio.sleep(self.datastore.delay + 1)
-                self.datastore.delay = 0
+                await asyncio.sleep(self.__datastore.delay + 1)
+                self.__datastore.delay = 0
                 if not self.__silence:
                     await self.message.answer("Начинаю работу.", reply_markup=cancel_keyboard())
                 self.form_token_pairs(unpair=True)
@@ -754,7 +772,7 @@ class UserData:
         elif status_code == 401:
             if discord_code_error == 0:
                 await self.message.answer("Сменился токен."
-                                     f"\nToken: {token}")
+                                          f"\nToken: {token}")
             else:
                 await self.message.answer(
                     "Произошла ошибка данных. "
@@ -841,11 +859,12 @@ class UserData:
                 random.shuffle(tokens)
                 first_token = tokens.pop()
                 second_token = tokens.pop()
-                first_token_instance: 'Token' = Token.get_by_id(first_token)
-                second_token_instance: 'Token' = Token.get_by_id(second_token)
-                logger.info(f"Pairs formed: "
-                            f"\nFirst: {first_token_instance.token}"
-                            f"\nSecond: {second_token_instance.token}")
+                if DEBUG:
+                    first_token_instance: 'Token' = Token.get_by_id(first_token)
+                    second_token_instance: 'Token' = Token.get_by_id(second_token)
+                    logger.info(f"Pairs formed: "
+                                f"\nFirst: {first_token_instance.token}"
+                                f"\nSecond: {second_token_instance.token}")
                 formed_pairs += Token.make_tokens_pair(first_token, second_token)
 
         logger.info(f"Pairs formed: {formed_pairs}")

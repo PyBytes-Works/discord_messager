@@ -33,6 +33,7 @@ if not DEBUG:
 DEFAULT_PROXY = os.getenv("DEFAULT_PROXY")
 if not DEFAULT_PROXY:
     raise ValueError("Config: DEFAULT_PROXY not found in file .env")
+
 tgToken = os.getenv("TELEBOT_TOKEN")
 
 # configure bot
@@ -43,6 +44,8 @@ dp = Dispatcher(bot, storage=storage)
 
 #  ********** LOGGER CONFIG ********************************
 PATH = os.getcwd()
+if not os.path.exists('./logs'):
+    os.mkdir("./logs")
 today = datetime.datetime.today().strftime("%Y-%m-%d")
 file_path = os.path.join(os.path.relpath(PATH, start=None), 'logs', today, 'discord_mailer.log')
 

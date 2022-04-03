@@ -40,7 +40,7 @@ jobs:
           key: ${{ secrets.SSH_KEY_PROD }}
           script: |
             cd ${{ env.WORK_DIR }}
-            docker-compose restart redis
             docker-compose stop ${{ env.PROJECT_NAME }}
+            docker-compose restart redis
             docker rmi ${{ env.DOCKER_USER }}/${{ env.DOCKER_REPOSITORY_NAME }}:${{ env.PROJECT_NAME}}-${{ env.COUNT }} -f
             docker-compose up -d --build ${{ env.PROJECT_NAME }}
