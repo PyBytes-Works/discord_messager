@@ -342,7 +342,7 @@ async def start_parsing_command_handler(message: Message, state: FSMContext) -> 
         return
     if User.get_is_work(telegram_id=user_telegram_id):
         User.set_user_is_not_work(telegram_id=user_telegram_id)
-        return
+        await state.finish()
     User.set_user_is_work(telegram_id=user_telegram_id)
     mute: bool = False
     mute_text: str = ''
