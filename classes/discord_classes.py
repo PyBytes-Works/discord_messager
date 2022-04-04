@@ -635,8 +635,7 @@ class UserData:
             if replies:
                 await self.__send_replies(replies=replies)
             if not token_work:
-                text: str = await self.__get_error_text(
-                    datastore=self.__datastore, discord_data=discord_data)
+                text: str = await self.__get_error_text(discord_data=discord_data)
                 if text == 'stop':
                     break
                 elif text != 'ok':
