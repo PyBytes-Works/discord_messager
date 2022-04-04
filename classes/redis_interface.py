@@ -20,10 +20,13 @@ class RedisInterface:
     async def __get_or_set_from_db(self, key: str) -> Optional[list]:
         """Запрашивает или записывает данные в редис, возвращает список если запрашивали"""
 
+        logger.debug(f"Запрос в редис: "
+                     f"\nUSER: {self.telegram_id}")
         result: List[dict] = []
         try:
             async with self.redis_db.client() as conn:
                 if key == "set":
+                    logger.debug(f"\nDATA: {self.data}")
                     await conn.set(
                         name=self.telegram_id, value=json.dumps(self.data), ex=self.timeout_sec)
                 elif key == "get":
@@ -43,7 +46,7 @@ class RedisInterface:
             logger.error(f"RedisInterface.__get_or_set_from_db(): Connection error: {err}")
         except Exception as err:
             logger.error(f"RedisInterface.__get_or_set_from_db(): {err}")
-
+        logger.debug(f"REDIS RESULT: {result}")
         return result
 
     @logger.catch

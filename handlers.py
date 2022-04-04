@@ -27,9 +27,9 @@ async def cancel_handler(message: Message, state: FSMContext) -> None:
     user_telegram_id: str = str(message.from_user.id)
     text: str = ''
     if User.get_is_work(telegram_id=user_telegram_id):
-        text = ("\nДождитесь завершения работы бота...")
+        text = "\nДождитесь завершения работы бота..."
     await message.answer(
-        "Вы отменили текущую команду." + text
+        "Вы отменили текущую команду." + text, reply_markup=user_menu_keyboard()
     )
     User.set_user_is_not_work(telegram_id=user_telegram_id)
     await state.finish()

@@ -33,7 +33,8 @@ async def on_startup(_) -> None:
     try:
         # Отправляет сообщение админам при запуске бота
         await send_report_to_admins(text="Discord_mailer started."
-                                         f"\nVersion: {VERSION}")
+                                         f"\nVersion: {VERSION}"
+                                         f"TEST\n")
     except Exception:
         pass
     if not os.path.exists('./db'):
