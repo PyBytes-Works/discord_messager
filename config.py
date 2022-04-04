@@ -49,7 +49,7 @@ if not os.path.exists('./logs'):
     os.mkdir("./logs")
 today = datetime.datetime.today().strftime("%Y-%m-%d")
 file_path = os.path.join(os.path.relpath(PATH, start=None), 'logs', today, 'discord_mailer.log')
-LOG_LEVEL = "ERROR"
+LOG_LEVEL = "WARNING"
 DEBUG_LEVEL = "INFO"
 if DEBUG:
     DEBUG_LEVEL = "DEBUG"

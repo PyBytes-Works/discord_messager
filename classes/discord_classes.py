@@ -597,6 +597,7 @@ class UserData:
 
     def __init__(self, message: Message, mute: bool = False) -> None:
         self.message: 'Message' = message
+        self.__username: str = message.from_user.username
         self.user_telegram_id: str = str(self.message.from_user.id)
         self.__silence: bool = mute
         self.__current_tokens_list: List[dict] = []
@@ -604,11 +605,23 @@ class UserData:
         self.__datastore: Optional['TokenDataStore'] = None
 
     @logger.catch
+    async def __send_text(self, text: str, keyboard=None, check_silence: bool = False) -> None:
+        """Отправляет текст и клавиатуру пользователю если он не в тихом режиме."""
+
+        if check_silence and self.__silence:
+            return
+        if not keyboard:
+            await self.message.answer(text)
+            return
+        await self.message.answer(text, reply_markup=keyboard)
+
+    @logger.catch
     async def lets_play(self) -> None:
         """Show must go on
         Запускает рабочий цикл бота, проверяет ошибки."""
 
         while User.get_is_work(telegram_id=self.user_telegram_id):
+            logger.debug(f"\tUSER: {self.__username}:{self.user_telegram_id} - Game begin.")
             if await self.is_expired_user_deactivated():
                 break
             self.__datastore: 'TokenDataStore' = TokenDataStore(self.user_telegram_id)
@@ -645,24 +658,22 @@ class UserData:
             self.form_token_pairs(unpair=True)
             self.__current_tokens_list = await self.__get_tokens_list()
             if not self.__current_tokens_list:
-                await self.get_error_text(discord_data={"message": "no pairs"})
+                await self.__send_text(text="Не смог сформировать пары токенов.", keyboard=user_menu_keyboard())
                 return False
             await self.__get_workers()
         if await self.__get_worker_from_list():
             return True
         message: str = await self.__get_all_tokens_busy_message()
-        if not self.__silence:
-            await self.message.answer(message)
-            await self.__sleep()
-            return True
+        await self.__send_text(text=message, check_silence=True)
+        await self.__sleep()
+        return True
 
     @logger.catch
     async def __sleep(self):
         logger.info(f"PAUSE: {self.__datastore.delay + 1}")
         await asyncio.sleep(self.__datastore.delay + 1)
         self.__datastore.delay = 0
-        if not self.__silence:
-            await self.message.answer("Начинаю работу.", reply_markup=cancel_keyboard())
+        await self.__send_text(text="Начинаю работу.", keyboard=cancel_keyboard(), check_silence=True)
 
     @logger.catch
     async def __get_tokens_list(self) -> list:
@@ -683,6 +694,7 @@ class UserData:
     @logger.catch
     async def __get_worker_from_list(self) -> bool:
         """Возвращает токен для работы"""
+
         if not self.__workers:
             return False
         random.shuffle(self.__workers)
@@ -763,12 +775,7 @@ class UserData:
 
         result: str = 'ok'
 
-        if text == "no pairs":
-            pairs_formed: int = self.form_token_pairs(unpair=False)
-            if not pairs_formed:
-                await self.message.answer("Не смог сформировать пары токенов.")
-                result = 'stop'
-        elif status_code == -1:
+        if status_code == -1:
             error_text = sender_text
             await self.message.answer("Ошибка десериализации отправки ответа.")
             await send_report_to_admins(error_text)
@@ -876,9 +883,9 @@ class UserData:
                 if DEBUG:
                     first_token_instance: 'Token' = Token.get_by_id(first_token)
                     second_token_instance: 'Token' = Token.get_by_id(second_token)
-                    logger.info(f"Pairs formed: "
-                                f"\nFirst: {first_token_instance.token}"
-                                f"\nSecond: {second_token_instance.token}")
+                    logger.debug(f"Pairs formed: "
+                                 f"\nFirst: {first_token_instance.token}"
+                                 f"\nSecond: {second_token_instance.token}")
                 formed_pairs += Token.make_tokens_pair(first_token, second_token)
 
         logger.info(f"Pairs formed: {formed_pairs}")
