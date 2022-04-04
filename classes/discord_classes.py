@@ -85,17 +85,6 @@ class MessageReceiver:
         и само сообщение"""
 
         result = {"work": False}
-        # token_data: dict = await self.__select_token_for_work()
-        # result_message: str = token_data.get("message")
-        # if result_message == "no pairs":
-        #     result.update(token_data)
-        #     return result
-        #
-        # token: str = token_data.get("token", '')
-        # if not token:
-        #     result.update({"message": result_message})
-        #     return result
-
         user_message, message_id = await self.__get_user_message_from_redis()
 
         filtered_data: dict = await self.__get_filtered_data()
@@ -414,6 +403,12 @@ class MessageSender:
             await self.__typing(proxies=proxies)
             await asyncio.sleep(1)
             await self.__typing(proxies=proxies)
+            logger.debug(f"Sending message:"
+                         f"\n\tUSER: {self.__datastore.telegram_id}"
+                         f"\n\tGUILD/CHANNEL: {self.__datastore.guild}/{self.__datastore.channel}"
+                         f"\n\tTOKEN: {self.__datastore.token}"
+                         f"\n\tDATA: {data}"
+                         f"\n\tPROXIES: {self.__datastore.proxy}")
             response = session.post(url=url, json=data, proxies=proxies)
             status_code = response.status_code
             if status_code == 200:
@@ -649,19 +644,15 @@ class UserData:
         if not self.__workers:
             self.form_token_pairs(unpair=True)
             self.__current_tokens_list = await self.__get_tokens_list()
-            logger.debug(f"WORKERS: {self.__workers}")
             if not self.__current_tokens_list:
                 await self.get_error_text(discord_data={"message": "no pairs"})
-                logger.debug("message: no pairs")
                 return False
             await self.__get_workers()
-        token_data: dict = await self.__select_token_for_work()
-        logger.debug(f"TOKEN_DATA: {token_data}")
-        if token_data.get("token"):
+        if await self.__get_worker_from_list():
             return True
-        if token_data.get("message"):
-            if not self.__silence:
-                await self.message.answer(token_data.get("message"))
+        message: str = await self.__get_all_tokens_busy_message()
+        if not self.__silence:
+            await self.message.answer(message)
             await self.__sleep()
             return True
 
@@ -690,27 +681,14 @@ class UserData:
         ]
 
     @logger.catch
-    async def __get_worker_from_list(self) -> dict:
+    async def __get_worker_from_list(self) -> bool:
         """Возвращает токен для работы"""
-
-        result = {}
+        if not self.__workers:
+            return False
         random.shuffle(self.__workers)
         random_token: str = self.__workers.pop()
-        result["token"]: str = random_token
         self.__datastore.create_datastore_data(random_token)
-
-        return result
-
-    @logger.catch
-    async def __select_token_for_work(self) -> dict:
-        """
-        Выбирает случайного токена дискорда из свободных, если нет свободных - возвращает сообщение что
-        свободных нет.
-        """
-
-        if self.__workers:
-            return await self.__get_worker_from_list()
-        return await self.__get_all_tokens_busy_message()
+        return True
 
     @logger.catch
     async def __get_current_time(self) -> int:
@@ -719,7 +697,7 @@ class UserData:
         return int(datetime.datetime.now().timestamp())
 
     @logger.catch
-    async def __get_all_tokens_busy_message(self) -> dict:
+    async def __get_all_tokens_busy_message(self) -> str:
         min_token_data = {}
         for elem in self.__current_tokens_list:
             min_token_data: dict = min(elem.items(), key=lambda x: x[1].get('time'))
@@ -739,7 +717,7 @@ class UserData:
             delay: str = f"{minutes}:{seconds}"
             text = "минут"
 
-        return {"message": f"Все токены отработали. Следующий старт через {delay} {text}."}
+        return f"Все токены отработали. Следующий старт через {delay} {text}."
 
     @logger.catch
     async def send_replies(self, replies: list):
