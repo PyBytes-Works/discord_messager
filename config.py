@@ -13,6 +13,7 @@ from peewee import SqliteDatabase
 
 load_dotenv()
 
+
 VERSION = os.getenv("VERSION")
 
 # # redis init
@@ -22,11 +23,17 @@ REDIS_DB = os.environ.get("REDIS_DB", "redis://127.0.0.1:6379/0")
 deskent = os.getenv("DESKENT_TELEGRAM_ID")
 artem = os.getenv("ARTEM_TELEGRAM_ID")
 vova = os.getenv("VOVA_TELEGRAM_ID")
-admins_list = [deskent, artem, vova]
-# admins_list = [deskent]
+
+# set admins list
+admins_list = [deskent]
+DEBUG = os.getenv("DEBUG")
+DEBUG = True if (int(DEBUG) or DEBUG.lower() == "true") else False
+if not DEBUG:
+    admins_list = [deskent, artem, vova]
 
 DEFAULT_PROXY = os.getenv("DEFAULT_PROXY")
-
+if not DEFAULT_PROXY:
+    raise ValueError("Config: DEFAULT_PROXY not found in file .env")
 
 tgToken = os.getenv("TELEBOT_TOKEN")
 
@@ -38,20 +45,19 @@ dp = Dispatcher(bot, storage=storage)
 
 #  ********** LOGGER CONFIG ********************************
 PATH = os.getcwd()
+if not os.path.exists('./logs'):
+    os.mkdir("./logs")
 today = datetime.datetime.today().strftime("%Y-%m-%d")
 file_path = os.path.join(os.path.relpath(PATH, start=None), 'logs', today, 'discord_mailer.log')
-
-LOG_LEVEL = "ERROR"
+LOG_LEVEL = "WARNING"
+DEBUG_LEVEL = "INFO"
+if DEBUG:
+    DEBUG_LEVEL = "DEBUG"
 logger_cfg = {
    "handlers": [
        {
            "sink": sys.stdout,
-           "level": "ERROR",
-           "format": "<white>{time:HH:mm:ss}</white> - <lr>{level}</lr> | <green>{message}</green>"
-       },
-       {
-           "sink": sys.stdout,
-           "level": "INFO",
+           "level": DEBUG_LEVEL,
            "format": "<white>{time:HH:mm:ss}</white> - <yellow>{level}</yellow> | <green>{message}</green>"
        },
        {
