@@ -16,8 +16,8 @@ from classes.vocabulary import Vocabulary
 from config import logger, DEBUG
 from utils import send_report_to_admins
 from keyboards import cancel_keyboard, user_menu_keyboard
-from utils import RedisInterface
 from models import User, Token, Proxy
+from classes.redis_interface import RedisInterface
 
 
 PROXY_USER = os.getenv("PROXY_USER")
@@ -403,12 +403,12 @@ class MessageSender:
             await self.__typing(proxies=proxies)
             await asyncio.sleep(1)
             await self.__typing(proxies=proxies)
-            logger.debug(f"Sending message:"
-                         f"\n\tUSER: {self.__datastore.telegram_id}"
-                         f"\n\tGUILD/CHANNEL: {self.__datastore.guild}/{self.__datastore.channel}"
-                         f"\n\tTOKEN: {self.__datastore.token}"
-                         f"\n\tDATA: {data}"
-                         f"\n\tPROXIES: {self.__datastore.proxy}")
+            # logger.debug(f"Sending message:"
+            #              f"\n\tUSER: {self.__datastore.telegram_id}"
+            #              f"\n\tGUILD/CHANNEL: {self.__datastore.guild}/{self.__datastore.channel}"
+            #              f"\n\tTOKEN: {self.__datastore.token}"
+            #              f"\n\tDATA: {data}"
+            #              f"\n\tPROXIES: {self.__datastore.proxy}")
             response = session.post(url=url, json=data, proxies=proxies)
             status_code = response.status_code
             if status_code == 200:
@@ -635,8 +635,7 @@ class UserData:
             if replies:
                 await self.__send_replies(replies=replies)
             if not token_work:
-                text: str = await self.__get_error_text(
-                    datastore=self.__datastore, discord_data=discord_data)
+                text: str = await self.__get_error_text(discord_data=discord_data)
                 if text == 'stop':
                     break
                 elif text != 'ok':
@@ -885,12 +884,12 @@ class UserData:
                 random.shuffle(tokens)
                 first_token = tokens.pop()
                 second_token = tokens.pop()
-                if DEBUG:
-                    first_token_instance: 'Token' = Token.get_by_id(first_token)
-                    second_token_instance: 'Token' = Token.get_by_id(second_token)
-                    logger.debug(f"Pairs formed: "
-                                 f"\nFirst: {first_token_instance.token}"
-                                 f"\nSecond: {second_token_instance.token}")
+                # if DEBUG:
+                #     first_token_instance: 'Token' = Token.get_by_id(first_token)
+                #     second_token_instance: 'Token' = Token.get_by_id(second_token)
+                #     logger.debug(f"Pairs formed: "
+                #                  f"\nFirst: {first_token_instance.token}"
+                #                  f"\nSecond: {second_token_instance.token}")
                 formed_pairs += Token.make_tokens_pair(first_token, second_token)
 
         logger.info(f"Pairs formed: {formed_pairs}")

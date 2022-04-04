@@ -4,8 +4,8 @@ env:
   DOCKER_REPOSITORY_NAME: "deskent"
   PROJECT_NAME: "discord_mailer"
   STAGE: "prod"
-  VERSION: "ver-${{ github.sha }}-prod"
-  COUNT: "3.0"
+  VERSION: "ver-${{ github.sha }}"
+  COUNT: "3.1.7-prod"
 on:
   push:
     branches: [ main ]
@@ -29,18 +29,15 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     needs: [create_docker_build]
-    env:
-      WORK_DIR: "/home/${{ secrets.USERNAME_PROD }}/deploy"
     steps:
       - name: Executing remote ssh commands using ssh key
         uses: appleboy/ssh-action@master
         with:
           host: ${{ secrets.HOST_PROD }}
-          username: ${{ secrets.USERNAME_PROD }}
+          username: ${{ secrets.USERNAME }}
           key: ${{ secrets.SSH_KEY_PROD }}
           script: |
-            cd ${{ env.WORK_DIR }}
-            docker-compose stop ${{ env.PROJECT_NAME }}
-            docker-compose restart redis
-            docker rmi ${{ env.DOCKER_USER }}/${{ env.DOCKER_REPOSITORY_NAME }}:${{ env.PROJECT_NAME}}-${{ env.COUNT }} -f
-            docker-compose up -d --build ${{ env.PROJECT_NAME }}
+            cd "/home/${{ secrets.USERNAME }}/deploy/${{ env.PROJECT_NAME }}/${{ env.STAGE }}"
+            docker-compose down
+            docker rmi ${{ env.DOCKER_USER }}/${{ env.DOCKER_REPOSITORY_NAME }}:${{ env.PROJECT_NAME}}-${{ env.COUNT }}
+            docker-compose up -d --build

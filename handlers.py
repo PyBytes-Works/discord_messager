@@ -12,9 +12,8 @@ from models import User, Token
 from keyboards import cancel_keyboard, user_menu_keyboard, all_tokens_keyboard
 from classes.discord_classes import MessageReceiver, UserData
 from states import UserState
-from utils import (
-    check_is_int, save_data_to_json, send_report_to_admins, RedisInterface
-)
+from utils import check_is_int, save_data_to_json, send_report_to_admins
+from classes.redis_interface import RedisInterface
 
 
 @logger.catch
@@ -28,9 +27,9 @@ async def cancel_handler(message: Message, state: FSMContext) -> None:
     user_telegram_id: str = str(message.from_user.id)
     text: str = ''
     if User.get_is_work(telegram_id=user_telegram_id):
-        text = ("\nДождитесь завершения работы бота...")
+        text = "\nДождитесь завершения работы бота..."
     await message.answer(
-        "Вы отменили текущую команду." + text
+        "Вы отменили текущую команду." + text, reply_markup=user_menu_keyboard()
     )
     User.set_user_is_not_work(telegram_id=user_telegram_id)
     await state.finish()
@@ -341,8 +340,8 @@ async def start_parsing_command_handler(message: Message, state: FSMContext) -> 
         await message.answer("Сначала добавьте токен.", reply_markup=user_menu_keyboard())
         return
     if User.get_is_work(telegram_id=user_telegram_id):
-        await message.answer("Бот уже запущен.", reply_markup=cancel_keyboard())
-        return
+        User.set_user_is_not_work(telegram_id=user_telegram_id)
+        await state.finish()
     User.set_user_is_work(telegram_id=user_telegram_id)
     mute: bool = False
     mute_text: str = ''
@@ -362,7 +361,6 @@ async def answer_to_reply_handler(callback: CallbackQuery, state: FSMContext):
 
     message_id: str = callback.data.rsplit("_", maxsplit=1)[-1]
     await callback.message.answer('Введите текст ответа:', reply_markup=cancel_keyboard())
-    await UserState.answer_to_reply.set()
     await state.update_data(message_id=message_id)
     await callback.answer()
 
@@ -382,12 +380,10 @@ async def send_message_to_reply_handler(message: Message, state: FSMContext):
     else:
         logger.warning("f: send_message_to_reply_handler: elem in Redis data not found.")
         await message.answer('Время хранения данных истекло.', reply_markup=cancel_keyboard())
-        await state.finish()
         return
     await message.answer('Добавляю сообщение в очередь. Это займет несколько секунд.', reply_markup=ReplyKeyboardRemove())
     await RedisInterface(telegram_id=user_telegram_id).save(data=redis_data)
     await message.answer('Сообщение добавлено в очередь сообщений.', reply_markup=cancel_keyboard())
-    await state.finish()
 
 
 @logger.catch
@@ -426,7 +422,7 @@ def register_handlers(dp: Dispatcher) -> None:
     dp.register_message_handler(get_all_tokens_handler, Text(equals=["Установить кулдаун"]))
     dp.register_callback_query_handler(request_self_token_cooldown_handler, state=UserState.select_token)
     dp.register_callback_query_handler(answer_to_reply_handler, Text(startswith=["reply_"]), state=UserState.in_work)
-    dp.register_message_handler(send_message_to_reply_handler, state=UserState.answer_to_reply)
+    dp.register_message_handler(send_message_to_reply_handler, state=UserState.in_work)
     dp.register_message_handler(set_self_token_cooldown_handler, state=UserState.set_user_self_cooldown)
     dp.register_message_handler(invitation_add_discord_token_handler, Text(equals=["Добавить токен"]))
     dp.register_message_handler(add_cooldown_handler, state=UserState.user_add_cooldown)
