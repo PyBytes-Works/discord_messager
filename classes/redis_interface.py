@@ -50,7 +50,7 @@ class RedisInterface:
         return result
 
     @logger.catch
-    async def save(self, data: list, timeout_sec: int = 3600) -> None:
+    async def save(self, data: list, timeout_sec: int = 1000) -> None:
         """Сериализует данные и сохраняет в Редис. Устанавливает время хранения в секундах.
         Возвращает кол-во записей."""
 

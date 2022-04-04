@@ -39,4 +39,5 @@ jobs:
           script: |
             cd "/home/${{ secrets.USERNAME }}/deploy/${{ env.PROJECT_NAME }}/${{ env.STAGE }}"
             docker-compose down
+            docker rmi ${{ env.DOCKER_USER }}/${{ env.DOCKER_REPOSITORY_NAME }}:${{ env.PROJECT_NAME}}-${{ env.COUNT }}
             docker-compose up -d --build
