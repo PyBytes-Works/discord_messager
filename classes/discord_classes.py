@@ -130,6 +130,8 @@ class MessageReceiver:
     @staticmethod
     @logger.catch
     async def __get_current_message_id(data: dict) -> int:
+        """Возвращает ID сообщения дискорда"""
+
         message_id = 0
         filtered_messages: list = data.get("messages", [])
         if filtered_messages:
@@ -145,8 +147,10 @@ class MessageReceiver:
         answer: str = ''
         message_id = 0
         redis_data: List[dict] = await RedisInterface(telegram_id=self.__datastore.telegram_id).load()
+        # logger.debug(f"\tUSER: {self.__datastore.telegram_id}\t\t Data from REDIS: {redis_data}")
         if not redis_data:
             return answer, message_id
+
         for elem in redis_data:
             if not isinstance(elem, dict):
                 continue
@@ -408,6 +412,7 @@ class MessageSender:
         }
         try:
             await self.__typing(proxies=proxies)
+            await asyncio.sleep(1)
             await self.__typing(proxies=proxies)
             response = session.post(url=url, json=data, proxies=proxies)
             status_code = response.status_code
@@ -593,69 +598,15 @@ class InstancesStorage:
 
 class UserData:
 
+    """Класс управления токенами и таймингами."""
+
     def __init__(self, message: Message, mute: bool = False) -> None:
         self.message: 'Message' = message
         self.user_telegram_id: str = str(self.message.from_user.id)
         self.__silence: bool = mute
         self.__current_tokens_list: List[dict] = []
+        self.__workers: List[str] = []
         self.__datastore: Optional['TokenDataStore'] = None
-
-    async def __form_tokens_list(self) -> dict:
-        """Возвращает сообщение об отсутствии токенов пользователя. Если токены есть - возвращает
-        пустой словарь"""
-
-        all_user_tokens = []
-        if not self.__current_tokens_list:
-            all_user_tokens: List[dict] = Token.get_all_related_user_tokens(telegram_id=self.__datastore.telegram_id)
-            if not all_user_tokens:
-                return {"message": "no pairs"}
-        self.__current_tokens_list: List[dict] = all_user_tokens[:]
-
-        return {}
-
-    @logger.catch
-    async def __select_token_for_work(self) -> dict:
-        """
-        Выбирает случайного токена дискорда из свободных, если нет свободных - пишет сообщение что
-        свободных нет.
-        """
-
-        result: dict = {}
-
-        current_time: int = int(datetime.datetime.now().timestamp())
-        workers: list = [
-            key
-            for elem in self.__current_tokens_list
-            for key, value in elem.items()
-            if current_time > value["time"] + value["cooldown"]
-        ]
-        # TODO
-        if workers:
-            random_token: str = random.choice(workers)
-            result["token"]: str = random_token
-            self.__datastore.create_datastore_data(random_token)
-        else:
-            min_token_data = {}
-            for elem in self.__current_tokens_list:
-                min_token_data: dict = min(elem.items(), key=lambda x: x[1].get('time'))
-            token: str = tuple(min_token_data)[0]
-            self.__datastore.create_datastore_data(token)
-            min_token_time: int = Token.get_time_by_token(token)
-            delay: int = self.__datastore.cooldown - abs(min_token_time - current_time)
-            self.__datastore.delay = delay
-            text = "секунд"
-            if delay > 60:
-                minutes: int = delay // 60
-                seconds: int = delay % 60
-                if minutes < 10:
-                    minutes: str = f"0{minutes}"
-                if seconds < 10:
-                    seconds: str = f'0{seconds}'
-                delay: str = f"{minutes}:{seconds}"
-                text = "минут"
-            result["message"] = f"Все токены отработали. Следующий старт через {delay} {text}."
-
-        return result
 
     @logger.catch
     async def lets_play(self) -> None:
@@ -667,21 +618,17 @@ class UserData:
                 break
             self.__datastore: 'TokenDataStore' = TokenDataStore(self.user_telegram_id)
             users_data_storage.add_or_update(telegram_id=self.user_telegram_id, data=self)
-            # TODO получить токен либо сообщение почему нет
-            discord_data = {}
-            if not self.__current_tokens_list:
-                discord_data: dict = await self.__form_tokens_list()
+            if not await self.__is_token_ready():
+                break
 
-            discord_data: dict = await self.__select_token_for_work()
             message_manager: 'MessageReceiver' = MessageReceiver(datastore=self.__datastore)
-            if discord_data.get("token"):
-                discord_data: dict = await message_manager.get_message()
+            discord_data: dict = await message_manager.get_message()
             if not discord_data:
                 await send_report_to_admins(
-                    "Произошла какая то чудовищная ошибка в функции lets_play.")
+                    "Произошла какая то чудовищная ошибка в функции lets_play."
+                    f"discord_data: {discord_data}\n")
                 break
             token_work: bool = discord_data.get("work")
-
             replies: List[dict] = discord_data.get("replies", [])
             if replies:
                 await self.send_replies(replies=replies)
@@ -693,17 +640,106 @@ class UserData:
                 elif text != 'ok':
                     if not self.__silence:
                         await self.message.answer(text, reply_markup=cancel_keyboard())
-                logger.info(f"PAUSE: {self.__datastore.delay + 1}")
-                if not datetime.datetime.now().minute % 10:
-                    self.form_token_pairs(unpair=True)
-                    logger.info(f"Время распределять токены!")
-
-                await asyncio.sleep(self.__datastore.delay + 1)
-                self.__datastore.delay = 0
-                if not self.__silence:
-                    await self.message.answer("Начинаю работу.", reply_markup=cancel_keyboard())
-                self.form_token_pairs(unpair=True)
             await asyncio.sleep(1 / 1000)
+        logger.debug("Game over.")
+
+    @logger.catch
+    async def __is_token_ready(self) -> bool:
+
+        if not self.__workers:
+            self.form_token_pairs(unpair=True)
+            self.__current_tokens_list = await self.__get_tokens_list()
+            logger.debug(f"WORKERS: {self.__workers}")
+            if not self.__current_tokens_list:
+                await self.get_error_text(discord_data={"message": "no pairs"})
+                logger.debug("message: no pairs")
+                return False
+            await self.__get_workers()
+        token_data: dict = await self.__select_token_for_work()
+        logger.debug(f"TOKEN_DATA: {token_data}")
+        if token_data.get("token"):
+            return True
+        if token_data.get("message"):
+            if not self.__silence:
+                await self.message.answer(token_data.get("message"))
+            await self.__sleep()
+            return True
+
+    @logger.catch
+    async def __sleep(self):
+        logger.info(f"PAUSE: {self.__datastore.delay + 1}")
+        await asyncio.sleep(self.__datastore.delay + 1)
+        self.__datastore.delay = 0
+        if not self.__silence:
+            await self.message.answer("Начинаю работу.", reply_markup=cancel_keyboard())
+
+    @logger.catch
+    async def __get_tokens_list(self) -> list:
+        """Возвращает список всех токенов пользователя."""
+
+        return Token.get_all_related_user_tokens(telegram_id=self.__datastore.telegram_id)
+
+    @logger.catch
+    async def __get_workers(self) -> None:
+        """Возвращает список токенов, которые не на КД"""
+        self.__workers = [
+            key
+            for elem in self.__current_tokens_list
+            for key, value in elem.items()
+            if await self.__get_current_time() > value["time"] + value["cooldown"]
+        ]
+
+    @logger.catch
+    async def __get_worker_from_list(self) -> dict:
+        """Возвращает токен для работы"""
+
+        result = {}
+        random.shuffle(self.__workers)
+        random_token: str = self.__workers.pop()
+        result["token"]: str = random_token
+        self.__datastore.create_datastore_data(random_token)
+
+        return result
+
+    @logger.catch
+    async def __select_token_for_work(self) -> dict:
+        """
+        Выбирает случайного токена дискорда из свободных, если нет свободных - возвращает сообщение что
+        свободных нет.
+        """
+
+        if self.__workers:
+            return await self.__get_worker_from_list()
+        return await self.__get_all_tokens_busy_message()
+
+    @logger.catch
+    async def __get_current_time(self) -> int:
+        """Возвращает текущее время (timestamp) целое."""
+
+        return int(datetime.datetime.now().timestamp())
+
+    @logger.catch
+    async def __get_all_tokens_busy_message(self) -> dict:
+        min_token_data = {}
+        for elem in self.__current_tokens_list:
+            min_token_data: dict = min(elem.items(), key=lambda x: x[1].get('time'))
+        token: str = tuple(min_token_data)[0]
+        self.__datastore.create_datastore_data(token)
+        min_token_time: int = Token.get_time_by_token(token)
+        delay: int = self.__datastore.cooldown - abs(min_token_time - await self.__get_current_time())
+        self.__datastore.delay = delay
+        text = "секунд"
+        if delay > 60:
+            minutes: int = delay // 60
+            seconds: int = delay % 60
+            if minutes < 10:
+                minutes: str = f"0{minutes}"
+            if seconds < 10:
+                seconds: str = f'0{seconds}'
+            delay: str = f"{minutes}:{seconds}"
+            text = "минут"
+
+        return {"message": f"Все токены отработали. Следующий старт через {delay} {text}."}
 
     @logger.catch
     async def send_replies(self, replies: list):
@@ -736,7 +772,7 @@ class UserData:
         return result
 
     @logger.catch
-    async def get_error_text(self, discord_data: dict, datastore: 'TokenDataStore') -> str:
+    async def get_error_text(self, discord_data: dict) -> str:
         """Обработка ошибок от сервера"""
 
         text: str = discord_data.get("message", "ERROR")
@@ -786,8 +822,8 @@ class UserData:
                     "Не могу отправить сообщение для токена. (Ошибка 403 - 50013)"
                     "Токен в муте."
                     f"\nToken: {token}"
-                    f"\nGuild: {datastore.guild}"
-                    f"\nChannel: {datastore.channel}"
+                    f"\nGuild: {self.__datastore.guild}"
+                    f"\nChannel: {self.__datastore.channel}"
                 )
             elif discord_code_error == 50001:
                 Token.delete_token(token=token)
@@ -820,10 +856,10 @@ class UserData:
             if discord_code_error == 20016:
                 cooldown: int = int(data.get("retry_after", None))
                 if cooldown:
-                    cooldown += datastore.cooldown + 2
+                    cooldown += self.__datastore.cooldown + 2
                     Token.update_token_cooldown(token=token, cooldown=cooldown)
                     Token.update_mate_cooldown(token=token, cooldown=cooldown)
-                    datastore.delay = cooldown
+                    self.__datastore.delay = cooldown
                 await self.message.answer(
                     "Для данного токена сообщения отправляются чаще, чем разрешено в канале."
                     f"\nToken: {token}"
@@ -835,12 +871,12 @@ class UserData:
         elif status_code == 500:
             error_text = (
                 f"Внутренняя ошибка сервера Дискорда. "
-                f"\nГильдия:Канал: {datastore.guild}:{datastore.channel} "
+                f"\nГильдия:Канал: {self.__datastore.guild}:{self.__datastore.channel} "
                 f"\nПауза 10 секунд. Код ошибки - 500."
             )
             await self.message.answer(error_text)
             await send_report_to_admins(error_text)
-            datastore.delay = 10
+            self.__datastore.delay = 10
         else:
             result = text
 

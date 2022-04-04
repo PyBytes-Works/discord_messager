@@ -26,7 +26,8 @@ vova = os.getenv("VOVA_TELEGRAM_ID")
 
 # set admins list
 admins_list = [deskent]
-DEBUG = int(os.getenv("DEBUG"))
+DEBUG = os.getenv("DEBUG")
+DEBUG = True if (int(DEBUG) or DEBUG.lower() == "true") else False
 if not DEBUG:
     admins_list = [deskent, artem, vova]
 
@@ -48,18 +49,15 @@ if not os.path.exists('./logs'):
     os.mkdir("./logs")
 today = datetime.datetime.today().strftime("%Y-%m-%d")
 file_path = os.path.join(os.path.relpath(PATH, start=None), 'logs', today, 'discord_mailer.log')
-
 LOG_LEVEL = "ERROR"
+DEBUG_LEVEL = "INFO"
+if DEBUG:
+    DEBUG_LEVEL = "DEBUG"
 logger_cfg = {
    "handlers": [
        {
            "sink": sys.stdout,
-           "level": "ERROR",
-           "format": "<white>{time:HH:mm:ss}</white> - <lr>{level}</lr> | <green>{message}</green>"
-       },
-       {
-           "sink": sys.stdout,
-           "level": "INFO",
+           "level": DEBUG_LEVEL,
            "format": "<white>{time:HH:mm:ss}</white> - <yellow>{level}</yellow> | <green>{message}</green>"
        },
        {
