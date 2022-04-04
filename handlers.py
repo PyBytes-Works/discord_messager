@@ -341,7 +341,7 @@ async def start_parsing_command_handler(message: Message, state: FSMContext) -> 
         await message.answer("Сначала добавьте токен.", reply_markup=user_menu_keyboard())
         return
     if User.get_is_work(telegram_id=user_telegram_id):
-        await message.answer("Бот уже запущен.", reply_markup=cancel_keyboard())
+        User.set_user_is_not_work(telegram_id=user_telegram_id)
         return
     User.set_user_is_work(telegram_id=user_telegram_id)
     mute: bool = False
