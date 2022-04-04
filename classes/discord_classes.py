@@ -593,7 +593,12 @@ class InstancesStorage:
 
 class UserData:
 
-    """Класс управления токенами и таймингами."""
+    """Класс управления токенами и таймингами.
+    Methods:
+        lets_play
+        form_token_pair
+        is_expired_user_deactivated
+    """
 
     def __init__(self, message: Message, mute: bool = False) -> None:
         self.message: 'Message' = message
@@ -603,17 +608,6 @@ class UserData:
         self.__current_tokens_list: List[dict] = []
         self.__workers: List[str] = []
         self.__datastore: Optional['TokenDataStore'] = None
-
-    @logger.catch
-    async def __send_text(self, text: str, keyboard=None, check_silence: bool = False) -> None:
-        """Отправляет текст и клавиатуру пользователю если он не в тихом режиме."""
-
-        if check_silence and self.__silence:
-            return
-        if not keyboard:
-            await self.message.answer(text)
-            return
-        await self.message.answer(text, reply_markup=keyboard)
 
     @logger.catch
     async def lets_play(self) -> None:
@@ -639,9 +633,9 @@ class UserData:
             token_work: bool = discord_data.get("work")
             replies: List[dict] = discord_data.get("replies", [])
             if replies:
-                await self.send_replies(replies=replies)
+                await self.__send_replies(replies=replies)
             if not token_work:
-                text: str = await self.get_error_text(
+                text: str = await self.__get_error_text(
                     datastore=self.__datastore, discord_data=discord_data)
                 if text == 'stop':
                     break
@@ -650,6 +644,17 @@ class UserData:
                         await self.message.answer(text, reply_markup=cancel_keyboard())
             await asyncio.sleep(1 / 1000)
         logger.debug("Game over.")
+
+    @logger.catch
+    async def __send_text(self, text: str, keyboard=None, check_silence: bool = False) -> None:
+        """Отправляет текст и клавиатуру пользователю если он не в тихом режиме."""
+
+        if check_silence and self.__silence:
+            return
+        if not keyboard:
+            await self.message.answer(text)
+            return
+        await self.message.answer(text, reply_markup=keyboard)
 
     @logger.catch
     async def __is_token_ready(self) -> bool:
@@ -732,7 +737,7 @@ class UserData:
         return f"Все токены отработали. Следующий старт через {delay} {text}."
 
     @logger.catch
-    async def send_replies(self, replies: list):
+    async def __send_replies(self, replies: list):
         """Отправляет реплаи из дискорда в телеграм с кнопкой Ответить"""
 
         result = []
@@ -762,7 +767,7 @@ class UserData:
         return result
 
     @logger.catch
-    async def get_error_text(self, discord_data: dict) -> str:
+    async def __get_error_text(self, discord_data: dict) -> str:
         """Обработка ошибок от сервера"""
 
         text: str = discord_data.get("message", "ERROR")
