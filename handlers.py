@@ -425,7 +425,7 @@ def register_handlers(dp: Dispatcher) -> None:
     dp.register_message_handler(info_tokens_handler, Text(equals=["Информация"]))
     dp.register_message_handler(get_all_tokens_handler, Text(equals=["Установить кулдаун"]))
     dp.register_callback_query_handler(request_self_token_cooldown_handler, state=UserState.select_token)
-    dp.register_callback_query_handler(answer_to_reply_handler, Text(startswith=["reply_"]), state=UserState.in_work)
+    dp.register_callback_query_handler(answer_to_reply_handler, Text(startswith=["reply_"]), state="*")
     dp.register_message_handler(send_message_to_reply_handler, state=UserState.answer_to_reply)
     dp.register_message_handler(set_self_token_cooldown_handler, state=UserState.set_user_self_cooldown)
     dp.register_message_handler(invitation_add_discord_token_handler, Text(equals=["Добавить токен"]))
