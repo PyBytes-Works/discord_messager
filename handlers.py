@@ -12,9 +12,8 @@ from models import User, Token
 from keyboards import cancel_keyboard, user_menu_keyboard, all_tokens_keyboard
 from classes.discord_classes import MessageReceiver, UserData
 from states import UserState
-from utils import (
-    check_is_int, save_data_to_json, send_report_to_admins, RedisInterface
-)
+from utils import check_is_int, save_data_to_json, send_report_to_admins
+from classes.redis_interface import RedisInterface
 
 
 @logger.catch

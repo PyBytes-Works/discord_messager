@@ -16,8 +16,8 @@ from classes.vocabulary import Vocabulary
 from config import logger, DEBUG
 from utils import send_report_to_admins
 from keyboards import cancel_keyboard, user_menu_keyboard
-from utils import RedisInterface
 from models import User, Token, Proxy
+from classes.redis_interface import RedisInterface
 
 
 PROXY_USER = os.getenv("PROXY_USER")
