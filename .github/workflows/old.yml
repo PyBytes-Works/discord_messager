@@ -38,6 +38,6 @@ jobs:
 #          key: ${{ secrets.SSH_KEY_PROD }}
 #          script: |
 #            cd "/home/${{ secrets.USERNAME }}/deploy/${{ env.PROJECT_NAME }}/${{ env.STAGE }}"
-#            docker-compose -f docker-compose-${{ env.PROJECT_NAME}}-${{ env.STAGE }} down
+#            docker-compose -f docker-compose-${{ env.PROJECT_NAME}}-${{ env.STAGE }}.yml down
 #            docker rmi ${{ env.DOCKER_USER }}/${{ env.DOCKER_REPOSITORY_NAME }}:${{ env.PROJECT_NAME}}-${{ env.COUNT }}
-#            docker-compose -f docker-compose-${{ env.PROJECT_NAME}}-${{ env.STAGE }} up -d --build
+#            docker-compose -f docker-compose-${{ env.PROJECT_NAME}}-${{ env.STAGE }}.yml up -d --build
