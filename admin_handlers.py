@@ -75,7 +75,10 @@ async def set_max_tokens_handler(message: Message, state: FSMContext) -> None:
                 reply_markup=user_menu_keyboard()
             )
         else:
-            text = "F: set_max_tokens_handler: Не изменилось количество токенов пользователя."
+            text = (
+               "F: set_max_tokens_handler: Не изменилось количество токенов пользователя."
+               f"\nУбедитесь, что пользователь с {telegram_id} существует."
+            )
             logger.error(text)
             await message.answer(text, reply_markup=ReplyKeyboardRemove())
         await state.finish()

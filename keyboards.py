@@ -43,19 +43,18 @@ def user_menu_keyboard() -> 'ReplyKeyboardMarkup':
     """Возвращает кнопочки из списка"""
 
     keyboard = ReplyKeyboardMarkup(
-            resize_keyboard=True,
-            one_time_keyboard=True
+        resize_keyboard=True,
+        one_time_keyboard=True,
+        row_width=3
     )
 
-    keyboard.row(
-        KeyboardButton("/start_parsing"),
-        # KeyboardButton("/stop"),
-    )
-    keyboard.row(
-        KeyboardButton("/add_token"),
-        KeyboardButton("/set_cooldown"),
-        KeyboardButton("/info"),
-        KeyboardButton("/cancel")
+    keyboard.add(
+        KeyboardButton("Старт"),
+        KeyboardButton("Старт & Mute"),
+        KeyboardButton("Информация"),
+        KeyboardButton("Отмена"),
+        KeyboardButton("Добавить токен"),
+        KeyboardButton("Установить кулдаун")
     )
     return keyboard
 

@@ -26,3 +26,4 @@ class UserState(StatesGroup):
     select_token = State()
     subscribe_time = State()
     answer_to_reply = State()
+    in_work = State()

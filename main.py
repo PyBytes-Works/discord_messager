@@ -1,6 +1,8 @@
+#!/usr/local/bin/python
 """
-Python 3.8
-Главный модуль бота
+Python 3.8 or higher
+Docker version 20.10.13 +
+Redis server v=5.0.14 +
 """
 
 import os.path
@@ -9,7 +11,7 @@ import datetime
 from aiogram import executor
 
 from admin_handlers import register_admin_handlers
-from config import dp, logger, admins_list, bot, db_file_name
+from config import dp, logger, admins_list, bot, db_file_name, VERSION
 from handlers import register_handlers
 from models import recreate_db
 
@@ -30,9 +32,12 @@ async def on_startup(_) -> None:
 
     try:
         # Отправляет сообщение админам при запуске бота
-        await send_report_to_admins(text="Я заработал")
+        await send_report_to_admins(text="Discord_mailer started."
+                                         f"\nVersion: {VERSION}")
     except Exception:
         pass
+    if not os.path.exists('./db'):
+        os.mkdir("./db")
     if not os.path.exists(db_file_name):
         logger.warning(f"Database not found with file name: {db_file_name}")
         recreate_db(db_file_name)
@@ -45,7 +50,7 @@ async def on_startup(_) -> None:
 async def on_shutdown(dp) -> None:
     """Действия при отключении бота."""
     try:
-        await send_report_to_admins(text="Я выключаюсь")
+        await send_report_to_admins(text="Discord_mailer stopping.")
     except Exception:
         pass
     logger.warning("BOT shutting down.")
