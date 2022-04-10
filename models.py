@@ -4,9 +4,9 @@ import os
 from itertools import groupby
 
 from peewee import (
-    CharField, BooleanField, DateTimeField, ForeignKeyField, IntegerField, TimestampField
+    Model, CharField, BooleanField, DateTimeField, ForeignKeyField, IntegerField, TimestampField
 )
-from peewee import Model
+from peewee import ModelDelete
 from config import logger, admins_list, db, db_file_name, DEFAULT_PROXY
 
 
@@ -523,10 +523,10 @@ class Proxy(BaseModel):
 class Channel(BaseModel):
     """The Channel class have fields guild and channel"""
     guild = CharField(
-        default='0', max_length=30, unique=False, verbose_name="Гильдия для подключения"
+        default='0', max_length=30, unique=True, verbose_name="Гильдия для подключения"
     )
     channel = CharField(
-        default='0', max_length=30, unique=False, verbose_name="Канал для подключения"
+        default='0', max_length=30, unique=True, verbose_name="Канал для подключения"
     )
 
     class Meta:
@@ -545,9 +545,11 @@ class Channel(BaseModel):
 
 
 class UserChannel(BaseModel):
-    user = ForeignKeyField(User, backref='user_channel', verbose_name='Пользователь')
+    user = ForeignKeyField(
+        User, backref='user_channel', verbose_name='Пользователь', on_delete='CASCADE')
     name = CharField(default='', max_length='100', verbose_name='Название канала')
-    channel = ForeignKeyField(Channel, backref='user_channel', verbose_name='Канал')
+    channel = ForeignKeyField(
+        Channel, backref='user_channel', verbose_name='Канал', on_delete='CASCADE')
     cooldown = IntegerField(default=60, verbose_name="Задержка между сообщениями")
 
     class Meta:
@@ -620,21 +622,18 @@ class Token(BaseModel):
     """
     # user = ForeignKeyField(User, on_delete="CASCADE")
     user_channel = ForeignKeyField(
-        UserChannel, backref='token', verbose_name="Канал для подключения"
-    )
+        UserChannel, backref='token', verbose_name="Канал для подключения", on_delete='CASCADE')
     name = CharField(max_length=100, verbose_name="Название токена")
     token = CharField(max_length=255, unique=True, verbose_name="Токен пользователя в discord")
     discord_id = CharField(max_length=255, unique=True, verbose_name="ID пользователя в discord")
-    # guild = CharField(
-    #     default='0', max_length=30, unique=False, verbose_name="Гильдия для подключения"
-    # )
+
     language = CharField(
         default='en', max_length=10, unique=False, verbose_name="Язык канала в discord"
     )
     cooldown = IntegerField(
         default=60*5, verbose_name="Время отправки последнего сообщения"
     )
-    last_message_time = IntegerField(
+    last_message_time = TimestampField(
         default=datetime.datetime.now().timestamp() - 60*5,
         verbose_name="Время отправки последнего сообщения"
     )
@@ -651,57 +650,45 @@ class Token(BaseModel):
     @logger.catch
     def add_token_by_user_channel(
                                     cls,
-                                    # telegram_id: str,
                                     token: str,
                                     discord_id: str,
                                     user_channel: 'UserChannel',
-                                    name_token: str,
-                                    language: str = 'en',
-                                    cooldown: int = 60 * 5
+                                    name: str,
                                  ) -> bool:
 
         """
-        Добавляет новый токен в указанный пользовательский канал
-        return: bool если запись прошла то True, если такой токен есть то False,
+        Add a new token to the client channel
+        return: bool True if write was successful,
+        False if this token or discord_id already exists in the database
+        or the number of tokens is equal to the limit
         """
-        if cls.is_token_exists(token=token):
-            return False
-        return cls.create(
-            user_channel=user_channel,
-            name=''.join(random.choices(string.ascii_letters, k=5)),
-            token=''.join(random.choices(string.ascii_letters, k=7)),
-            discord_id=discord_id
-            )
+        count_tokens = (
+                        Token.select()
+                        .join(UserChannel, on=(Token.user_channel == UserChannel.id))
+                        .join(User, on=(UserChannel.user == User.id))
+                        .where(User.id == user_channel.user).count()
+        )
+        limit = user_channel.user.max_tokens > count_tokens
+        answer = False
+        if limit:
+            token, answer = cls.get_or_create(
+                user_channel=user_channel,
+                name=name,
+                token=token,
+                discord_id=discord_id,
+                )
+        return answer
 
-    # a = cls.select().join(UserChannel, cls.user_channel == UserChannel.id).join(User, UserChannel.user == User.id).count()
+    @classmethod
+    @logger.catch
+    def update_token_time(cls, token: str) -> bool:
+        """
+        set last_time: now datetime last message
+        token: (str)
+        """
+        last_time = datetime.datetime.now().timestamp()
+        return cls.update(last_message_time=last_time).where(cls.token == token).execute()
 
-    # count_tokens = cls.select().where(cls.user_channel.user.max_tokens == user_id).count()
-    # # count_tokens = cls.get_all_user_tokens(telegram_id)
-    # max_tokens = User.get_max_tokens(telegram_id)
-    # if max_tokens > int(count_tokens):
-    #     new_token = {
-    #         'user': user_id,
-    #         'token': token,
-    #         'discord_id': discord_id,
-    #         # 'guild': guild,
-    #         # 'channel': channel,
-    #         'language': language,
-    #         'cooldown': cooldown,
-    #     }
-    #
-    #     return cls.get_or_create(**new_token)[-1]
-
-
-    # @classmethod
-    # @logger.catch
-    # def update_token_time(cls, token: str) -> bool:
-    #     """
-    #     set last_time: now datetime last message
-    #     token: (str)
-    #     """
-    #     last_time = datetime.datetime.now().timestamp()
-    #     return cls.update(last_message_time=last_time).where(cls.token == token).execute()
-    #
     # @classmethod
     # @logger.catch
     # def update_token_cooldown(cls, token: str, cooldown: int) -> bool:
@@ -722,29 +709,40 @@ class Token(BaseModel):
     #     my_token: 'Token' = cls.get_or_none(cls.token == token)
     #     mate: 'TokenPair' = TokenPair.get_token_mate(my_token.id)
     #     return cls.update_token_cooldown(token=mate.token, cooldown=cooldown)
-    #
-    # @classmethod
-    # @logger.catch
-    # def make_tokens_pair(cls, first: Any, second: Any) -> int:
-    #     """
-    #     make pair
-    #          first_id: (str) or int
-    #          second_id: (str)
-    #          соединяет пару токенов
-    #     """
-    #     result = TokenPair.add_pair(first=first, second=second)
-    #     return result
-    #
-    # @classmethod
-    # @logger.catch
-    # def delete_token_pair(cls, token: str) -> bool:
-    #     """
-    #         Удаляет пару по токен
-    #     """
-    #     token_data: 'Token' = cls.get_or_none(token=token)
-    #     if token_data:
-    #         return TokenPair.delete_pair(token_id=token_data.id)
-    #
+
+    @classmethod
+    @logger.catch
+    def make_tokens_pair(cls, first: Union[int, str], second: Union[int, str]) -> bool:
+        """
+        make pair
+             first_id: (str) or int
+             second_id: (str)
+             unites tokens in pair
+             TODO а нужно ли это в методах токена,
+        """
+        token_first: cls = cls.select().where(cls.token == first).first()
+        if not token_first:
+            return False
+        token_second = (cls.select()
+                        .where(cls.token == second, cls.user_channel == token_first.user_channel)
+                        .first())
+        if not token_second:
+            return False
+        result = TokenPair.add_pair(first=token_first.id, second=token_second.id)
+        return bool(result)
+
+    @classmethod
+    @logger.catch
+    def delete_token_pair(cls, token: str) -> bool:
+        """
+            Удаляет пару по токен
+        """
+        result = False
+        token_data: 'Token' = cls.get_or_none(token=token)
+        if token_data:
+            result = TokenPair.delete_pair(token_id=token_data.id)
+        return bool(result)
+
     # @classmethod
     # @logger.catch
     # def update_token_info(
@@ -1015,8 +1013,10 @@ class TokenPair(BaseModel):
             get_all_related_tokens
      """
 
-    first_id = ForeignKeyField(Token, unique=True, verbose_name="первый токен")
-    second_id = ForeignKeyField(Token, unique=True, verbose_name="второй токен")
+    first_id = ForeignKeyField(
+        Token, unique=True, backref='token_first', verbose_name="первый токен", on_delete="CASCADE")
+    second_id = ForeignKeyField(
+        Token, unique=True, backref='token_first', verbose_name="второй токен", on_delete="CASCADE")
 
     class Meta:
         db_table = 'token_pair'
@@ -1030,7 +1030,7 @@ class TokenPair(BaseModel):
                 second_id: int
         """
         if (cls.select().where((cls.first_id.in_((first, second)))
-                               | (cls.second_id.in_((first, second)))).execute()):
+                               | (cls.second_id.in_((first, second)))).count()):
             return False
         pair = cls.create(first_id=first, second_id=second)
         return 1 if pair else 0
