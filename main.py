@@ -1,4 +1,5 @@
 #!/usr/local/bin/python
+# -*- coding: UTF-8 -*-
 """
 Python 3.8 or higher
 Docker version 20.10.13 +
