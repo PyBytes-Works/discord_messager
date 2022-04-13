@@ -288,7 +288,7 @@ async def info_tokens_handler(message: Message) -> None:
             f'\nВсего токенов: {count_tokens}'
             f'\nСвободно слотов: {free_slots}'
             f'\nТокены:',
-            reply_markup=user_menu_keyboard()
+            reply_markup=cancel_keyboard()
         )
 
         for token_info in all_tokens:
