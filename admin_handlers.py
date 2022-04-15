@@ -9,6 +9,7 @@ from aiogram.dispatcher.filters import Text
 from aiogram.types import Message, CallbackQuery, ReplyKeyboardRemove, InlineKeyboardMarkup, \
     InlineKeyboardButton
 
+from classes.vocabulary import Vocabulary
 from config import logger, bot, admins_list
 from handlers import cancel_handler
 from keyboards import cancel_keyboard, user_menu_keyboard, inactive_users_keyboard
@@ -177,7 +178,8 @@ async def admin_help_handler(message: Message) -> None:
             ]
             commands.extend(superadmin)
         admin_commands: str = "".join(commands)
-        await message.answer(f'Список команд администратора: {admin_commands}', reply_markup=user_menu_keyboard())
+        await message.answer(f'Список команд администратора: {admin_commands}')
+        await message.answer(f'Всего отправлено символов: {Vocabulary.get_count_symbols()}', reply_markup=user_menu_keyboard())
     else:
         logger.info(f'{message.from_user.id}:{message.from_user.username}: NOT AUTORIZATED')
 

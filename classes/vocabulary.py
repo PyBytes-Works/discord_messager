@@ -8,6 +8,7 @@ class Vocabulary:
 
     __VOCABULARY: list = []
     __PATH_TO_FILE: str = "./db/vocabulary_en.txt"
+    __SYMBOLS_COUNT: int = 0
 
     @classmethod
     @logger.catch
@@ -19,9 +20,22 @@ class Vocabulary:
         except (ValueError, TypeError, FileNotFoundError) as err:
             logger.error(f"ERROR: __get_random_message_from_vocabulary: {err}")
             return "Vocabulary error"
-        if len(message_text) > 60:
+        length: int = len(message_text)
+        if length > 60:
             return cls.get_message()
+        cls.__count_symbols(length)
         return message_text
+
+    @classmethod
+    @logger.catch
+    def __count_symbols(cls, count: int):
+        cls.__SYMBOLS_COUNT += count
+        logger.info(f"Total symbols sent: {cls.__SYMBOLS_COUNT}")
+
+    @classmethod
+    @logger.catch
+    def get_count_symbols(cls):
+        return cls.__SYMBOLS_COUNT
 
     @classmethod
     @logger.catch
