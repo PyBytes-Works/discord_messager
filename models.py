@@ -983,6 +983,7 @@ class Proxy(BaseModel):
         Метод получает не рабочую порокси, удаляет ее и
         перезаписывает прокси для всех пользователей
         """
+
         cls.delete_proxy(proxy=proxy)
         if not cls.get_proxy_count():
             return 0
