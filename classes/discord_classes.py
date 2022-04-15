@@ -423,10 +423,7 @@ class MessageSender:
                     logger.error(error_text, err)
                     status_code = -1
                     data: dict = {"message": error_text}
-        except requests.exceptions.ProxyError as err:
-            logger.error(f"F: _send_data Error: {err}")
-            status_code = 407
-        except requests.exceptions.ConnectionError as err:
+        except (requests.exceptions.ProxyError, requests.exceptions.ConnectionError) as err:
             logger.error(f"F: _send_data Error: {err}")
             status_code = 407
         self.__answer = {"status_code": status_code, "data": data}
