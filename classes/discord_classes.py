@@ -376,7 +376,6 @@ class MessageSender:
 
     async def __typing(self, proxies: dict) -> None:
         """Имитирует "Пользователь печатает" в чате дискорда."""
-
         response = requests.post(
             f'https://discord.com/api/v9/channels/{self.__datastore.channel}/typing',
             headers={
@@ -426,6 +425,9 @@ class MessageSender:
                     status_code = -1
                     data: dict = {"message": error_text}
         except requests.exceptions.ProxyError as err:
+            logger.error(f"F: _send_data Error: {err}")
+            status_code = 407
+        except requests.exceptions.ConnectionError as err:
             logger.error(f"F: _send_data Error: {err}")
             status_code = 407
 
