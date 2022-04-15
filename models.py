@@ -231,6 +231,13 @@ class User(BaseModel):
 
     @classmethod
     @logger.catch
+    def delete_proxy_for_all_users(cls: 'User') -> int:
+        """Delete all user proxies, returns deleted proxies count"""
+
+        return cls.update(proxy='').execute()
+
+    @classmethod
+    @logger.catch
     def get_is_work(cls: 'User', telegram_id: str) -> bool:
         """
         return list of telegram ids for active users with active subscription
@@ -956,12 +963,15 @@ class Proxy(BaseModel):
     @logger.catch
     def delete_all_proxy(cls) -> bool:
         """Deletes all proxies, returns deleted proxies count"""
+
+        User.delete_proxy_for_all_users()
         return cls.delete().execute()
 
     @classmethod
     @logger.catch
     def get_list_proxies(cls: 'Proxy') -> tuple:
         """return Tuple[Tuple[str, int]] or () """
+
         result = cls.get()
         return [(inst.proxy, inst.using) for inst in result] if result else ()
 
@@ -972,6 +982,7 @@ class Proxy(BaseModel):
         Возвращает первую прокси с самым малым использованием
             return: str
         """
+
         result = cls.select().order_by(cls.using).execute()[:1]
         if result:
             return result[0].proxy
