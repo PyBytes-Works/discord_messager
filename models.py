@@ -954,6 +954,12 @@ class Proxy(BaseModel):
 
     @classmethod
     @logger.catch
+    def delete_all_proxy(cls) -> bool:
+        """Deletes all proxies, returns deleted proxies count"""
+        return cls.delete().execute()
+
+    @classmethod
+    @logger.catch
     def get_list_proxies(cls: 'Proxy') -> tuple:
         """return Tuple[Tuple[str, int]] or () """
         result = cls.get()
@@ -977,6 +983,7 @@ class Proxy(BaseModel):
         Метод получает не рабочую порокси, удаляет ее и
         перезаписывает прокси для всех пользователей
         """
+
         cls.delete_proxy(proxy=proxy)
         if not cls.get_proxy_count():
             return 0

@@ -95,7 +95,7 @@ async def set_max_tokens_handler(message: Message, state: FSMContext) -> None:
 
 @logger.catch
 async def request_proxies_handler(message: Message) -> None:
-    """Обработчик команды /add_proxy и /delete_proxy"""
+    """Обработчик команды /add_proxy /delete_proxy, /delete_all_proxy"""
 
     user_id: str = str(message.from_user.id)
     if user_id in admins_list:
@@ -107,6 +107,9 @@ async def request_proxies_handler(message: Message) -> None:
             await UserState.user_add_proxy.set()
         elif message.text == '/delete_proxy':
             await UserState.user_delete_proxy.set()
+        elif message.text == '/delete_all_proxy':
+            await message.answer("ТОЧНО удалить все прокси? (yes/No)", reply_markup=cancel_keyboard())
+            await UserState.user_delete_all_proxy.set()
 
 
 @logger.catch
@@ -117,6 +120,19 @@ async def add_new_proxy_handler(message: Message) -> None:
     for proxy in proxies:
         Proxy.add_proxy(proxy=proxy)
         await message.answer(f"Добавлена прокси: {proxy}")
+
+
+@logger.catch
+async def delete_all_proxies(message: Message, state: FSMContext) -> None:
+    """Удаляет все прокси."""
+
+    if message.text.lower() == "yes":
+        Proxy.delete_all_proxy()
+        await send_report_to_admins(f"Пользователь {message.from_user.id} удалил ВСЕ прокси.")
+        await state.finish()
+        return
+    await message.answer("Прокси не удалены.")
+    await state.finish()
 
 
 @logger.catch
@@ -174,6 +190,7 @@ async def admin_help_handler(message: Message) -> None:
                 "\n/sendall 'тут текст сообщения без кавычек' - отправить сообщение всем активным пользователям",
                 "\n/add_proxy - добавить прокси",
                 "\n/delete_proxy - удалить прокси",
+                "\n/delete_all_proxy - удалить ВСЕ прокси",
                 "\n/set_max_tokens - изменить кол-во токенов пользователя",
             ]
             commands.extend(superadmin)
@@ -464,9 +481,10 @@ def register_admin_handlers(dp: Dispatcher) -> None:
     dp.register_message_handler(activate_new_user_handler, commands=['ua'])
     dp.register_message_handler(request_user_admin_handler, commands=['add_admin'])
     dp.register_message_handler(set_user_admin_handler, state=UserState.name_for_admin)
-    dp.register_message_handler(request_proxies_handler, commands=['add_proxy', 'delete_proxy'])
+    dp.register_message_handler(request_proxies_handler, commands=['add_proxy', 'delete_proxy', 'delete_all_proxy'])
     dp.register_message_handler(add_new_proxy_handler, state=UserState.user_add_proxy)
     dp.register_message_handler(delete_proxy_handler, state=UserState.user_delete_proxy)
+    dp.register_message_handler(delete_all_proxies, state=UserState.user_delete_all_proxy)
     dp.register_message_handler(delete_user_name_handler, commands=['delete_user'])
     dp.register_callback_query_handler(delete_user_handler, Text(startswith=['user_']), state=UserState.name_for_del)
     dp.register_message_handler(request_activate_user_handler, commands=['activate_user'])
