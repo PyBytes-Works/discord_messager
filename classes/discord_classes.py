@@ -328,16 +328,19 @@ class MessageSender:
     def __init__(self, datastore: 'TokenDataStore'):
         self.__datastore: 'TokenDataStore' = datastore
         self.__answer: dict = {}
+        self.__session = None
 
     @logger.catch
     async def send_message(self, text: str = '') -> dict:
         """Отправляет данные в канал дискорда, возвращает результат отправки."""
 
-        data: dict = await self.__prepare_data(text=text)
-        await self.__send_data(data=data)
-        Token.update_token_time(token=self.__datastore.token)
+        async with aiohttp.ClientSession() as session:
+            self.__session = session
+            data: dict = await self.__prepare_data(text=text)
+            await self.__send_data(data=data)
+            Token.update_token_time(token=self.__datastore.token)
 
-        return self.__answer
+            return self.__answer
 
     @logger.catch
     async def __prepare_data(self, text: str = '') -> dict:
@@ -374,57 +377,56 @@ class MessageSender:
 
         return data
 
-    async def __typing(self, proxies: dict) -> None:
+    async def __typing(self, proxy: str) -> None:
         """Имитирует "Пользователь печатает" в чате дискорда."""
 
-        response = requests.post(
+        async with self.__session.post(
             f'https://discord.com/api/v9/channels/{self.__datastore.channel}/typing',
             headers={
                 "Authorization": self.__datastore.token,
                 "Content-Length": "0"
             },
-            proxies=proxies
-        )
-        if response.status_code != 204:
-            logger.warning(f"Typing: {response.status_code}: {response.text}")
-        await asyncio.sleep(2)
+            proxy=proxy
+        ) as response:
+            if response.status != 204:
+                logger.warning(f"Typing: {response.status_code}: {response.text}")
+            await asyncio.sleep(2)
 
     @logger.catch
     async def __send_data(self, data) -> None:
         """Отправляет данные в дискорд канал"""
 
-        session = requests.Session()
-        session.headers['authorization'] = self.__datastore.token
+        self.__session.headers['authorization'] = self.__datastore.token
         url = self.__datastore.get_channel_url() + f'{self.__datastore.channel}/messages?'
-        proxies = {
-            "http": f"http://{PROXY_USER}:{PROXY_PASSWORD}@{self.__datastore.proxy}/",
-        }
+        proxy: str = f"http://{PROXY_USER}:{PROXY_PASSWORD}@{self.__datastore.proxy}/"
         try:
-            await self.__typing(proxies=proxies)
+            await self.__typing(proxy=proxy)
             await asyncio.sleep(1)
-            await self.__typing(proxies=proxies)
+            await self.__typing(proxy=proxy)
             logger.debug(f"Sending message:"
                          f"\n\tUSER: {self.__datastore.telegram_id}"
                          f"\n\tGUILD/CHANNEL: {self.__datastore.guild}/{self.__datastore.channel}"
                          f"\n\tTOKEN: {self.__datastore.token}"
                          f"\n\tDATA: {data}"
                          f"\n\tPROXIES: {self.__datastore.proxy}")
-            response = session.post(url=url, json=data, proxies=proxies)
-            status_code = response.status_code
-            if status_code == 200:
-                data: dict = {}
-            elif status_code == 407:
-                Proxy.update_proxies_for_owners(self.__datastore.proxy)
-            else:
-                logger.error(f"F: __send_data_to_api error: {status_code}: {response.text}")
-                try:
-                    data: dict = response.json()
-                except JSONDecodeError as err:
-                    error_text = "F: __send_data_to_api: JSON ERROR:"
-                    logger.error(error_text, err)
-                    status_code = -1
-                    data: dict = {"message": error_text}
-        except requests.exceptions.ProxyError as err:
+            async with self.__session.post(url=url, json=data, proxy=proxy) as response:
+                status_code = response.status
+                if status_code == 200:
+                    data: dict = {}
+                elif status_code == 407:
+                    logger.error(f"F: __send_data_to_api error: {status_code}: {response.text}")
+                    logger.debug(f"Try to set new proxy for user {self.__datastore.telegram_id}")
+                    Proxy.update_proxies_for_owners(self.__datastore.proxy)
+                else:
+                    logger.error(f"F: __send_data_to_api error: {status_code}: {response.text}")
+                    try:
+                        data: dict = response.json()
+                    except JSONDecodeError as err:
+                        error_text = "F: __send_data_to_api: JSON ERROR:"
+                        logger.error(error_text, err)
+                        status_code = -1
+                        data: dict = {"message": error_text}
+        except aiohttp.client_exceptions.ClientHttpProxyError as err:
             logger.error(f"F: _send_data Error: {err}")
             status_code = 407
 
