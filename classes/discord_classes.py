@@ -403,12 +403,6 @@ class MessageSender:
             await self.__typing(proxies=proxies)
             await asyncio.sleep(1)
             await self.__typing(proxies=proxies)
-            # logger.debug(f"Sending message:"
-            #              f"\n\tUSER: {self.__datastore.telegram_id}"
-            #              f"\n\tGUILD/CHANNEL: {self.__datastore.guild}/{self.__datastore.channel}"
-            #              f"\n\tTOKEN: {self.__datastore.token}"
-            #              f"\n\tDATA: {data}"
-            #              f"\n\tPROXIES: {self.__datastore.proxy}")
             response = session.post(url=url, json=data, proxies=proxies)
             status_code = response.status_code
             if status_code == 200:
