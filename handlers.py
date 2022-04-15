@@ -184,12 +184,14 @@ async def add_discord_token_handler(message: Message, state: FSMContext) -> None
 
     proxy: str = await MessageReceiver.get_proxy(telegram_id=message.from_user.id)
     if not await is_proxy_valid(message=message, proxy=proxy):
+        await message.answer("Прокси не валидна.")
         await state.finish()
         return
 
     result: dict = await MessageReceiver.check_user_data(token=token, proxy=proxy, channel=channel)
     request_result: str = result.get('token')
     if not await is_proxy_valid(message=message, proxy=request_result):
+        await message.answer("Прокси с токеном не валидны.")
         await state.finish()
         return
 

@@ -120,6 +120,8 @@ async def add_new_proxy_handler(message: Message) -> None:
     for proxy in proxies:
         Proxy.add_proxy(proxy=proxy)
         await message.answer(f"Добавлена прокси: {proxy}")
+    User.delete_proxy_for_all_users()
+    User.set_new_proxy_for_all_users()
 
 
 @logger.catch

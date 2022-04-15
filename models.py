@@ -233,7 +233,7 @@ class User(BaseModel):
     @logger.catch
     def delete_proxy_for_all_users(cls: 'User') -> int:
         """Delete all user proxies, returns deleted proxies count"""
-
+        Proxy.update(using=0).execute()
         return cls.update(proxy='no proxy').execute()
 
     @classmethod
@@ -345,6 +345,19 @@ class User(BaseModel):
         subscription_period:  int
         """
         return cls.update(max_tokens=max_tokens).where(cls.telegram_id == telegram_id).execute()
+
+    @classmethod
+    @logger.catch
+    def set_new_proxy_for_all_users(cls) -> int:
+        """Set up proxies for all users"""
+
+        all_users: List['User'] = list(cls.select().execute())
+        for user in all_users:
+            proxy: str = Proxy.get_low_used_proxy()
+            if not proxy:
+                return 0
+            cls.set_proxy_by_telegram_id(telegram_id=str(user.telegram_id), proxy=proxy)
+        return len(all_users)
 
     @classmethod
     @logger.catch
