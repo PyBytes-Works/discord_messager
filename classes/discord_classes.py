@@ -398,6 +398,7 @@ class MessageSender:
         url = self.__datastore.get_channel_url() + f'{self.__datastore.channel}/messages?'
         proxies = {
             "http": f"http://{PROXY_USER}:{PROXY_PASSWORD}@{self.__datastore.proxy}/",
+            "https": f"http://{PROXY_USER}:{PROXY_PASSWORD}@{self.__datastore.proxy}/"
         }
         try:
             await self.__typing(proxies=proxies)
