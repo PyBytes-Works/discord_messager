@@ -414,8 +414,6 @@ class MessageSender:
             status_code = response.status_code
             if status_code == 200:
                 data: dict = {}
-            elif status_code == 407:
-                Proxy.update_proxies_for_owners(self.__datastore.proxy)
             else:
                 logger.error(f"F: __send_data_to_api error: {status_code}: {response.text}")
                 try:
@@ -428,8 +426,16 @@ class MessageSender:
         except requests.exceptions.ProxyError as err:
             logger.error(f"F: _send_data Error: {err}")
             status_code = 407
-
+        except requests.exceptions.ConnectionError as err:
+            logger.error(f"F: _send_data Error: {err}")
+            status_code = 407
         self.__answer = {"status_code": status_code, "data": data}
+        if status_code == 407:
+            new_proxy: str = await MessageReceiver.get_proxy(self.__datastore.telegram_id)
+            if new_proxy == 'no proxies':
+                return
+            self.__datastore.proxy = new_proxy
+            await self.__send_data(data=data)
 
 
 class TokenDataStore:
@@ -885,12 +891,12 @@ class UserData:
                 random.shuffle(tokens)
                 first_token = tokens.pop()
                 second_token = tokens.pop()
-                # if DEBUG:
-                #     first_token_instance: 'Token' = Token.get_by_id(first_token)
-                #     second_token_instance: 'Token' = Token.get_by_id(second_token)
-                #     logger.debug(f"Pairs formed: "
-                #                  f"\nFirst: {first_token_instance.token}"
-                #                  f"\nSecond: {second_token_instance.token}")
+                if DEBUG:
+                    first_token_instance: 'Token' = Token.get_by_id(first_token)
+                    second_token_instance: 'Token' = Token.get_by_id(second_token)
+                    logger.debug(f"Pairs formed: "
+                                 f"\nFirst: {first_token_instance.token}"
+                                 f"\nSecond: {second_token_instance.token}")
                 formed_pairs += Token.make_tokens_pair(first_token, second_token)
 
         logger.info(f"Pairs formed: {formed_pairs}")

@@ -234,7 +234,7 @@ class User(BaseModel):
     def delete_proxy_for_all_users(cls: 'User') -> int:
         """Delete all user proxies, returns deleted proxies count"""
 
-        return cls.update(proxy='').execute()
+        return cls.update(proxy='no proxy').execute()
 
     @classmethod
     @logger.catch
