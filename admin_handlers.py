@@ -124,7 +124,7 @@ async def add_new_proxy_handler(message: Message) -> None:
 
 @logger.catch
 async def delete_all_proxies(message: Message, state: FSMContext) -> None:
-    """Удаляет все прокси"""
+    """Удаляет все прокси."""
 
     if message.text.lower() == "yes":
         Proxy.delete_all_proxy()
