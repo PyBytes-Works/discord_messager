@@ -27,3 +27,4 @@ class UserState(StatesGroup):
     subscribe_time = State()
     answer_to_reply = State()
     in_work = State()
+    user_delete_all_proxy = State()

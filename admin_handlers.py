@@ -107,6 +107,9 @@ async def request_proxies_handler(message: Message) -> None:
             await UserState.user_add_proxy.set()
         elif message.text == '/delete_proxy':
             await UserState.user_delete_proxy.set()
+        elif message.text == '/delete_all_proxy':
+            await message.answer("ТОЧНО удалить все прокси? (yes/No)", reply_markup=cancel_keyboard())
+            await UserState.user_delete_all_proxy.set()
 
 
 @logger.catch
@@ -117,6 +120,19 @@ async def add_new_proxy_handler(message: Message) -> None:
     for proxy in proxies:
         Proxy.add_proxy(proxy=proxy)
         await message.answer(f"Добавлена прокси: {proxy}")
+
+
+@logger.catch
+async def delete_all_proxies(message: Message, state: FSMContext) -> None:
+    """Удаляет все прокси"""
+
+    if message.text.lower() == "yes":
+        Proxy.delete_all_proxy()
+        await send_report_to_admins(f"Пользователь {message.from_user.id} удалил ВСЕ прокси.")
+        await state.finish()
+        return
+    await message.answer("Прокси не удалены.")
+    await state.finish()
 
 
 @logger.catch
@@ -174,6 +190,7 @@ async def admin_help_handler(message: Message) -> None:
                 "\n/sendall 'тут текст сообщения без кавычек' - отправить сообщение всем активным пользователям",
                 "\n/add_proxy - добавить прокси",
                 "\n/delete_proxy - удалить прокси",
+                "\n/delete_all_proxy - удалить ВСЕ прокси",
                 "\n/set_max_tokens - изменить кол-во токенов пользователя",
             ]
             commands.extend(superadmin)
