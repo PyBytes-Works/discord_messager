@@ -514,7 +514,7 @@ def register_admin_handlers(dp: Dispatcher) -> None:
     )
     dp.register_message_handler(activate_user_handler, state=UserState.user_activate)
     dp.register_message_handler(show_all_users_handler, commands=['show_users', 'su'])
-    dp.register_message_handler(reboot_handler, commands=['reboot'])
+    dp.register_message_handler(reboot_handler, commands=['reboot'], state="*")
     dp.register_message_handler(admin_help_handler, commands=['admin', 'adm'])
     dp.register_message_handler(request_max_tokens_handler, commands=['set_max_tokens'])
     dp.register_message_handler(set_max_tokens_handler, state=UserState.user_set_max_tokens)
