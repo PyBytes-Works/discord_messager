@@ -34,7 +34,6 @@ class MessageReceiver:
         aiohttp.client_exceptions.ClientHttpProxyError,
         aiohttp.client_exceptions.ClientOSError,
         aiohttp.client_exceptions.TooManyRedirects,
-        ConnectionResetError
     )
 
     """Выбирает токен для отправки сообщения и вызывает метод вызова сообщения,
