@@ -18,6 +18,7 @@ from utils import send_report_to_admins
 from keyboards import cancel_keyboard, user_menu_keyboard
 from models import User, Token, Proxy
 from classes.redis_interface import RedisInterface
+from classes.open_ai import OpenAI
 
 
 PROXY_USER = os.getenv("PROXY_USER")
@@ -45,6 +46,7 @@ class MessageReceiver:
         self.__datastore: 'TokenDataStore' = datastore
 
     @classmethod
+    @logger.catch
     async def _is_proxy_work(cls, proxy: str) -> bool:
         """Проверяет прокси на работоспособность"""
 
@@ -52,6 +54,7 @@ class MessageReceiver:
             return True
 
     @classmethod
+    @logger.catch
     async def get_proxy(cls, telegram_id: str) -> str:
         """Возвращает рабочую прокси из базы данных, если нет рабочих возвращает 'no proxies'"""
 
@@ -66,6 +69,7 @@ class MessageReceiver:
         return await cls.get_proxy(telegram_id=telegram_id)
 
     @classmethod
+    @logger.catch
     async def check_user_data(cls, token: str, proxy: str, channel: int) -> dict:
         """Returns checked dictionary for user data
 
@@ -96,9 +100,11 @@ class MessageReceiver:
         if message_id:
             self.__datastore.current_message_id = message_id
         elif filtered_data:
-            self.__datastore.current_message_id = await self.__get_current_message_id(data=filtered_data)
-        text_to_send: str = user_message if user_message else ''
-        answer: dict = await MessageSender(datastore=self.__datastore).send_message(text=text_to_send)
+            message_data: Tuple[int, str] = await self.__get_current_message_data(filtered_data)
+            self.__datastore.current_message_id = message_data[0]
+            self.__datastore.current_message_text = OpenAI().get_answer(message_data[1])
+        text_to_send: str = user_message if user_message else self.__datastore.current_message_text
+        answer: dict = await MessageSender(self.__datastore).send_message(text_to_send)
         if not answer:
             logger.error("F: get_message ERROR: NO ANSWER ERROR")
             result.update({"message": "ERROR"})
@@ -118,16 +124,18 @@ class MessageReceiver:
 
     @staticmethod
     @logger.catch
-    async def __get_current_message_id(data: dict) -> int:
+    async def __get_current_message_data(data: dict) -> Tuple[int, str]:
         """Возвращает ID сообщения дискорда"""
 
-        message_id = 0
+        message_id: int = 0
+        message_text: str = ''
         filtered_messages: list = data.get("messages", [])
         if filtered_messages:
             result_data: dict = random.choice(filtered_messages)
             message_id = int(result_data.get("id"))
+            message_text: str = result_data.get("message", '')
 
-        return message_id
+        return message_id, message_text
 
     @logger.catch
     async def __get_user_message_from_redis(self) -> Tuple[str, int]:
@@ -136,7 +144,6 @@ class MessageReceiver:
         answer: str = ''
         message_id = 0
         redis_data: List[dict] = await RedisInterface(telegram_id=self.__datastore.telegram_id).load()
-        # logger.debug(f"\tUSER: {self.__datastore.telegram_id}\t\t Data from REDIS: {redis_data}")
         if not redis_data:
             return answer, message_id
 
@@ -194,7 +201,6 @@ class MessageReceiver:
         messages = []
         replies = []
         result = {}
-        summa = 0
         for elem in data:
             message: str = elem.get("content")
             message_time: 'datetime' = elem.get("timestamp")
@@ -207,7 +213,6 @@ class MessageReceiver:
                 is_author_mate: bool = str(self.__datastore.mate_id) == str(elem["author"]["id"])
                 my_message: bool = str(elem["author"]["id"]) == str(self.__datastore.my_discord_id)
                 if is_author_mate and not my_message:
-                    summa += len(message)
                     messages.append(
                         {
                             "id": elem.get("id"),
@@ -243,6 +248,7 @@ class MessageReceiver:
 
         return result
 
+    @logger.catch
     def __replies_filter(self, elem: dict) -> dict:
         """Возвращает реплаи не из нашего села."""
 
@@ -277,6 +283,7 @@ class MessageReceiver:
         return result
 
     @classmethod
+    @logger.catch
     async def __check_token(cls, token: str, proxy: str, channel: int) -> str:
         """Returns valid token else 'bad token'"""
 
@@ -291,6 +298,7 @@ class MessageReceiver:
         return result
 
     @classmethod
+    @logger.catch
     async def _send_get_request(cls, proxy: str, token: str = '', channel: int = 0) -> int:
         """Отправляет запрос через прокси, возвращает статус код ответа"""
 
@@ -324,7 +332,6 @@ class MessageSender:
     связанного токена
     Возвращает сообщение об ошибке или об успехе"""
 
-    @logger.catch
     def __init__(self, datastore: 'TokenDataStore'):
         self.__datastore: 'TokenDataStore' = datastore
         self.__answer: dict = {}
@@ -374,6 +381,7 @@ class MessageSender:
 
         return data
 
+    @logger.catch
     async def __typing(self, proxies: dict) -> None:
         """Имитирует "Пользователь печатает" в чате дискорда."""
 
@@ -457,7 +465,9 @@ class TokenDataStore:
         self.__MATE_DISCORD_ID: str = ''
         self.__DELAY: int = 0
         self.__MY_DISCORD_ID: str = ''
+        self.__current_message_text: str = ''
 
+    @logger.catch
     def create_datastore_data(self, token: str):
         self.token: str = token
         token_data: dict = Token.get_info_by_token(token)
@@ -471,6 +481,14 @@ class TokenDataStore:
     @classmethod
     def get_channel_url(cls) -> str:
         return cls.__DISCORD_BASE_URL
+
+    @property
+    def current_message_text(self) -> str:
+        return self.__current_message_text
+
+    @current_message_text.setter
+    def current_message_text(self, message_text: str):
+        self.__current_message_text = message_text
 
     @property
     def my_discord_id(self) -> str:
@@ -582,12 +600,14 @@ class InstancesStorage:
             }
         )
 
+    @logger.catch
     def mute(self, telegram_id):
         user_class: 'UserData' = self.get_instance(telegram_id=telegram_id)
         if user_class:
             user_class.silence = True
             return True
 
+    @logger.catch
     def unmute(self, telegram_id):
         user_class: 'UserData' = self.get_instance(telegram_id=telegram_id)
         if user_class:
