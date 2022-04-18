@@ -13,7 +13,7 @@ from keyboards import cancel_keyboard, user_menu_keyboard, all_tokens_keyboard
 from classes.discord_classes import MessageReceiver, UserData
 from states import UserState
 from utils import check_is_int, save_data_to_json, send_report_to_admins
-from classes.redis_interface import RedisInterface
+from classes.redis_interface import RedisDB
 
 
 @logger.catch
@@ -376,7 +376,7 @@ async def send_message_to_reply_handler(message: Message, state: FSMContext):
     state_data: dict = await state.get_data()
     message_id: str = state_data.get("message_id")
     user_telegram_id: str = str(message.from_user.id)
-    redis_data: List[dict] = await RedisInterface(telegram_id=user_telegram_id).load()
+    redis_data: List[dict] = await RedisDB(telegram_id=user_telegram_id).load()
     for elem in redis_data:
         if str(elem.get("message_id")) == str(message_id):
             elem.update({"answer_text": message.text})
@@ -386,7 +386,7 @@ async def send_message_to_reply_handler(message: Message, state: FSMContext):
         await message.answer('Время хранения данных истекло.', reply_markup=cancel_keyboard())
         return
     await message.answer('Добавляю сообщение в очередь. Это займет несколько секунд.', reply_markup=ReplyKeyboardRemove())
-    await RedisInterface(telegram_id=user_telegram_id).save(data=redis_data)
+    await RedisDB(telegram_id=user_telegram_id).save(data=redis_data)
     await message.answer('Сообщение добавлено в очередь сообщений.', reply_markup=cancel_keyboard())
 
 

@@ -56,9 +56,10 @@ class OpenAI:
         if not answers:
             logger.error("OpenAI: No answers")
             return ''
-        logger.debug(f'OpenAI answer: {answers[0].get("text", "").strip()}')
+        result: str = answers[0].get("text", '').strip().split("\n")[0]
+        logger.debug(f"OpenAI answer: {result}")
 
-        return answers[0].get("text", '').strip().split('\n')[0]
+        return result
 
 
 if __name__ == '__main__':
@@ -71,4 +72,3 @@ if __name__ == '__main__':
     print(messages)
     bot = OpenAI()
     bot.get_answer(messages)
-

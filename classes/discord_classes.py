@@ -17,7 +17,7 @@ from config import logger, DEBUG
 from utils import send_report_to_admins
 from keyboards import cancel_keyboard, user_menu_keyboard
 from models import User, Token, Proxy
-from classes.redis_interface import RedisInterface
+from classes.redis_interface import RedisDB
 from classes.open_ai import OpenAI
 
 
@@ -97,12 +97,11 @@ class MessageReceiver:
                 result.update({"replies": replies})
 
         if message_id:
+            # TODO Давинчи
             self.__datastore.current_message_id = message_id
         elif filtered_data:
-            message_data: Tuple[int, str] = await self.__get_current_message_data(filtered_data)
-            self.__datastore.current_message_id = message_data[0]
-            self.__datastore.current_message_text = OpenAI().get_answer(message_data[1])
-        text_to_send: str = user_message if user_message else self.__datastore.current_message_text
+            self.__datastore.current_message_id = await self.__get_current_message_data(filtered_data)
+        text_to_send: str = user_message if user_message else ''
         answer: dict = await MessageSender(self.__datastore).send_message(text_to_send)
         if not answer:
             logger.error("F: get_message ERROR: NO ANSWER ERROR")
@@ -123,18 +122,16 @@ class MessageReceiver:
 
     @staticmethod
     @logger.catch
-    async def __get_current_message_data(data: dict) -> Tuple[int, str]:
+    async def __get_current_message_data(data: dict) -> int:
         """Возвращает ID сообщения дискорда"""
 
         message_id: int = 0
-        message_text: str = ''
         filtered_messages: list = data.get("messages", [])
         if filtered_messages:
             result_data: dict = random.choice(filtered_messages)
             message_id = int(result_data.get("id"))
-            message_text: str = result_data.get("message", '')
 
-        return message_id, message_text
+        return message_id
 
     @logger.catch
     async def __get_user_message_from_redis(self) -> Tuple[str, int]:
@@ -142,7 +139,7 @@ class MessageReceiver:
 
         answer: str = ''
         message_id = 0
-        redis_data: List[dict] = await RedisInterface(telegram_id=self.__datastore.telegram_id).load()
+        redis_data: List[dict] = await RedisDB(redis_key=self.__datastore.telegram_id).load()
         if not redis_data:
             return answer, message_id
 
@@ -156,7 +153,7 @@ class MessageReceiver:
                     if answer:
                         message_id = elem.get("message_id", 0)
                         elem.update({"answered": True})
-                        await RedisInterface(telegram_id=self.__datastore.telegram_id).save(data=redis_data)
+                        await RedisDB(redis_key=self.__datastore.telegram_id).save(data=redis_data)
                         break
 
         return answer, message_id
@@ -234,7 +231,7 @@ class MessageReceiver:
         """Возвращает разницу между старыми и новыми данными в редисе,
         записывает полные данные в редис"""
 
-        total_replies: List[dict] = await RedisInterface(telegram_id=self.__datastore.telegram_id).load()
+        total_replies: List[dict] = await RedisDB(redis_key=self.__datastore.telegram_id).load()
         old_messages: list = list(map(lambda x: x.get("message_id"), total_replies))
         result: List[dict] = [
             elem
@@ -243,7 +240,7 @@ class MessageReceiver:
         ]
 
         total_replies.extend(result)
-        await RedisInterface(telegram_id=self.__datastore.telegram_id).save(data=total_replies)
+        await RedisDB(redis_key=self.__datastore.telegram_id).save(data=total_replies)
 
         return result
 
@@ -331,36 +328,69 @@ class MessageSender:
     связанного токена
     Возвращает сообщение об ошибке или об успехе"""
 
-    def __init__(self, datastore: 'TokenDataStore'):
+    def __init__(self, datastore: 'TokenDataStore', text: str = ''):
         self.__datastore: 'TokenDataStore' = datastore
         self.__answer: dict = {}
+        self.__data_for_send: dict = {}
+        self.__text: str = text
 
     @logger.catch
-    async def send_message(self, text: str = '') -> dict:
+    async def send_message(self) -> dict:
         """Отправляет данные в канал дискорда, возвращает результат отправки."""
 
-        data: dict = await self.__prepare_data(text=text)
-        await self.__send_data(data=data)
-        Token.update_token_time(token=self.__datastore.token)
+        await self.__prepare_data()
+        if self.__data_for_send:
+            await self.__send_data()
+            Token.update_token_time(token=self.__datastore.token)
 
         return self.__answer
 
     @logger.catch
-    async def __prepare_data(self, text: str = '') -> dict:
+    async def __get_text_from_vocabulary(self) -> str:
+        text: str = Vocabulary.get_message()
+        if text == "Vocabulary error":
+            self.__answer = {"status_code": -2, "data": {"message": text}}
+            return ''
+        await RedisDB(redis_key=self.__datastore.mate_id).save(data=[text])
+        return text
+
+    @logger.catch
+    async def __prepare_message_text(self) -> None:
+        mate_message: list = await RedisDB(redis_key=self.__datastore.my_discord_id).load()
+        logger.debug(f"From mate: {mate_message}")
+        if mate_message:
+            self._text: str = OpenAI().get_answer(mate_message[0])
+            await RedisDB(redis_key=self.__datastore.my_discord_id).delete(mate_id=self.__datastore.mate_id)
+        if not self._text:
+            self._text: str = await self.__get_text_from_vocabulary()
+        logger.debug(f"Final text: {self._text}")
+
+    @logger.catch
+    def __roll_the_dice(self) -> bool:
+        return random.randint(1, 100) <= 10
+
+    async def __get_text(self) -> None:
+        if self.__text:
+            return
+        if self.__roll_the_dice():
+            self.__datastore.current_message_id = 0
+            self._text = await self.__get_text_from_vocabulary()
+            return
+        await self.__prepare_message_text()
+
+    @logger.catch
+    async def __prepare_data(self) -> None:
         """Возвращает сформированные данные для отправки в дискорд"""
 
-        if not text:
-            text: str = Vocabulary.get_message()
-            if text == "Vocabulary error":
-                self.__answer = {"status_code": -2, "data": {"message": text}}
-        data = {
-            "content": text,
+        await self.__get_text()
+        if not self.__text:
+            return
+        self.__data_for_send = {
+            "content": self.__text,
             "tts": "false",
         }
         if self.__datastore.current_message_id:
-            data.update({
-                "content": text,
-                "tts": "false",
+            self.__data_for_send.update({
                 "message_reference":
                     {
                         "guild_id": self.__datastore.guild,
@@ -377,8 +407,6 @@ class MessageSender:
                         "replied_user": "false"
                     }
             })
-
-        return data
 
     @logger.catch
     async def __typing(self, proxies: dict) -> None:
@@ -397,7 +425,7 @@ class MessageSender:
         await asyncio.sleep(2)
 
     @logger.catch
-    async def __send_data(self, data) -> None:
+    async def __send_data(self) -> None:
         """Отправляет данные в дискорд канал"""
 
         session = requests.Session()
@@ -407,6 +435,7 @@ class MessageSender:
             "http": f"http://{PROXY_USER}:{PROXY_PASSWORD}@{self.__datastore.proxy}/",
             "https": f"http://{PROXY_USER}:{PROXY_PASSWORD}@{self.__datastore.proxy}/"
         }
+        answer_data: dict = {}
         try:
             await self.__typing(proxies=proxies)
             await asyncio.sleep(1)
@@ -415,31 +444,29 @@ class MessageSender:
                          f"\n\tUSER: {self.__datastore.telegram_id}"
                          f"\n\tGUILD/CHANNEL: {self.__datastore.guild}/{self.__datastore.channel}"
                          f"\n\tTOKEN: {self.__datastore.token}"
-                         f"\n\tDATA: {data}"
+                         f"\n\tDATA: {self.__data_for_send}"
                          f"\n\tPROXIES: {self.__datastore.proxy}")
-            response = session.post(url=url, json=data, proxies=proxies)
+            response = session.post(url=url, json=self.__data_for_send, proxies=proxies)
             status_code = response.status_code
-            if status_code == 200:
-                data: dict = {}
-            else:
+            if status_code != 200:
                 logger.error(f"F: __send_data_to_api error: {status_code}: {response.text}")
                 try:
-                    data: dict = response.json()
+                    answer_data: dict = response.json()
                 except JSONDecodeError as err:
                     error_text = "F: __send_data_to_api: JSON ERROR:"
                     logger.error(error_text, err)
                     status_code = -1
-                    data: dict = {"message": error_text}
+                    answer_data: dict = {"message": error_text}
         except (requests.exceptions.ProxyError, requests.exceptions.ConnectionError) as err:
             logger.error(f"F: _send_data Error: {err}")
             status_code = 407
-        self.__answer = {"status_code": status_code, "data": data}
+        self.__answer = {"status_code": status_code, "data": answer_data}
         if status_code == 407:
             new_proxy: str = await MessageReceiver.get_proxy(self.__datastore.telegram_id)
             if new_proxy == 'no proxies':
                 return
             self.__datastore.proxy = new_proxy
-            await self.__send_data(data=data)
+            await self.__send_data()
 
 
 class TokenDataStore:
