@@ -58,7 +58,7 @@ class OpenAI:
             return ''
         logger.debug(f'OpenAI answer: {answers[0].get("text", "").strip()}')
 
-        return answers[0].get("text", '').strip()
+        return answers[0].get("text", '').strip().split('\n')[0]
 
 
 if __name__ == '__main__':
