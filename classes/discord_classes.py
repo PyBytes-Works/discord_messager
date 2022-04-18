@@ -359,7 +359,7 @@ class MessageSender:
         mate_message: list = await RedisDB(redis_key=self.__datastore.my_discord_id).load()
         logger.debug(f"From mate: {mate_message}")
         if mate_message:
-            self.__text: str = OpenAI().get_answer(mate_message[0])
+            self.__text: str = OpenAI().get_answer(mate_message[0].strip())
             await RedisDB(redis_key=self.__datastore.my_discord_id).delete(mate_id=self.__datastore.mate_id)
         if not self.__text:
             self.__text: str = await self.__get_text_from_vocabulary()
@@ -373,6 +373,7 @@ class MessageSender:
         if self.__text:
             return
         if self.__roll_the_dice():
+            logger.debug("Random message!")
             self.__datastore.current_message_id = 0
             self.__text = await self.__get_text_from_vocabulary()
             return
