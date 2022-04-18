@@ -424,10 +424,14 @@ async def add_user_to_db_by_token(message: Message, state: FSMContext) -> None:
 
     user_data: dict = delete_used_token(message.text)
     if not user_data:
-        await send_report_to_admins("Пользователь ошибочно или повторно ввел токен."
-                                    "\nПри чтении токена для создания нового пользователя из файла произошла ошибка."
-                                    f"\nUser: {message.from_user.id}"
-                                    f"\nData: {message}")
+        error_text: str = (
+            "Пользователь ошибочно или повторно ввел токен."
+            "\nПри чтении токена для создания нового пользователя из файла произошла ошибка."
+            f"\nUser: {message.from_user.id}"
+            f"\nData: {message}"
+        )
+        await send_report_to_admins(error_text)
+        logger.error(error_text)
         return
     user_name = user_data["name"]
     max_tokens = user_data["max_tokens"]

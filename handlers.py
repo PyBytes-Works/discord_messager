@@ -13,7 +13,7 @@ from keyboards import cancel_keyboard, user_menu_keyboard, all_tokens_keyboard
 from classes.discord_classes import MessageReceiver, UserData
 from states import UserState
 from utils import check_is_int, save_data_to_json, send_report_to_admins
-from classes.redis_interface import RedisInterface
+from classes.redis_interface import RedisDB
 
 
 @logger.catch
@@ -26,10 +26,12 @@ async def cancel_handler(message: Message, state: FSMContext) -> None:
 
     user_telegram_id: str = str(message.from_user.id)
     text: str = ''
+    keyboard = user_menu_keyboard
     if User.get_is_work(telegram_id=user_telegram_id):
-        text = "\nДождитесь завершения работы бота..."
+        text: str = "\nДождитесь завершения работы бота. Это займет несколько секунд..."
+        keyboard = ReplyKeyboardRemove
     await message.answer(
-        "Вы отменили текущую команду." + text, reply_markup=user_menu_keyboard()
+        "Вы отменили текущую команду." + text, reply_markup=keyboard()
     )
     User.set_user_is_not_work(telegram_id=user_telegram_id)
     await state.finish()
@@ -374,7 +376,7 @@ async def send_message_to_reply_handler(message: Message, state: FSMContext):
     state_data: dict = await state.get_data()
     message_id: str = state_data.get("message_id")
     user_telegram_id: str = str(message.from_user.id)
-    redis_data: List[dict] = await RedisInterface(telegram_id=user_telegram_id).load()
+    redis_data: List[dict] = await RedisDB(telegram_id=user_telegram_id).load()
     for elem in redis_data:
         if str(elem.get("message_id")) == str(message_id):
             elem.update({"answer_text": message.text})
@@ -384,7 +386,7 @@ async def send_message_to_reply_handler(message: Message, state: FSMContext):
         await message.answer('Время хранения данных истекло.', reply_markup=cancel_keyboard())
         return
     await message.answer('Добавляю сообщение в очередь. Это займет несколько секунд.', reply_markup=ReplyKeyboardRemove())
-    await RedisInterface(telegram_id=user_telegram_id).save(data=redis_data)
+    await RedisDB(telegram_id=user_telegram_id).save(data=redis_data)
     await message.answer('Сообщение добавлено в очередь сообщений.', reply_markup=cancel_keyboard())
 
 
@@ -399,8 +401,8 @@ async def default_message(message: Message) -> None:
 
 
 @logger.catch
-async def start_command_handler(message: Message):
-    """Активирует пользователя если он валидный"""
+async def activate_valid_user_handler(message: Message):
+    """Активирует пользователя если он продлил оплату при команде /start"""
 
     user_telegram_id: str = str(message.from_user.id)
     user_not_expired: bool = User.check_expiration_date(telegram_id=user_telegram_id)
@@ -418,7 +420,7 @@ def register_handlers(dp: Dispatcher) -> None:
 
     dp.register_message_handler(cancel_handler, commands=['отмена', 'cancel'], state="*")
     dp.register_message_handler(cancel_handler, Text(startswith=["отмена", "cancel"], ignore_case=True), state="*")
-    dp.register_message_handler(start_command_handler, commands=["start"])
+    dp.register_message_handler(activate_valid_user_handler, commands=["start"])
     dp.register_message_handler(start_parsing_command_handler, Text(equals=["Старт", "Старт & Mute"]))
     dp.register_message_handler(info_tokens_handler, Text(equals=["Информация"]))
     dp.register_message_handler(get_all_tokens_handler, Text(equals=["Установить кулдаун"]))
