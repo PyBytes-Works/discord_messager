@@ -102,7 +102,7 @@ class MessageReceiver:
         elif filtered_data:
             self.__datastore.current_message_id = await self.__get_current_message_data(filtered_data)
         text_to_send: str = user_message if user_message else ''
-        answer: dict = await MessageSender(self.__datastore).send_message(text_to_send)
+        answer: dict = await MessageSender(datastore=self.__datastore, text=text_to_send).send_message()
         if not answer:
             logger.error("F: get_message ERROR: NO ANSWER ERROR")
             result.update({"message": "ERROR"})
@@ -359,11 +359,11 @@ class MessageSender:
         mate_message: list = await RedisDB(redis_key=self.__datastore.my_discord_id).load()
         logger.debug(f"From mate: {mate_message}")
         if mate_message:
-            self._text: str = OpenAI().get_answer(mate_message[0])
+            self.__text: str = OpenAI().get_answer(mate_message[0])
             await RedisDB(redis_key=self.__datastore.my_discord_id).delete(mate_id=self.__datastore.mate_id)
-        if not self._text:
-            self._text: str = await self.__get_text_from_vocabulary()
-        logger.debug(f"Final text: {self._text}")
+        if not self.__text:
+            self.__text: str = await self.__get_text_from_vocabulary()
+        logger.debug(f"Final text: {self.__text}")
 
     @logger.catch
     def __roll_the_dice(self) -> bool:
@@ -374,7 +374,7 @@ class MessageSender:
             return
         if self.__roll_the_dice():
             self.__datastore.current_message_id = 0
-            self._text = await self.__get_text_from_vocabulary()
+            self.__text = await self.__get_text_from_vocabulary()
             return
         await self.__prepare_message_text()
 
