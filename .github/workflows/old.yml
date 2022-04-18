@@ -5,7 +5,7 @@ env:
   PROJECT_NAME: "discord_mailer"
   STAGE: "dev"
   VERSION: "ver-${{ github.sha }}"
-  COUNT: "3.1.8"
+  COUNT: "3.2"
 on:
   push:
     branches: [ old_version1 ]
