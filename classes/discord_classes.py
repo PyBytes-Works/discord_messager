@@ -87,6 +87,13 @@ class MessageReceiver:
         """Получает данные из АПИ, выбирает случайное сообщение и возвращает ID сообщения
         и само сообщение"""
 
+        # TODO сделать список в редис, куда складывать айдишники всех сообщений, на которые ответили
+        # TODO Вынести работу с отправкой запросов в отдельный класс и написать обработку ошибок там
+        # TODO Сделать флаг автоответа (если флаг стоит - то отвечает бот Давинчи, иначе -
+        #  отправлять в телеграм юзеру
+        # TODO выделить реплаи и работу с ними в отдельный класс
+        # TODO Разобрать данный класс на несколько
+
         result = {"work": False}
         user_message, message_id = await self.__get_user_message_from_redis()
 
@@ -97,7 +104,6 @@ class MessageReceiver:
                 result.update({"replies": replies})
 
         if message_id:
-            # TODO Давинчи
             self.__datastore.current_message_id = message_id
         elif filtered_data:
             self.__datastore.current_message_id = await self.__get_current_message_data(filtered_data)
@@ -248,6 +254,7 @@ class MessageReceiver:
     def __replies_filter(self, elem: dict) -> dict:
         """Возвращает реплаи не из нашего села."""
 
+
         result = {}
         ref_messages: dict = elem.get("referenced_message", {})
         if not ref_messages:
@@ -266,7 +273,8 @@ class MessageReceiver:
         author_id: str = elem.get("author", {}).get("id", '')
         message_for_me: bool = reply_for_author_id == self.__datastore.my_discord_id
         if any(mentions) or message_for_me:
-            if author_id not in Token.get_all_discord_id(token=self.__datastore.token):
+            all_discord_tokens: List[str] = Token.get_all_discord_id(token=self.__datastore.token)
+            if author_id not in all_discord_tokens:
                 result.update({
                     "token": self.__datastore.token,
                     "author": author,
@@ -363,7 +371,6 @@ class MessageSender:
             await RedisDB(redis_key=self.__datastore.my_discord_id).delete(mate_id=self.__datastore.mate_id)
         if not self.__text:
             self.__text: str = await self.__get_text_from_vocabulary()
-        logger.debug(f"Final text: {self.__text}")
 
     @logger.catch
     def __roll_the_dice(self) -> bool:
@@ -386,6 +393,7 @@ class MessageSender:
         await self.__get_text()
         if not self.__text:
             return
+        logger.debug(f"Final text: {self.__text}")
         self.__data_for_send = {
             "content": self.__text,
             "tts": "false",
