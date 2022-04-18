@@ -195,6 +195,7 @@ async def admin_help_handler(message: Message) -> None:
                 "\n/delete_proxy - удалить прокси",
                 "\n/delete_all_proxy - удалить ВСЕ прокси",
                 "\n/set_max_tokens - изменить кол-во токенов пользователя",
+                "\n/reboot - предупредить о перезагрузке, остановить работу всех ботов",
             ]
             commands.extend(superadmin)
         admin_commands: str = "".join(commands)
@@ -394,20 +395,6 @@ async def delete_user_name_handler(message: Message) -> None:
 
 
 @logger.catch
-async def reboot_handler(message: Message) -> None:
-    """Команда /reboot"""
-
-    if User.is_admin(telegram_id=message.from_user.id):
-        text: str = "Перезагрузка через 1 минуту. Работа бота будет остановлена автоматически."
-        for user_telegram_id in User.get_working_users():
-            try:
-                await bot.send_message(user_telegram_id, text=text)
-            except aiogram.utils.exceptions.ChatNotFound:
-                pass
-            User.set_user_is_not_work(str(user_telegram_id))
-
-
-@logger.catch
 async def delete_user_handler(callback: CallbackQuery, state: FSMContext) -> None:
     """Обработчик ввода имени пользователя для удаления"""
 
@@ -482,6 +469,21 @@ async def add_user_to_db_by_token(message: Message, state: FSMContext) -> None:
             else:
                 await send_report_to_admins("Произошла ошибка при добавлении нового пользователя.")
     await state.finish()
+
+
+@logger.catch
+async def reboot_handler(message: Message) -> None:
+    """Команда /reboot"""
+
+    user_id: str = str(message.from_user.id)
+    if user_id in admins_list:
+        text: str = "Перезагрузка через 1 минуту. Работа бота будет остановлена автоматически."
+        for user_telegram_id in User.get_working_users():
+            try:
+                await bot.send_message(user_telegram_id, text=text)
+            except aiogram.utils.exceptions.ChatNotFound:
+                logger.warning(f"Chat {user_telegram_id} not found.")
+            User.set_user_is_not_work(str(user_telegram_id))
 
 
 @logger.catch
