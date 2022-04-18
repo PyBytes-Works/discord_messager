@@ -24,6 +24,7 @@ from utils import (
 @logger.catch
 async def send_message_to_all_users_handler(message: Message) -> None:
     """Обработчик команд /sendall, /su"""
+
     index: int = 0
     text: str = message.text
     if text.startswith("/sendall"):
@@ -393,6 +394,20 @@ async def delete_user_name_handler(message: Message) -> None:
 
 
 @logger.catch
+async def reboot_handler(message: Message) -> None:
+    """Команда /reboot"""
+
+    if User.is_admin(telegram_id=message.from_user.id):
+        text: str = "Перезагрузка через 1 минуту. Работа бота будет остановлена автоматически."
+        for user_telegram_id in User.get_working_users():
+            try:
+                await bot.send_message(user_telegram_id, text=text)
+            except aiogram.utils.exceptions.ChatNotFound:
+                pass
+            User.set_user_is_not_work(str(user_telegram_id))
+
+
+@logger.catch
 async def delete_user_handler(callback: CallbackQuery, state: FSMContext) -> None:
     """Обработчик ввода имени пользователя для удаления"""
 
@@ -499,6 +514,7 @@ def register_admin_handlers(dp: Dispatcher) -> None:
     )
     dp.register_message_handler(activate_user_handler, state=UserState.user_activate)
     dp.register_message_handler(show_all_users_handler, commands=['show_users', 'su'])
+    dp.register_message_handler(reboot_handler, commands=['reboot'], state="*")
     dp.register_message_handler(admin_help_handler, commands=['admin', 'adm'])
     dp.register_message_handler(request_max_tokens_handler, commands=['set_max_tokens'])
     dp.register_message_handler(set_max_tokens_handler, state=UserState.user_set_max_tokens)
