@@ -12,7 +12,7 @@ from classes.token_checker import TokenChecker
 from config import logger, Dispatcher, admins_list
 from models import User, Token
 from keyboards import cancel_keyboard, user_menu_keyboard, all_tokens_keyboard
-from classes.discord_classes import DiscordManager
+from classes.discord_manager import DiscordManager
 from states import UserState
 from utils import check_is_int, save_data_to_json, send_report_to_admins
 from classes.redis_interface import RedisDB

@@ -31,8 +31,6 @@ class MessageReceiver:
         # TODO Сделать флаг автоответа (если флаг стоит - то отвечает бот Давинчи, иначе -
         #  отправлять в телеграм юзеру
         # TODO выделить реплаи и работу с ними в отдельный класс
-        # TODO Разобрать данный класс на несколько
-        # TODO Разделение создания экземпляров - создавать там, где используются, а не еще где то.
 
         result = {"work": False}
         user_message, message_id = await self.__get_user_message_from_redis()
@@ -45,6 +43,7 @@ class MessageReceiver:
             self.__datastore.current_message_id = message_id
         elif filtered_data:
             self.__datastore.current_message_id = filtered_data.get("last_message_id", 0)
+        print(self.__datastore.current_message_id)
         text_to_send: str = user_message if user_message else ''
 
         answer: dict = await MessageSender(datastore=self.__datastore, text=text_to_send).send_message()
@@ -95,6 +94,7 @@ class MessageReceiver:
         """Отправляет запрос к АПИ"""
 
         data: List[dict] = await RequestSender().get_data_from_channel(datastore=self.__datastore)
+        print("Data from RequestSender: ", data)
         if not data:
             return {}
         result: dict = await self.__data_filter(data=data)
@@ -125,7 +125,9 @@ class MessageReceiver:
                             "timestamp": message_time,
                         }
                     messages.append(spam)
+        print("Messages:", messages)
         last_message_id: int = await self.__get_last_message_id(data=messages)
+        print(last_message_id)
         result.update({"last_message_id": last_message_id})
         replies: List[dict] = await self.__update_replies_to_redis(new_replies=replies)
         result.update({"replies": replies})

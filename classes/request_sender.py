@@ -74,16 +74,16 @@ class RequestSender:
                 url: str = self.url
             try:
                 async with session.get(url=url, proxy=self.proxy_data, ssl=False, timeout=10) as response:
-                    answer.update(answer=response.status, data=await response.text())
+                    answer.update(status=response.status, data=await response.text())
             except self.__EXCEPTIONS as err:
                 logger.info(f"Token check Error: {err}")
             except aiohttp.http_exceptions.BadHttpMessage as err:
                 logger.error("МУДАК ПРОВЕРЬ ПОРТ ПРОКСИ!!!", err)
                 if "Proxy Authentication Required" in err:
-                    answer.update(answer=407)
+                    answer.update(status=407)
             except (ssl.SSLError, OSError) as err:
                 logger.error("Ошибка авторизации прокси:", err)
                 if "Proxy Authentication Required" in err:
-                    answer.update(answer=407)
+                    answer.update(status=407)
 
         return answer

@@ -87,7 +87,7 @@ class DiscordManager:
                 break
             self.__datastore: 'TokenDataStore' = TokenDataStore(self.user_telegram_id)
             # users_data_storage.add_or_update(telegram_id=self.user_telegram_id, data=self)
-            if not await self.__is_token_ready():
+            if not await self.__is_datastore_ready():
                 break
 
             message_manager: 'MessageReceiver' = MessageReceiver(datastore=self.__datastore)
@@ -123,7 +123,7 @@ class DiscordManager:
         await self.message.answer(text, reply_markup=keyboard)
 
     @logger.catch
-    async def __is_token_ready(self) -> bool:
+    async def __is_datastore_ready(self) -> bool:
 
         if not self.__workers:
             self.form_token_pairs(unpair=True)
