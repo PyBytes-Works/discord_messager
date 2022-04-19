@@ -341,7 +341,7 @@ async def start_parsing_command_handler(message: Message, state: FSMContext) -> 
     if not user_is_active or user_expired:
         return
     if not Token.get_all_user_tokens(user_telegram_id):
-        await message.answer("Сначала добавьте токен.", reply_markup=user_menu_keyboard())
+        await message.answer("Сначала добавьте пару токенов.", reply_markup=user_menu_keyboard())
         return
     if User.get_is_work(telegram_id=user_telegram_id):
         User.set_user_is_not_work(telegram_id=user_telegram_id)

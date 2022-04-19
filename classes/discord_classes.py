@@ -93,6 +93,7 @@ class MessageReceiver:
         #  отправлять в телеграм юзеру
         # TODO выделить реплаи и работу с ними в отдельный класс
         # TODO Разобрать данный класс на несколько
+        # TODO Разделение создания экземпляров - создавать там, где используются, а не еще где то.
 
         result = {"work": False}
         user_message, message_id = await self.__get_user_message_from_redis()
@@ -224,6 +225,8 @@ class MessageReceiver:
                             "timestamp": message_time,
                         }
                     )
+        # TODO добавить фильтр чтоб он брал только последнее сообщение.
+        "[{'id': '965914850993786910', 'message': 'I can not do it any longer((', 'channel_id': '932256559394861079', 'author': {'id': '487962073456836618', 'username': 'Deskent', 'avatar': '73a9ca402ddff53e053e67537324b8d8', 'avatar_decoration': None, 'discriminator': '8713', 'public_flags': 0}, 'timestamp': '2022-04-19T10:00:46.307000+00:00'}]"
         if messages:
             result.update({"messages": messages})
         if replies:
@@ -943,12 +946,12 @@ class UserData:
                 random.shuffle(tokens)
                 first_token = tokens.pop()
                 second_token = tokens.pop()
-                if DEBUG:
-                    first_token_instance: 'Token' = Token.get_by_id(first_token)
-                    second_token_instance: 'Token' = Token.get_by_id(second_token)
-                    logger.debug(f"Pairs formed: "
-                                 f"\nFirst: {first_token_instance.token}"
-                                 f"\nSecond: {second_token_instance.token}")
+                # if DEBUG:
+                #     first_token_instance: 'Token' = Token.get_by_id(first_token)
+                #     second_token_instance: 'Token' = Token.get_by_id(second_token)
+                #     logger.debug(f"Pairs formed: "
+                #                  f"\nFirst: {first_token_instance.token}"
+                #                  f"\nSecond: {second_token_instance.token}")
                 formed_pairs += Token.make_tokens_pair(first_token, second_token)
 
         logger.info(f"Pairs formed: {formed_pairs}")
