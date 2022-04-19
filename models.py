@@ -1,11 +1,11 @@
+from collections import namedtuple
 from typing import List, Tuple, Any, Union
 import datetime
 import os
-from itertools import groupby
 
 from peewee import (
     Model, CharField, BooleanField, DateTimeField, ForeignKeyField, IntegerField, TimestampField,
-    JOIN, Case, fn
+    JOIN, Case, fn, BaseQuery, BigIntegerField
 )
 
 from config import logger, admins_list, db, db_file_name, DEFAULT_PROXY
@@ -97,12 +97,8 @@ class Proxy(BaseModel):
 
 class Channel(BaseModel):
     """The Channel class have fields guild and channel"""
-    guild = CharField(
-        default='0', max_length=30, unique=True, verbose_name="Гильдия для подключения"
-    )
-    channel = CharField(
-        default='0', max_length=30, unique=True, verbose_name="Канал для подключения"
-    )
+    guild_id = BigIntegerField(unique=True, verbose_name="Гильдия для подключения")
+    channel_id = BigIntegerField(unique=True, verbose_name="Канал для подключения")
 
     class Meta:
         table_name = 'channel'
@@ -219,7 +215,7 @@ class User(BaseModel):
             expiration = int(datetime.datetime.now().timestamp()) + expiration * 60 * 60
             proxy = (cls.select(Proxy.id)
                      .join(Proxy, JOIN.RIGHT_OUTER, on=(Proxy.id == User.proxy))
-                     .group_by(Proxy.proxy).order_by(fn.COUNT(cls.id)).where(1 == 1)
+                     .group_by(Proxy.proxy).order_by(fn.COUNT(cls.id))
                      .limit(1).namedtuples().first())
             proxy_id = proxy if proxy.id else None
             result = cls.create(
@@ -324,6 +320,7 @@ class User(BaseModel):
     @logger.catch
     def get_all_users(cls: 'User') -> dict:
         """
+        TODO вернуть namedtuples
         returns dict of all users
         return: dict
         """
@@ -333,7 +330,7 @@ class User(BaseModel):
                 f'{user.nick_name.rsplit("_", maxsplit=1)[0]} | '
                 f'{"Active" if user.active else "Not active"} | '
                 f'{"Admin" if user.admin else "Not admin"} | '
-                f'Proxy: {user.proxy if user.proxy else "ЧТО ТО СЛОМАЛОСЬ"} | '
+                f'Proxy: {user.proxy.proxy if user.proxy else "ЧТО ТО СЛОМАЛОСЬ"} | '
                 f'\nID: {user.telegram_id if user.telegram_id else "ЧТО ТО СЛОМАЛОСЬ"} | '
                 f'№: {user.max_tokens if user.max_tokens else "ЧТО ТО СЛОМАЛОСЬ"} | '
                 f'{timestamp(user.expiration) if user.expiration else "ЧТО ТО СЛОМАЛОСЬ"}'
@@ -455,11 +452,11 @@ class User(BaseModel):
     @logger.catch
     def set_proxy_by_telegram_id(cls: 'User', telegram_id: str, proxy_pk: int) -> bool:
         """
-        set max tokens for user
-        subscription_period:  int
+        set proxy for user
+        telegram_id:  str
+        proxy_pk:  int
         """
         return cls.update(proxy=proxy_pk).where(cls.telegram_id == telegram_id).execute
-
 
     @classmethod
     @logger.catch
@@ -495,13 +492,13 @@ class User(BaseModel):
         """
         user: User = cls.get_or_none(cls.proxy, cls.telegram_id == telegram_id)
         if user:
-            return user.proxy.name
+            return user.proxy.proxy
 
     @classmethod
     @logger.catch
     def get_max_tokens(cls: 'User', telegram_id: str) -> int:
         """
-        Возвращает максимальное количество токенов для пользователя
+         Return the maximum number of tokens for a user
         """
         user = cls.get_or_none(cls.max_tokens, cls.telegram_id == telegram_id)
         if user:
@@ -512,7 +509,7 @@ class User(BaseModel):
     @logger.catch
     def delete_status_admin(cls: 'User', telegram_id: str) -> bool:
         """
-        set admin value enabled for user
+        set admin value disabled for a user
         return: 1 if good otherwise 0
         """
         return cls.update(admin=False).where(cls.telegram_id == telegram_id).execute()
@@ -540,16 +537,31 @@ class User(BaseModel):
     @classmethod
     @logger.catch
     def unwork_all_users(cls):
+        """
+        set unwork status for all users
+        """
         return cls.update(is_work=False).execute()
 
     @classmethod
     @logger.catch
     def work_all_users(cls):
+        """
+        set work status enabled fo all users
+        """
         now = datetime.datetime.now().timestamp()
         return cls.update(active=True).where(cls.expiration > now).execute()
 
 
 class UserChannel(BaseModel):
+    """
+    class user channel for save user's channels and cooldown
+    methods:
+        add_user_channel
+        get_user_channel
+        get_all_user_channel_by_telegram_id
+        update_cooldown_by_channel_id
+    """
+
     user = ForeignKeyField(
         User, backref='user_channel', verbose_name='Пользователь', on_delete='CASCADE')
     name = CharField(default='', max_length='100', verbose_name='Название канала')
@@ -564,7 +576,7 @@ class UserChannel(BaseModel):
     @classmethod
     @logger.catch
     def add_user_channel(
-            cls,
+            cls: 'UserChannel',
             telegram_id: str,
             name: str,
             guild: Union[str, int],
@@ -582,26 +594,66 @@ class UserChannel(BaseModel):
     @classmethod
     @logger.catch
     def get_user_channel(
-            cls, telegram_id: Union[str, int], channel: Union[str, int]) -> 'UserChannel':
+            cls: 'UserChannel', telegram_id: Union[str, int], channel_id: int
+    ) -> BaseQuery.namedtuples:
         """
-        Функция получает запись пользователя о канале
+        Function return named tuple
+            list of namedtuple fields:
+            channel_name: str
+            cooldown: int
+            channel_id: int
+            guild_id: int
         """
-        user = User.get_user_by_telegram_id(telegram_id=telegram_id)
-        return cls.select().union(Channel).where(cls.user == user, Channel.channel_id == channel)
+        return (cls.select(
+                            cls.name.alias('channel_name'),
+                            cls.name.alias('cooldown'),
+                            Channel.channel.alias('channel_id'),
+                            Channel.guild.alias('guild_id'),
+                        )
+                            .join(Channel, JOIN.LEFT_OUTER, on=(Channel.id == cls.channel))
+                            .join(User, JOIN.LEFT_OUTER, on=(User.id == cls.user))
+                            .where(User.telegram_id == telegram_id)
+                            .where(cls.channel == channel_id).namedtuples().first())
 
     @classmethod
     @logger.catch
     def get_all_user_channel_by_telegram_id(
-            cls, telegram_id: Union[str, int]) -> 'UserChannel':
+            cls: 'UserChannel', telegram_id: Union[str, int]) -> List[BaseQuery.namedtuples]:
         """
-        Функция получает запись пользователя о канале
+        Function returns a list of named tuples
+        list of namedtuple fields:
+            channel_name: str
+            cooldown: int
+            channel_id: int
+            guild_id: int
         """
-        user = User.get_user_by_telegram_id(telegram_id=telegram_id)
+        return list(
+                    cls.select(
+                            cls.name.alias('channel_name'),
+                            cls.name.alias('cooldown'),
+                            Channel.channel.alias('channel_id'),
+                            Channel.guild.alias('guild_id')
+                        )
+                    .join(Channel, JOIN.LEFT_OUTER, on=(Channel.id == cls.channel))
+                    .join(User, JOIN.LEFT_OUTER, on=(User.id == cls.user))
+                    .where(User.telegram_id == telegram_id).namedtuples().execute()
+        )
+
+    @classmethod
+    @logger.catch
+    def update_cooldown_by_channel_id(cls: 'UserChannel', chanel_id: int, cooldown: int) -> int:
+        """
+        Update cooldown for all users_channel by channel_id
+            TODO логично было бы всем но можно конкретному
+        """
         return (
-                    cls.select(cls)
-                    .join(Channel, UserChannel.channel == Channel.channel_id)
-                    .where(UserChannel.user == user)
+            cls.update(cooldown=cooldown)
+            .where(
+                cls.channel.in_(
+                    Channel.select(Channel.id).where(Channel.channel_id == chanel_id)
                 )
+            )
+        )
 
 
 class Token(BaseModel):
@@ -620,7 +672,6 @@ class Token(BaseModel):
           get_all_free_tokens
           get_all_discord_id
           get_all_discord_id_by_channel
-          get_token_by_discord_id
           check_token_by_discord_id
           update_token_cooldown
           update_token_time
@@ -655,6 +706,7 @@ class Token(BaseModel):
     @logger.catch
     def add_token_by_user_channel(
                                     cls,
+                                    telegram_id: Union[str, int],
                                     token: str,
                                     discord_id: str,
                                     user_channel: 'UserChannel',
@@ -667,13 +719,8 @@ class Token(BaseModel):
         False if this token or discord_id already exists in the database
         or the number of tokens is equal to the limit
         """
-        count_tokens = (
-                        Token.select()
-                        .join(UserChannel, on=(Token.user_channel == UserChannel.id))
-                        .join(User, on=(UserChannel.user == User.id))
-                        .where(User.id == user_channel.user).count()
-        )
-        limit = user_channel.user.max_tokens > count_tokens
+
+        limit = cls.get_number_of_free_slots_for_tokens(telegram_id=telegram_id)
         answer = False
         if limit:
             token, answer = cls.get_or_create(
@@ -694,26 +741,6 @@ class Token(BaseModel):
         last_time = datetime.datetime.now().timestamp()
         return cls.update(last_message_time=last_time).where(cls.token == token).execute()
 
-    # @classmethod
-    # @logger.catch
-    # def update_token_cooldown(cls, token: str, cooldown: int) -> bool:
-    #     """
-    #     set cooldown: update cooldown in seconds for token
-    #     token: (str)
-    #     cooldown: (int) seconds
-    #     """
-    #
-    #     cooldown = cooldown if cooldown > 0 else 5 * 60
-    #     return cls.update(cooldown=cooldown).where(cls.token == token).execute()
-
-    # @classmethod
-    # @logger.catch
-    # def update_mate_cooldown(cls, token: str, cooldown: int) -> bool:
-    #     """set cooldown in seconds to token mate"""
-    #     # TODO кулдаун не тут
-    #     my_token: 'Token' = cls.get_or_none(cls.token == token)
-    #     mate: TokenPair = TokenPair.get_token_mate(my_token.id)
-    #     return cls.update_token_cooldown(token=mate.token, cooldown=cooldown)
 
     @classmethod
     @logger.catch
@@ -723,7 +750,6 @@ class Token(BaseModel):
              first_id: (str) or int
              second_id: (str)
              unites tokens in pair
-             TODO test
         """
         token_first: cls = cls.select().where(cls.token == first).first()
         if not token_first:
@@ -766,17 +792,21 @@ class Token(BaseModel):
 
     @classmethod
     @logger.catch
-    def get_all_related_user_tokens(cls, telegram_id: Union[str, int] = None) -> List:
+    def get_related_tokens(cls, telegram_id: Union[str, int] = None) -> List[BaseQuery.namedtuples]:
         """
         Вернуть список всех связанных ТОКЕНОВ пользователя по его telegram_id:
-        return: data Список объектов с нужными полями
+        return: data список словарей
         TODO определится с составом полей, рефакторинг возможно по таблице пар начиная от юзера
+        token str
+        cooldown  int
+        last_message_time Timestamp
         """
         query = (cls.select(
             cls.token.alias('token'),
-            cls.name.alias('name'),
-            UserChannel.name.alias('user_channel'),
-            Channel.channel.alias('channel'),
+            cls.name.alias('token_name'),
+            UserChannel.name.alias('channel_name'),
+            Channel.channel.alias('channel_id'),
+            User.nick_name.alias('user_name'),
             User.nick_name.alias('user_name'),
             Case(None, [((TokenPair.first_id == cls.id),
                          TokenPair.second_id,)], TokenPair.first_id).alias('pair_id')
@@ -794,11 +824,19 @@ class Token(BaseModel):
 
     @classmethod
     @logger.catch
-    def get_all_user_tokens(cls, telegram_id: Union[str, int] = None) -> List:
+    def get_all_tokens_info(cls, telegram_id: Union[str, int] = None) -> List[BaseQuery.namedtuples]:
         """ TODO если подойдёт верхняя в этом методе нет смысла
         Вернуть список всех ТОКЕНОВ пользователя по его telegram_id:
-        return: data Список объектов с нужными полями
-        TODO определится с составом полей, рефакторинг возможно по таблице пар начиная от юзера
+        return:
+        TODO как вверху но добавить описательное для юзера имена каналов имена токенов
+        token str
+        token_discord_id str
+        proxy str
+        user_channel_pk int
+        channel_id int
+        guild_id int
+        cooldown  int
+        mate_id str (discord_id)
         """
         query = (cls.select(
             cls.token.alias('token'),
@@ -820,87 +858,44 @@ class Token(BaseModel):
                  )
         return [data for data in query]
 
-    @classmethod
-    @logger.catch
-    def get_all_tokens_by_user(cls, user_id: str) -> List['Token']:
-        """
-        TODO сомнительный метод проверить нужность
-        Вернуть список всех ТОКЕНОВ пользователя по его id:
-        return: список token
-        """
-        result = cls.select().where(cls.user == user_id).execute()
-        return [data for data in result] if result else []
-
     # @classmethod
     # @logger.catch
-    # def get_all_discord_id(cls, token: str) -> List[str]:
+    # def get_all_discord_id(cls, user_channel: int) -> List[str]:
     #     """
-    #     TODO обсудить скорее всего тоже лишнее, нужно возвращать по каналу
-    #     Вернуть список всех дискорд ID пользователя по его токену:
+    #     TODO Вернуть список всех дискорд ID пользователя по его токену:
     #     return: (list) список discord_id
     #     """
-    #     data = (cls.select(cls.name).)
-    #     token = Token.get_or_none(token=token)
-    #     tokens = None
-    #     if token:
-    #         user_id = token.user
-    #         tokens = cls.select().where(cls.user == user_id).execute()
-    #     return [data.discord_id for data in tokens] if tokens else []
+    #     pass
+        # data = (cls.select(cls.name).)
+        # token = Token.get_or_none(token=token)
+        # tokens = None
+        # if token:
+        #     user_id = token.user
+        #     tokens = cls.select().where(cls.user == user_id).execute()
+        # return [data.discord_id for data in tokens] if tokens else []
 
     @classmethod
     @logger.catch
-    def get_all_discord_id_by_channel(cls, user_channel: int) -> List[str]:
+    def get_all_discord_id_by_channel(cls, user_channel_pk: int) -> List[str]:
         """
-        Вернуть список всех дискорд ID в канале:
+        TODO  Вернуть список всех дискорд ID в пользовательском канале:
         return: (list) список discord_id
-        TODO test
+        TODO
         """
-        # FIXME скорее всего метод нужно перенести в пользовательские каналы
-        tokens = cls.select(Token.discord_id).where(cls.user_channel == user_channel).execute()
-        return [data.discord_id for data in tokens] if tokens else []
-
-    # @classmethod
-    # @logger.catch
-    # def get_all_info_tokens(cls, telegram_id: str) -> list:
-    #     """
-    #     TODO скорее всего метод удалить
-    #     Вернуть список всех ТОКЕНОВ пользователя по его telegram_id:
-    #     return: список словарей
-    #     {'token': str, 'guild':str, channel: str,
-    #     'time':время_последнего_сообщения, 'cooldown': кулдаун}
-    #     """
-    #     def get_info(token_data: 'Token') -> dict:
-    #         if not token_data:
-    #             return {}
-    #         mate_token: 'TokenPair' = TokenPair.get_token_mate(token_id=token_data.id)
-    #         mate_discord_id: int = mate_token.discord_id if mate_token else None
-    #         return {
-    #             'token_id': token_data.id,
-    #             'token': token_data.token,
-    #             'discord_id': token_data.discord_id,
-    #             'mate_id': mate_discord_id,
-    #             # 'guild': token_data.guild,
-    #             # 'channel': token_data.channel,
-    #             'time': token_data.last_message_time,
-    #             'cooldown': token_data.cooldown
-    #             }
-    #
-    #     user: 'User' = User.get_user_by_telegram_id(telegram_id)
-    #     if user:
-    #         discord_tokens = cls.select().where(cls.user == user.id).execute()
-    #         return [get_info(token) for token in discord_tokens]
-    #
-    #     return []
+        # FIXME метод нужно перенести в пользовательские каналы ДА
+        pass
 
     @classmethod
     @logger.catch
-    def get_all_free_tokens(cls, telegram_id: Union[str, int] = None) -> Tuple:
+    def get_all_free_tokens(cls, telegram_id: Union[str, int] = None) -> Tuple[List[int]]:
         """
-        TODO тоже под вопросом но возможно нужен
+        TODO  нужен Tuple[List[token_pk]]
         Возвращает список всех свободных токенов по каналам
         если ввести телеграмм id
         ограничивает выбору одним пользователем
+        discord id
         """
+
         query = (
                  cls.select(
                     cls.token.alias('token'),
@@ -937,61 +932,51 @@ class Token(BaseModel):
     def check_token_by_discord_id(cls, discord_id: str) -> bool:
         """
         Проверка токена по discord_id
-        TODO нужен ли?
         """
         data = cls.select().where(cls.discord_id == discord_id).execute()
         return True if data else False
 
     @classmethod
     @logger.catch
-    def get_info_by_token(cls, token: str) -> List:
+    def get_info_by_token(cls, token: str) -> dict:
         """
+        TODO сделать как в документации
         Вернуть info по токену
         возвращает объект токен
-            'proxy':proxy(str), 'guild':guild(int), 'channel': channel(int), 'language':
-                language(str), 'last_message_time': last_message_time(int, timestamp),
-                'cooldown': cooldown(int, seconds)}
-                если токена нет приходит пустой словарь
-                guild, channel по умолчанию 0 если не было изменений вернётся 0
-                proxy по умолчанию пусто
-                cooldown по умолчанию 5 * 60
+            'user_channel_pk' int
+            'proxy':proxy(str),
+            'guild':guild(int),
+            'channel': channel(int),
+            'cooldown': cooldown(int, seconds)}
+            'mate_id' str (discord_id)
+            'discord_id' str
         """
-        query = (
-                 cls.select(
-                    cls.token.alias('token'),
-                    cls.name.alias('name'),
-                    UserChannel.name.alias('user_channel'),
-                    Channel.channel.alias('channel'),
-                    User.nick_name.alias('user_name'),
-                 )
-                 .join_from(cls, UserChannel, JOIN.LEFT_OUTER,
-                            on=(cls.user_channel == UserChannel.id))
-                 .join_from(cls, Channel, JOIN.LEFT_OUTER, on=(UserChannel.channel == Channel.id))
-                 .join_from(cls, User, JOIN.LEFT_OUTER, on=(UserChannel.user == User.id))
-                 .join_from(cls, TokenPair, JOIN.LEFT_OUTER,
-                            on=((TokenPair.first_id == cls.id) | (TokenPair.second_id == cls.id)))
-
-                 .where(Token.token == token).namedtuples()
-                 )
-        result = query.first()
-        return result
+        # query = (
+        #          cls.select(
+        #             cls.token.alias('token'),
+        #             cls.name.alias('name'),
+        #             UserChannel.name.alias('user_channel'),
+        #             Channel.channel.alias('channel'),
+        #             User.nick_name.alias('user_name'),
+        #          )
+        #          .join_from(cls, UserChannel, JOIN.LEFT_OUTER,
+        #                     on=(cls.user_channel == UserChannel.id))
+        #          .join_from(cls, Channel, JOIN.LEFT_OUTER, on=(UserChannel.channel == Channel.id))
+        #          .join_from(cls, User, JOIN.LEFT_OUTER, on=(UserChannel.user == User.id))
+        #          .join_from(cls, TokenPair, JOIN.LEFT_OUTER,
+        #                     on=((TokenPair.first_id == cls.id) | (TokenPair.second_id == cls.id)))
+        #
+        #          .where(Token.token == token).namedtuples()
+        #          )
+        # result = query.first()
+        return 'result'
 
     @classmethod
     @logger.catch
     def delete_token(cls, token: str) -> int:
-        #
         """Удалить токен по его "значению": TODO тест"""
-        # token = cls.get_or_none(cls.token == token)
-        # if token:
-        #     TokenPair.delete_pair(token.id)
-        #     return token.delete_instance()
-        return cls.delete().where(cls.token == token).execute()
 
-    @classmethod
-    @logger.catch
-    def delete_token_by_id(cls, token_id: str):
-        """Удалить токен по его "pk": TODO тест """
-        return cls.delete().where(cls.id == token_id).execute()
+        return cls.delete().where(cls.token == token).execute()
 
     @classmethod
     @logger.catch
@@ -1008,7 +993,7 @@ class Token(BaseModel):
     @logger.catch
     def delete_tokens_by_user(cls, user: User) -> int:
         """
-        TODO ачем? легче удалять каналы пользователя токены автоматом грохнутся
+        TODO зачем? легче удалять каналы пользователя токены автоматом грохнутся
         removes all tokens for user
         return: number of removed tokens
         """
@@ -1018,29 +1003,25 @@ class Token(BaseModel):
         # TokenPair.remove_pairs_from_list(token_list=tokens)
         # return cls.delete().where(cls.user == user).execute()
 
-    # @classmethod
-    # @logger.catch
-    # def get_number_of_free_slots_for_tokens(cls, telegram_id: str) -> int:
-    #     """
-    #     Вернуть количество свободных мест для размещения токенов
-    #     """
-    #     user = User.get_user_by_telegram_id(telegram_id)
-    #     if user:
-    #         max_tokens = user.max_tokens
-    #         count_tokens = cls.select().where(cls.user == user.id).count()
-    #
-    #         return max_tokens - count_tokens
-
     @classmethod
     @logger.catch
-    def get_token_by_discord_id(cls, discord_id: str) -> 'Token':
+    def get_number_of_free_slots_for_tokens(cls, telegram_id: str) -> int:
         """
-        TODO нужно ли
-        Вернуть token по discord_id
+        TODO доработать
+        Вернуть количество свободных мест для размещения токенов
         """
-        token: 'Token' = cls.get_or_none(discord_id=discord_id)
 
-        return token
+        limit = (User.select(
+                    Case(None,
+                    [
+                        ((fn.MAX(User.max_tokens).is_null(False)),
+                            fn.MAX(User.max_tokens) - fn.COUNT(Token.id), )
+                    ], 0).alias('limit'))
+                    .join(UserChannel, JOIN.LEFT_OUTER, on=(UserChannel.user == User.id))
+                    .join(cls, JOIN.LEFT_OUTER, on=(cls.user_channel == UserChannel.id))
+                    .where(User.telegram_id == telegram_id).first())
+
+        return limit
 
 
 class TokenPair(BaseModel):
@@ -1106,7 +1087,7 @@ class TokenPair(BaseModel):
 
     @classmethod
     @logger.catch
-    def get_all_related_tokens(cls) -> Tuple[int, ...]:
+    def _get_all_related_tokens(cls) -> Tuple[int, ...]:
         """select all related tokens"""
         first = cls.select(cls.first_id.alias('token'))
         second = cls.select(cls.second_id.alias('token'))
