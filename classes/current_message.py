@@ -15,9 +15,15 @@ class CurrentMessage:
 
 
 if __name__ == '__main__':
-    a = CurrentMessage("123", "hello", "555", '0005', {"name": "vasya", 'values':{'total': 5}})
-    print(a)
-    data: dict = a.get_dict()
-    print(data)
-    total = data.get("author").get("values").get("total")
-    print(total)
+    mes = [
+        {
+            "id": "965957344892686376",
+            "timestamp": "2022-04-19T12:49:37.642000+00:00"
+        },
+        {
+            "id": "965957052100919316",
+            "timestamp": "2022-04-19T12:48:27.835000+00:00"
+        }
+    ]
+    mmm = max(mes, key=lambda x: x.get("timestamp"))
+    print(mmm)

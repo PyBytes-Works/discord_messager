@@ -109,7 +109,7 @@ class MessageReceiver:
         if message_id:
             self.__datastore.current_message_id = message_id
         elif filtered_data:
-            self.__datastore.current_message_id = await self.__get_current_message_id(filtered_data)
+            self.__datastore.current_message_id = filtered_data.get("last_message_id")
         text_to_send: str = user_message if user_message else ''
         answer: dict = await MessageSender(datastore=self.__datastore, text=text_to_send).send_message()
         if not answer:
@@ -128,19 +128,6 @@ class MessageReceiver:
         await asyncio.sleep(timer)
 
         return result
-
-    @staticmethod
-    @logger.catch
-    async def __get_current_message_id(data: dict) -> int:
-        """Возвращает ID сообщения дискорда"""
-
-        message_id: int = 0
-        filtered_messages: list = data.get("messages", [])
-        if filtered_messages:
-            result_data: dict = random.choice(filtered_messages)
-            message_id = int(result_data.get("id"))
-
-        return message_id
 
     @logger.catch
     async def __get_user_message_from_redis(self) -> Tuple[str, int]:
@@ -193,8 +180,6 @@ class MessageReceiver:
             except JSONDecodeError as err:
                 logger.error("F: __send_data_to_api: JSON ERROR:", err)
             else:
-                # Дебагеррный файл, можно удалять
-                # save_data_to_json(data=data)
                 result: dict = await self.__data_filter(data=data)
 
         return result
@@ -208,7 +193,6 @@ class MessageReceiver:
         result = {}
         for elem in data:
 
-            message: str = elem.get("content")
             message_time: 'datetime' = elem.get("timestamp")
             mes_time = datetime.datetime.fromisoformat(message_time).replace(tzinfo=None)
             delta = datetime.datetime.utcnow().replace(tzinfo=None) - mes_time
@@ -221,21 +205,22 @@ class MessageReceiver:
                 if is_author_mate and not my_message:
                     spam: dict = {
                             "id": elem.get("id"),
-                            "message": message,
-                            "channel_id": elem.get("channel_id"),
-                            "author": elem.get("author"),
                             "timestamp": message_time,
                         }
-                    messages.append(CurrentMessage(**spam))
-        # TODO добавить фильтр чтоб он брал только последнее сообщение.
-        "[{'id': '965914850993786910', 'message': 'I can not do it any longer((', 'channel_id': '932256559394861079', 'author': {'id': '487962073456836618', 'username': 'Deskent', 'avatar': '73a9ca402ddff53e053e67537324b8d8', 'avatar_decoration': None, 'discriminator': '8713', 'public_flags': 0}, 'timestamp': '2022-04-19T10:00:46.307000+00:00'}]"
-        if messages:
-            result.update({"messages": messages})
+                    messages.append(spam)
+        last_message_id: int = await self.__get_last_message_id(data=messages)
+        result.update({"last_message_id": last_message_id})
         if replies:
             replies: List[dict] = await self.__update_replies_to_redis(new_replies=replies)
             result.update({"replies": replies})
 
         return result
+
+    @logger.catch
+    async def __get_last_message_id(self, data: list) -> int:
+        if not data:
+            return 0
+        return int(max(data, key=lambda x: x.get("timestamp"))["id"])
 
     @logger.catch
     async def __update_replies_to_redis(self, new_replies: list) -> list:
