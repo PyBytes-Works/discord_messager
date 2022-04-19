@@ -1,6 +1,7 @@
 import os
 import random
 import time
+from typing import Tuple
 
 import openai
 
@@ -43,6 +44,9 @@ class OpenAI:
     def get_answer(self, message: str = '') -> str:
         """Returns answer from bot or empty string if errors"""
 
+        plugs: Tuple[str, ...] = ('server here:', 'https://discord.gg/')
+        defaults: Tuple[str, ...] = ('how are you', 'how are you doing')
+
         if not message:
             logger.debug("OpenAI: No message")
             return ''
@@ -58,7 +62,8 @@ class OpenAI:
             return ''
         result: str = answers[0].get("text", '').strip().split("\n")[0]
         logger.debug(f"OpenAI answer: {result}")
-
+        if any(filter(lambda x: x in result, plugs)):
+            return random.choice(defaults)
         return result
 
 
@@ -72,3 +77,4 @@ if __name__ == '__main__':
     print(messages)
     bot = OpenAI()
     bot.get_answer(messages)
+
