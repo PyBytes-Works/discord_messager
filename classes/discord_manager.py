@@ -15,49 +15,7 @@ from keyboards import cancel_keyboard, user_menu_keyboard
 from models import User, Token
 
 
-# class InstancesStorage:
-#     """
-#     Класс для хранения экземпляров классов данных (ID сообщения в дискорде, время и прочая)
-#     для каждого пользователя телеграма.
-#     Инициализируется при запуске бота.
-#     """
-#     # TODO сделать синглтон
-#
-#     def __init__(self):
-#         self.__instance = {}
-#
-#     @logger.catch
-#     def get_instance(self, telegram_id: str) -> 'DiscordManager':
-#         """Возвращает текущий экземпляр класса для пользователя'"""
-#
-#         return self.__instance.get(telegram_id, {})
-#
-#     @logger.catch
-#     def add_or_update(self, telegram_id: str, data: 'DiscordManager') -> None:
-#         """Сохраняет экземпляр класса пользователя"""
-#
-#         self.__instance.update(
-#             {
-#                 telegram_id: data
-#             }
-#         )
-#
-#     @logger.catch
-#     def mute(self, telegram_id):
-#         user_class: 'DiscordManager' = self.get_instance(telegram_id=telegram_id)
-#         if user_class:
-#             user_class.silence = True
-#             return True
-#
-#     @logger.catch
-#     def unmute(self, telegram_id):
-#         user_class: 'DiscordManager' = self.get_instance(telegram_id=telegram_id)
-#         if user_class:
-#             user_class.silence = False
-#             return True
-
-
-class DiscordManager:
+class DiscordTokenManager:
 
     """Класс управления токенами и таймингами.
     Methods:
@@ -86,7 +44,6 @@ class DiscordManager:
             if await self.is_expired_user_deactivated():
                 break
             self.__datastore: 'TokenDataStore' = TokenDataStore(self.user_telegram_id)
-            # users_data_storage.add_or_update(telegram_id=self.user_telegram_id, data=self)
             if not await self.__is_datastore_ready():
                 break
 
@@ -205,6 +162,7 @@ class DiscordManager:
     async def __send_replies(self, replies: list):
         """Отправляет реплаи из дискорда в телеграм с кнопкой Ответить"""
 
+        logger.debug(f"Replies:\n\t{replies}")
         result = []
         for reply in replies:
             answered: bool = reply.get("answered", False)
