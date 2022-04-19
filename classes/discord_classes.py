@@ -1,42 +1,27 @@
 import datetime
-import os
 import random
-import ssl
 from json import JSONDecodeError
 from typing import List, Tuple, Optional
 
 import asyncio
+
 import aiohttp
 import requests
-import aiohttp.client_exceptions
-import aiohttp.http_exceptions
 from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeyboardRemove
 
-import utils
-from classes.current_message import CurrentMessage
+from classes.proxy_checker import ProxyChecker
+from classes.request_sender import RequestSender
 from classes.vocabulary import Vocabulary
-from config import logger, DEBUG
+from classes.token_datastorage import TokenDataStore
+from config import logger, PROXY_USER, PROXY_PASSWORD, DISCORD_BASE_URL
 from utils import send_report_to_admins
 from keyboards import cancel_keyboard, user_menu_keyboard
-from models import User, Token, Proxy
+from models import User, Token
 from classes.redis_interface import RedisDB
 from classes.open_ai import OpenAI
 
 
-PROXY_USER = os.getenv("PROXY_USER")
-PROXY_PASSWORD = os.getenv("PROXY_PASSWORD")
-
-
 class MessageReceiver:
-
-    __EXCEPTIONS: tuple = (
-        asyncio.exceptions.TimeoutError,
-        aiohttp.client_exceptions.ServerDisconnectedError,
-        aiohttp.client_exceptions.ClientProxyConnectionError,
-        aiohttp.client_exceptions.ClientHttpProxyError,
-        aiohttp.client_exceptions.ClientOSError,
-        aiohttp.client_exceptions.TooManyRedirects,
-    )
 
     """Выбирает токен для отправки сообщения и вызывает метод вызова сообщения,
     проверяет его ответ, и, если есть свободные токены - повторяет процесс.
@@ -45,44 +30,6 @@ class MessageReceiver:
     @logger.catch
     def __init__(self, datastore: 'TokenDataStore'):
         self.__datastore: 'TokenDataStore' = datastore
-
-    @classmethod
-    @logger.catch
-    async def _is_proxy_work(cls, proxy: str) -> bool:
-        """Проверяет прокси на работоспособность"""
-
-        if await cls._send_get_request(proxy=proxy) == 200:
-            return True
-
-    @classmethod
-    @logger.catch
-    async def get_proxy(cls, telegram_id: str) -> str:
-        """Возвращает рабочую прокси из базы данных, если нет рабочих возвращает 'no proxies'"""
-
-        if not Proxy.get_proxy_count():
-            return 'no proxies'
-        proxy: str = str(User.get_proxy(telegram_id=telegram_id))
-        if await cls._is_proxy_work(proxy=proxy):
-            return proxy
-        if not Proxy.update_proxies_for_owners(proxy=proxy):
-            return 'no proxies'
-
-        return await cls.get_proxy(telegram_id=telegram_id)
-
-    @classmethod
-    @logger.catch
-    async def check_user_data(cls, token: str, proxy: str, channel: int) -> dict:
-        """Returns checked dictionary for user data
-
-        Save valid data to instance variables """
-        request_result: str = await cls.__check_token(token=token, proxy=proxy, channel=channel)
-        result = {"token": request_result}
-        if request_result != "bad token":
-            result["channel"] = channel
-        elif request_result == 'no proxies':
-            return {"token": request_result}
-
-        return result
 
     @logger.catch
     async def get_message(self) -> dict:
@@ -158,29 +105,11 @@ class MessageReceiver:
     async def __get_filtered_data(self) -> dict:
         """Отправляет запрос к АПИ"""
 
-        result: dict = {}
-        await asyncio.sleep(1 // 100)
-        async with aiohttp.ClientSession() as session:
-            session.headers['authorization']: str = self.__datastore.token
-            limit: int = 100
-            url: str = self.__datastore.get_channel_url() + f'{self.__datastore.channel}/messages?limit={limit}'
-            proxy_data = f"http://{PROXY_USER}:{PROXY_PASSWORD}@{self.__datastore.proxy}/"
-            try:
-                async with session.get(url=url, proxy=proxy_data, ssl=False, timeout=10) as response:
-                    status_code = response.status
-                    if status_code == 200:
-                        data: List[dict] = await response.json()
-                    else:
-                        logger.error(f"F: __get_data_from_api_aiohttp error: {status_code}: {await response.text()}")
-                        data: dict = {}
-            except MessageReceiver.__EXCEPTIONS as err:
-                logger.error(f"F: __get_data_from_api_aiohttp error: {err}", err)
-            except aiohttp.http_exceptions.BadHttpMessage as err:
-                logger.error("МУДАК ПРОВЕРЬ ПОРТ ПРОКСИ!!!", err)
-            except JSONDecodeError as err:
-                logger.error("F: __send_data_to_api: JSON ERROR:", err)
-            else:
-                result: dict = await self.__data_filter(data=data)
+        data = []
+        response: 'aiohttp.ClientResponse' = await RequestSender(datastore=self.__datastore).get_data_from_channel()
+        if response:
+            data: List[dict] = await response.json()
+        result: dict = await self.__data_filter(data=data)
 
         return result
 
@@ -210,9 +139,8 @@ class MessageReceiver:
                     messages.append(spam)
         last_message_id: int = await self.__get_last_message_id(data=messages)
         result.update({"last_message_id": last_message_id})
-        if replies:
-            replies: List[dict] = await self.__update_replies_to_redis(new_replies=replies)
-            result.update({"replies": replies})
+        replies: List[dict] = await self.__update_replies_to_redis(new_replies=replies)
+        result.update({"replies": replies})
 
         return result
 
@@ -275,50 +203,6 @@ class MessageReceiver:
                 })
 
         return result
-
-    @classmethod
-    @logger.catch
-    async def __check_token(cls, token: str, proxy: str, channel: int) -> str:
-        """Returns valid token else 'bad token'"""
-
-        result: str = 'bad token'
-        status: int = await cls._send_get_request(token=token, proxy=proxy, channel=channel)
-        if status == 200:
-            result = token
-        elif status == 407:
-            if not Proxy.update_proxies_for_owners(proxy):
-                return 'no proxies'
-
-        return result
-
-    @classmethod
-    @logger.catch
-    async def _send_get_request(cls, proxy: str, token: str = '', channel: int = 0) -> int:
-        """Отправляет запрос через прокси, возвращает статус код ответа"""
-
-        async with aiohttp.ClientSession() as session:
-            url: str = "https://www.google.com"
-            if token:
-                session.headers['authorization']: str = token
-                limit: int = 1
-                url: str = TokenDataStore.get_channel_url() + f'{channel}/messages?limit={limit}'
-            proxy_data = f"http://{PROXY_USER}:{PROXY_PASSWORD}@{proxy}/"
-            try:
-                async with session.get(
-                        url=url, proxy=proxy_data, ssl=False, timeout=10
-                ) as response:
-                    return response.status
-            except cls.__EXCEPTIONS as err:
-                logger.info(f"Token check Error: {err}")
-            except aiohttp.http_exceptions.BadHttpMessage as err:
-                logger.error("МУДАК ПРОВЕРЬ ПОРТ ПРОКСИ!!!", err)
-                if "Proxy Authentication Required" in err:
-                    return 407
-            except (ssl.SSLError, OSError) as err:
-                logger.error("Ошибка авторизации прокси:", err)
-                if "Proxy Authentication Required" in err:
-                    return 407
-        return 0
 
 
 class MessageSender:
@@ -429,7 +313,7 @@ class MessageSender:
 
         session = requests.Session()
         session.headers['authorization'] = self.__datastore.token
-        url = self.__datastore.get_channel_url() + f'{self.__datastore.channel}/messages?'
+        url = DISCORD_BASE_URL + f'{self.__datastore.channel}/messages?'
         proxies = {
             "http": f"http://{PROXY_USER}:{PROXY_PASSWORD}@{self.__datastore.proxy}/",
             "https": f"http://{PROXY_USER}:{PROXY_PASSWORD}@{self.__datastore.proxy}/"
@@ -461,141 +345,11 @@ class MessageSender:
             status_code = 407
         self.__answer = {"status_code": status_code, "data": answer_data}
         if status_code == 407:
-            new_proxy: str = await MessageReceiver.get_proxy(self.__datastore.telegram_id)
+            new_proxy: str = await ProxyChecker.get_proxy(self.__datastore.telegram_id)
             if new_proxy == 'no proxies':
                 return
             self.__datastore.proxy = new_proxy
             await self.__send_data()
-
-
-class TokenDataStore:
-    """
-    Класс для хранения текущих данных для отправки и получения сообщений дискорда
-
-    Methods
-        check_user_data
-        save_token_data
-    """
-
-    __DISCORD_BASE_URL: str = f'https://discord.com/api/v9/channels/'
-
-    def __init__(self, telegram_id: str):
-        self.telegram_id: str = telegram_id
-        self.__CURRENT_MESSAGE_ID: int = 0
-        self.__DISCORD_USER_TOKEN: str = ''
-        self.__PROXY: str = ''
-        self.__CHANNEL: int = 0
-        self.__GUILD: int = 0
-        self.__TOKEN_COOLDOWN: int = 0
-        self.__MATE_DISCORD_ID: str = ''
-        self.__DELAY: int = 0
-        self.__MY_DISCORD_ID: str = ''
-        self.__current_message_text: str = ''
-
-    @logger.catch
-    def create_datastore_data(self, token: str):
-        self.token: str = token
-        token_data: dict = Token.get_info_by_token(token)
-        self.proxy: str = token_data.get("proxy")
-        self.channel: int = token_data.get("channel")
-        self.guild: int = token_data.get("guild")
-        self.cooldown: int = token_data.get("cooldown")
-        self.mate_id: str = token_data.get("mate_id")
-        self.my_discord_id: str = token_data.get("discord_id")
-
-    @classmethod
-    def get_channel_url(cls) -> str:
-        return cls.__DISCORD_BASE_URL
-
-    @property
-    def current_message_text(self) -> str:
-        return self.__current_message_text
-
-    @current_message_text.setter
-    def current_message_text(self, message_text: str):
-        self.__current_message_text = message_text
-
-    @property
-    def my_discord_id(self) -> str:
-        return self.__MY_DISCORD_ID
-
-    @my_discord_id.setter
-    def my_discord_id(self, my_discord_id: str):
-        self.__MY_DISCORD_ID = my_discord_id
-
-    @property
-    def mate_id(self) -> str:
-        return self.__MATE_DISCORD_ID
-
-    @mate_id.setter
-    def mate_id(self, mate_id: str):
-        self.__MATE_DISCORD_ID = mate_id
-
-    @property
-    def last_message_time(self) -> float:
-        return self.__TOKEN_COOLDOWN + 120
-
-    @property
-    def delay(self) -> int:
-        return self.__DELAY
-
-    @delay.setter
-    def delay(self, delay: int):
-        self.__DELAY = delay
-
-    @property
-    def cooldown(self) -> int:
-        return self.__TOKEN_COOLDOWN
-
-    @cooldown.setter
-    def cooldown(self, cooldown: int):
-        self.__TOKEN_COOLDOWN = cooldown
-
-    @property
-    def current_message_id(self) -> int:
-        return self.__CURRENT_MESSAGE_ID
-
-    @current_message_id.setter
-    def current_message_id(self, message_id: int):
-        self.__CURRENT_MESSAGE_ID = message_id
-
-    @property
-    def channel(self) -> str:
-        channel = self.__CHANNEL
-
-        return channel if channel else 'no channel'
-
-    @channel.setter
-    def channel(self, channel: str):
-        self.__CHANNEL = channel
-
-    @property
-    def guild(self) -> str:
-        guild = self.__GUILD
-
-        return guild if guild else 'no guild'
-
-    @guild.setter
-    def guild(self, guild: str):
-        self.__GUILD = guild
-
-    @property
-    def token(self) -> str:
-        spam = self.__DISCORD_USER_TOKEN
-
-        return spam if spam else 'no token'
-
-    @token.setter
-    def token(self, token: str):
-        self.__DISCORD_USER_TOKEN = token
-
-    @property
-    def proxy(self) -> str:
-        return self.__PROXY if self.__PROXY else 'no proxy'
-
-    @proxy.setter
-    def proxy(self, proxy: str) -> None:
-        self.__PROXY = proxy
 
 
 class InstancesStorage:

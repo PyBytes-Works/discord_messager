@@ -7,10 +7,12 @@ from aiogram.dispatcher.filters import Text
 from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeyboardRemove
 from aiogram.dispatcher import FSMContext
 
+from classes.proxy_checker import ProxyChecker
+from classes.token_checker import TokenChecker
 from config import logger, Dispatcher, admins_list
 from models import User, Token
 from keyboards import cancel_keyboard, user_menu_keyboard, all_tokens_keyboard
-from classes.discord_classes import MessageReceiver, UserData
+from classes.discord_classes import UserData
 from states import UserState
 from utils import check_is_int, save_data_to_json, send_report_to_admins
 from classes.redis_interface import RedisDB
@@ -184,13 +186,13 @@ async def add_discord_token_handler(message: Message, state: FSMContext) -> None
     data: dict = await state.get_data()
     channel: int = data.get('channel')
 
-    proxy: str = await MessageReceiver.get_proxy(telegram_id=message.from_user.id)
+    proxy: str = await ProxyChecker.get_proxy(telegram_id=message.from_user.id)
     if not await is_proxy_valid(message=message, proxy=proxy):
         await message.answer("Прокси не валидна.")
         await state.finish()
         return
 
-    result: dict = await MessageReceiver.check_user_data(token=token, proxy=proxy, channel=channel)
+    result: dict = await TokenChecker.check_user_data(token=token, proxy=proxy, channel=channel)
     request_result: str = result.get('token')
     if not await is_proxy_valid(message=message, proxy=request_result):
         await message.answer("Прокси с токеном не валидны.")
@@ -355,6 +357,7 @@ async def start_parsing_command_handler(message: Message, state: FSMContext) -> 
     await message.answer("Запускаю бота " + mute_text, reply_markup=cancel_keyboard())
     await UserState.in_work.set()
     await UserData(message=message, mute=mute).lets_play()
+    # TODO добавить проверку - если все токены на КД - закончить работу
     await message.answer("Закончил работу.", reply_markup=user_menu_keyboard())
     await state.finish()
 

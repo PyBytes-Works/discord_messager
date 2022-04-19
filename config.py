@@ -31,6 +31,9 @@ DEBUG = True if (int(DEBUG) or DEBUG.lower() == "true") else False
 if not DEBUG:
     admins_list = [deskent, artem, vova]
 
+# Proxy config
+PROXY_USER = os.getenv("PROXY_USER")
+PROXY_PASSWORD = os.getenv("PROXY_PASSWORD")
 DEFAULT_PROXY = os.getenv("DEFAULT_PROXY")
 if not DEFAULT_PROXY:
     raise ValueError("Config: DEFAULT_PROXY not found in file .env")
@@ -41,6 +44,9 @@ tgToken = os.getenv("TELEBOT_TOKEN")
 bot = Bot(token=tgToken)
 storage = MemoryStorage()
 dp = Dispatcher(bot, storage=storage)
+
+# Constants
+DISCORD_BASE_URL: str = f'https://discord.com/api/v9/channels/'
 
 
 #  ********** LOGGER CONFIG ********************************
