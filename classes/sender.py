@@ -41,7 +41,7 @@ class MessageSender:
         if text == "Vocabulary error":
             self.__answer = {"status_code": -2, "data": {"message": text}}
             return ''
-        await RedisDB(redis_key=self.__datastore.mate_id).save(data=[text])
+        await RedisDB(redis_key=self.__datastore.mate_id).save(data=[text], timeout_sec=self.__datastore.delay + 300)
         return text
 
     @logger.catch

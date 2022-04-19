@@ -35,6 +35,7 @@ async def cancel_handler(message: Message, state: FSMContext) -> None:
     await message.answer(
         "Вы отменили текущую команду." + text, reply_markup=keyboard()
     )
+    logger.debug(f"\n\t{user_telegram_id}: canceled command.")
     User.set_user_is_not_work(telegram_id=user_telegram_id)
     await state.finish()
 
