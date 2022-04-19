@@ -2,17 +2,15 @@ import datetime
 import os
 import sys
 
+from peewee import SqliteDatabase
+
 from aiogram import Bot, Dispatcher
 from dotenv import load_dotenv
 from loguru import logger
 from aiogram.contrib.fsm_storage.memory import MemoryStorage
 
-
 # Загружаем переменные из файла .env
-from peewee import SqliteDatabase
-
 load_dotenv()
-
 
 VERSION = os.getenv("VERSION")
 
@@ -48,29 +46,30 @@ dp = Dispatcher(bot, storage=storage)
 # Constants
 DISCORD_BASE_URL: str = f'https://discord.com/api/v9/channels/'
 
-
 #  ********** LOGGER CONFIG ********************************
+LOGGING_DIRECTORY = 'logs'
+LOGGING_FILENAME = 'discord_mailer.log'
 PATH = os.getcwd()
 if not os.path.exists('./logs'):
     os.mkdir("./logs")
 today = datetime.datetime.today().strftime("%Y-%m-%d")
-file_path = os.path.join(os.path.relpath(PATH, start=None), 'logs', today, 'discord_mailer.log')
+file_path = os.path.join(PATH, LOGGING_DIRECTORY, today, LOGGING_FILENAME)
 LOG_LEVEL = "WARNING"
 DEBUG_LEVEL = "INFO"
 if DEBUG:
     DEBUG_LEVEL = "DEBUG"
 logger_cfg = {
-   "handlers": [
-       {
-           "sink": sys.stdout,
-           "level": DEBUG_LEVEL,
-           "format": "<white>{time:HH:mm:ss}</white> - <yellow>{level}</yellow> | <green>{message}</green>"
-       },
-       {
+    "handlers": [
+        {
+            "sink": sys.stdout,
+            "level": DEBUG_LEVEL,
+            "format": "<white>{time:HH:mm:ss}</white> - <yellow>{level}</yellow> | <green>{message}</green>"
+        },
+        {
             "sink": file_path, "level": LOG_LEVEL,
             "format": "{time:YYYY-MM-DD HH:mm:ss} - {level} | {message}",
             "rotation": "50 MB"
-       },
+        },
     ]
 }
 logger.configure(**logger_cfg)
@@ -78,8 +77,8 @@ print('Start logging to:', file_path)
 #  ********** END OF LOGGER CONFIG *************************
 
 #  ********** DATABASE CONFIG *************************
-db_file_name = 'db/discord_mailer.db'
-full_path = os.path.join(PATH, db_file_name)
+DB_FILE_NAME = 'db/discord_mailer.db'
+full_path = os.path.join(PATH, DB_FILE_NAME)
 db = SqliteDatabase(
     full_path,
     pragmas={

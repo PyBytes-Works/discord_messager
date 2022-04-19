@@ -12,7 +12,7 @@ import datetime
 from aiogram import executor
 
 from admin_handlers import register_admin_handlers
-from config import dp, logger, admins_list, bot, db_file_name, VERSION
+from config import dp, logger, admins_list, bot, DB_FILE_NAME, VERSION
 from handlers import register_handlers
 from models import recreate_db
 
@@ -39,9 +39,9 @@ async def on_startup(_) -> None:
         pass
     if not os.path.exists('./db'):
         os.mkdir("./db")
-    if not os.path.exists(db_file_name):
-        logger.warning(f"Database not found with file name: {db_file_name}")
-        recreate_db(db_file_name)
+    if not os.path.exists(DB_FILE_NAME):
+        logger.warning(f"Database not found with file name: {DB_FILE_NAME}")
+        recreate_db(DB_FILE_NAME)
 
     print('Bot started at:', datetime.datetime.now())
     logger.info("BOT POLLING ONLINE")

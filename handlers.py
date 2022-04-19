@@ -12,7 +12,7 @@ from classes.token_checker import TokenChecker
 from config import logger, Dispatcher, admins_list
 from models import User, Token
 from keyboards import cancel_keyboard, user_menu_keyboard, all_tokens_keyboard
-from classes.discord_classes import UserData
+from classes.discord_classes import DiscordManager
 from states import UserState
 from utils import check_is_int, save_data_to_json, send_report_to_admins
 from classes.redis_interface import RedisDB
@@ -43,7 +43,7 @@ async def cancel_handler(message: Message, state: FSMContext) -> None:
 async def get_all_tokens_handler(message: Message) -> None:
     """Обработчик команды "Установить кулдаун"""""
 
-    if await UserData(message=message).is_expired_user_deactivated():
+    if await DiscordManager(message=message).is_expired_user_deactivated():
         return
     user_telegram_id: str = str(message.from_user.id)
 
@@ -93,7 +93,7 @@ async def set_self_token_cooldown_handler(message: Message, state: FSMContext):
 async def invitation_add_discord_token_handler(message: Message) -> None:
     """Обработчик команды /add_token"""
 
-    if await UserData(message=message).is_expired_user_deactivated():
+    if await DiscordManager(message=message).is_expired_user_deactivated():
         return
     user: str = str(message.from_user.id)
     if User.is_active(telegram_id=user):
@@ -257,7 +257,7 @@ async def add_discord_id_handler(message: Message, state: FSMContext) -> None:
             user: data
         }
         save_data_to_json(data=data, file_name="user_data.json", key='a')
-        UserData(message=message).form_token_pairs(unpair=False)
+        DiscordManager(message=message).form_token_pairs(unpair=False)
     else:
         Token.delete_token(token)
         text: str = "ERROR: add_discord_id_handler: Не смог добавить токен, нужно вводить данные заново."
@@ -272,7 +272,7 @@ async def info_tokens_handler(message: Message) -> None:
     Выводит инфо о токенах. Обработчик кнопки "Информация"
     """
 
-    if await UserData(message=message).is_expired_user_deactivated():
+    if await DiscordManager(message=message).is_expired_user_deactivated():
         return
     user: str = str(message.from_user.id)
     if User.is_active(message.from_user.id):
@@ -339,7 +339,7 @@ async def start_parsing_command_handler(message: Message, state: FSMContext) -> 
 
     user_telegram_id: str = str(message.from_user.id)
     user_is_active: bool = User.is_active(telegram_id=user_telegram_id)
-    user_expired: bool = await UserData(message=message).is_expired_user_deactivated()
+    user_expired: bool = await DiscordManager(message=message).is_expired_user_deactivated()
     if not user_is_active or user_expired:
         return
     if not Token.get_all_user_tokens(user_telegram_id):
@@ -356,7 +356,7 @@ async def start_parsing_command_handler(message: Message, state: FSMContext) -> 
         mute = True
     await message.answer("Запускаю бота " + mute_text, reply_markup=cancel_keyboard())
     await UserState.in_work.set()
-    await UserData(message=message, mute=mute).lets_play()
+    await DiscordManager(message=message, mute=mute).lets_play()
     # TODO добавить проверку - если все токены на КД - закончить работу
     await message.answer("Закончил работу.", reply_markup=user_menu_keyboard())
     await state.finish()
@@ -398,7 +398,7 @@ async def default_message(message: Message) -> None:
     """Ответ на любое необработанное действие активного пользователя."""
 
     if User.is_active(message.from_user.id):
-        if await UserData(message=message).is_expired_user_deactivated():
+        if await DiscordManager(message=message).is_expired_user_deactivated():
             return
         await message.answer('Выберите команду.', reply_markup=user_menu_keyboard())
 
