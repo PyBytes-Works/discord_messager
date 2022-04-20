@@ -96,7 +96,7 @@ class Proxy(BaseModel):
 
 
 class Channel(BaseModel):
-    """The Channel class have fields guild and channel"""
+    """The Channel class have fields guild_id and channel_id"""
     guild_id = BigIntegerField(unique=True, verbose_name="Гильдия для подключения")
     channel_id = BigIntegerField(unique=True, verbose_name="Канал для подключения")
 
@@ -105,14 +105,14 @@ class Channel(BaseModel):
 
     @classmethod
     @logger.catch
-    def get_or_create_channel(cls: 'Channel', guild: Any, channel: Any) -> 'Channel':
-        user_channel, created = cls.get_or_create(guild=guild, channel=channel)
+    def get_or_create_channel(cls: 'Channel', guild_id: Any, channel_id: Any) -> 'Channel':
+        user_channel, created = cls.get_or_create(guild_id=guild_id, channel_id=channel_id)
         return user_channel
 
     # @classmethod
     # @logger.catch
-    # def get_channel(cls: 'Channel', guild: Any, channel: Any) -> 'Channel':
-    #     return cls.get(guild=guild, channel=channel)
+    # def get_channel(cls: 'Channel', guild_id: Any, channel_id: Any) -> 'Channel':
+    #     return cls.get(guild_id=guild_id, channel_id=channel_id)
 
 
 class User(BaseModel):
@@ -239,7 +239,7 @@ class User(BaseModel):
     @classmethod
     @logger.catch
     def delete_all_tokens(cls, telegram_id: str) -> int:
-        """TODO Нахрена? удялить при деактивации
+        """TODO Нахрена? удялить при деактивации? ждем Артема?
         удаляет пользовательские каналы
         """
         return UserChannel.delete().where(
@@ -318,25 +318,36 @@ class User(BaseModel):
 
     @classmethod
     @logger.catch
-    def get_all_users(cls: 'User') -> dict:
+    def get_all_users(cls: 'User') -> BaseQuery.namedtuples:
         """
-        TODO вернуть namedtuples
         returns dict of all users
-        return: dict
+        return: named tuple
+        list of namedtuple fields:
+            nick_name: str
+            user_active: str
+            user_admin: str
+            proxy: str
+            telegram_id: str
+            max_token: int
+            user_expiration: timestamp
         """
-        timestamp = datetime.datetime.fromtimestamp
-        return {
-            user.telegram_id: (
-                f'{user.nick_name.rsplit("_", maxsplit=1)[0]} | '
-                f'{"Active" if user.active else "Not active"} | '
-                f'{"Admin" if user.admin else "Not admin"} | '
-                f'Proxy: {user.proxy.proxy if user.proxy else "ЧТО ТО СЛОМАЛОСЬ"} | '
-                f'\nID: {user.telegram_id if user.telegram_id else "ЧТО ТО СЛОМАЛОСЬ"} | '
-                f'№: {user.max_tokens if user.max_tokens else "ЧТО ТО СЛОМАЛОСЬ"} | '
-                f'{timestamp(user.expiration) if user.expiration else "ЧТО ТО СЛОМАЛОСЬ"}'
-                )
-            for user in User.select().execute()
-        }
+        return User.select(
+            User.nick_name.alias('nick_name'),
+            Case(None, [((User.active == True), 'Active',)], 'Not active').alias('user_active'),
+            Case(None, [((User.admin == True), 'Admin',)], 'Not admin').alias('user_admin'),
+            Proxy.proxy.alias('proxy'),
+            User.telegram_id.alias('telegram_id'),
+            User.telegram_id.alias('telegram_id'),
+            User.max_tokens.alias('max_token'),
+            User.expiration.alias('user_expiration'),
+        ).join(Proxy, JOIN.LEFT_OUTER, on=(User.proxy == Proxy.id)).execute()
+                # f'{user.nick_name.rsplit("_", maxsplit=1)[0]} | '
+                # f'{"Active" if user.active else "Not active"} | '
+                # f'{"Admin" if user.admin else "Not admin"} | '
+                # f'Proxy: {user.proxy.proxy if user.proxy else "ЧТО ТО СЛОМАЛОСЬ"} | '
+                # f'\nID: {user.telegram_id if user.telegram_id else "ЧТО ТО СЛОМАЛОСЬ"} | '
+                # f'№: {user.max_tokens if user.max_tokens else "ЧТО ТО СЛОМАЛОСЬ"} | '
+                # f'{timestamp(user.expiration) if user.expiration else "ЧТО ТО СЛОМАЛОСЬ"}'
 
     @classmethod
     @logger.catch
@@ -579,16 +590,15 @@ class UserChannel(BaseModel):
             cls: 'UserChannel',
             telegram_id: str,
             name: str,
-            guild: Union[str, int],
-            channel: Union[str, int],
+            guild_id: int,
+            channel_id: int,
             cooldown: int = 60) -> 'UserChannel':
         """
-        TODO гильдия и какнал перевести в бигинт
         Функция создает запись связи пользователя с дискорд каналом
         если канала нет, он будет создан
         """
         user = User.get_user_by_telegram_id(telegram_id=telegram_id)
-        channel = Channel.get_or_create_channel(guild=guild, channel=channel)
+        channel = Channel.get_or_create_channel(guild_id=guild_id, channel_id=channel_id)
         return cls.create(user=user, name=name, channel=channel.id, cooldown=cooldown)
 
     @classmethod
@@ -607,8 +617,8 @@ class UserChannel(BaseModel):
         return (cls.select(
                             cls.name.alias('channel_name'),
                             cls.name.alias('cooldown'),
-                            Channel.channel.alias('channel_id'),
-                            Channel.guild.alias('guild_id'),
+                            Channel.channel_id.alias('channel_id'),
+                            Channel.guild_id.alias('guild_id'),
                         )
                             .join(Channel, JOIN.LEFT_OUTER, on=(Channel.id == cls.channel))
                             .join(User, JOIN.LEFT_OUTER, on=(User.id == cls.user))
@@ -631,8 +641,8 @@ class UserChannel(BaseModel):
                     cls.select(
                             cls.name.alias('channel_name'),
                             cls.name.alias('cooldown'),
-                            Channel.channel.alias('channel_id'),
-                            Channel.guild.alias('guild_id')
+                            Channel.channel_id.alias('channel_id'),
+                            Channel.guild_id.alias('guild_id')
                         )
                     .join(Channel, JOIN.LEFT_OUTER, on=(Channel.id == cls.channel))
                     .join(User, JOIN.LEFT_OUTER, on=(User.id == cls.user))
@@ -673,7 +683,6 @@ class Token(BaseModel):
           get_all_discord_id
           get_all_discord_id_by_channel
           check_token_by_discord_id
-          update_token_cooldown
           update_token_time
     """
     # user = ForeignKeyField(User, on_delete="CASCADE")
@@ -686,9 +695,6 @@ class Token(BaseModel):
     language = CharField(
         default='en', max_length=10, unique=False, verbose_name="Язык канала в discord"
     )
-    # TODO kill cooldown = IntegerField(
-    #     default=60*5, verbose_name="Время отправки последнего сообщения"
-    # )
     last_message_time = TimestampField(
         default=datetime.datetime.now().timestamp() - 60*5,
         verbose_name="Время отправки последнего сообщения"
@@ -796,28 +802,20 @@ class Token(BaseModel):
         """
         Вернуть список всех связанных ТОКЕНОВ пользователя по его telegram_id:
         return: data список словарей
-        TODO определится с составом полей, рефакторинг возможно по таблице пар начиная от юзера
         token str
         cooldown  int
         last_message_time Timestamp
         """
         query = (cls.select(
             cls.token.alias('token'),
-            cls.name.alias('token_name'),
-            UserChannel.name.alias('channel_name'),
-            Channel.channel.alias('channel_id'),
-            User.nick_name.alias('user_name'),
-            User.nick_name.alias('user_name'),
-            Case(None, [((TokenPair.first_id == cls.id),
-                         TokenPair.second_id,)], TokenPair.first_id).alias('pair_id')
-        )
+            cls.last_message_time.alias('last_message_time'),
+            UserChannel.name.alias('channel_name'))
                  .join_from(cls, UserChannel, JOIN.LEFT_OUTER, on=(
                     cls.user_channel == UserChannel.id))
                  .join_from(cls, Channel, JOIN.LEFT_OUTER, on=(UserChannel.channel == Channel.id))
                  .join_from(cls, User, JOIN.LEFT_OUTER, on=(UserChannel.user == User.id))
                  .join_from(cls, TokenPair, JOIN.RIGHT_OUTER,
                     on=((TokenPair.first_id == cls.id) | (TokenPair.second_id == cls.id)))
-
                  .where(User.telegram_id == telegram_id).namedtuples()
                  )
         return [data for data in query]
@@ -843,7 +841,7 @@ class Token(BaseModel):
             cls.id.alias('id'),
             cls.name.alias('name'),
             UserChannel.name.alias('user_channel'),
-            Channel.channel.alias('channel'),
+            Channel.channel_id.alias('channel_id'),
             User.nick_name.alias('user_name'),
             Case(None, [((TokenPair.first_id == cls.id),
                          TokenPair.second_id,)], TokenPair.first_id).alias('pair_id')
@@ -901,7 +899,7 @@ class Token(BaseModel):
                     cls.token.alias('token'),
                     cls.name.alias('name'),
                     UserChannel.name.alias('user_channel'),
-                    Channel.channel.alias('channel'),
+                    Channel.channel_id.alias('channel_id'),
                     User.nick_name.alias('user_name'),
                  )
                  .join_from(cls, UserChannel, JOIN.LEFT_OUTER, on=(
@@ -945,8 +943,8 @@ class Token(BaseModel):
         возвращает объект токен
             'user_channel_pk' int
             'proxy':proxy(str),
-            'guild':guild(int),
-            'channel': channel(int),
+            'guild_id':guild_id(int),
+            'channel_id': channel_id(int),
             'cooldown': cooldown(int, seconds)}
             'mate_id' str (discord_id)
             'discord_id' str
@@ -956,7 +954,7 @@ class Token(BaseModel):
         #             cls.token.alias('token'),
         #             cls.name.alias('name'),
         #             UserChannel.name.alias('user_channel'),
-        #             Channel.channel.alias('channel'),
+        #             Channel.channel_id.alias('channel_id'),
         #             User.nick_name.alias('user_name'),
         #          )
         #          .join_from(cls, UserChannel, JOIN.LEFT_OUTER,
