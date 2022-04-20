@@ -754,8 +754,8 @@ class Token(BaseModel):
         """
         if not name:
             name: str = token
-        limit = cls.get_number_of_free_slots_for_tokens(telegram_id=telegram_id)
-        answer = False
+        limit: int = cls.get_number_of_free_slots_for_tokens(telegram_id=telegram_id)
+        answer: bool = False
         if limit:
             token, answer = cls.get_or_create(
                 user_channel=user_channel_pk,
