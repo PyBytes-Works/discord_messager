@@ -2,7 +2,7 @@ from typing import List
 
 from aiogram.types import ReplyKeyboardRemove, Message
 
-from models import User, Token, Proxy
+from models import User, Token, Proxy, BaseQuery
 from classes.token_datastorage import TokenDataStore
 from config import logger
 from utils import send_report_to_admins
@@ -43,8 +43,9 @@ class DBI:
 
     @classmethod
     @logger.catch
-    async def add_new_user(cls, *args, **kwargs):
-        return User.add_new_user(*args, **kwargs)
+    async def add_new_user(cls, nick_name: str, telegram_id: str, proxy_pk: int, expiration: int):
+        return User.add_new_user(
+            nick_name=nick_name, telegram_id=telegram_id, proxy_pk=proxy_pk, expiration=expiration)
 
     @classmethod
     @logger.catch
@@ -284,7 +285,7 @@ class DBI:
 
     @classmethod
     @logger.catch
-    async def get_low_used_proxy(cls) -> str:
+    async def get_low_used_proxy(cls) -> collections.namedtuples:
         return Proxy.get_low_used_proxy()
 
     @classmethod

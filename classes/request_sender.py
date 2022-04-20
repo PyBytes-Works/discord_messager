@@ -30,7 +30,6 @@ class RequestSender:
         self.token: str = ''
         self.channel: Union[str, int] = 0
 
-
     @logger.catch
     async def get_request(self, datastore: 'TokenDataStore') -> List[dict]:
         """Отправляет GET запрос к АПИ"""
@@ -96,6 +95,15 @@ class RequestSender:
     async def get_me(self, token: str):
         # TODO написать
         pass
+
+    @logger.catch
+    async def check_proxy(self, proxy: str):
+
+        self.proxy = proxy
+        answer: dict = await self._send_get_request()
+        if answer.get("status") == 200:
+            return proxy
+        return await self.get_checked_proxy()
 
     @logger.catch
     async def _check_proxy(self, proxy: str, token: str = '', channel: Union[str, int] = 0) -> int:

@@ -164,7 +164,6 @@ class DiscordTokenManager:
                 seconds: str = f'0{seconds}'
             delay: str = f"{minutes}:{seconds}"
             text = "минут"
-
         return f"Все токены отработали. Следующий старт через {delay} {text}."
 
     @logger.catch

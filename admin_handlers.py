@@ -1,4 +1,5 @@
 """Модуль для обработчиков администратора"""
+import collections
 import re
 
 import aiogram
@@ -9,6 +10,7 @@ from aiogram.dispatcher.filters import Text
 from aiogram.types import Message, CallbackQuery, ReplyKeyboardRemove, InlineKeyboardMarkup, \
     InlineKeyboardButton
 
+from classes.request_sender import RequestSender
 from classes.vocabulary import Vocabulary
 from config import logger, bot, admins_list
 from handlers import cancel_handler
@@ -422,6 +424,7 @@ async def delete_user_handler(callback: CallbackQuery, state: FSMContext) -> Non
 @logger.catch
 async def activate_new_user_handler(message: Message) -> None:
     """Обработчик команды /ua для авторизации нового пользователя"""
+
     user_telegram_id: str = str(message.from_user.id)
     if await DBI.is_active(telegram_id=user_telegram_id):
         await message.answer("Вы уже есть в базе данных.", reply_markup=cancel_keyboard())
@@ -450,13 +453,20 @@ async def add_user_to_db_by_token(message: Message, state: FSMContext) -> None:
     subscribe_time = user_data["subscribe_time"]
     if user_name and max_tokens and subscribe_time:
         user_telegram_id: str = str(message.from_user.id)
-        proxy: str = await DBI.get_low_used_proxy()
-        # TODO проверить проксю
 
+        proxy_data: collections.namedtuple = await DBI.get_low_used_proxy()
+        # proxy: str = await RequestSender().check_proxy(proxy=proxy_data.proxy)
+        # # FIXME дублирование кода
+        # if proxy == 'no proxies':
+        #     text: str = "Ошибка прокси. Нет доступных прокси."
+        #     await message.answer(text, reply_markup=ReplyKeyboardRemove())
+        #     await send_report_to_admins(text)
+        #     await state.finish()
+        #     return
         user_data: dict = {
             "telegram_id": user_telegram_id,
             "nick_name": user_name,
-            "proxy": proxy,
+            "proxy_pk": proxy_data.proxy_pk,
             "expiration": subscribe_time
         }
 
