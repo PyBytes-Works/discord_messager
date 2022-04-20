@@ -30,7 +30,7 @@ class RequestSender:
         self.token: str = ''
         self.channel: Union[str, int] = 0
 
-    # TODO отрефакторить метод, у него двойной функционал
+
     @logger.catch
     async def get_request(self, datastore: 'TokenDataStore') -> List[dict]:
         """Отправляет GET запрос к АПИ"""
@@ -56,7 +56,7 @@ class RequestSender:
         pass
 
     @logger.catch
-    async def get_proxy(self, telegram_id: str) -> str:
+    async def get_checked_proxy(self, telegram_id: str) -> str:
         """Возвращает рабочую прокси из базы данных, если нет рабочих возвращает 'no proxies'"""
 
         if not await DBI.get_proxy_count():
@@ -67,7 +67,7 @@ class RequestSender:
         if not await DBI.update_proxies_for_owners(proxy=proxy):
             return 'no proxies'
 
-        return await self.get_proxy(telegram_id=telegram_id)
+        return await self.get_checked_proxy(telegram_id=telegram_id)
 
     @logger.catch
     async def check_token(self, proxy: str, token: str, channel: int) -> dict:
@@ -101,6 +101,7 @@ class RequestSender:
     async def _check_proxy(self, proxy: str, token: str = '', channel: Union[str, int] = 0) -> int:
         """Отправляет запрос через прокси, возвращает статус код ответа"""
 
+        # TODO отрефакторить метод, у него двойной функционал
         self.proxy: str = proxy
         self.token: str = token
         self.channel: int = channel
