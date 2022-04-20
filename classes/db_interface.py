@@ -114,6 +114,7 @@ class DBI:
     @classmethod
     @logger.catch
     async def get_user_by_name(cls, name: str) -> 'User':
+        # TODO написать метод в БД
         return User.get_or_none(User.nick_name.contains(name))
 
     @classmethod
