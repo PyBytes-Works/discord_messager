@@ -30,7 +30,6 @@ class DBI:
                 "Время подписки истекло. Ваш аккаунт деактивирован, токены удалены.",
                 reply_markup=ReplyKeyboardRemove()
             )
-            User.delete_all_tokens(telegram_id)
             User.deactivate_user(telegram_id)
             text = (
                 f"Время подписки {telegram_id} истекло, "
