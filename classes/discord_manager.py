@@ -85,7 +85,7 @@ class DiscordTokenManager:
     async def __is_datastore_ready(self) -> bool:
 
         if not self.__workers:
-            self.form_token_pairs(unpair=True)
+            await self.form_token_pairs(unpair=True)
             self.__current_tokens_list = await self.__get_tokens_list()
             if not self.__current_tokens_list:
                 await self.__send_text(text="Не смог сформировать пары токенов.", keyboard=user_menu_keyboard())
@@ -251,7 +251,7 @@ class DiscordTokenManager:
                     f"\nФормирую новые пары.",
                     reply_markup=user_menu_keyboard()
                 )
-                self.form_token_pairs(unpair=False)
+                await self.form_token_pairs(unpair=False)
             else:
                 await self.message.answer(f"Ошибка {status_code}: {data}")
         elif status_code == 404:
@@ -300,7 +300,7 @@ class DiscordTokenManager:
         return result
 
     @logger.catch
-    def form_token_pairs(self, unpair: bool = False) -> int:
+    async def form_token_pairs(self, unpair: bool = False) -> int:
         """Формирует пары из свободных токенов если они в одном канале"""
 
         if unpair:

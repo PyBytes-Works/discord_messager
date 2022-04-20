@@ -73,7 +73,7 @@ logger_cfg = {
     ]
 }
 logger.configure(**logger_cfg)
-print('Start logging to:', file_path)
+logger.info('Start logging to:', file_path)
 #  ********** END OF LOGGER CONFIG *************************
 
 #  ********** DATABASE CONFIG *************************

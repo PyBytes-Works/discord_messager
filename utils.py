@@ -23,7 +23,7 @@ def save_data_to_json(data, file_name: str = "data.json", key: str = 'w'):
         result.update(data)
         save_data_to_json(data=result, file_name=file_name, key='w')
 
-    print(file_name, "saved.")
+    logger.debug(f"{file_name} saved.")
 
 
 @logger.catch
@@ -32,7 +32,7 @@ def save_data_to_txt(data: Union[dict, list], file_name: str = "data.json"):
         data = "\n".join(data)
         f.write(data)
 
-    print(file_name, "saved.")
+    logger.debug(f"{file_name} saved.")
 
 
 @logger.catch

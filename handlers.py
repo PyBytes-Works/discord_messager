@@ -265,7 +265,7 @@ async def add_discord_id_handler(message: Message, state: FSMContext) -> None:
             telegram_id: data
         }
         save_data_to_json(data=data, file_name="user_data.json", key='a')
-        DiscordTokenManager(message=message).form_token_pairs(unpair=False)
+        await DiscordTokenManager(message=message).form_token_pairs(unpair=False)
     else:
         await DBI.delete_token(token)
         text: str = "ERROR: add_discord_id_handler: Не смог добавить токен, нужно вводить данные заново."
