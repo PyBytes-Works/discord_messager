@@ -858,21 +858,22 @@ class Token(BaseModel):
                  )
         return list(data)
 
-    # @classmethod
-    # @logger.catch
-    # def get_all_discord_id(cls, user_channel: int) -> List[str]:
-    #     """
-    #     TODO Вернуть список всех дискорд ID пользователя по его токену:
-    #     return: (list) список discord_id
-    #     """
-    #     pass
-        # data = (cls.select(cls.name).)
-        # token = Token.get_or_none(token=token)
-        # tokens = None
-        # if token:
-        #     user_id = token.user
-        #     tokens = cls.select().where(cls.user == user_id).execute()
-        # return [data.discord_id for data in tokens] if tokens else []
+    @classmethod
+    @logger.catch
+    def get_all_discord_id(cls, telegram_id: str) -> List[str]:
+        """
+        Вернуть список всех дискорд ID пользователя по его telegram_id:
+        return: (list) список discord_id
+        """
+        tokens = (cls.select(
+                    cls.discord_id.alias('discord_id'),
+                )
+                .join_from(cls, UserChannel, JOIN.LEFT_OUTER, on=(
+                        cls.user_channel == UserChannel.id))
+                .join_from(cls, Channel, JOIN.LEFT_OUTER, on=(UserChannel.channel == Channel.id))
+                .join_from(cls, User, JOIN.LEFT_OUTER, on=(UserChannel.user == User.id))
+                .where(User.telegram_id == telegram_id).namedtuples().execute())
+        return [data.discord_id for data in tokens] if tokens else []
 
     @classmethod
     @logger.catch
