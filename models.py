@@ -1,4 +1,5 @@
 from collections import namedtuple
+from itertools import groupby
 from typing import List, Tuple, Any, Union
 import datetime
 import os
@@ -654,7 +655,7 @@ class UserChannel(BaseModel):
     def update_cooldown_by_channel_id(cls: 'UserChannel', chanel_id: int, cooldown: int) -> int:
         """
         Update cooldown for all users_channel by channel_id
-            TODO логично было бы всем но можно конкретному
+            TODO логично было бы всем с таким же channel_id, но можно конкретному
         """
         return (
             cls.update(cooldown=cooldown)
@@ -752,10 +753,10 @@ class Token(BaseModel):
     @logger.catch
     def make_tokens_pair(cls, first: Union[int, str], second: Union[int, str]) -> bool:
         """
-        make pair
-             first_id: (str) or int
-             second_id: (str)
-             unites tokens in pair
+        Make pair
+        first_id: (str) or int
+        second_id: (str)
+            unites tokens in pair
         """
         token_first: cls = cls.select().where(cls.token == first).first()
         if not token_first:
@@ -801,10 +802,11 @@ class Token(BaseModel):
     def get_related_tokens(cls, telegram_id: Union[str, int] = None) -> List[BaseQuery.namedtuples]:
         """
         Вернуть список всех связанных ТОКЕНОВ пользователя по его telegram_id:
-        return: data список словарей
-        token str
-        cooldown  int
-        last_message_time Timestamp
+        return: list of numed tuples
+        list of namedtuple fields:
+            token str
+            cooldown  int
+            last_message_time Timestamp
         """
         query = (cls.select(
             cls.token.alias('token'),
@@ -823,28 +825,28 @@ class Token(BaseModel):
     @classmethod
     @logger.catch
     def get_all_tokens_info(cls, telegram_id: Union[str, int] = None) -> List[BaseQuery.namedtuples]:
-        """ TODO если подойдёт верхняя в этом методе нет смысла
+        """
         Вернуть список всех ТОКЕНОВ пользователя по его telegram_id:
         return:
-        TODO как вверху но добавить описательное для юзера имена каналов имена токенов
-        token str
-        token_discord_id str
-        proxy str
-        user_channel_pk int
-        channel_id int
-        guild_id int
-        cooldown  int
-        mate_id str (discord_id)
+        list of namedtuple fields:
+            token str
+            token_discord_id str
+            proxy str
+            user_channel_pk int
+            channel_id int
+            guild_id int
+            cooldown  int
+            mate_id str (discord_id)
         """
-        query = (cls.select(
+        data = (cls.select(
             cls.token.alias('token'),
-            cls.id.alias('id'),
-            cls.name.alias('name'),
-            UserChannel.name.alias('user_channel'),
+            cls.id.alias('token_pk'),
+            cls.name.alias('name_token'),
+            UserChannel.name.alias('channel_name'),
             Channel.channel_id.alias('channel_id'),
             User.nick_name.alias('user_name'),
             Case(None, [((TokenPair.first_id == cls.id),
-                         TokenPair.second_id,)], TokenPair.first_id).alias('pair_id')
+                         TokenPair.second_id,)], TokenPair.first_id).alias('pair_pk')
         )
                  .join_from(cls, UserChannel, JOIN.LEFT_OUTER, on=(
                     cls.user_channel == UserChannel.id))
@@ -854,7 +856,7 @@ class Token(BaseModel):
                             on=((cls.id == TokenPair.first_id) | (cls.id == TokenPair.second_id)))
                  .where(User.telegram_id == telegram_id).namedtuples()
                  )
-        return [data for data in query]
+        return list(data)
 
     # @classmethod
     # @logger.catch
@@ -874,34 +876,26 @@ class Token(BaseModel):
 
     @classmethod
     @logger.catch
-    def get_all_discord_id_by_channel(cls, user_channel_pk: int) -> List[str]:
+    def get_all_discord_id_by_channel(cls, user_channel_pk: int) -> List[BaseQuery.namedtuples]:
         """
-        TODO  Вернуть список всех дискорд ID в пользовательском канале:
-        return: (list) список discord_id
-        TODO
+        return: list named tuples
+
         """
-        # FIXME метод нужно перенести в пользовательские каналы ДА
-        pass
+        return list(cls.select(cls.discord_id.alias('discord_id'))
+                    .where(cls.user_channel == user_channel_pk).namedtuples().execute())
 
     @classmethod
     @logger.catch
-    def get_all_free_tokens(cls, telegram_id: Union[str, int] = None) -> Tuple[List[int]]:
+    def get_all_free_tokens(cls, telegram_id: Union[str, int] = None) -> Tuple[List[int], ...]:
         """
-        TODO  нужен Tuple[List[token_pk]]
         Возвращает список всех свободных токенов по каналам
-        если ввести телеграмм id
-        ограничивает выбору одним пользователем
-        discord id
+          discord id
         """
-
-        query = (
+        data = (
                  cls.select(
-                    cls.token.alias('token'),
-                    cls.name.alias('name'),
-                    UserChannel.name.alias('user_channel'),
+                    cls.id.alias('token_pk'),
                     Channel.channel_id.alias('channel_id'),
-                    User.nick_name.alias('user_name'),
-                 )
+                    )
                  .join_from(cls, UserChannel, JOIN.LEFT_OUTER, on=(
                         cls.user_channel == UserChannel.id))
                  .join_from(cls, Channel, JOIN.LEFT_OUTER, on=(UserChannel.channel == Channel.id))
@@ -909,19 +903,20 @@ class Token(BaseModel):
                  .join_from(cls, TokenPair, JOIN.LEFT_OUTER,
                             on=((TokenPair.first_id == cls.id) | (TokenPair.second_id == cls.id)))
 
-                .where(User.telegram_id == telegram_id)
-                .where(TokenPair.first_id == None).namedtuples()
+                 .where(User.telegram_id == telegram_id)
+                 .where(TokenPair.first_id == None).namedtuples().execute()
         )
-        return tuple([data for data in query])
+        result: Tuple[List[int], ...] = tuple([[token.token_pk for token in tokens]
+                                    for channel, tokens in groupby(data, lambda x: x.channel_id)])
+        return result
 
     @classmethod
     @logger.catch
-    def get_time_by_token(cls, token: str) -> int:
+    def get_time_by_token(cls: 'Token', token: str) -> int:
         """
         Вернуть timestamp(кд) токена по его "значению":
-        TODO test
         """
-        data = cls.get_or_none(cls.last_message_time, cls.token == token)
+        data = cls.get_or_none(cls.token == token)
         last_message_time = data.last_message_time if data else None
         return last_message_time
 
@@ -936,9 +931,8 @@ class Token(BaseModel):
 
     @classmethod
     @logger.catch
-    def get_info_by_token(cls, token: str) -> dict:
+    def get_info_by_token(cls, token: str) -> BaseQuery.namedtuples:
         """
-        TODO сделать как в документации
         Вернуть info по токену
         возвращает объект токен
             'user_channel_pk' int
@@ -949,30 +943,34 @@ class Token(BaseModel):
             'mate_id' str (discord_id)
             'discord_id' str
         """
-        # query = (
-        #          cls.select(
-        #             cls.token.alias('token'),
-        #             cls.name.alias('name'),
-        #             UserChannel.name.alias('user_channel'),
-        #             Channel.channel_id.alias('channel_id'),
-        #             User.nick_name.alias('user_name'),
-        #          )
-        #          .join_from(cls, UserChannel, JOIN.LEFT_OUTER,
-        #                     on=(cls.user_channel == UserChannel.id))
-        #          .join_from(cls, Channel, JOIN.LEFT_OUTER, on=(UserChannel.channel == Channel.id))
-        #          .join_from(cls, User, JOIN.LEFT_OUTER, on=(UserChannel.user == User.id))
-        #          .join_from(cls, TokenPair, JOIN.LEFT_OUTER,
-        #                     on=((TokenPair.first_id == cls.id) | (TokenPair.second_id == cls.id)))
-        #
-        #          .where(Token.token == token).namedtuples()
-        #          )
-        # result = query.first()
-        return 'result'
+        data = (
+                 cls.select(
+                     cls.user_channel.alias('user_channel_pk'),
+                     Proxy.proxy.alias('proxy'),
+                     Channel.guild_id.alias('guild_id'),
+                     Channel.channel_id.alias('channel_id'),
+                     UserChannel.cooldown.alias('cooldown'),
+                     Case(None, [((TokenPair.first_id == cls.id),
+                                  TokenPair.second_id,)], TokenPair.first_id).alias('mate_id'),
+                     cls.discord_id.alias('discord_id'),
+
+                 )
+                 .join(UserChannel, JOIN.LEFT_OUTER,
+                            on=(cls.user_channel == UserChannel.id))
+                 .join(Channel, JOIN.LEFT_OUTER, on=(UserChannel.channel == Channel.id))
+                 .join(User, JOIN.LEFT_OUTER, on=(UserChannel.user == User.id))
+                 .join(TokenPair, JOIN.LEFT_OUTER,
+                            on=((TokenPair.first_id == cls.id) | (TokenPair.second_id == cls.id)))
+                 .join(Proxy, JOIN.LEFT_OUTER, on=(Proxy.id == User.proxy))
+                 .where(Token.token == token).namedtuples().first()
+                 )
+
+        return data
 
     @classmethod
     @logger.catch
     def delete_token(cls, token: str) -> int:
-        """Удалить токен по его "значению": TODO тест"""
+        """Удалить токен по его "значению": """
 
         return cls.delete().where(cls.token == token).execute()
 
@@ -996,16 +994,12 @@ class Token(BaseModel):
         return: number of removed tokens
         """
         pass
-        # result = Token.get_all_tokens_by_user(user_id=user.id)
-        # tokens = [data.id for data in result]
-        # TokenPair.remove_pairs_from_list(token_list=tokens)
-        # return cls.delete().where(cls.user == user).execute()
+
 
     @classmethod
     @logger.catch
     def get_number_of_free_slots_for_tokens(cls, telegram_id: str) -> int:
         """
-        TODO доработать
         Вернуть количество свободных мест для размещения токенов
         """
 
