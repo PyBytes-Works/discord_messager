@@ -171,7 +171,6 @@ class DiscordTokenManager:
     async def __send_replies(self, replies: list):
         """Отправляет реплаи из дискорда в телеграм с кнопкой Ответить"""
 
-        logger.debug(f"Replies:\n\t{replies}")
         result = []
         for reply in replies:
             answered: bool = reply.get("answered", False)

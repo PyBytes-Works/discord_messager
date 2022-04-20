@@ -51,7 +51,6 @@ class OpenAI:
             logger.debug("OpenAI: No message")
             return ''
         self.__message = message.strip()
-        logger.debug(f"Message for OpenAI: {message}")
         data: dict = self.__send_message()
         if not data:
             logger.error("OpenAI: No data")
@@ -61,7 +60,6 @@ class OpenAI:
             logger.error("OpenAI: No answers")
             return ''
         result: str = answers[0].get("text", '').strip().split("\n")[0]
-        logger.debug(f"OpenAI answer: {result}")
         if any(filter(lambda x: x in result, plugs)):
             return random.choice(defaults)
         return result

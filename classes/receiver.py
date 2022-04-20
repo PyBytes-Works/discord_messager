@@ -43,7 +43,6 @@ class MessageReceiver:
         elif filtered_data:
             self.__datastore.current_message_id = filtered_data.get("last_message_id", 0)
         text_to_send: str = user_message if user_message else ''
-
         answer: dict = await MessageSender(datastore=self.__datastore, text=text_to_send).send_message()
         # TODO вынести эту обработку в класс message_sender
         if not answer:
@@ -125,8 +124,6 @@ class MessageReceiver:
                     messages.append(spam)
         last_message_id: int = await self.__get_last_message_id(data=messages)
         result.update({"last_message_id": last_message_id})
-        logger.debug(f"REPLIES:"
-                     f"\n\t\t{replies}")
         replies: List[dict] = await self.__update_replies_to_redis(new_replies=replies)
         result.update({"replies": replies})
 

@@ -59,7 +59,7 @@ class MessageSender:
         if self.__text:
             return
         if self.__roll_the_dice():
-            logger.debug("Random message!")
+            logger.debug("Random message! You are lucky!!!")
             self.__datastore.current_message_id = 0
             self.__text = await self.__get_text_from_vocabulary()
             return
@@ -72,7 +72,6 @@ class MessageSender:
         await self.__get_text()
         if not self.__text:
             return
-        logger.debug(f"Final text: {self.__text}")
         self.__data_for_send = {
             "content": self.__text,
             "tts": "false",

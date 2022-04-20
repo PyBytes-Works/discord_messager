@@ -19,13 +19,10 @@ class RedisDB:
     async def __send_request_do_redis_db(self, key: str, mate_id: str = '') -> Optional[list]:
         """Запрашивает или записывает данные в редис, возвращает список если запрашивали"""
 
-        logger.debug(f"Запрос в редис: "
-                     f"\nUSER: {self.redis_key}")
         result: List[dict] = []
         try:
             async with self.redis_db.client() as conn:
                 if key == "set":
-                    logger.debug(f"\nDATA: {self.data}")
                     await conn.set(
                         name=self.redis_key, value=json.dumps(self.data), ex=self.timeout_sec)
                 elif key == "get":
