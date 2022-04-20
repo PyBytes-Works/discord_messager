@@ -1,6 +1,6 @@
 from classes.request_sender import RequestSender
 from config import logger
-from models import Proxy
+from classes.db_interface import DBI
 
 
 class TokenChecker:
@@ -34,13 +34,14 @@ class TokenChecker:
     async def __check_token(self) -> str:
         """Returns valid token else 'bad token'"""
 
+        # TODO дописать для всех случаев
         result: str = 'bad token'
-        rs = RequestSender(proxy=self.proxy, token=self.token, channel=self.channel)
-        status: int = await rs.check_proxy()
+        rs = RequestSender()
+        status: int = await rs.check_proxy(proxy=self.proxy, token=self.token, channel=self.channel)
         if status == 200:
             result = self.token
         elif status == 407:
-            if not Proxy.update_proxies_for_owners(self.proxy):
+            if not await DBI.update_proxies_for_owners(self.proxy):
                 return 'no proxies'
 
         return result

@@ -805,7 +805,7 @@ class Token(BaseModel):
 
     @classmethod
     @logger.catch
-    def delete_token_by_id(cls, token_id: str):
+    def delete_token_by_id(cls, token_id: int):
         """Удалить токен по его "pk": """
         token = cls.get_or_none(cls.id == token_id)
         if token:

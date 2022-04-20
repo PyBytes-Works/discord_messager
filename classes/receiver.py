@@ -8,7 +8,6 @@ from classes.redis_interface import RedisDB
 from classes.request_sender import RequestSender
 from config import logger, DEBUG
 from classes.token_datastorage import TokenDataStore
-from models import Token
 
 
 class MessageReceiver:
@@ -47,6 +46,7 @@ class MessageReceiver:
         text_to_send: str = user_message if user_message else ''
 
         answer: dict = await MessageSender(datastore=self.__datastore, text=text_to_send).send_message()
+        # TODO вынести эту обработку в класс message_sender
         if not answer:
             logger.error("F: get_message ERROR: NO ANSWER ERROR")
             result.update({"message": "ERROR"})
@@ -162,7 +162,6 @@ class MessageReceiver:
     def __replies_filter(self, elem: dict) -> dict:
         """Возвращает реплаи не из нашего села."""
 
-
         result = {}
         ref_messages: dict = elem.get("referenced_message", {})
         if not ref_messages:
@@ -181,7 +180,7 @@ class MessageReceiver:
         author_id: str = elem.get("author", {}).get("id", '')
         message_for_me: bool = reply_for_author_id == self.__datastore.my_discord_id
         if any(mentions) or message_for_me:
-            all_discord_tokens: List[str] = Token.get_all_discord_id(token=self.__datastore.token)
+            all_discord_tokens: List[str] = self.__datastore.all_tokens
             if author_id not in all_discord_tokens:
                 result.update({
                     "token": self.__datastore.token,

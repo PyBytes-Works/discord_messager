@@ -14,8 +14,7 @@ from config import logger, bot, admins_list
 from handlers import cancel_handler
 from keyboards import cancel_keyboard, user_menu_keyboard, inactive_users_keyboard
 from states import UserState
-from models import User, Proxy
-
+from classes.db_interface import DBI
 from utils import (
     get_token, add_new_token, delete_used_token, send_report_to_admins, check_is_int
 )
@@ -37,14 +36,14 @@ async def send_message_to_all_users_handler(message: Message) -> None:
         await message.answer("Нет данных для отправки.")
         return
     if user_id in admins_list:
-        for user in User.get_active_users():
+        for user in await DBI.get_active_users():
             try:
                 await bot.send_message(chat_id=user, text=data)
             except aiogram.utils.exceptions.ChatNotFound as err:
                 logger.error(f"Не смог отправить сообщение пользователю {user}.", err)
             except aiogram.utils.exceptions.BotBlocked as err:
                 logger.error(f"Пользователь {user} заблокировал бота", err)
-                result: bool = User.deactivate_user(telegram_id=user)
+                result: bool = await DBI.deactivate_user(telegram_id=user)
                 if result:
                     await send_report_to_admins(f"Пользователь {user} заблокировал бота. "
                                                 f"\nЕго аккаунт деактивирован.")
@@ -71,7 +70,7 @@ async def set_max_tokens_handler(message: Message, state: FSMContext) -> None:
     telegram_id = str(message.text.strip().split()[0])
     new_tokens_count: int = check_is_int(message.text.strip().split()[-1])
     if new_tokens_count and telegram_id:
-        if User.set_max_tokens(telegram_id=telegram_id, max_tokens=new_tokens_count):
+        if await DBI.set_max_tokens(telegram_id=telegram_id, max_tokens=new_tokens_count):
             await message.answer(
                 f'Для пользователя {telegram_id} установили количество токенов {new_tokens_count}',
                 reply_markup=user_menu_keyboard()
@@ -109,7 +108,8 @@ async def request_proxies_handler(message: Message) -> None:
         elif message.text == '/delete_proxy':
             await UserState.user_delete_proxy.set()
         elif message.text == '/delete_all_proxy':
-            await message.answer("ТОЧНО удалить все прокси? (yes/No)", reply_markup=cancel_keyboard())
+            await message.answer(
+                "ТОЧНО удалить все прокси? (yes/No)", reply_markup=cancel_keyboard())
             await UserState.user_delete_all_proxy.set()
 
 
@@ -119,10 +119,10 @@ async def add_new_proxy_handler(message: Message) -> None:
 
     proxies: list = re.findall(r'\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}:\d{1,6}\b', message.text)
     for proxy in proxies:
-        Proxy.add_proxy(proxy=proxy)
+        await DBI.add_proxy(proxy=proxy)
         await message.answer(f"Добавлена прокси: {proxy}")
-    User.delete_proxy_for_all_users()
-    User.set_new_proxy_for_all_users()
+    await DBI.delete_proxy_for_all_users()
+    await DBI.set_new_proxy_for_all_users()
 
 
 @logger.catch
@@ -130,7 +130,7 @@ async def delete_all_proxies(message: Message, state: FSMContext) -> None:
     """Удаляет все прокси."""
 
     if message.text.lower() == "yes":
-        Proxy.delete_all_proxy()
+        await DBI.delete_all_proxy()
         await send_report_to_admins(f"Пользователь {message.from_user.id} удалил ВСЕ прокси.")
         await state.finish()
         return
@@ -144,7 +144,7 @@ async def delete_proxy_handler(message: Message) -> None:
 
     proxies: list = re.findall(r'\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}:\d{1,6}\b', message.text)
     for proxy in proxies:
-        Proxy.delete_proxy(proxy=proxy)
+        await DBI.delete_proxy(proxy=proxy)
         await message.answer(f"Удалена прокси: {proxy}")
 
 
@@ -153,7 +153,10 @@ async def request_user_admin_handler(message: Message) -> None:
     """Обработчик команды /add_admin"""
 
     if str(message.from_user.id) in admins_list:
-        await message.answer(f'Введите имя пользователя: ', reply_markup=cancel_keyboard())
+        await message.answer(
+            f'Введите telegram_id пользователя для назначения его администратором:',
+            reply_markup=cancel_keyboard()
+        )
         await UserState.name_for_admin.set()
 
 
@@ -161,13 +164,15 @@ async def request_user_admin_handler(message: Message) -> None:
 async def set_user_admin_handler(message: Message, state: FSMContext) -> None:
     """Обработчик назначения пользователя администратором """
 
-    user_name: str = message.text
-    user: 'User' = User.get_or_none(User.nick_name.contains(user_name))
-    if user:
-        user_id: str = str(user.telegram_id)
-        User.set_user_status_admin(telegram_id=user_id)
-        await message.answer(f'{user_name} назначен администратором. ', reply_markup=user_menu_keyboard())
-        await bot.send_message(chat_id=user_id, text='Вас назначили администратором.')
+    user_telegram_id_for_admin: str = message.text
+    if await DBI.get_user_by_telegram_id(user_telegram_id_for_admin):
+        await DBI.set_user_status_admin(telegram_id=user_telegram_id_for_admin)
+        await message.answer(
+            f'{user_telegram_id_for_admin} назначен администратором. ',
+            reply_markup=user_menu_keyboard()
+        )
+        await bot.send_message(
+            chat_id=user_telegram_id_for_admin, text='Вас назначили администратором.')
     else:
         await message.answer(f'Имя пользователя нераспознано.')
     await state.finish()
@@ -178,7 +183,7 @@ async def admin_help_handler(message: Message) -> None:
     """Обработчик команды /admin"""
 
     user_telegram_id: str = str(message.from_user.id)
-    if User.is_admin(telegram_id=user_telegram_id):
+    if await DBI.is_admin(telegram_id=user_telegram_id):
         commands: list = [
             "\n/ua - команда для пользователя, для активации по токену.",
             "\n/admin - показать список команд администратора.",
@@ -200,7 +205,10 @@ async def admin_help_handler(message: Message) -> None:
             commands.extend(superadmin)
         admin_commands: str = "".join(commands)
         await message.answer(f'Список команд администратора: {admin_commands}')
-        await message.answer(f'Всего отправлено символов: {Vocabulary.get_count_symbols()}', reply_markup=user_menu_keyboard())
+        await message.answer(
+            f'Всего отправлено символов: {Vocabulary.get_count_symbols()}',
+            reply_markup=user_menu_keyboard()
+        )
     else:
         logger.info(f'{message.from_user.id}:{message.from_user.username}: NOT AUTORIZATED')
 
@@ -210,8 +218,8 @@ async def request_activate_user_handler(message: Message) -> None:
     """Обработчик команды /activate_user"""
 
     user_telegram_id: str = str(message.from_user.id)
-    if User.is_admin(telegram_id=user_telegram_id):
-        users: dict = User.get_all_inactive_users()
+    if await DBI.is_admin(telegram_id=user_telegram_id):
+        users: dict = await DBI.get_all_inactive_users()
         if users:
             await message.answer("Выберите пользователя:", reply_markup=inactive_users_keyboard(users))
             await UserState.user_add_token.set()
@@ -227,7 +235,7 @@ async def tokens_and_hours_request_callback_handler(callback: CallbackQuery, sta
     """Запрашивает количество часов и токенов для активации пользователя"""
 
     user_telegram_id: str = str(callback.data.rsplit("_", maxsplit=1)[-1])
-    if User.get_user_by_telegram_id(telegram_id=user_telegram_id):
+    if await DBI.get_user_by_telegram_id(telegram_id=user_telegram_id):
         await callback.message.answer(
             "Введите количество часов и количество токенов для активации через пробел."
             "\nНапример: '24 10'",
@@ -262,9 +270,9 @@ async def activate_user_handler(message: Message, state: FSMContext) -> None:
     hours: int = check_is_int(data[0])
     max_tokens: int = check_is_int(data[1])
     if hours and max_tokens:
-        User.set_max_tokens(telegram_id=user_telegram_id, max_tokens=max_tokens)
-        User.set_expiration_date(telegram_id=user_telegram_id, subscription_period=hours)
-        User.activate_user(telegram_id=user_telegram_id)
+        await DBI.set_max_tokens(telegram_id=user_telegram_id, max_tokens=max_tokens)
+        await DBI.set_expiration_date(telegram_id=user_telegram_id, subscription_period=hours)
+        await DBI.activate_user(telegram_id=user_telegram_id)
         await message.answer(
             f"Для пользователя {user_telegram_id} установлено:"
             f"\nТокенов: {max_tokens}"
@@ -283,8 +291,8 @@ async def activate_user_handler(message: Message, state: FSMContext) -> None:
 async def max_tokens_request_handler(message: Message) -> None:
     """Обработчик для создания нового пользователя. Команда /add_user"""
 
-    if User.is_admin(telegram_id=str(message.from_user.id)):
-        if not Proxy.get_proxy_count():
+    if await DBI.is_admin(telegram_id=str(message.from_user.id)):
+        if not await DBI.get_proxy_count():
             await message.answer("Нет ни одной прокси. Добавьте хотя бы одну.", reply_markup=user_menu_keyboard())
             return
         await message.answer('Введите количество токенов для пользователя?', reply_markup=cancel_keyboard())
@@ -299,7 +307,10 @@ async def user_name_request_handler(message: Message, state: FSMContext) -> None
 
     max_tokens: int = check_is_int(message.text)
     if not max_tokens:
-        await message.answer('Число должно быть целым положительным. Введите еще раз.: ', reply_markup=cancel_keyboard())
+        await message.answer(
+            'Число должно быть целым положительным. Введите еще раз.: ',
+            reply_markup=cancel_keyboard()
+        )
         return
     await state.update_data(max_tokens=max_tokens)
     await message.answer('Введите имя для нового пользователя: ', reply_markup=cancel_keyboard())
@@ -311,8 +322,7 @@ async def subscribe_time_request_handler(message: Message, state: FSMContext) ->
     """Проверка введеного имени и запрос времени подписки для нового пользователя"""
 
     name: str = message.text
-    user: 'User' = User.get_or_none(User.nick_name.contains(name))
-    if user:
+    if await DBI.get_user_by_name(name=name):
         await message.answer('Такой пользователь уже существует. Введите другое имя.')
         return
     if len(name) > 20:
@@ -361,8 +371,8 @@ async def add_new_user_handler(message: Message, state: FSMContext) -> None:
 async def show_all_users_handler(message: Message) -> None:
     """Обработчик команды /show_users. Показывает список всех пользователей"""
 
-    if User.is_admin(telegram_id=message.from_user.id):
-        users: dict = User.get_all_users()
+    if await DBI.is_admin(telegram_id=message.from_user.id):
+        users: dict = await DBI.get_all_users()
         total_values: list = list(users.values())
         lenght: int = len(total_values)
         for shift in range(0, lenght, 10):
@@ -380,8 +390,8 @@ async def show_all_users_handler(message: Message) -> None:
 async def delete_user_name_handler(message: Message) -> None:
     """Обработчик для удаления пользователя. Команда /delete_user"""
 
-    if User.is_admin(telegram_id=message.from_user.id):
-        all_users: dict = User.get_all_users()
+    if await DBI.is_admin(telegram_id=message.from_user.id):
+        all_users: dict = await DBI.get_all_users()
         users_keys: list = list(all_users.keys())
         lenght: int = len(users_keys)
         for index in range(0, lenght, 10):
@@ -398,13 +408,12 @@ async def delete_user_name_handler(message: Message) -> None:
 async def delete_user_handler(callback: CallbackQuery, state: FSMContext) -> None:
     """Обработчик ввода имени пользователя для удаления"""
 
-    user_id: str = callback.data.rsplit("_", maxsplit=1)[-1]
-    user: 'User' = User.get_user_by_telegram_id(telegram_id=user_id)
-    name: str = user.nick_name
-    if user:
-        User.delete_user_by_telegram_id(user_id)
-    await callback.message.answer(
-        f"Пользователь {name}: {user_id} удален из БД.", reply_markup=user_menu_keyboard())
+    telegram_id: str = callback.data.rsplit("_", maxsplit=1)[-1]
+    if await DBI.delete_user_by_telegram_id(telegram_id):
+        message_text: str = f"Пользователь {telegram_id} удален из БД."
+    else:
+        message_text: str = f"Пользователь {telegram_id} не найден в БД."
+    await callback.message.answer(message_text, reply_markup=user_menu_keyboard())
     await state.finish()
     await callback.answer()
 
@@ -413,7 +422,7 @@ async def delete_user_handler(callback: CallbackQuery, state: FSMContext) -> Non
 async def activate_new_user_handler(message: Message) -> None:
     """Обработчик команды /ua для авторизации нового пользователя"""
     user_telegram_id: str = str(message.from_user.id)
-    if User.is_active(telegram_id=user_telegram_id):
+    if await DBI.is_active(telegram_id=user_telegram_id):
         await message.answer("Вы уже есть в базе данных.", reply_markup=cancel_keyboard())
         return
     await message.answer("Введите токен: ", reply_markup=cancel_keyboard())
@@ -439,13 +448,17 @@ async def add_user_to_db_by_token(message: Message, state: FSMContext) -> None:
     max_tokens = user_data["max_tokens"]
     subscribe_time = user_data["subscribe_time"]
     if user_name and max_tokens and subscribe_time:
-        user_telegram_id = message.from_user.id
+        user_telegram_id: str = str(message.from_user.id)
+        proxy: str = await DBI.get_low_used_proxy()
 
-        proxy: str = Proxy.get_low_used_proxy()
-        user_created = User.add_new_user(
-            telegram_id=user_telegram_id, nick_name=user_name,
-            proxy=proxy, expiration=subscribe_time
-        )
+        user_data: dict = {
+            "telegram_id": user_telegram_id,
+            "nick_name": user_name,
+            "proxy": proxy,
+            "expiration": subscribe_time
+        }
+
+        user_created = await DBI.add_new_user(**user_data)
 
         if not user_created:
             await send_report_to_admins(
@@ -454,7 +467,7 @@ async def add_user_to_db_by_token(message: Message, state: FSMContext) -> None:
             )
             await message.answer('Пользователь уже существует.')
         else:
-            tokens_set = User.set_max_tokens(telegram_id=user_telegram_id, max_tokens=max_tokens)
+            tokens_set = await DBI.set_max_tokens(telegram_id=user_telegram_id, max_tokens=max_tokens)
             if tokens_set:
                 await message.answer(
                     'Поздравляю, вы добавлены в БД'
@@ -478,12 +491,12 @@ async def reboot_handler(message: Message) -> None:
     user_id: str = str(message.from_user.id)
     if user_id in admins_list:
         text: str = "Перезагрузка через 1 минуту. Работа бота будет остановлена автоматически."
-        for user_telegram_id in User.get_working_users():
+        for user_telegram_id in await DBI.get_working_users():
             try:
                 await bot.send_message(user_telegram_id, text=text)
             except aiogram.utils.exceptions.ChatNotFound:
                 logger.warning(f"Chat {user_telegram_id} not found.")
-            User.set_user_is_not_work(str(user_telegram_id))
+            await DBI.set_user_is_not_work(str(user_telegram_id))
 
 
 @logger.catch

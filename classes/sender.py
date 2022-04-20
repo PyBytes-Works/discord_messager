@@ -10,7 +10,6 @@ from classes.redis_interface import RedisDB
 from classes.vocabulary import Vocabulary
 from config import logger, DISCORD_BASE_URL, PROXY_USER, PROXY_PASSWORD
 from classes.token_datastorage import TokenDataStore
-from models import Token
 
 
 class MessageSender:
@@ -31,7 +30,6 @@ class MessageSender:
         await self.__prepare_data()
         if self.__data_for_send:
             await self.__send_data()
-            Token.update_token_time(token=self.__datastore.token)
 
         return self.__answer
 

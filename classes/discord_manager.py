@@ -12,7 +12,7 @@ from classes.token_datastorage import TokenDataStore
 from config import logger, DEBUG
 from utils import send_report_to_admins
 from keyboards import cancel_keyboard, user_menu_keyboard
-from models import User, Token
+from classes.db_interface import DBI
 
 
 class DiscordTokenManager:
@@ -38,16 +38,18 @@ class DiscordTokenManager:
         """Show must go on
         Запускает рабочий цикл бота, проверяет ошибки."""
 
-        while User.get_is_work(telegram_id=self.user_telegram_id):
+        while await DBI.is_user_work(telegram_id=self.user_telegram_id):
             await self.__send_text(text="Начинаю работу.", keyboard=cancel_keyboard(), check_silence=True)
             logger.debug(f"\tUSER: {self.__username}:{self.user_telegram_id} - Game begin.")
-            if await self.is_expired_user_deactivated():
+            if await DBI.is_expired_user_deactivated(self.message):
                 break
-            self.__datastore: 'TokenDataStore' = TokenDataStore(self.user_telegram_id)
+            if self.__datastore is None:
+                self.__datastore: 'TokenDataStore' = TokenDataStore(self.user_telegram_id)
+                self.__datastore.all_tokens = await DBI.get_all_discord_id(token=self.__datastore.token)
             if not await self.__is_datastore_ready():
                 break
-
             message_manager: 'MessageReceiver' = MessageReceiver(datastore=self.__datastore)
+            await DBI.update_token_time(token=self.__datastore.token)
             discord_data: dict = await message_manager.get_message()
             if not discord_data:
                 await send_report_to_admins(
@@ -106,7 +108,7 @@ class DiscordTokenManager:
     async def __get_tokens_list(self) -> list:
         """Возвращает список всех токенов пользователя."""
 
-        return Token.get_all_related_user_tokens(telegram_id=self.__datastore.telegram_id)
+        return await DBI.get_all_related_user_tokens(telegram_id=self.__datastore.telegram_id)
 
     @logger.catch
     async def __get_workers(self) -> None:
@@ -126,7 +128,9 @@ class DiscordTokenManager:
             return False
         random.shuffle(self.__workers)
         random_token: str = self.__workers.pop()
-        self.__datastore.create_datastore_data(random_token)
+        token_data: dict = await DBI.get_info_by_token(random_token)
+
+        self.__datastore.create_datastore_data(token=random_token, token_data=token_data)
         return True
 
     @logger.catch
@@ -142,7 +146,7 @@ class DiscordTokenManager:
             min_token_data: dict = min(elem.items(), key=lambda x: x[1].get('time'))
         token: str = tuple(min_token_data)[0]
         self.__datastore.create_datastore_data(token)
-        min_token_time: int = Token.get_time_by_token(token)
+        min_token_time: int = await DBI.get_time_by_token(token)
         delay: int = self.__datastore.cooldown - abs(min_token_time - await self.__get_current_time())
         self.__datastore.delay = delay
         text = "секунд"
@@ -239,7 +243,7 @@ class DiscordTokenManager:
                     f"\nChannel: {self.__datastore.channel}"
                 )
             elif discord_code_error == 50001:
-                Token.delete_token(token=token)
+                await DBI.delete_token(token=token)
                 await self.message.answer(
                     "Не могу отправить сообщение для токена. (Ошибка 403 - 50001)"
                     "Токен забанили."
@@ -270,8 +274,8 @@ class DiscordTokenManager:
                 cooldown: int = int(data.get("retry_after", None))
                 if cooldown:
                     cooldown += self.__datastore.cooldown + 2
-                    Token.update_token_cooldown(token=token, cooldown=cooldown)
-                    Token.update_mate_cooldown(token=token, cooldown=cooldown)
+                    await DBI.update_token_cooldown(token=token, cooldown=cooldown)
+                    await DBI.update_mate_cooldown(token=token, cooldown=cooldown)
                     self.__datastore.delay = cooldown
                 await self.message.answer(
                     "Для данного токена сообщения отправляются чаще, чем разрешено в канале."
@@ -300,49 +304,19 @@ class DiscordTokenManager:
         """Формирует пары из свободных токенов если они в одном канале"""
 
         if unpair:
-            User.delete_all_pairs(telegram_id=self.user_telegram_id)
-        free_tokens: Tuple[Tuple[str, list]] = Token.get_all_free_tokens(telegram_id=self.user_telegram_id)
+            await DBI.delete_all_pairs(telegram_id=self.user_telegram_id)
+        free_tokens: Tuple[Tuple[str, list]] = await DBI.get_all_free_tokens(telegram_id=self.user_telegram_id)
         formed_pairs: int = 0
         for channel, tokens in free_tokens:
             while len(tokens) > 1:
                 random.shuffle(tokens)
                 first_token = tokens.pop()
                 second_token = tokens.pop()
-                # if DEBUG:
-                #     first_token_instance: 'Token' = Token.get_by_id(first_token)
-                #     second_token_instance: 'Token' = Token.get_by_id(second_token)
-                #     logger.debug(f"Pairs formed: "
-                #                  f"\nFirst: {first_token_instance.token}"
-                #                  f"\nSecond: {second_token_instance.token}")
-                formed_pairs += Token.make_tokens_pair(first_token, second_token)
+                formed_pairs += await DBI.make_tokens_pair(first_token, second_token)
 
         logger.info(f"Pairs formed: {formed_pairs}")
 
         return formed_pairs
-
-    @logger.catch
-    async def is_expired_user_deactivated(self) -> bool:
-        """Удаляет пользователя с истекшим сроком действия.
-        Возвращает True если деактивирован."""
-
-        user_not_expired: bool = User.check_expiration_date(telegram_id=self.user_telegram_id)
-        user_is_admin: bool = User.is_admin(telegram_id=self.user_telegram_id)
-        if not user_not_expired and not user_is_admin:
-            await self.message.answer(
-                "Время подписки истекло. Ваш аккаунт деактивирован, токены удалены.",
-                reply_markup=ReplyKeyboardRemove()
-            )
-            User.delete_all_tokens(telegram_id=self.user_telegram_id)
-            User.deactivate_user(telegram_id=self.user_telegram_id)
-            text = (
-                f"Время подписки {self.user_telegram_id} истекло, "
-                f"пользователь декативирован, его токены удалены"
-            )
-            logger.info(text)
-            await send_report_to_admins(text)
-            return True
-
-        return False
 
     @property
     def silence(self) -> bool:
@@ -353,7 +327,3 @@ class DiscordTokenManager:
         if not isinstance(silence, bool):
             raise TypeError("Silence must be boolean.")
         self.__silence = silence
-
-
-# initialization user data storage
-# users_data_storage = InstancesStorage()

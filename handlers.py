@@ -10,12 +10,12 @@ from aiogram.dispatcher import FSMContext
 from classes.proxy_checker import ProxyChecker
 from classes.token_checker import TokenChecker
 from config import logger, Dispatcher, admins_list
-from models import User, Token
 from keyboards import cancel_keyboard, user_menu_keyboard, all_tokens_keyboard
 from classes.discord_manager import DiscordTokenManager
 from states import UserState
 from utils import check_is_int, save_data_to_json, send_report_to_admins
 from classes.redis_interface import RedisDB
+from classes.db_interface import DBI
 
 
 @logger.catch
@@ -29,14 +29,14 @@ async def cancel_handler(message: Message, state: FSMContext) -> None:
     user_telegram_id: str = str(message.from_user.id)
     text: str = ''
     keyboard = user_menu_keyboard
-    if User.get_is_work(telegram_id=user_telegram_id):
+    if DBI.is_user_work(telegram_id=user_telegram_id):
         text: str = "\nДождитесь завершения работы бота. Это займет несколько секунд..."
         keyboard = ReplyKeyboardRemove
     await message.answer(
         "Вы отменили текущую команду." + text, reply_markup=keyboard()
     )
     logger.debug(f"\n\t{user_telegram_id}: canceled command.")
-    User.set_user_is_not_work(telegram_id=user_telegram_id)
+    await DBI.set_user_is_not_work(telegram_id=user_telegram_id)
     await state.finish()
 
 
@@ -44,11 +44,11 @@ async def cancel_handler(message: Message, state: FSMContext) -> None:
 async def get_all_tokens_handler(message: Message) -> None:
     """Обработчик команды "Установить кулдаун"""""
 
-    if await DiscordTokenManager(message=message).is_expired_user_deactivated():
+    if await DBI.is_expired_user_deactivated(message):
         return
     user_telegram_id: str = str(message.from_user.id)
 
-    if User.is_active(telegram_id=user_telegram_id):
+    if await DBI.user_is_active(telegram_id=user_telegram_id):
         keyboard: 'InlineKeyboardMarkup' = all_tokens_keyboard(user_telegram_id)
         if not keyboard:
             await message.answer("Токенов нет. Нужно ввести хотя бы один.", reply_markup=cancel_keyboard())
@@ -85,7 +85,7 @@ async def set_self_token_cooldown_handler(message: Message, state: FSMContext):
 
     state_data: dict = await state.get_data()
     token: str = state_data["token"]
-    Token.update_token_cooldown(token=token, cooldown=cooldown * 60)
+    await DBI.update_token_cooldown(token=token, cooldown=cooldown * 60)
     await message.answer(f"Кулдаун для токена [{token}] установлен: [{cooldown}] минут", reply_markup=user_menu_keyboard())
     await state.finish()
 
@@ -94,12 +94,12 @@ async def set_self_token_cooldown_handler(message: Message, state: FSMContext):
 async def invitation_add_discord_token_handler(message: Message) -> None:
     """Обработчик команды /add_token"""
 
-    if await DiscordTokenManager(message=message).is_expired_user_deactivated():
+    if await DBI.is_expired_user_deactivated(message):
         return
-    user: str = str(message.from_user.id)
-    if User.is_active(telegram_id=user):
-        is_superadmin: bool = user in admins_list
-        is_free_slots: bool = Token.get_number_of_free_slots_for_tokens(user) > 0
+    user_telegram_id: str = str(message.from_user.id)
+    if await DBI.user_is_active(telegram_id=user_telegram_id):
+        is_superadmin: bool = user_telegram_id in admins_list
+        is_free_slots: bool = await DBI.get_number_of_free_slots_for_tokens(user_telegram_id) > 0
         if is_free_slots or is_superadmin:
             await message.answer(
                 "Введите cooldown в минутах: ", reply_markup=cancel_keyboard())
@@ -175,7 +175,7 @@ async def add_discord_token_handler(message: Message, state: FSMContext) -> None
 
     await message.answer("Проверяю данные.")
     token: str = message.text.strip()
-    if Token.is_token_exists(token):
+    if await DBI.is_token_exists(token):
         await message.answer(
             "Такой токен токен уже есть в база данных."
             "\n Повторите ввод токена.",
@@ -232,7 +232,7 @@ async def add_discord_id_handler(message: Message, state: FSMContext) -> None:
 
     discord_id: str = message.text.strip()
 
-    if Token.check_token_by_discord_id(discord_id=discord_id):
+    if await DBI.check_token_by_discord_id(discord_id=discord_id):
         await message.answer(
             "Такой discord_id уже был введен повторите ввод discord_id.",
             reply_markup=cancel_keyboard()
@@ -245,22 +245,29 @@ async def add_discord_id_handler(message: Message, state: FSMContext) -> None:
     channel: int = data.get('channel')
     token: str = data.get('token')
     cooldown: int = data.get('cooldown')
-    user: str = str(message.from_user.id)
+    telegram_id: str = str(message.from_user.id)
 
-    token_result_complete: bool = Token.add_token_by_telegram_id(
-        telegram_id=user, token=token, discord_id=discord_id,
-        guild=guild, channel=channel, cooldown=cooldown)
+    token_data: dict = {
+        "telegram_id": telegram_id,
+        "token": token,
+        "discord_id": discord_id,
+        "guild": guild,
+        "channel": channel,
+        "cooldown": cooldown
+    }
+
+    token_result_complete: bool = await DBI.add_token_by_telegram_id(**token_data)
     if token_result_complete:
         await message.answer(
             "Токен удачно добавлен.",
             reply_markup=user_menu_keyboard())
         data = {
-            user: data
+            telegram_id: data
         }
         save_data_to_json(data=data, file_name="user_data.json", key='a')
         DiscordTokenManager(message=message).form_token_pairs(unpair=False)
     else:
-        Token.delete_token(token)
+        await DBI.delete_token(token)
         text: str = "ERROR: add_discord_id_handler: Не смог добавить токен, нужно вводить данные заново."
         await message.answer(text, reply_markup=user_menu_keyboard())
         logger.error(text)
@@ -273,16 +280,16 @@ async def info_tokens_handler(message: Message) -> None:
     Выводит инфо о токенах. Обработчик кнопки "Информация"
     """
 
-    if await DiscordTokenManager(message=message).is_expired_user_deactivated():
+    if await DBI.is_expired_user_deactivated(message):
         return
-    user: str = str(message.from_user.id)
-    if User.is_active(message.from_user.id):
+    telegram_id: str = str(message.from_user.id)
+    if await DBI.user_is_active(message.from_user.id):
 
-        date_expiration = User.get_expiration_date(user)
+        date_expiration = await DBI.get_expiration_date(telegram_id)
         date_expiration = datetime.datetime.fromtimestamp(date_expiration)
-        all_tokens: list = Token.get_all_info_tokens(user)
+        all_tokens: list = await DBI.get_all_info_tokens(telegram_id)
         count_tokens: int = len(all_tokens)
-        free_slots: int = Token.get_number_of_free_slots_for_tokens(telegram_id=user)
+        free_slots: int = await DBI.get_number_of_free_slots_for_tokens(telegram_id)
         if not all_tokens:
             await message.answer(
                 f'Подписка истекает  {date_expiration}'
@@ -319,12 +326,12 @@ async def info_tokens_handler(message: Message) -> None:
 async def delete_token_handler(callback: CallbackQuery, state: FSMContext) -> None:
     """Хэндлер для нажатия на кнопку "Удалить токен" """
 
-    user: str = str(callback.from_user.id)
-    if User.is_active(user):
-        if User.get_is_work(telegram_id=user):
+    telegram_id: str = str(callback.from_user.id)
+    if await DBI.user_is_active(telegram_id):
+        if await DBI.is_user_work(telegram_id=telegram_id):
             await callback.message.answer("Бот запущен, сначала остановите бота.", reply_markup=cancel_keyboard())
         else:
-            Token.delete_token_by_id(token_id=callback.data)
+            await DBI.delete_token_by_id(token_id=int(callback.data))
             await callback.message.answer("Токен удален.", reply_markup=user_menu_keyboard())
             await callback.message.delete()
             await state.finish()
@@ -339,17 +346,17 @@ async def start_parsing_command_handler(message: Message, state: FSMContext) -> 
     """
 
     user_telegram_id: str = str(message.from_user.id)
-    user_is_active: bool = User.is_active(telegram_id=user_telegram_id)
-    user_expired: bool = await DiscordTokenManager(message=message).is_expired_user_deactivated()
+    user_is_active: bool = await DBI.user_is_active(telegram_id=user_telegram_id)
+    user_expired: bool = await DBI.is_expired_user_deactivated(message)
     if not user_is_active or user_expired:
         return
-    if not Token.get_all_user_tokens(user_telegram_id):
+    if not await DBI.get_all_user_tokens(user_telegram_id):
         await message.answer("Сначала добавьте пару токенов.", reply_markup=user_menu_keyboard())
         return
-    if User.get_is_work(telegram_id=user_telegram_id):
-        User.set_user_is_not_work(telegram_id=user_telegram_id)
+    if await DBI.is_user_work(telegram_id=user_telegram_id):
+        await DBI.set_user_is_not_work(telegram_id=user_telegram_id)
         await state.finish()
-    User.set_user_is_work(telegram_id=user_telegram_id)
+    await DBI.set_user_is_work(telegram_id=user_telegram_id)
     mute: bool = False
     mute_text: str = ''
     if message.text == "Старт & Mute":
@@ -398,8 +405,8 @@ async def send_message_to_reply_handler(message: Message, state: FSMContext):
 async def default_message(message: Message) -> None:
     """Ответ на любое необработанное действие активного пользователя."""
 
-    if User.is_active(message.from_user.id):
-        if await DiscordTokenManager(message=message).is_expired_user_deactivated():
+    if await DBI.user_is_active(message.from_user.id):
+        if await DBI.is_expired_user_deactivated(message):
             return
         await message.answer('Выберите команду.', reply_markup=user_menu_keyboard())
 
@@ -409,10 +416,10 @@ async def activate_valid_user_handler(message: Message):
     """Активирует пользователя если он продлил оплату при команде /start"""
 
     user_telegram_id: str = str(message.from_user.id)
-    user_not_expired: bool = User.check_expiration_date(telegram_id=user_telegram_id)
-    user_activated: bool = User.is_active(telegram_id=user_telegram_id)
+    user_not_expired: bool = await DBI.check_expiration_date(telegram_id=user_telegram_id)
+    user_activated: bool = await DBI.user_is_active(telegram_id=user_telegram_id)
     if user_not_expired and not user_activated:
-        User.activate_user(telegram_id=user_telegram_id)
+        await DBI.activate_user(telegram_id=user_telegram_id)
         await message.answer("Аккаунт активирован.")
 
 

@@ -1,5 +1,6 @@
+from typing import List
+
 from config import logger
-from models import Token
 
 
 class TokenDataStore:
@@ -23,11 +24,11 @@ class TokenDataStore:
         self.__DELAY: int = 0
         self.__MY_DISCORD_ID: str = ''
         self.__current_message_text: str = ''
+        self.__all_tokens: List[str] = []
 
     @logger.catch
-    def create_datastore_data(self, token: str):
+    def create_datastore_data(self, token: str, token_data: dict):
         self.token: str = token
-        token_data: dict = Token.get_info_by_token(token)
         self.proxy: str = token_data.get("proxy")
         self.channel: int = token_data.get("channel")
         self.guild: int = token_data.get("guild")
@@ -42,6 +43,16 @@ class TokenDataStore:
     @current_message_text.setter
     def current_message_text(self, message_text: str):
         self.__current_message_text = message_text
+
+    @property
+    def all_tokens(self) -> List[str]:
+        return self.__all_tokens
+
+    @all_tokens.setter
+    def all_tokens(self, all_tokens: List[str]):
+        self.__all_tokens = all_tokens
+        if not all_tokens:
+            self.__all_tokens = []
 
     @property
     def my_discord_id(self) -> str:
