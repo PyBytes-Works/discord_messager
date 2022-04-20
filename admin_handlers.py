@@ -451,6 +451,7 @@ async def add_user_to_db_by_token(message: Message, state: FSMContext) -> None:
     if user_name and max_tokens and subscribe_time:
         user_telegram_id: str = str(message.from_user.id)
         proxy: str = await DBI.get_low_used_proxy()
+        # TODO проверить проксю
 
         user_data: dict = {
             "telegram_id": user_telegram_id,
