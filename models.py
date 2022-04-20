@@ -408,6 +408,7 @@ class User(BaseModel):
         set active value disabled for user
         return: 1 if good otherwise 0
         """
+        # TODO Удалить все канаты и токены пользователя
         return cls.update(active=False).where(cls.telegram_id == telegram_id).execute()
 
     @classmethod
