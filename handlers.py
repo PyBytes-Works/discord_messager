@@ -2,6 +2,7 @@
 
 import datetime
 from typing import List
+from collections import namedtuple
 
 from aiogram.dispatcher.filters import Text
 from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeyboardRemove
@@ -64,29 +65,8 @@ async def request_self_token_cooldown_handler(callback: CallbackQuery, state: FS
     token: str = callback.data
     await state.update_data(token=token)
     await callback.message.answer("Введите время кулдауна в минутах", reply_markup=cancel_keyboard())
-    await UserState.set_user_self_cooldown.set()
-
-    await callback.answer()
-
-
-@logger.catch
-async def set_self_token_cooldown_handler(message: Message, state: FSMContext):
-    """Получает время кулдауна в минутах, переводит в секунды, сохраняет новые данные для токена"""
-
-    cooldown: int = check_is_int(message.text)
-    if not cooldown:
-        await message.answer(
-            "Время должно быть целым, положительным числом. "
-            "\nВведите время кулдауна в минутах.",
-            reply_markup=cancel_keyboard()
-        )
-        return
-
-    state_data: dict = await state.get_data()
-    token: str = state_data["token"]
-    await DBI.update_token_cooldown(token=token, cooldown=cooldown * 60)
-    await message.answer(f"Кулдаун для токена [{token}] установлен: [{cooldown}] минут", reply_markup=user_menu_keyboard())
     await state.finish()
+    await callback.answer()
 
 
 @logger.catch
@@ -238,18 +218,21 @@ async def add_discord_id_handler(message: Message, state: FSMContext) -> None:
     data: dict = await state.get_data()
 
     guild: int = data.get('guild')
-    channel: int = data.get('channel')
+    channel_id: int = data.get('channel')
     token: str = data.get('token')
     cooldown: int = data.get('cooldown')
     telegram_id: str = str(message.from_user.id)
+
+    user_channel_pk: int = await DBI.add_user_channel(
+        telegram_id=telegram_id, channel_id=channel_id, guild_id=guild, cooldown=cooldown)
+
+    # TODO get discord_id from get_me func
 
     token_data: dict = {
         "telegram_id": telegram_id,
         "token": token,
         "discord_id": discord_id,
-        "guild": guild,
-        "channel": channel,
-        "cooldown": cooldown
+        "user_channel_pk": user_channel_pk,
     }
 
     token_result_complete: bool = await DBI.add_token_by_telegram_id(**token_data)
@@ -283,13 +266,13 @@ async def info_tokens_handler(message: Message) -> None:
 
         date_expiration = await DBI.get_expiration_date(telegram_id)
         date_expiration = datetime.datetime.fromtimestamp(date_expiration)
-        all_tokens: list = await DBI.get_all_info_tokens(telegram_id)
+        all_tokens: List[namedtuple] = await DBI.get_all_tokens_info(telegram_id)
         count_tokens: int = len(all_tokens)
         free_slots: int = await DBI.get_number_of_free_slots_for_tokens(telegram_id)
         if not all_tokens:
             await message.answer(
                 f'Подписка истекает  {date_expiration}'
-                'Данных о токенах нет.', reply_markup=user_menu_keyboard())
+                f'Данных о токенах нет.', reply_markup=user_menu_keyboard())
             return
 
         await UserState.user_delete_token.set()
@@ -302,16 +285,17 @@ async def info_tokens_handler(message: Message) -> None:
         )
 
         for token_info in all_tokens:
-            token_id: int = token_info.get('token_id')
             mess: str = (
-                f"Токен: {token_info.get('token')}"
-                f"\nКанал: {token_info.get('channel')}"
-                f"\nДискорд id: {token_info.get('discord_id')}"
-                f"\nДискорд id напарника: {token_info.get('mate_id', 'Напарника отсутствует.')}"
-                f"\nКуллдаун: {token_info.get('cooldown')} сек."
+                f"Имя токена: {token_info.token_name}"
+                f"Токен: {token_info.token}"
+                f"\nКанал: {token_info.channel_id}"
+                f"\nДискорд id: {token_info.discord_id}"
+                f"\nДискорд id напарника: {token_info.mate_discord_id}"
+                f"\nКуллдаун канала: {token_info.cooldown} сек."
             )
             keyboard: 'InlineKeyboardMarkup' = InlineKeyboardMarkup(row_width=1)
-            keyboard.add(InlineKeyboardButton(text="Удалить токен.", callback_data=f"{token_id}"))
+            keyboard.add(InlineKeyboardButton(
+                text="Удалить токен.", callback_data=f"{token_info.token_pk}"))
             await message.answer(
                     mess,
                     reply_markup=keyboard
@@ -327,7 +311,7 @@ async def delete_token_handler(callback: CallbackQuery, state: FSMContext) -> No
         if await DBI.is_user_work(telegram_id=telegram_id):
             await callback.message.answer("Бот запущен, сначала остановите бота.", reply_markup=cancel_keyboard())
         else:
-            await DBI.delete_token_by_id(token_id=int(callback.data))
+            await DBI.delete_token_by_pk(token_pk=int(callback.data))
             await callback.message.answer("Токен удален.", reply_markup=user_menu_keyboard())
             await callback.message.delete()
             await state.finish()
@@ -434,7 +418,6 @@ def register_handlers(dp: Dispatcher) -> None:
     dp.register_callback_query_handler(request_self_token_cooldown_handler, state=UserState.select_token)
     dp.register_callback_query_handler(answer_to_reply_handler, Text(startswith=["reply_"]), state=UserState.in_work)
     dp.register_message_handler(send_message_to_reply_handler, state=UserState.in_work)
-    dp.register_message_handler(set_self_token_cooldown_handler, state=UserState.set_user_self_cooldown)
     dp.register_message_handler(invitation_add_discord_token_handler, Text(equals=["Добавить токен"]))
     dp.register_message_handler(add_cooldown_handler, state=UserState.user_add_cooldown)
     dp.register_message_handler(add_discord_token_handler, state=UserState.user_add_token)

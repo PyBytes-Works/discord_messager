@@ -57,7 +57,7 @@ class TestToken(TestCase):
         self.user_channel = UserChannel.create(
             user=self.user,channel=self.channel,**test_user_channel)
         for token in test_token.values():
-            Token.add_token_by_user_channel(
+            Token.add_token(
                 name=token['name'],
                 discord_id=token['discord_id'],
                 user_channel=self.user_channel,
@@ -92,7 +92,7 @@ class TestToken(TestCase):
 
     def test_update_token_time(self):
         expect = datetime.datetime.now().timestamp()
-        answer = Token.update_token_time(token=test_token['first']['token'])
+        answer = Token.update_token_last_message_time(token=test_token['first']['token'])
         self.assertEqual(answer, 1)
         actual = (
                     Token.select()

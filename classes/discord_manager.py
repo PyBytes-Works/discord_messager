@@ -1,6 +1,7 @@
 import datetime
 import random
 from typing import List, Tuple, Optional
+from collections import namedtuple
 
 import asyncio
 
@@ -29,7 +30,7 @@ class DiscordTokenManager:
         self.__username: str = message.from_user.username
         self.user_telegram_id: str = str(self.message.from_user.id)
         self.__silence: bool = mute
-        self.__current_tokens_list: List[dict] = []
+        self.__current_tokens_list: List[namedtuple] = []
         self.__workers: List[str] = []
         self.__datastore: Optional['TokenDataStore'] = None
         self.__all_tokens_ids: List[str] = []
@@ -53,7 +54,7 @@ class DiscordTokenManager:
             if not await self.__is_datastore_ready():
                 break
             message_manager: 'MessageReceiver' = MessageReceiver(datastore=self.__datastore)
-            await DBI.update_token_time(token=self.__datastore.token)
+            await DBI.update_token_last_message_time(token=self.__datastore.token)
             discord_data: dict = await message_manager.get_message()
             if not discord_data:
                 await send_report_to_admins(
@@ -90,9 +91,12 @@ class DiscordTokenManager:
 
         if not self.__workers:
             await self.form_token_pairs(unpair=True)
-            self.__current_tokens_list = await self.__get_tokens_list()
+            self.__current_tokens_list: List[namedtuple] = await DBI.get_all_related_user_tokens(
+                telegram_id=self.__datastore.telegram_id
+            )
             if not self.__current_tokens_list:
-                await self.__send_text(text="Не смог сформировать пары токенов.", keyboard=user_menu_keyboard())
+                await self.__send_text(
+                    text="Не смог сформировать пары токенов.", keyboard=user_menu_keyboard())
                 return False
             await self.__get_workers()
         if await self.__get_worker_from_list():
@@ -109,19 +113,13 @@ class DiscordTokenManager:
         self.__datastore.delay = 0
 
     @logger.catch
-    async def __get_tokens_list(self) -> list:
-        """Возвращает список всех токенов пользователя."""
-
-        return await DBI.get_all_related_user_tokens(telegram_id=self.__datastore.telegram_id)
-
-    @logger.catch
     async def __get_workers(self) -> None:
         """Возвращает список токенов, которые не на КД"""
+
         self.__workers = [
-            key
+            elem.token
             for elem in self.__current_tokens_list
-            for key, value in elem.items()
-            if await self.__get_current_time() > value["time"] + value["cooldown"]
+            if await self.__get_current_time() > elem.last_message_time + elem.cooldown
         ]
 
     @logger.catch
@@ -132,9 +130,7 @@ class DiscordTokenManager:
             return False
         random.shuffle(self.__workers)
         random_token: str = self.__workers.pop()
-        token_data: dict = await DBI.get_info_by_token(random_token)
-
-        self.__datastore.create_datastore_data(token=random_token, token_data=token_data)
+        await self.__update_datastore(random_token)
         return True
 
     @logger.catch
@@ -144,14 +140,18 @@ class DiscordTokenManager:
         return int(datetime.datetime.now().timestamp())
 
     @logger.catch
+    async def __update_datastore(self, token: str) -> None:
+        token_data: namedtuple = await DBI.get_info_by_token(token)
+        self.__datastore.update(token=token, token_data=token_data)
+
+    @logger.catch
     async def __get_all_tokens_busy_message(self) -> str:
         min_token_data = {}
         for elem in self.__current_tokens_list:
             min_token_data: dict = min(elem.items(), key=lambda x: x[1].get('time'))
         token: str = tuple(min_token_data)[0]
-        token_data: dict = await DBI.get_info_by_token(token)
-        self.__datastore.create_datastore_data(token=token, token_data=token_data)
-        min_token_time: int = await DBI.get_time_by_token(token)
+        await self.__update_datastore(token)
+        min_token_time: int = await DBI.get_last_message_time(token)
         delay: int = self.__datastore.cooldown - abs(min_token_time - await self.__get_current_time())
         self.__datastore.delay = delay
         text = "секунд"
@@ -164,7 +164,6 @@ class DiscordTokenManager:
                 seconds: str = f'0{seconds}'
             delay: str = f"{minutes}:{seconds}"
             text = "минут"
-
         return f"Все токены отработали. Следующий старт через {delay} {text}."
 
     @logger.catch
@@ -278,8 +277,8 @@ class DiscordTokenManager:
                 cooldown: int = int(data.get("retry_after", None))
                 if cooldown:
                     cooldown += self.__datastore.cooldown + 2
-                    await DBI.update_token_cooldown(token=token, cooldown=cooldown)
-                    await DBI.update_mate_cooldown(token=token, cooldown=cooldown)
+                    await DBI.update_user_channel_cooldown(
+                        user_channel_pk=self.__datastore.user_channel_pk, cooldown=cooldown)
                     self.__datastore.delay = cooldown
                 await self.message.answer(
                     "Для данного токена сообщения отправляются чаще, чем разрешено в канале."
@@ -309,9 +308,9 @@ class DiscordTokenManager:
 
         if unpair:
             await DBI.delete_all_pairs(telegram_id=self.user_telegram_id)
-        free_tokens: Tuple[Tuple[str, list]] = await DBI.get_all_free_tokens(telegram_id=self.user_telegram_id)
+        free_tokens: Tuple[List[int], ...] = await DBI.get_all_free_tokens(telegram_id=self.user_telegram_id)
         formed_pairs: int = 0
-        for channel, tokens in free_tokens:
+        for tokens in free_tokens:
             while len(tokens) > 1:
                 random.shuffle(tokens)
                 first_token = tokens.pop()

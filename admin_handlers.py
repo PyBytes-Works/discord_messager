@@ -1,5 +1,7 @@
 """Модуль для обработчиков администратора"""
+from collections import namedtuple
 import re
+from typing import Tuple
 
 import aiogram
 import aiogram.utils.exceptions
@@ -119,7 +121,7 @@ async def add_new_proxy_handler(message: Message) -> None:
 
     proxies: list = re.findall(r'\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}:\d{1,6}\b', message.text)
     for proxy in proxies:
-        await DBI.add_proxy(proxy=proxy)
+        await DBI.add_new_proxy(proxy=proxy)
         await message.answer(f"Добавлена прокси: {proxy}")
     await DBI.delete_proxy_for_all_users()
     await DBI.set_new_proxy_for_all_users()
@@ -321,6 +323,7 @@ async def user_name_request_handler(message: Message, state: FSMContext) -> None
 async def subscribe_time_request_handler(message: Message, state: FSMContext) -> None:
     """Проверка введеного имени и запрос времени подписки для нового пользователя"""
 
+    # TODO переделать
     name: str = message.text
     if await DBI.get_user_by_name(name=name):
         await message.answer('Такой пользователь уже существует. '
@@ -373,12 +376,21 @@ async def show_all_users_handler(message: Message) -> None:
     """Обработчик команды /show_users. Показывает список всех пользователей"""
 
     if await DBI.is_admin(telegram_id=message.from_user.id):
-        users: dict = await DBI.get_all_users()
-        total_values: list = list(users.values())
-        lenght: int = len(total_values)
-        for shift in range(0, lenght, 10):
-            user_list: str = "\n".join(total_values[shift:shift + 10])
-            await message.answer(user_list, reply_markup=ReplyKeyboardRemove())
+        users: Tuple[namedtuple] = await DBI.get_all_users()
+        # TODO сделать строку представления
+        # f'{user.nick_name.rsplit("_", maxsplit=1)[0]} | '
+        # f'{"Active" if user.active else "Not active"} | '
+        # f'{"Admin" if user.admin else "Not admin"} | '
+        # f'Proxy: {user.proxy.proxy if user.proxy else "ЧТО ТО СЛОМАЛОСЬ"} | '
+        # f'\nID: {user.telegram_id if user.telegram_id else "ЧТО ТО СЛОМАЛОСЬ"} | '
+        # f'№: {user.max_tokens if user.max_tokens else "ЧТО ТО СЛОМАЛОСЬ"} | '
+        # f'{timestamp(user.expiration) if user.expiration else "ЧТО ТО СЛОМАЛОСЬ"}'
+
+        # total_values: list = list(users.values())
+        # lenght: int = len(total_values)
+        # for shift in range(0, lenght, 10):
+        #     user_list: str = "\n".join(total_values[shift:shift + 10])
+        #     await message.answer(user_list, reply_markup=ReplyKeyboardRemove())
         await message.answer(
             f'Список пользователей: {len(users)}',
             reply_markup=ReplyKeyboardRemove()
@@ -392,15 +404,17 @@ async def delete_user_name_handler(message: Message) -> None:
     """Обработчик для удаления пользователя. Команда /delete_user"""
 
     if await DBI.is_admin(telegram_id=message.from_user.id):
-        all_users: dict = await DBI.get_all_users()
-        users_keys: list = list(all_users.keys())
-        lenght: int = len(users_keys)
+        all_users: 'Tuple[namedtuple]' = await DBI.get_all_users()
+        lenght: int = len(all_users)
         for index in range(0, lenght, 10):
             keyboard = InlineKeyboardMarkup(row_width=1)
-            slice: list = users_keys[index: index + 10]
-            for telegram_id in slice:
-                keyboard.add(InlineKeyboardButton(text=all_users[telegram_id], callback_data=f'user_{telegram_id}'))
-            await message.answer(f'Выберите пользователя для удаления: {index}/{lenght}', reply_markup=keyboard)
+            users_group: 'Tuple[namedtuple]' = all_users[index: index + 10]
+            for elem in users_group:
+                text: str = f"{elem.nick_name}: {elem.telegram_id}"
+                keyboard.add(InlineKeyboardButton(
+                    text=text, callback_data=f'user_{elem.telegram_id}'))
+            await message.answer(
+                f'Выберите пользователя для удаления: {index}/{lenght}', reply_markup=keyboard)
         await message.answer("Для отмены нажмите кнопку Отмена", reply_markup=cancel_keyboard())
         await UserState.name_for_del.set()
 
@@ -422,8 +436,9 @@ async def delete_user_handler(callback: CallbackQuery, state: FSMContext) -> Non
 @logger.catch
 async def activate_new_user_handler(message: Message) -> None:
     """Обработчик команды /ua для авторизации нового пользователя"""
+
     user_telegram_id: str = str(message.from_user.id)
-    if await DBI.is_active(telegram_id=user_telegram_id):
+    if await DBI.user_is_active(telegram_id=user_telegram_id):
         await message.answer("Вы уже есть в базе данных.", reply_markup=cancel_keyboard())
         return
     await message.answer("Введите токен: ", reply_markup=cancel_keyboard())
@@ -450,13 +465,12 @@ async def add_user_to_db_by_token(message: Message, state: FSMContext) -> None:
     subscribe_time = user_data["subscribe_time"]
     if user_name and max_tokens and subscribe_time:
         user_telegram_id: str = str(message.from_user.id)
-        proxy: str = await DBI.get_low_used_proxy()
-        # TODO проверить проксю
 
+        proxy_data: 'namedtuple' = await DBI.get_low_used_proxy()
         user_data: dict = {
             "telegram_id": user_telegram_id,
             "nick_name": user_name,
-            "proxy": proxy,
+            "proxy_pk": proxy_data.proxy_pk,
             "expiration": subscribe_time
         }
 
