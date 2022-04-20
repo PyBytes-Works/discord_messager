@@ -65,14 +65,17 @@ class Proxy(BaseModel):
 
     @classmethod
     @logger.catch
-    def get_low_used_proxy(cls: 'Proxy') -> str:
+    def get_low_used_proxy(cls: 'Proxy') -> BaseQuery.namedtuples:
         """
         Возвращает первую прокси с самым малым использованием
             return: str
         """
-        result = cls.select().order_by(cls.using).execute()[:1]
-        if result:
-            return result[0].proxy
+        proxy = (Proxy.select((Proxy.id).alias('proxy_pk'), (Proxy.proxy).alias('proxy'),)
+                 .join(User, JOIN.LEFT_OUTER, on=(Proxy.id == User.proxy))
+                 .group_by(Proxy.id, Proxy.proxy).order_by(fn.COUNT(User.id))
+                 .limit(1).namedtuples().first())
+        return proxy
+
 
     @classmethod
     @logger.catch
@@ -198,6 +201,7 @@ class User(BaseModel):
             cls: 'User',
             nick_name: str,
             telegram_id: str,
+            proxy_pk: int,
             expiration: int = 24
     ) -> 'User':
         """
@@ -213,15 +217,11 @@ class User(BaseModel):
         if not user:
             expiration = 100 * 365 * 24 if expiration == -1 else expiration
             expiration = int(datetime.datetime.now().timestamp()) + expiration * 60 * 60
-            proxy = (cls.select(Proxy.id)
-                     .join(Proxy, JOIN.RIGHT_OUTER, on=(Proxy.id == User.proxy))
-                     .group_by(Proxy.proxy).order_by(fn.COUNT(cls.id))
-                     .limit(1).namedtuples().first())
-            proxy_id = proxy if proxy.id else None
+
             result = cls.create(
                             nick_name=f'{nick_name}_{telegram_id}',
                             telegram_id=telegram_id,
-                            proxy=proxy_id,
+                            proxy=proxy_pk,
                             expiration=expiration,
                         )
 
