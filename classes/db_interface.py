@@ -44,9 +44,10 @@ class DBI:
     @classmethod
     @logger.catch
     async def add_new_user(
-            cls, nick_name: str, telegram_id: str, proxy_pk: int, expiration: int) -> 'User':
+            cls, nick_name: str, telegram_id: str, proxy_pk: int, expiration: int, max_tokens: int) -> bool:
         return User.add_new_user(
-            nick_name=nick_name, telegram_id=telegram_id, proxy_pk=proxy_pk, expiration=expiration)
+            nick_name=nick_name, telegram_id=telegram_id, proxy_pk=proxy_pk, expiration=expiration,
+            max_tokens=max_tokens)
 
     @classmethod
     @logger.catch
@@ -288,3 +289,12 @@ class DBI:
     async def update_user_channel_cooldown(cls, user_channel_pk: int, cooldown: int) -> int:
         return UserChannel.update_cooldown(
             user_channel_pk=user_channel_pk, cooldown=cooldown)
+
+    @classmethod
+    @logger.catch
+    async def get_user_channels(cls, telegram_id: str) -> List[namedtuple]:
+        # TODO вернуть список list(namedtuple[channel_id, channel_pk])
+        pass
+
+
+# TODO

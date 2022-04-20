@@ -209,7 +209,8 @@ class User(BaseModel):
             nick_name: str,
             telegram_id: str,
             proxy_pk: int,
-            expiration: int = 24
+            expiration: int = 24,
+            max_tokens: int = 2
     ) -> 'User':
         """
         if the user is already in the database, returns None
@@ -225,14 +226,15 @@ class User(BaseModel):
             expiration = 100 * 365 * 24 if expiration == -1 else expiration
             expiration = int(datetime.datetime.now().timestamp()) + expiration * 60 * 60
 
-            result = cls.create(
+            result, answer = cls.get_or_create(
                 nick_name=f'{nick_name}_{telegram_id}',
                 telegram_id=telegram_id,
                 proxy=proxy_pk,
                 expiration=expiration,
+                max_tokens=max_tokens
             )
 
-            return result
+            return answer
 
     @classmethod
     @logger.catch
