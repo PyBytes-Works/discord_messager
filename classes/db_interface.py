@@ -43,7 +43,8 @@ class DBI:
 
     @classmethod
     @logger.catch
-    async def add_new_user(cls, nick_name: str, telegram_id: str, proxy_pk: int, expiration: int):
+    async def add_new_user(
+            cls, nick_name: str, telegram_id: str, proxy_pk: int, expiration: int) -> 'User':
         return User.add_new_user(
             nick_name=nick_name, telegram_id=telegram_id, proxy_pk=proxy_pk, expiration=expiration)
 
@@ -81,7 +82,6 @@ class DBI:
     @logger.catch
     async def activate_user(cls, telegram_id: str) -> bool:
         return User.activate_user(telegram_id=telegram_id)
-
 
     @classmethod
     @logger.catch
@@ -198,12 +198,6 @@ class DBI:
 
     @classmethod
     @logger.catch
-    async def update_user_channel_cooldown(cls, user_channel_pk: int, cooldown: int) -> int:
-        return UserChannel.update_cooldown(
-            user_channel_pk=user_channel_pk, cooldown=cooldown)
-
-    @classmethod
-    @logger.catch
     async def update_token_last_message_time(cls, token: str) -> bool:
         return Token.update_token_last_message_time(token=token)
 
@@ -288,3 +282,9 @@ class DBI:
     @logger.catch
     async def update_proxies_for_owners(cls, proxy) -> int:
         return Proxy.update_proxies_for_owners(proxy=proxy)
+
+    @classmethod
+    @logger.catch
+    async def update_user_channel_cooldown(cls, user_channel_pk: int, cooldown: int) -> int:
+        return UserChannel.update_cooldown(
+            user_channel_pk=user_channel_pk, cooldown=cooldown)
