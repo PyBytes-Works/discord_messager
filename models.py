@@ -8,7 +8,7 @@ from peewee import (
     JOIN, Case, fn, BaseQuery, BigIntegerField
 )
 
-from config import logger, admins_list, db, db_file_name, DEFAULT_PROXY
+from config import logger, admins_list, db, DB_FILE_NAME, DEFAULT_PROXY
 
 
 class BaseModel(Model):
@@ -1152,7 +1152,7 @@ if __name__ == '__main__':
     #         for user_id in ('test1', 'test3', 'test5') for number in range(1, 4)
     #     ]
     if recreate:
-        recreate_db(db_file_name)
+        recreate_db(DB_FILE_NAME)
 
     if add_admins:
         for idx, admin_id in enumerate(admins_list, start=1):

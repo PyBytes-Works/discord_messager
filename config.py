@@ -12,7 +12,6 @@ import psycopg2
 
 
 # Загружаем переменные из файла .env
-
 load_dotenv()
 
 # Версия приложения
@@ -101,9 +100,9 @@ def psql():
     return db
 
 
-db_file_name = 'db/discord_mailer.db'
+DB_FILE_NAME = 'db/discord_mailer.db'
 if not DEBUG:
-    full_path = os.path.join(PATH, db_file_name)
+    full_path = os.path.join(PATH, DB_FILE_NAME)
     db = SqliteDatabase(
         full_path,
         pragmas={

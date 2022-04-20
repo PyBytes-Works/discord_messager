@@ -11,7 +11,6 @@ from aiogram.dispatcher.filters import Text
 from aiogram.types import Message, CallbackQuery, ReplyKeyboardRemove, InlineKeyboardMarkup, \
     InlineKeyboardButton
 
-from classes.request_sender import RequestSender
 from classes.vocabulary import Vocabulary
 from config import logger, bot, admins_list
 from handlers import cancel_handler
@@ -405,15 +404,17 @@ async def delete_user_name_handler(message: Message) -> None:
     """Обработчик для удаления пользователя. Команда /delete_user"""
 
     if await DBI.is_admin(telegram_id=message.from_user.id):
-        all_users: dict = await DBI.get_all_users()
-        users_keys: list = list(all_users.keys())
-        lenght: int = len(users_keys)
+        all_users: 'Tuple[namedtuple]' = await DBI.get_all_users()
+        lenght: int = len(all_users)
         for index in range(0, lenght, 10):
             keyboard = InlineKeyboardMarkup(row_width=1)
-            slice: list = users_keys[index: index + 10]
-            for telegram_id in slice:
-                keyboard.add(InlineKeyboardButton(text=all_users[telegram_id], callback_data=f'user_{telegram_id}'))
-            await message.answer(f'Выберите пользователя для удаления: {index}/{lenght}', reply_markup=keyboard)
+            users_group: 'Tuple[namedtuple]' = all_users[index: index + 10]
+            for elem in users_group:
+                text: str = f"{elem.nick_name}: {elem.telegram_id}"
+                keyboard.add(InlineKeyboardButton(
+                    text=text, callback_data=f'user_{elem.telegram_id}'))
+            await message.answer(
+                f'Выберите пользователя для удаления: {index}/{lenght}', reply_markup=keyboard)
         await message.answer("Для отмены нажмите кнопку Отмена", reply_markup=cancel_keyboard())
         await UserState.name_for_del.set()
 
