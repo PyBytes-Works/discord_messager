@@ -144,7 +144,7 @@ class MessageSender:
         self.__answer = {"status_code": status_code, "data": answer_data}
         # TODO перенести в сендер
         if status_code == 407:
-            new_proxy: str = await RequestSender().get_proxy(self.__datastore.telegram_id)
+            new_proxy: str = await RequestSender().get_checked_proxy(self.__datastore.telegram_id)
             if new_proxy == 'no proxies':
                 return
             self.__datastore.proxy = new_proxy
