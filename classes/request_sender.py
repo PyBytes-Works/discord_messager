@@ -60,7 +60,7 @@ class RequestSender:
 
         if not await DBI.get_proxy_count():
             return 'no proxies'
-        proxy: str = str(await DBI.get_proxy(telegram_id=telegram_id))
+        proxy: str = str(await DBI.get_user_proxy(telegram_id=telegram_id))
         if await self._check_proxy(proxy=proxy) == 200:
             return proxy
         if not await DBI.update_proxies_for_owners(proxy=proxy):

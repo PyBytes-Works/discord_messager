@@ -1,4 +1,5 @@
 from typing import List
+from collections import namedtuple
 
 from config import logger
 
@@ -25,16 +26,18 @@ class TokenDataStore:
         self.__MY_DISCORD_ID: str = ''
         self.__current_message_text: str = ''
         self.__all_tokens_ids: List[str] = []
+        self.user_channel_pk: int = 0
 
     @logger.catch
-    def create_datastore_data(self, token: str, token_data: dict):
+    def update(self, token: str, token_data: namedtuple):
         self.token: str = token
-        self.proxy: str = token_data.get("proxy")
-        self.channel: int = token_data.get("channel")
-        self.guild: int = token_data.get("guild")
-        self.cooldown: int = token_data.get("cooldown")
-        self.mate_id: str = token_data.get("mate_id")
-        self.my_discord_id: str = token_data.get("discord_id")
+        self.proxy: str = token_data.proxy
+        self.channel: int = token_data.channel_id
+        self.guild: int = token_data.guild
+        self.cooldown: int = token_data.cooldown
+        self.mate_id: str = token_data.mate_discord_id
+        self.my_discord_id: str = token_data.discord_id
+        self.user_channel_pk: int = token_data.user_channel_pk
 
     @property
     def current_message_text(self) -> str:

@@ -1,5 +1,5 @@
 from itertools import groupby
-from typing import List, Tuple, Any, Union
+from typing import List, Tuple, Any, Union, Dict
 import datetime
 import os
 
@@ -45,7 +45,7 @@ class Proxy(BaseModel):
 
     @classmethod
     @logger.catch
-    def get_proxy_count(cls) -> bool:
+    def get_proxy_count(cls) -> int:
         return cls.select().count()
 
     @classmethod
@@ -55,6 +55,13 @@ class Proxy(BaseModel):
         if instance:
             return instance.delete_instance()
         return False
+
+    @classmethod
+    @logger.catch
+    def delete_all_proxy(cls) -> bool:
+        """Deletes all proxies, returns deleted proxies count"""
+
+        return cls.delete().execute()
 
     @classmethod
     @logger.catch
@@ -70,12 +77,12 @@ class Proxy(BaseModel):
         Возвращает первую прокси с самым малым использованием
             return: str
         """
+        # TODO Сделать чтоб возвращала всегда namedtuple
         proxy = (Proxy.select((Proxy.id).alias('proxy_pk'), (Proxy.proxy).alias('proxy'),)
                  .join(User, JOIN.LEFT_OUTER, on=(Proxy.id == User.proxy))
                  .group_by(Proxy.id, Proxy.proxy).order_by(fn.COUNT(User.id))
                  .limit(1).namedtuples().first())
         return proxy
-
 
     @classmethod
     @logger.catch
@@ -229,12 +236,12 @@ class User(BaseModel):
 
     @classmethod
     @logger.catch
-    def delete_user_by_telegram_id(cls: 'User', telegram_id: str) -> tuple:
+    def delete_user_by_telegram_id(cls: 'User', telegram_id: str) -> bool:
         """
         delete user by telegram id
         #
         """
-        return cls.delete().where(cls.telegram_id == telegram_id).execute
+        return cls.delete().where(cls.telegram_id == telegram_id).execute()
 
     @classmethod
     @logger.catch
@@ -271,7 +278,7 @@ class User(BaseModel):
 
     @classmethod
     @logger.catch
-    def get_active_users(cls: 'User') -> list:
+    def get_active_users(cls: 'User') -> List[str]:
         """
         return list of telegram ids for active users
         return: list
@@ -292,7 +299,7 @@ class User(BaseModel):
 
     @classmethod
     @logger.catch
-    def get_all_inactive_users(cls: 'User') -> dict:
+    def get_all_inactive_users(cls: 'User') -> Dict[str, 'User']:
         """
         return dict of NOT active users
         return: dict
@@ -318,7 +325,7 @@ class User(BaseModel):
 
     @classmethod
     @logger.catch
-    def get_all_users(cls: 'User') -> BaseQuery.namedtuples:
+    def get_all_users(cls: 'User') -> Tuple[BaseQuery.namedtuples]:
         """
         returns dict of all users
         return: named tuple
@@ -328,26 +335,18 @@ class User(BaseModel):
             user_admin: str
             proxy: str
             telegram_id: str
-            max_token: int
+            max_tokens: int
             user_expiration: timestamp
         """
-        return User.select(
+        return tuple(User.select(
             User.nick_name.alias('nick_name'),
             Case(None, [((User.active == True), 'Active',)], 'Not active').alias('user_active'),
             Case(None, [((User.admin == True), 'Admin',)], 'Not admin').alias('user_admin'),
             Proxy.proxy.alias('proxy'),
             User.telegram_id.alias('telegram_id'),
-            User.telegram_id.alias('telegram_id'),
-            User.max_tokens.alias('max_token'),
+            User.max_tokens.alias('max_tokens'),
             User.expiration.alias('user_expiration'),
-        ).join(Proxy, JOIN.LEFT_OUTER, on=(User.proxy == Proxy.id)).execute()
-                # f'{user.nick_name.rsplit("_", maxsplit=1)[0]} | '
-                # f'{"Active" if user.active else "Not active"} | '
-                # f'{"Admin" if user.admin else "Not admin"} | '
-                # f'Proxy: {user.proxy.proxy if user.proxy else "ЧТО ТО СЛОМАЛОСЬ"} | '
-                # f'\nID: {user.telegram_id if user.telegram_id else "ЧТО ТО СЛОМАЛОСЬ"} | '
-                # f'№: {user.max_tokens if user.max_tokens else "ЧТО ТО СЛОМАЛОСЬ"} | '
-                # f'{timestamp(user.expiration) if user.expiration else "ЧТО ТО СЛОМАЛОСЬ"}'
+        ).join(Proxy, JOIN.LEFT_OUTER, on=(User.proxy == Proxy.id)).namedtuples().execute())
 
     @classmethod
     @logger.catch
@@ -362,7 +361,7 @@ class User(BaseModel):
 
     @classmethod
     @logger.catch
-    def get_working_users(cls: 'User') -> list:
+    def get_working_users(cls: 'User') -> List[str]:
         """
         return list of telegram ids for active users with active subscription
         return: list
@@ -432,6 +431,26 @@ class User(BaseModel):
 
     @classmethod
     @logger.catch
+    def delete_proxy_for_all_users(cls: 'User') -> int:
+        """Delete all user proxies, returns deleted proxies count"""
+
+        return cls.update(proxy=None).execute()
+
+    @classmethod
+    @logger.catch
+    def set_new_proxy_for_all_users(cls) -> int:
+        """Set up proxies for all users"""
+
+        all_users: List['User'] = list(cls.select().execute())
+        for user in all_users:
+            proxy: BaseQuery.namedtuples = Proxy.get_low_used_proxy()
+            if not proxy.proxy_pk:
+                return 0
+            cls.set_proxy_by_telegram_id(telegram_id=str(user.telegram_id), proxy_pk=proxy.proxy_pk)
+        return len(all_users)
+
+    @classmethod
+    @logger.catch
     def set_user_status_admin(cls: 'User', telegram_id: str) -> bool:
         """
         set admin value enabled for user
@@ -497,13 +516,13 @@ class User(BaseModel):
 
     @classmethod
     @logger.catch
-    def get_proxy(cls: 'User', telegram_id: str) -> CharField:
+    def get_proxy(cls: 'User', telegram_id: str) -> str:
         """
         Возвращает прокси пользователя
         """
-        user: User = cls.get_or_none(cls.proxy, cls.telegram_id == telegram_id)
-        if user:
-            return user.proxy.proxy
+        user: User = cls.get_or_none(cls.telegram_id == telegram_id)
+        if user and user.proxy:
+            return str(user.proxy.proxy)
 
     @classmethod
     @logger.catch
@@ -589,17 +608,20 @@ class UserChannel(BaseModel):
     def add_user_channel(
             cls: 'UserChannel',
             telegram_id: str,
-            name: str,
             guild_id: int,
             channel_id: int,
-            cooldown: int = 60) -> 'UserChannel':
+            name: str = '',
+            cooldown: int = 60) -> int:
         """
         Функция создает запись связи пользователя с дискорд каналом
         если канала нет, он будет создан
         """
+        if not name:
+            name: str = str(channel_id)
         user = User.get_user_by_telegram_id(telegram_id=telegram_id)
         channel = Channel.get_or_create_channel(guild_id=guild_id, channel_id=channel_id)
-        return cls.create(user=user, name=name, channel=channel.id, cooldown=cooldown)
+        result = cls.create(user=user, name=name, channel=channel.id, cooldown=cooldown)
+        return result.id
 
     @classmethod
     @logger.catch
@@ -651,19 +673,12 @@ class UserChannel(BaseModel):
 
     @classmethod
     @logger.catch
-    def update_cooldown_by_channel_id(cls: 'UserChannel', chanel_id: int, cooldown: int) -> int:
+    def update_cooldown(cls: 'UserChannel', user_channel_pk: int, cooldown: int) -> int:
         """
         Update cooldown for all users_channel by channel_id
             TODO логично было бы всем с таким же channel_id, но можно конкретному
         """
-        return (
-            cls.update(cooldown=cooldown)
-            .where(
-                cls.channel.in_(
-                    Channel.select(Channel.id).where(Channel.channel_id == chanel_id)
-                )
-            )
-        )
+        return cls.update(cooldown=cooldown).where(cls.id == user_channel_pk)
 
 
 class Token(BaseModel):
@@ -710,12 +725,12 @@ class Token(BaseModel):
 
     @classmethod
     @logger.catch
-    def add_token_by_user_channel(
+    def add_token(
                                     cls,
                                     telegram_id: Union[str, int],
                                     token: str,
                                     discord_id: str,
-                                    user_channel: 'UserChannel',
+                                    user_channel_pk: 'UserChannel',
                                     name: str,
                                  ) -> bool:
 
@@ -730,7 +745,7 @@ class Token(BaseModel):
         answer = False
         if limit:
             token, answer = cls.get_or_create(
-                user_channel=user_channel,
+                user_channel=user_channel_pk,
                 name=name,
                 token=token,
                 discord_id=discord_id,
@@ -739,14 +754,13 @@ class Token(BaseModel):
 
     @classmethod
     @logger.catch
-    def update_token_time(cls, token: str) -> bool:
+    def update_token_last_message_time(cls, token: str) -> bool:
         """
         set last_time: now datetime last message
         token: (str)
         """
         last_time = datetime.datetime.now().timestamp()
         return cls.update(last_message_time=last_time).where(cls.token == token).execute()
-
 
     @classmethod
     @logger.catch
@@ -798,7 +812,7 @@ class Token(BaseModel):
 
     @classmethod
     @logger.catch
-    def get_related_tokens(cls, telegram_id: Union[str, int] = None) -> List[BaseQuery.namedtuples]:
+    def get_related_tokens(cls: 'User', telegram_id: Union[str, int] = None) -> List[BaseQuery.namedtuples]:
         """
         Вернуть список всех связанных ТОКЕНОВ пользователя по его telegram_id:
         return: list of numed tuples
@@ -835,12 +849,13 @@ class Token(BaseModel):
             channel_id int
             guild_id int
             cooldown  int
-            mate_id str (discord_id)
+            mate_discord_id str (discord_id)
         """
+        # TODO добавить 2 поля: mate_id ( дискорда1111111)  и МОЙ дискорд_ИД
         data = (cls.select(
             cls.token.alias('token'),
             cls.id.alias('token_pk'),
-            cls.name.alias('name_token'),
+            cls.name.alias('token_name'),
             UserChannel.name.alias('channel_name'),
             Channel.channel_id.alias('channel_id'),
             User.nick_name.alias('user_name'),
@@ -912,7 +927,7 @@ class Token(BaseModel):
 
     @classmethod
     @logger.catch
-    def get_time_by_token(cls: 'Token', token: str) -> int:
+    def get_last_message_time(cls: 'Token', token: str) -> int:
         """
         Вернуть timestamp(кд) токена по его "значению":
         """
@@ -931,7 +946,7 @@ class Token(BaseModel):
 
     @classmethod
     @logger.catch
-    def get_info_by_token(cls, token: str) -> BaseQuery.namedtuples:
+    def get_token_info(cls, token: str) -> BaseQuery.namedtuples:
         """
         Вернуть info по токену
         возвращает объект токен
@@ -940,9 +955,10 @@ class Token(BaseModel):
             'guild_id':guild_id(int),
             'channel_id': channel_id(int),
             'cooldown': cooldown(int, seconds)}
-            'mate_id' str (discord_id)
+            'mate_discord_id' str (discord_id)
             'discord_id' str
         """
+        # TODO mate_discord_id ДОДЕЛАТЬ
         data = (
                  cls.select(
                      cls.user_channel.alias('user_channel_pk'),
@@ -951,7 +967,7 @@ class Token(BaseModel):
                      Channel.channel_id.alias('channel_id'),
                      UserChannel.cooldown.alias('cooldown'),
                      Case(None, [((TokenPair.first_id == cls.id),
-                                  TokenPair.second_id,)], TokenPair.first_id).alias('mate_id'),
+                                  TokenPair.second_id,)], TokenPair.first_id).alias('mate_discord_id'),
                      cls.discord_id.alias('discord_id'),
 
                  )
@@ -995,25 +1011,22 @@ class Token(BaseModel):
         """
         pass
 
-
     @classmethod
     @logger.catch
     def get_number_of_free_slots_for_tokens(cls, telegram_id: str) -> int:
         """
         Вернуть количество свободных мест для размещения токенов
         """
-
-        limit = (User.select(
-                    Case(None,
-                    [
-                        ((fn.MAX(User.max_tokens).is_null(False)),
-                            fn.MAX(User.max_tokens) - fn.COUNT(Token.id), )
-                    ], 0).alias('limit'))
-                    .join(UserChannel, JOIN.LEFT_OUTER, on=(UserChannel.user == User.id))
-                    .join(cls, JOIN.LEFT_OUTER, on=(cls.user_channel == UserChannel.id))
-                    .where(User.telegram_id == telegram_id).first())
-
-        return limit
+        # TODO Вове не нра
+        return (User.select(
+            Case(None,
+                [
+                    ((fn.MAX(User.max_tokens).is_null(False)),
+                     fn.MAX(User.max_tokens) - fn.COUNT(Token.id), )
+                ], 0).alias('limit'))
+                .join(UserChannel, JOIN.LEFT_OUTER, on=(UserChannel.user == User.id))
+                .join(cls, JOIN.LEFT_OUTER, on=(cls.user_channel == UserChannel.id))
+                .where(User.telegram_id == telegram_id).first())
 
 
 class TokenPair(BaseModel):
