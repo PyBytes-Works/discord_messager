@@ -226,7 +226,7 @@ class User(BaseModel):
             expiration = 100 * 365 * 24 if expiration == -1 else expiration
             expiration = int(datetime.datetime.now().timestamp()) + expiration * 60 * 60
 
-            result = cls.create(
+            result, answer = cls.get_or_create(
                 nick_name=f'{nick_name}_{telegram_id}',
                 telegram_id=telegram_id,
                 proxy=proxy_pk,
@@ -234,7 +234,7 @@ class User(BaseModel):
                 max_tokens=max_tokens
             )
 
-            return result
+            return answer
 
     @classmethod
     @logger.catch

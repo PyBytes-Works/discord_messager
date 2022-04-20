@@ -475,9 +475,7 @@ async def final_add_user_handler(message: Message, state: FSMContext) -> None:
             "max_tokens": max_tokens
         }
 
-        user_created = await DBI.add_new_user(**user_data)
-
-        if not user_created:
+        if not await DBI.add_new_user(**user_data):
             await send_report_to_admins(
                 text=(f"При добавлении нового пользователя произошла ошибка:"
                       f"\nПользователь {user_name} : ID: {user_telegram_id} уже существует.")

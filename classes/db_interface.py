@@ -44,7 +44,7 @@ class DBI:
     @classmethod
     @logger.catch
     async def add_new_user(
-            cls, nick_name: str, telegram_id: str, proxy_pk: int, expiration: int, max_tokens: int) -> 'User':
+            cls, nick_name: str, telegram_id: str, proxy_pk: int, expiration: int, max_tokens: int) -> bool:
         return User.add_new_user(
             nick_name=nick_name, telegram_id=telegram_id, proxy_pk=proxy_pk, expiration=expiration,
             max_tokens=max_tokens)
