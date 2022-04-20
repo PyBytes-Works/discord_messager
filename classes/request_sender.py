@@ -93,6 +93,11 @@ class RequestSender:
         return answer
 
     @logger.catch
+    async def get_me(self, token: str):
+        # TODO написать
+        pass
+
+    @logger.catch
     async def _check_proxy(self, proxy: str, token: str = '', channel: Union[str, int] = 0) -> int:
         """Отправляет запрос через прокси, возвращает статус код ответа"""
 

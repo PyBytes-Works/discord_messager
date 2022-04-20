@@ -323,7 +323,8 @@ async def subscribe_time_request_handler(message: Message, state: FSMContext) ->
 
     name: str = message.text
     if await DBI.get_user_by_name(name=name):
-        await message.answer('Такой пользователь уже существует. Введите другое имя.')
+        await message.answer('Такой пользователь уже существует. '
+                             '\nВведите другое имя:')
         return
     if len(name) > 20:
         await message.answer('Имя пользователя не должно превышать 20 символов. Введите заново.')

@@ -114,7 +114,7 @@ class DBI:
     @classmethod
     @logger.catch
     async def get_user_by_name(cls, name: str) -> 'User':
-        # TODO написать метод в БД
+        # TODO написать метод - возвращает юзера по его имени (nick_name)
         return User.get_or_none(User.nick_name.contains(name))
 
     @classmethod
@@ -145,7 +145,8 @@ class DBI:
     @classmethod
     @logger.catch
     async def set_expiration_date(cls, telegram_id: str, subscription_period: int):
-        return User.set_expiration_date(telegram_id=telegram_id, subscription_period=subscription_period)
+        return User.set_expiration_date(
+            telegram_id=telegram_id, subscription_period=subscription_period)
 
     @classmethod
     @logger.catch
@@ -225,7 +226,8 @@ class DBI:
     @classmethod
     @logger.catch
     async def get_all_discord_id(cls, telegram_id: str) -> List[str]:
-        # TODO Сделать метод - должен вернуть список дискорд_ид токенов для пользователя
+        # TODO Сделать метод - должен вернуть список дискорд_ид токенов для пользователя по
+        #  его телеграм_ид
         # return User.get_all_discord_id(telegram_id=telegram_id)
         return ['933119013775626302', '933119060420476939']
 
@@ -252,7 +254,8 @@ class DBI:
     @classmethod
     @logger.catch
     async def add_token_by_telegram_id(
-            cls, telegram_id: str, token: str, discord_id: str, guild: int, channel: int, cooldown: int
+            cls, telegram_id: str, token: str, discord_id: str, guild: int, channel: int,
+            cooldown: int
     ) -> bool:
         return Token.add_token_by_telegram_id(
             telegram_id=telegram_id, token=token, discord_id=discord_id,
