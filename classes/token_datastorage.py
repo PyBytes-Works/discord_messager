@@ -24,7 +24,7 @@ class TokenDataStore:
         self.__DELAY: int = 0
         self.__MY_DISCORD_ID: str = ''
         self.__current_message_text: str = ''
-        self.__all_tokens: List[str] = []
+        self.__all_tokens_ids: List[str] = []
 
     @logger.catch
     def create_datastore_data(self, token: str, token_data: dict):
@@ -45,14 +45,14 @@ class TokenDataStore:
         self.__current_message_text = message_text
 
     @property
-    def all_tokens(self) -> List[str]:
-        return self.__all_tokens
+    def all_tokens_ids(self) -> List[str]:
+        return self.__all_tokens_ids
 
-    @all_tokens.setter
-    def all_tokens(self, all_tokens: List[str]):
-        self.__all_tokens = all_tokens
+    @all_tokens_ids.setter
+    def all_tokens_ids(self, all_tokens: List[str]):
         if not all_tokens:
-            self.__all_tokens = []
+            return
+        self.__all_tokens_ids = all_tokens
 
     @property
     def my_discord_id(self) -> str:

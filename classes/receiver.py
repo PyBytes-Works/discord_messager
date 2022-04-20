@@ -25,7 +25,7 @@ class MessageReceiver:
         """Получает данные из АПИ, выбирает случайное сообщение и возвращает ID сообщения
         и само сообщение"""
 
-        # TODO сделать список в редис, куда складывать айдишники всех сообщений, на которые ответили
+        # TODO сделать список в редис, куда складывать айдишники всех реплаев, на которые ответили
         # TODO Вынести работу с отправкой запросов в отдельный класс и написать обработку ошибок там
         # TODO Сделать флаг автоответа (если флаг стоит - то отвечает бот Давинчи, иначе -
         #  отправлять в телеграм юзеру
@@ -112,7 +112,7 @@ class MessageReceiver:
             mes_time = datetime.datetime.fromisoformat(message_time).replace(tzinfo=None)
             delta = datetime.datetime.utcnow().replace(tzinfo=None) - mes_time
             if delta.seconds < self.__datastore.last_message_time:
-                filtered_replies: dict = self.__replies_filter(elem=elem)
+                filtered_replies: dict = self.__get_replies_for_my_tokens(elem=elem)
                 if filtered_replies:
                     replies.append(filtered_replies)
                 is_author_mate: bool = str(self.__datastore.mate_id) == str(elem["author"]["id"])
@@ -143,6 +143,8 @@ class MessageReceiver:
         """Возвращает разницу между старыми и новыми данными в редисе,
         записывает полные данные в редис"""
 
+        if not new_replies:
+            return []
         total_replies: List[dict] = await RedisDB(redis_key=self.__datastore.telegram_id).load()
         old_messages: list = list(map(lambda x: x.get("message_id"), total_replies))
         result: List[dict] = [
@@ -157,7 +159,7 @@ class MessageReceiver:
         return result
 
     @logger.catch
-    def __replies_filter(self, elem: dict) -> dict:
+    def __get_replies_for_my_tokens(self, elem: dict) -> dict:
         """Возвращает реплаи не из нашего села."""
 
         result = {}
@@ -178,7 +180,9 @@ class MessageReceiver:
         author_id: str = elem.get("author", {}).get("id", '')
         message_for_me: bool = reply_for_author_id == self.__datastore.my_discord_id
         if any(mentions) or message_for_me:
-            all_discord_tokens: List[str] = self.__datastore.all_tokens
+            all_discord_tokens: List[str] = self.__datastore.all_tokens_ids
+            print(f"Author ID: {author_id}")
+            print(f"IDS: {all_discord_tokens}")
             if author_id not in all_discord_tokens:
                 result.update({
                     "token": self.__datastore.token,

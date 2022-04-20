@@ -223,8 +223,10 @@ class DBI:
 
     @classmethod
     @logger.catch
-    async def get_all_discord_id(cls, token: str) -> List[str]:
-        return Token.get_all_discord_id(token=token)
+    async def get_all_discord_id(cls, telegram_id: str) -> List[str]:
+        # TODO Сделать метод - должен вернуть список дискорд_ид токенов для пользователя
+        # return User.get_all_discord_id(telegram_id=telegram_id)
+        return ['933119013775626302', '933119060420476939']
 
     @classmethod
     @logger.catch

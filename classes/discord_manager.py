@@ -32,20 +32,24 @@ class DiscordTokenManager:
         self.__current_tokens_list: List[dict] = []
         self.__workers: List[str] = []
         self.__datastore: Optional['TokenDataStore'] = None
+        self.__all_tokens_ids: List[str] = []
 
     @logger.catch
     async def lets_play(self) -> None:
         """Show must go on
         Запускает рабочий цикл бота, проверяет ошибки."""
 
+        # TODO переписать метод для пользователя, а не для токена
+        self.__all_tokens_ids = await DBI.get_all_discord_id(telegram_id=self.user_telegram_id)
+
         while await DBI.is_user_work(telegram_id=self.user_telegram_id):
-            await self.__send_text(text="Начинаю работу.", keyboard=cancel_keyboard(), check_silence=True)
+            await self.__send_text(
+                text="Начинаю работу.", keyboard=cancel_keyboard(), check_silence=True)
             logger.debug(f"\tUSER: {self.__username}:{self.user_telegram_id} - Game begin.")
             if await DBI.is_expired_user_deactivated(self.message):
                 break
-            if self.__datastore is None:
-                self.__datastore: 'TokenDataStore' = TokenDataStore(self.user_telegram_id)
-                self.__datastore.all_tokens = await DBI.get_all_discord_id(token=self.__datastore.token)
+            self.__datastore: 'TokenDataStore' = TokenDataStore(self.user_telegram_id)
+            self.__datastore.all_tokens_ids = self.__all_tokens_ids
             if not await self.__is_datastore_ready():
                 break
             message_manager: 'MessageReceiver' = MessageReceiver(datastore=self.__datastore)
