@@ -178,7 +178,7 @@ async def add_discord_token_handler(message: Message, state: FSMContext) -> None
     data: dict = await state.get_data()
     channel: int = data.get('channel')
 
-    proxy: str = await RequestSender().get_proxy(telegram_id=message.from_user.id)
+    proxy: str = await RequestSender().get_checked_proxy(telegram_id=message.from_user.id)
     if proxy == 'no proxies':
         text: str = "Ошибка прокси. Нет доступных прокси."
         await message.answer(text, reply_markup=ReplyKeyboardRemove())
