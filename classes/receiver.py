@@ -91,7 +91,7 @@ class MessageReceiver:
     async def __get_filtered_data(self) -> dict:
         """Отправляет запрос к АПИ"""
 
-        data: List[dict] = await RequestSender().get_data_from_channel(datastore=self.__datastore)
+        data: List[dict] = await RequestSender().get_request(datastore=self.__datastore)
         if not data:
             return {}
         result: dict = await self.__data_filter(data=data)

@@ -161,15 +161,6 @@ async def add_channel_handler(message: Message, state: FSMContext) -> None:
 
 
 @logger.catch
-async def is_proxy_valid(message: Message, proxy: str) -> bool:
-    if proxy != 'no proxies':
-        return True
-    text: str = "Ошибка прокси. Нет доступных прокси."
-    await message.answer(text, reply_markup=ReplyKeyboardRemove())
-    await send_report_to_admins(text)
-
-
-@logger.catch
 async def add_discord_token_handler(message: Message, state: FSMContext) -> None:
     """ Получение токена запрос discord_id """
 
@@ -187,33 +178,38 @@ async def add_discord_token_handler(message: Message, state: FSMContext) -> None
     data: dict = await state.get_data()
     channel: int = data.get('channel')
 
-    # FIXME Надо рефакторить
     proxy: str = await RequestSender().get_proxy(telegram_id=message.from_user.id)
-    if not await is_proxy_valid(message=message, proxy=proxy):
+    if proxy == 'no proxies':
+        text: str = "Ошибка прокси. Нет доступных прокси."
+        await message.answer(text, reply_markup=ReplyKeyboardRemove())
+        await send_report_to_admins(text)
         await state.finish()
         return
 
-    # FIXME Надо рефакторить
     result: dict = await RequestSender().check_token(token=token, proxy=proxy, channel=channel)
-    request_result: str = result.get('token')
-    if not await is_proxy_valid(message=message, proxy=request_result):
-        await state.finish()
-        return
+    if not result.get("success"):
+        error_message: str = result.get("message")
+        if error_message == 'bad proxy':
+            await message.answer(error_message, reply_markup=user_menu_keyboard())
+            await state.finish()
+            return
+        elif error_message == 'bad token':
+            await message.answer(
+                f"Ваш токен {token} не прошел проверку в канале {channel}. "
+                "\nЛибо канал не существует либо токен отсутствует данном канале, "
+                "\nЛибо токен не рабочий."
+                "\nВведите ссылку на канал заново:",
 
-    if request_result == 'bad token':
-        await message.answer(
-            "Ваш токен не прошел проверку в данном канале. "
-            "\nЛибо канал не существует либо токен отсутствует данном канале, "
-            "\nЛибо токен не рабочий."
-            "\nВведите ссылку на канал заново:",
-
-            reply_markup=cancel_keyboard()
-        )
-        await UserState.user_add_channel.set()
-        return
-
+                reply_markup=cancel_keyboard()
+            )
+            await UserState.user_add_channel.set()
+            return
+        else:
+            logger.error("f: add_discord_token_handler: error: Don`t know why")
+            await state.finish()
+            return
+    token: str = result.get('token')
     await state.update_data(token=token)
-
     await UserState.user_add_discord_id.set()
     link: str = "https://ibb.co/WHKKytW"
     await message.answer(

@@ -30,20 +30,10 @@ class RequestSender:
         self.token: str = ''
         self.channel: Union[str, int] = 0
 
+    # TODO отрефакторить метод, у него двойной функционал
     @logger.catch
-    async def check_proxy(self, proxy: str, token: str = '', channel: Union[str, int] = 0) -> int:
-        """Отправляет запрос через прокси, возвращает статус код ответа"""
-
-        self.proxy: str = proxy
-        self.token: str = token
-        self.channel: int = channel
-        answer: dict = await self._send_get_request()
-
-        return answer.get("status")
-
-    @logger.catch
-    async def get_data_from_channel(self, datastore: 'TokenDataStore') -> List[dict]:
-        """Отправляет запрос к АПИ"""
+    async def get_request(self, datastore: 'TokenDataStore') -> List[dict]:
+        """Отправляет GET запрос к АПИ"""
 
         self.proxy: str = datastore.proxy
         self.token: str = datastore.token
@@ -60,35 +50,10 @@ class RequestSender:
                 logger.error("F: get_data_from_channel: JSON ERROR:", err)
 
     @logger.catch
-    async def _send_get_request(self) -> dict:
-
-        self.proxy_data: str = f"http://{PROXY_USER}:{PROXY_PASSWORD}@{self.proxy}/"
-        self.url: str = DISCORD_BASE_URL + f'{self.channel}/messages?limit={self.limit}'
-
-        answer: dict = {
-            "status": 0,
-            "data": ''
-        }
-        async with aiohttp.ClientSession() as session:
-            url: str = "https://www.google.com"
-            if self.token:
-                session.headers['authorization']: str = self.token
-                url: str = self.url
-            try:
-                async with session.get(url=url, proxy=self.proxy_data, ssl=False, timeout=10) as response:
-                    answer.update(status=response.status, data=await response.text())
-            except self.__EXCEPTIONS as err:
-                logger.info(f"Token check Error: {err}")
-            except aiohttp.http_exceptions.BadHttpMessage as err:
-                logger.error("МУДАК ПРОВЕРЬ ПОРТ ПРОКСИ!!!", err)
-                if "Proxy Authentication Required" in err:
-                    answer.update(status=407)
-            except (ssl.SSLError, OSError) as err:
-                logger.error("Ошибка авторизации прокси:", err)
-                if "Proxy Authentication Required" in err:
-                    answer.update(status=407)
-
-        return answer
+    async def post_request(self, datastore: 'TokenDataStore', data: dict):
+        """Отправляет POST запрос к АПИ"""
+        # TODO Написать из сендера
+        pass
 
     @logger.catch
     async def get_proxy(self, telegram_id: str) -> str:
@@ -97,7 +62,7 @@ class RequestSender:
         if not await DBI.get_proxy_count():
             return 'no proxies'
         proxy: str = str(await DBI.get_proxy(telegram_id=telegram_id))
-        if await self.check_proxy(proxy=proxy) == 200:
+        if await self._check_proxy(proxy=proxy) == 200:
             return proxy
         if not await DBI.update_proxies_for_owners(proxy=proxy):
             return 'no proxies'
@@ -112,7 +77,7 @@ class RequestSender:
             "success": False,
             "message": '',
         }
-        status: int = await self.check_proxy(proxy=proxy, token=token, channel=channel)
+        status: int = await self._check_proxy(proxy=proxy, token=token, channel=channel)
         if status == 200:
             answer.update({
                 "success": True,
@@ -124,5 +89,55 @@ class RequestSender:
             answer.update(message='bad proxy')
         else:
             answer.update(message='bad token')
+
+        return answer
+
+    @logger.catch
+    async def _check_proxy(self, proxy: str, token: str = '', channel: Union[str, int] = 0) -> int:
+        """Отправляет запрос через прокси, возвращает статус код ответа"""
+
+        self.proxy: str = proxy
+        self.token: str = token
+        self.channel: int = channel
+        answer: dict = await self._send_get_request()
+
+        return answer.get("status")
+
+    @logger.catch
+    async def _send_get_request(self) -> dict:
+
+        self.proxy_data: str = f"http://{PROXY_USER}:{PROXY_PASSWORD}@{self.proxy}/"
+        self.url: str = DISCORD_BASE_URL + f'{self.channel}/messages?limit={self.limit}'
+
+        answer: dict = {
+            "status": 0,
+            "data": ''
+        }
+        async with aiohttp.ClientSession() as session:
+            params: dict = {
+                'url': "https://www.google.com",
+                "proxy": self.proxy_data,
+                "ssl": False,
+                "timeout": 10
+            }
+            if self.token:
+                session.headers['authorization']: str = self.token
+                params.update(url=self.url)
+            try:
+                async with session.get(**params) as response:
+                    answer.update(
+                        status=response.status,
+                        data=await response.text()
+                    )
+            except self.__EXCEPTIONS as err:
+                logger.info(f"Token check Error: {err}")
+            except aiohttp.http_exceptions.BadHttpMessage as err:
+                logger.error("МУДАК ПРОВЕРЬ ПОРТ ПРОКСИ!!!", err)
+                if "Proxy Authentication Required" in err:
+                    answer.update(status=407)
+            except (ssl.SSLError, OSError) as err:
+                logger.error("Ошибка авторизации прокси:", err)
+                if "Proxy Authentication Required" in err:
+                    answer.update(status=407)
 
         return answer
