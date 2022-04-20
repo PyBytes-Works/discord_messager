@@ -209,7 +209,8 @@ class User(BaseModel):
             nick_name: str,
             telegram_id: str,
             proxy_pk: int,
-            expiration: int = 24
+            expiration: int = 24,
+            max_tokens: int = 2
     ) -> 'User':
         """
         if the user is already in the database, returns None
@@ -230,6 +231,7 @@ class User(BaseModel):
                 telegram_id=telegram_id,
                 proxy=proxy_pk,
                 expiration=expiration,
+                max_tokens=max_tokens
             )
 
             return result

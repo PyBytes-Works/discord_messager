@@ -446,7 +446,7 @@ async def activate_new_user_handler(message: Message) -> None:
 
 
 @logger.catch
-async def add_user_to_db_by_token(message: Message, state: FSMContext) -> None:
+async def final_add_user_handler(message: Message, state: FSMContext) -> None:
     """Обработчик создания инициализации активации нового пользователя"""
 
     user_data: dict = delete_used_token(message.text)
@@ -471,7 +471,8 @@ async def add_user_to_db_by_token(message: Message, state: FSMContext) -> None:
             "telegram_id": user_telegram_id,
             "nick_name": user_name,
             "proxy_pk": proxy_data.proxy_pk,
-            "expiration": subscribe_time
+            "expiration": subscribe_time,
+            "max_tokens": max_tokens
         }
 
         user_created = await DBI.add_new_user(**user_data)
@@ -482,21 +483,18 @@ async def add_user_to_db_by_token(message: Message, state: FSMContext) -> None:
                       f"\nПользователь {user_name} : ID: {user_telegram_id} уже существует.")
             )
             await message.answer('Пользователь уже существует.')
-        else:
-            tokens_set = await DBI.set_max_tokens(telegram_id=user_telegram_id, max_tokens=max_tokens)
-            if tokens_set:
-                await message.answer(
-                    'Поздравляю, вы добавлены в БД'
-                    f'\nВам назначен лимит в {max_tokens} токенов.',
-                    reply_markup=user_menu_keyboard()
-                )
-                await send_report_to_admins(
-                    text=f"Пользователь {user_name} : ID: {user_telegram_id} добавлен в БД."
-                         f"\nМаксимальное количество токенов: {max_tokens}"
-                         f"\nВремя подписки: {subscribe_time} часов.",
-                )
-            else:
-                await send_report_to_admins("Произошла ошибка при добавлении нового пользователя.")
+            await state.finish()
+            return
+        await message.answer(
+            'Поздравляю, вы добавлены в БД'
+            f'\nВам назначен лимит в {max_tokens} токенов.',
+            reply_markup=user_menu_keyboard()
+        )
+        await send_report_to_admins(
+            text=f"Пользователь {user_name} : ID: {user_telegram_id} добавлен в БД."
+                 f"\nМаксимальное количество токенов: {max_tokens}"
+                 f"\nВремя подписки: {subscribe_time} часов.",
+        )
     await state.finish()
 
 
@@ -525,7 +523,7 @@ def register_admin_handlers(dp: Dispatcher) -> None:
         cancel_handler, Text(startswith=["отмена", "cancel"], ignore_case=True), state="*"
     )
     dp.register_message_handler(
-        add_user_to_db_by_token, Text(startswith=["new_user_"]), state=UserState.name_for_activate
+        final_add_user_handler, Text(startswith=["new_user_"]), state=UserState.name_for_activate
     )
     dp.register_message_handler(max_tokens_request_handler, commands=['add_user', 'addu'])
     dp.register_message_handler(user_name_request_handler, state=UserState.max_tokens_req)
