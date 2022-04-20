@@ -37,6 +37,7 @@ class RequestSender:
         self.token: str = token
         self.channel: int = channel
         answer: dict = await self._send_get_request()
+
         return answer.get("status")
 
     @logger.catch
@@ -55,7 +56,7 @@ class RequestSender:
             try:
                 return json.loads(answer.get("data"))
             except JSONDecodeError as err:
-                logger.error("F: __send_data_to_api: JSON ERROR:", err)
+                logger.error("F: get_data_from_channel: JSON ERROR:", err)
 
     @logger.catch
     async def _send_get_request(self) -> dict:

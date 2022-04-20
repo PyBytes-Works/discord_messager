@@ -8,6 +8,7 @@ from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKe
 from aiogram.dispatcher import FSMContext
 
 from classes.proxy_checker import ProxyChecker
+from classes.request_sender import RequestSender
 from classes.token_checker import TokenChecker
 from config import logger, Dispatcher, admins_list
 from keyboards import cancel_keyboard, user_menu_keyboard, all_tokens_keyboard
@@ -161,12 +162,38 @@ async def add_channel_handler(message: Message, state: FSMContext) -> None:
     await message.answer("Введите токен:", reply_markup=cancel_keyboard())
 
 
+@logger.catch
 async def is_proxy_valid(message: Message, proxy: str) -> bool:
     if proxy != 'no proxies':
         return True
     text: str = "Ошибка прокси. Нет доступных прокси."
     await message.answer(text, reply_markup=ReplyKeyboardRemove())
     await send_report_to_admins(text)
+
+
+@logger.catch
+async def check_token(self, proxy: str, token: str, channel: int) -> dict:
+    """Returns valid token else 'bad token'"""
+
+    answer: dict = {
+        "success": False,
+        "message": '',
+    }
+    rs = RequestSender()
+    status: int = await rs.check_proxy(proxy=proxy, token=token, channel=channel)
+    if status == 200:
+        answer.update({
+                "success": True,
+                "proxy": proxy,
+                "token": token,
+                "channel": channel
+        })
+    elif status == 407:
+        answer.update(message='bad proxy')
+    else:
+        answer.update(message='bad token')
+
+    return answer
 
 
 @logger.catch
@@ -187,16 +214,16 @@ async def add_discord_token_handler(message: Message, state: FSMContext) -> None
     data: dict = await state.get_data()
     channel: int = data.get('channel')
 
+    # FIXME Надо рефакторить
     proxy: str = await ProxyChecker.get_proxy(telegram_id=message.from_user.id)
     if not await is_proxy_valid(message=message, proxy=proxy):
-        await message.answer("Прокси не валидна.")
         await state.finish()
         return
 
-    result: dict = await TokenChecker.check_user_data(token=token, proxy=proxy, channel=channel)
+    # FIXME Надо рефакторить
+    result: dict = await check_token(token=token, proxy=proxy, channel=channel)
     request_result: str = result.get('token')
     if not await is_proxy_valid(message=message, proxy=request_result):
-        await message.answer("Прокси с токеном не валидны.")
         await state.finish()
         return
 
