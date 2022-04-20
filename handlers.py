@@ -7,9 +7,7 @@ from aiogram.dispatcher.filters import Text
 from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeyboardRemove
 from aiogram.dispatcher import FSMContext
 
-from classes.proxy_checker import ProxyChecker
 from classes.request_sender import RequestSender
-from classes.token_checker import TokenChecker
 from config import logger, Dispatcher, admins_list
 from keyboards import cancel_keyboard, user_menu_keyboard, all_tokens_keyboard
 from classes.discord_manager import DiscordTokenManager
@@ -30,7 +28,7 @@ async def cancel_handler(message: Message, state: FSMContext) -> None:
     user_telegram_id: str = str(message.from_user.id)
     text: str = ''
     keyboard = user_menu_keyboard
-    if DBI.is_user_work(telegram_id=user_telegram_id):
+    if await DBI.is_user_work(telegram_id=user_telegram_id):
         text: str = "\nДождитесь завершения работы бота. Это займет несколько секунд..."
         keyboard = ReplyKeyboardRemove
     await message.answer(
@@ -172,31 +170,6 @@ async def is_proxy_valid(message: Message, proxy: str) -> bool:
 
 
 @logger.catch
-async def check_token(self, proxy: str, token: str, channel: int) -> dict:
-    """Returns valid token else 'bad token'"""
-
-    answer: dict = {
-        "success": False,
-        "message": '',
-    }
-    rs = RequestSender()
-    status: int = await rs.check_proxy(proxy=proxy, token=token, channel=channel)
-    if status == 200:
-        answer.update({
-                "success": True,
-                "proxy": proxy,
-                "token": token,
-                "channel": channel
-        })
-    elif status == 407:
-        answer.update(message='bad proxy')
-    else:
-        answer.update(message='bad token')
-
-    return answer
-
-
-@logger.catch
 async def add_discord_token_handler(message: Message, state: FSMContext) -> None:
     """ Получение токена запрос discord_id """
 
@@ -215,13 +188,13 @@ async def add_discord_token_handler(message: Message, state: FSMContext) -> None
     channel: int = data.get('channel')
 
     # FIXME Надо рефакторить
-    proxy: str = await ProxyChecker.get_proxy(telegram_id=message.from_user.id)
+    proxy: str = await RequestSender().get_proxy(telegram_id=message.from_user.id)
     if not await is_proxy_valid(message=message, proxy=proxy):
         await state.finish()
         return
 
     # FIXME Надо рефакторить
-    result: dict = await check_token(token=token, proxy=proxy, channel=channel)
+    result: dict = await RequestSender().check_token(token=token, proxy=proxy, channel=channel)
     request_result: str = result.get('token')
     if not await is_proxy_valid(message=message, proxy=request_result):
         await state.finish()

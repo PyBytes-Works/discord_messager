@@ -47,7 +47,6 @@ class RedisDB:
             logger.error(f"RedisInterface.__get_or_set_from_db(): Connection error: {err}")
         except Exception as err:
             logger.error(f"RedisInterface.__get_or_set_from_db(): {err}")
-        logger.debug(f"REDIS RESULT: {result}")
         return result
 
     @logger.catch

@@ -5,8 +5,8 @@ from json import JSONDecodeError
 import requests
 
 from classes.open_ai import OpenAI
-from classes.proxy_checker import ProxyChecker
 from classes.redis_interface import RedisDB
+from classes.request_sender import RequestSender
 from classes.vocabulary import Vocabulary
 from config import logger, DISCORD_BASE_URL, PROXY_USER, PROXY_PASSWORD
 from classes.token_datastorage import TokenDataStore
@@ -45,7 +45,6 @@ class MessageSender:
     @logger.catch
     async def __prepare_message_text(self) -> None:
         mate_message: list = await RedisDB(redis_key=self.__datastore.my_discord_id).load()
-        logger.debug(f"From mate: {mate_message}")
         if mate_message:
             self.__text: str = OpenAI().get_answer(mate_message[0].strip())
             await RedisDB(redis_key=self.__datastore.my_discord_id).delete(mate_id=self.__datastore.mate_id)
@@ -129,12 +128,6 @@ class MessageSender:
             await self.__typing(proxies=proxies)
             await asyncio.sleep(1)
             await self.__typing(proxies=proxies)
-            # logger.debug(f"Sending message:"
-            #              f"\n\tUSER: {self.__datastore.telegram_id}"
-            #              f"\n\tGUILD/CHANNEL: {self.__datastore.guild}/{self.__datastore.channel}"
-            #              f"\n\tTOKEN: {self.__datastore.token}"
-            #              f"\n\tDATA: {self.__data_for_send}"
-            #              f"\n\tPROXIES: {self.__datastore.proxy}")
             response = session.post(url=url, json=self.__data_for_send, proxies=proxies)
             status_code = response.status_code
             if status_code != 200:
@@ -150,8 +143,9 @@ class MessageSender:
             logger.error(f"F: _send_data Error: {err}")
             status_code = 407
         self.__answer = {"status_code": status_code, "data": answer_data}
+        # TODO перенести в сендер
         if status_code == 407:
-            new_proxy: str = await ProxyChecker.get_proxy(self.__datastore.telegram_id)
+            new_proxy: str = await RequestSender().get_proxy(self.__datastore.telegram_id)
             if new_proxy == 'no proxies':
                 return
             self.__datastore.proxy = new_proxy

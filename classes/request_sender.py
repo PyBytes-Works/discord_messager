@@ -8,6 +8,7 @@ import aiohttp
 import aiohttp.client_exceptions
 import aiohttp.http_exceptions
 
+from classes.db_interface import DBI
 from config import logger, DISCORD_BASE_URL, PROXY_USER, PROXY_PASSWORD
 from classes.token_datastorage import TokenDataStore
 
@@ -86,5 +87,42 @@ class RequestSender:
                 logger.error("Ошибка авторизации прокси:", err)
                 if "Proxy Authentication Required" in err:
                     answer.update(status=407)
+
+        return answer
+
+    @logger.catch
+    async def get_proxy(self, telegram_id: str) -> str:
+        """Возвращает рабочую прокси из базы данных, если нет рабочих возвращает 'no proxies'"""
+
+        if not await DBI.get_proxy_count():
+            return 'no proxies'
+        proxy: str = str(await DBI.get_proxy(telegram_id=telegram_id))
+        if await self.check_proxy(proxy=proxy) == 200:
+            return proxy
+        if not await DBI.update_proxies_for_owners(proxy=proxy):
+            return 'no proxies'
+
+        return await self.get_proxy(telegram_id=telegram_id)
+
+    @logger.catch
+    async def check_token(self, proxy: str, token: str, channel: int) -> dict:
+        """Returns valid token else 'bad token'"""
+
+        answer: dict = {
+            "success": False,
+            "message": '',
+        }
+        status: int = await self.check_proxy(proxy=proxy, token=token, channel=channel)
+        if status == 200:
+            answer.update({
+                "success": True,
+                "proxy": proxy,
+                "token": token,
+                "channel": channel
+            })
+        elif status == 407:
+            answer.update(message='bad proxy')
+        else:
+            answer.update(message='bad token')
 
         return answer

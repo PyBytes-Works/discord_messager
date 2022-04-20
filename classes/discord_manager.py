@@ -145,7 +145,8 @@ class DiscordTokenManager:
         for elem in self.__current_tokens_list:
             min_token_data: dict = min(elem.items(), key=lambda x: x[1].get('time'))
         token: str = tuple(min_token_data)[0]
-        self.__datastore.create_datastore_data(token)
+        token_data: dict = await DBI.get_info_by_token(token)
+        self.__datastore.create_datastore_data(token=token, token_data=token_data)
         min_token_time: int = await DBI.get_time_by_token(token)
         delay: int = self.__datastore.cooldown - abs(min_token_time - await self.__get_current_time())
         self.__datastore.delay = delay
