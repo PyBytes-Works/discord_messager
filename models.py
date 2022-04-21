@@ -262,7 +262,7 @@ class User(BaseModel):
         """
         remove all associations of user token pairs and User channels
         """
-
+        # TODO упростить
         return TokenPair.delete().where(
             (TokenPair.first_id.in_(
                 Token.select(Token.id)
@@ -623,17 +623,17 @@ class UserChannel(BaseModel):
         user = User.get_user_by_telegram_id(telegram_id=telegram_id)
         channel = Channel.get_or_create_channel(guild_id=guild_id, channel_id=channel_id)
         user_channel: UserChannel = cls.select().where(cls.channel == channel.id).first()
-        if not user_channel:
+        if user_channel:
             user_channel.name = name
             user_channel.save()
-            return user_channel.id
+        else:
+            user_channel, answer = cls.get_or_create(
+                user=user,
+                name=name,
+                channel=channel.id,
+                cooldown=cooldown
+            )
 
-        user_channel, answer = cls.get_or_create(
-            user=user,
-            name=name,
-            channel=channel.id,
-            cooldown=cooldown
-        )
         return user_channel.id
 
     @classmethod
@@ -764,23 +764,14 @@ class Token(BaseModel):
 
     @classmethod
     @logger.catch
-    def make_tokens_pair(cls: 'Token', first: Union[int, str], second: Union[int, str]) -> bool:
+    def make_tokens_pair(cls: 'Token', first: int, second: int) -> bool:
         """
         Make pair
-        first_id: (str) or int
-        second_id: (str)
+        first_pk: (int)
+        second_pk: (int)
             unites tokens in pair
         """
-        token_first: cls = cls.select().where(cls.token == first).first()
-        if not token_first:
-            return False
-        token_second = (cls.select()
-                        .where(cls.token == second, cls.user_channel == token_first.user_channel_id)
-                        .first())
-        if not token_second:
-            return False
-        result = TokenPair.add_pair(first=token_first.id, second=token_second.id)
-        return bool(result)
+        return bool(TokenPair.add_pair(first=first, second=second))
 
     @classmethod
     @logger.catch
@@ -824,7 +815,7 @@ class Token(BaseModel):
         query = (cls.select(
             cls.token.alias('token'),
             cls.last_message_time.alias('last_message_time'),
-            UserChannel.name.alias('channel_name'))
+            UserChannel.cooldown.alias('cooldown'))
                  .join(UserChannel, JOIN.LEFT_OUTER,
             on=(cls.user_channel == UserChannel.id))
                  .join(Channel, JOIN.LEFT_OUTER, on=(UserChannel.channel == Channel.id))
@@ -843,6 +834,7 @@ class Token(BaseModel):
         return:
         list of namedtuple fields:
             token str
+            token_pk int
             token_discord_id str
             proxy str
             user_channel_pk int
@@ -850,9 +842,11 @@ class Token(BaseModel):
             guild_id int
             cooldown  int
             mate_discord_id str (discord_id)
+
         """
         data = (cls.select(
             cls.token.alias('token'),
+            cls.id.alias('token_pk'),
             cls.discord_id.alias('token_discord_id'),
             Proxy.proxy.alias('proxy'),
             cls.name.alias('token_name'),
@@ -921,9 +915,11 @@ class Token(BaseModel):
                 .where(User.telegram_id == telegram_id)
                 .where(TokenPair.first_id.is_null(True)).namedtuples().execute()
         )
-        result: Tuple[List[int], ...] = tuple([[token.token_pk for token in tokens]
-                                               for channel, tokens in
-                                               groupby(data, lambda x: x.channel_id)])
+        result: Tuple[List[int], ...] = tuple(
+            [token.token_pk for token in tokens]
+            for channel, tokens in
+            groupby(data, lambda x: x.channel_id)
+        )
         return result
 
     @classmethod

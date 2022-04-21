@@ -124,8 +124,10 @@ class MessageReceiver:
                     messages.append(spam)
         last_message_id: int = await self.__get_last_message_id(data=messages)
         result.update({"last_message_id": last_message_id})
+        print("Replies before:", replies)
         replies: List[dict] = await self.__update_replies_to_redis(new_replies=replies)
         result.update({"replies": replies})
+        print("Replies after:", replies)
 
         return result
 

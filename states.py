@@ -28,3 +28,9 @@ class UserState(StatesGroup):
     answer_to_reply = State()
     in_work = State()
     user_delete_all_proxy = State()
+
+
+class AdminStates(StatesGroup):
+    add_new_user = State()
+    add_new_user_expiration = State()
+    add_new_user_max_tokens = State()

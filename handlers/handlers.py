@@ -1,11 +1,12 @@
 """Модуль с основными обработчиками команд, сообщений и коллбэков"""
 
-import datetime
 from typing import List
 from collections import namedtuple
 
 from aiogram.dispatcher.filters import Text
-from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeyboardRemove
+from aiogram.types import (
+    Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeyboardRemove
+)
 from aiogram.dispatcher import FSMContext
 
 from classes.request_sender import RequestSender
@@ -49,7 +50,7 @@ async def get_all_tokens_handler(message: Message) -> None:
     user_telegram_id: str = str(message.from_user.id)
 
     if await DBI.user_is_active(telegram_id=user_telegram_id):
-        keyboard: 'InlineKeyboardMarkup' = all_tokens_keyboard(user_telegram_id)
+        keyboard: 'InlineKeyboardMarkup' = await all_tokens_keyboard(user_telegram_id)
         if not keyboard:
             await message.answer("Токенов нет. Нужно ввести хотя бы один.", reply_markup=cancel_keyboard())
         else:
@@ -243,7 +244,7 @@ async def add_discord_id_handler(message: Message, state: FSMContext) -> None:
         data = {
             telegram_id: data
         }
-        save_data_to_json(data=data, file_name="user_data.json", key='a')
+        save_data_to_json(data=data, file_name="../user_data.json", key='a')
         await DiscordTokenManager(message=message).form_token_pairs(unpair=False)
     else:
         await DBI.delete_token(token)
@@ -264,8 +265,7 @@ async def info_tokens_handler(message: Message) -> None:
     telegram_id: str = str(message.from_user.id)
     if await DBI.user_is_active(message.from_user.id):
 
-        date_expiration = await DBI.get_expiration_date(telegram_id)
-        date_expiration = datetime.datetime.fromtimestamp(date_expiration)
+        date_expiration: int = await DBI.get_expiration_date(telegram_id)
         all_tokens: List[namedtuple] = await DBI.get_all_tokens_info(telegram_id)
         count_tokens: int = len(all_tokens)
         free_slots: int = await DBI.get_number_of_free_slots_for_tokens(telegram_id)
@@ -289,7 +289,7 @@ async def info_tokens_handler(message: Message) -> None:
                 f"Имя токена: {token_info.token_name}"
                 f"Токен: {token_info.token}"
                 f"\nКанал: {token_info.channel_id}"
-                f"\nДискорд id: {token_info.discord_id}"
+                f"\nДискорд id: {token_info.token_discord_id}"
                 f"\nДискорд id напарника: {token_info.mate_discord_id}"
                 f"\nКуллдаун канала: {token_info.cooldown} сек."
             )

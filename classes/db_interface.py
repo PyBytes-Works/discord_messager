@@ -4,7 +4,6 @@ from collections import namedtuple
 from aiogram.types import ReplyKeyboardRemove, Message
 
 from models import User, Token, Proxy, UserChannel
-from classes.token_datastorage import TokenDataStore
 from config import logger
 from utils import send_report_to_admins
 
@@ -13,11 +12,6 @@ class DBI:
 
     """Database interface class"""
 
-    # TODO lasted write method "auto assign a proxy"
-
-    def __init__(self, datastore: 'TokenDataStore' = None):
-        self.datastore: 'TokenDataStore' = datastore
-
     @classmethod
     @logger.catch
     async def is_expired_user_deactivated(cls, message: Message) -> bool:
@@ -25,6 +19,7 @@ class DBI:
         Возвращает True если деактивирован."""
 
         telegram_id: str = str(message.from_user.id)
+        # TODO инвертировать условие
         user_not_expired: bool = User.check_expiration_date(telegram_id)
         user_is_admin: bool = User.is_admin(telegram_id)
         if not user_not_expired and not user_is_admin:
@@ -110,12 +105,6 @@ class DBI:
     @logger.catch
     async def get_user_by_telegram_id(cls, telegram_id: str) -> 'User':
         return User.get_user_by_telegram_id(telegram_id=telegram_id)
-
-    @classmethod
-    @logger.catch
-    async def get_user_by_name(cls, name: str) -> 'User':
-        # TODO lasted... may by написать метод - возвращает юзера по его имени (nick_name)
-        return User.get_or_none(User.nick_name.contains(name))
 
     @classmethod
     @logger.catch

@@ -101,7 +101,7 @@ def psql():
 
 
 DB_FILE_NAME = 'db/discord_mailer.db'
-if not DEBUG:
+def sqlite():
     full_path = os.path.join(PATH, DB_FILE_NAME)
     db = SqliteDatabase(
         full_path,
@@ -113,7 +113,13 @@ if not DEBUG:
             'synchronous': 0
         }
     )
-else:
+    return db
+
+
+DATABASE: str = os.getenv("DATABASE", 'lite')
+if DATABASE == 'postgres':
     db: Union[PostgresqlDatabase, SqliteDatabase] = psql()
+elif DATABASE == 'lite':
+    db: Union[PostgresqlDatabase, SqliteDatabase] = sqlite()
 
 #  ********** END OF DATABASE CONFIG *************************
