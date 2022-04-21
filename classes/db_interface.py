@@ -13,6 +13,8 @@ class DBI:
 
     """Database interface class"""
 
+    # TODO lasted write method "auto assign a proxy"
+
     def __init__(self, datastore: 'TokenDataStore' = None):
         self.datastore: 'TokenDataStore' = datastore
 
@@ -112,7 +114,7 @@ class DBI:
     @classmethod
     @logger.catch
     async def get_user_by_name(cls, name: str) -> 'User':
-        # TODO написать метод - возвращает юзера по его имени (nick_name)
+        # TODO lasted... may by написать метод - возвращает юзера по его имени (nick_name)
         return User.get_or_none(User.nick_name.contains(name))
 
     @classmethod
@@ -194,7 +196,6 @@ class DBI:
     @classmethod
     @logger.catch
     async def delete_token_by_pk(cls, token_pk: int):
-        # TODO реализовать метод удаления токен по его pk
         return Token.delete_token_by_id(token_pk=token_pk)
 
     @classmethod
@@ -215,7 +216,7 @@ class DBI:
     @classmethod
     @logger.catch
     async def get_all_discord_id(cls, telegram_id: str) -> List[str]:
-        return User.get_all_discord_id(telegram_id=telegram_id)
+        return Token.get_all_discord_id(telegram_id=telegram_id)
 
     @classmethod
     @logger.catch
@@ -287,14 +288,9 @@ class DBI:
     @classmethod
     @logger.catch
     async def update_user_channel_cooldown(cls, user_channel_pk: int, cooldown: int) -> int:
-        return UserChannel.update_cooldown(
-            user_channel_pk=user_channel_pk, cooldown=cooldown)
+        return UserChannel.update_cooldown(user_channel_pk=user_channel_pk, cooldown=cooldown)
 
     @classmethod
     @logger.catch
     async def get_user_channels(cls, telegram_id: str) -> List[namedtuple]:
-        # TODO вернуть список list(namedtuple[channel_id, channel_pk])
-        pass
-
-
-# TODO
+        return UserChannel.get_user_channels_by_telegram_id(telegram_id=telegram_id)
