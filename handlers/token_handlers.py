@@ -2,14 +2,13 @@ from collections import namedtuple
 from typing import List
 
 from aiogram.dispatcher.filters import Text
-from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeyboardRemove, \
-    CallbackQuery
+from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
 
 from aiogram.dispatcher import FSMContext
 
 from classes.request_sender import RequestSender
 from states import TokenStates
-from utils import check_is_int, send_report_to_admins
+from utils import check_is_int, send_report_to_admins, errors_report
 from classes.db_interface import DBI
 from config import logger, Dispatcher, admins_list
 from keyboards import user_menu_keyboard, cancel_keyboard, new_channel_key, get_yes_no_buttons
@@ -83,7 +82,7 @@ async def check_and_add_token_handler(message: Message, state: FSMContext) -> No
     """"""
 
     telegram_id: str = str(message.from_user.id)
-    await message.answer("Проверяю данные.")
+    await message.answer("Проверяю данные...")
     token: str = message.text.strip()
     if await DBI.is_token_exists(token):
         await message.answer(
@@ -99,9 +98,7 @@ async def check_and_add_token_handler(message: Message, state: FSMContext) -> No
 
     proxy: str = await RequestSender().get_checked_proxy(telegram_id=telegram_id)
     if proxy == 'no proxies':
-        text: str = "Ошибка прокси. Нет доступных прокси."
-        await message.answer(text, reply_markup=ReplyKeyboardRemove())
-        await send_report_to_admins(text)
+        await errors_report(telegram_id=telegram_id, text="Ошибка прокси. Нет доступных прокси.")
         await state.finish()
         return
 
@@ -124,25 +121,31 @@ async def check_and_add_token_handler(message: Message, state: FSMContext) -> No
 
     user_channel_pk: int = await DBI.add_user_channel(telegram_id=telegram_id, channel_id=channel, guild_id=guild)
     if not user_channel_pk:
-        text: str = f"Не смог добавить канал:\n{telegram_id}:{channel}:{guild}"
-        logger.error(text)
-        await send_report_to_admins(text)
-        await message.answer(text, reply_markup=user_menu_keyboard())
+        await errors_report(
+            telegram_id=telegram_id,
+            text=f"Не смог добавить канал:\n{telegram_id}:{channel}:{guild}"
+        )
         await state.finish()
         return
     discord_id: str = await RequestSender().get_discord_id(token=token, proxy=proxy)
     if not discord_id:
-        text: str = (f"Не смог определить discord_id для токена:"
+        error_text: str = (f"Не смог определить discord_id для токена:"
                      f"\nToken: [{token}]"
                      f"\nGuild/channel: [{guild}: {channel}]")
-        logger.error(text)
-        await send_report_to_admins(text)
-        await message.answer(text, reply_markup=user_menu_keyboard())
+        await errors_report(telegram_id=telegram_id, text=error_text)
         await state.finish()
         return
-    await DBI.add_token_by_telegram_id(
-        telegram_id=telegram_id, token=token, discord_id=discord_id, user_channel_pk=user_channel_pk)
+
+    if not await DBI.add_token_by_telegram_id(
+        telegram_id=telegram_id, token=token, discord_id=discord_id, user_channel_pk=user_channel_pk):
+        error_text: str = (f"Не добавить токен:"
+                     f"\nToken: [{token}]"
+                     f"\nGuild/channel: [{guild}: {channel}]")
+        await errors_report(telegram_id=telegram_id, text=error_text)
+        await state.finish()
+        return
     await message.answer(
+        "Токен удачно добавлен."
         "Хотите ввести кулдаун для данного канала?",
         reply_markup=get_yes_no_buttons(yes_msg=f'set_cooldown_{user_channel_pk}', no_msg='endof')
     )
@@ -165,12 +168,18 @@ async def add_channel_cooldown_handler(message: Message, state: FSMContext) -> N
     cooldown: int = check_is_int(message.text)
     if not cooldown:
         await message.answer(
-            "Попробуйте ещё раз cooldown должен быть целым положительным числом: ",
+            "Попробуйте ещё раз. Cooldown должен быть целым положительным числом: ",
             reply_markup=cancel_keyboard())
         return
     data = await state.get_data()
     user_channel_pk: int = int(data.get("user_channel_pk"))
-    await DBI.update_user_channel_cooldown(user_channel_pk=user_channel_pk, cooldown=cooldown)
+    if not await DBI.update_user_channel_cooldown(user_channel_pk=user_channel_pk, cooldown=cooldown):
+        error_text: str = (f"Не смог установить кулдаун для канала:"
+                     f"\nuser_channel_pk: [{user_channel_pk}: cooldown: {cooldown}]")
+        await errors_report(telegram_id=str(message.from_user.id), text=error_text)
+        await state.finish()
+        return
+    await message.answer("Кулдаун установлен.", reply_markup=user_menu_keyboard())
     await state.finish()
 
 
@@ -179,7 +188,7 @@ def token_register_handlers(dp: Dispatcher) -> None:
     """
     Регистратор для функций данного модуля
     """
-    dp.register_message_handler(select_channel_handler, commands=['add_token'])
+    dp.register_message_handler(select_channel_handler, Text(equals=['Добавить токен']))
     dp.register_callback_query_handler(start_create_channel_handler, state=TokenStates.create_channel)
     dp.register_message_handler(check_channel_and_add_token_handler, state=TokenStates.add_token)
     dp.register_message_handler(check_and_add_token_handler, state=TokenStates.check_token)

@@ -668,7 +668,7 @@ class UserChannel(BaseModel):
         """
         Update cooldown for all users_channel by channel_id
         """
-        return cls.update(cooldown=cooldown).where(cls.id == user_channel_pk)
+        return cls.update(cooldown=cooldown).where(cls.id == user_channel_pk).execute()
 
 
 class Token(BaseModel):

@@ -287,7 +287,7 @@ async def info_tokens_handler(message: Message) -> None:
         for token_info in all_tokens:
             mess: str = (
                 f"Имя токена: {token_info.token_name}"
-                f"Токен: {token_info.token}"
+                f"\nТокен: {token_info.token}"
                 f"\nКанал: {token_info.channel_id}"
                 f"\nДискорд id: {token_info.token_discord_id}"
                 f"\nДискорд id напарника: {token_info.mate_discord_id}"
@@ -418,7 +418,7 @@ def register_handlers(dp: Dispatcher) -> None:
     dp.register_callback_query_handler(request_self_token_cooldown_handler, state=UserState.select_token)
     dp.register_callback_query_handler(answer_to_reply_handler, Text(startswith=["reply_"]), state=UserState.in_work)
     dp.register_message_handler(send_message_to_reply_handler, state=UserState.in_work)
-    dp.register_message_handler(invitation_add_discord_token_handler, Text(equals=["Добавить токен"]))
+    # dp.register_message_handler(invitation_add_discord_token_handler, Text(equals=["Добавить токен"]))
     dp.register_message_handler(add_cooldown_handler, state=UserState.user_add_cooldown)
     dp.register_message_handler(add_discord_token_handler, state=UserState.user_add_token)
     dp.register_message_handler(add_discord_token_handler, state=UserState.user_add_token)

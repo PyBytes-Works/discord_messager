@@ -37,7 +37,7 @@ class RequestSender:
         self.url = f'https://discord.com/api/v9/users/@me'
         answer: dict = await self._send_get_request()
         if answer.get("status"):
-            return answer["data"]["id"]
+            return json.loads(answer["data"])["id"]
         return ''
 
     @logger.catch
