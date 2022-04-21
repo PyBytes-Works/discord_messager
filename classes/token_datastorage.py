@@ -33,10 +33,10 @@ class TokenDataStore:
         self.token: str = token
         self.proxy: str = token_data.proxy
         self.channel: int = token_data.channel_id
-        self.guild: int = token_data.guild
+        self.guild: int = token_data.guild_id
         self.cooldown: int = token_data.cooldown
         self.mate_id: str = token_data.mate_discord_id
-        self.my_discord_id: str = token_data.discord_id
+        self.my_discord_id: str = token_data.token_discord_id
         self.user_channel_pk: int = token_data.user_channel_pk
 
     @property
