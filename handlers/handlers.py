@@ -132,13 +132,13 @@ async def add_channel_handler(message: Message, state: FSMContext) -> None:
         return
 
     await state.update_data(guild=guild, channel=channel)
-    await UserState.user_add_token.set()
     link: str = "https://teletype.in/@ted_crypto/Txzfz8Vuwd2"
     await message.answer(
         "\nЧтобы узнать свой токен - перейдите по ссылке: "
         f"\n{link}"
     )
     await message.answer("Введите токен:", reply_markup=cancel_keyboard())
+    await UserState.user_add_token.set()
 
 
 @logger.catch
@@ -189,6 +189,9 @@ async def add_discord_token_handler(message: Message, state: FSMContext) -> None
             logger.error("f: add_discord_token_handler: error: Don`t know why")
             await state.finish()
             return
+
+    # TODO get discord_id from get_me func
+
     token: str = result.get('token')
     await state.update_data(token=token)
     await UserState.user_add_discord_id.set()
@@ -226,8 +229,6 @@ async def add_discord_id_handler(message: Message, state: FSMContext) -> None:
 
     user_channel_pk: int = await DBI.add_user_channel(
         telegram_id=telegram_id, channel_id=channel_id, guild_id=guild, cooldown=cooldown)
-
-    # TODO get discord_id from get_me func
 
     token_data: dict = {
         "telegram_id": telegram_id,

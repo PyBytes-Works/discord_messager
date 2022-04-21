@@ -74,6 +74,31 @@ async def all_tokens_keyboard(telegram_id: str) -> 'InlineKeyboardMarkup':
 
 
 @logger.catch
+async def new_channel_key() -> 'InlineKeyboardMarkup':
+    """Возвращает список кнопок всех токенов пользователя"""
+
+    keyboard = InlineKeyboardMarkup(row_width=1)
+    keyboard.add(InlineKeyboardButton(
+        text="Добавить канал", callback_data="new_channel"))
+
+    return keyboard
+
+
+# @logger.catch
+# async def all_channels_key(channels: List[namedtuple]) -> 'InlineKeyboardMarkup':
+#     """Возвращает список кнопок всех токенов пользователя"""
+#
+#     keyboard = InlineKeyboardMarkup(row_width=1)
+#     for elem in channels:
+#         keyboard.add(InlineKeyboardButton(
+#             text=f"{elem.channel_name}: {elem.guild_id}/{elem.channel_id}",
+#             callback_data=f"{elem.user_channel_pk}")
+#         )
+#
+#     return keyboard
+
+
+@logger.catch
 def get_yes_no_buttons(yes_msg: str, no_msg: str) -> 'InlineKeyboardMarkup':
     """Возвращает кнопочки Да и Нет"""
 

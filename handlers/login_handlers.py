@@ -1,11 +1,9 @@
 from collections import namedtuple
 
-from aiogram.types import (
-    Message
-)
+from aiogram.types import Message
 from aiogram.dispatcher import FSMContext
 
-from utils import check_is_int
+from utils import check_is_int, send_report_to_admins
 from classes.db_interface import DBI
 from config import logger, Dispatcher, admins_list
 from keyboards import user_menu_keyboard, cancel_keyboard
@@ -76,7 +74,7 @@ async def set_max_tokens_for_new_user_handler(message: Message, state: FSMContex
 
 
 @logger.catch
-async def set_expiration_for_new_user_handler(message: Message, state: FSMContext) -> None:
+async def check_expiration_and_add_new_user_handler(message: Message, state: FSMContext) -> None:
     """Проверка введенного времени подписки и создание токена для нового пользователя"""
 
     subscribe_time: int = check_is_int(message.text)
@@ -111,6 +109,7 @@ async def set_expiration_for_new_user_handler(message: Message, state: FSMContex
     if not await DBI.add_new_user(**user_data):
         text: str = (f"ОШИБКА ДОБАВЛЕНИЯ ПОЛЬЗОВАТЕЛЯ В БД: "
                      f"\nИмя: {new_user_nickname}  ID:{new_user_telegram_id}")
+        await send_report_to_admins(text)
     await message.answer(text, reply_markup=user_menu_keyboard())
     await state.finish()
 
@@ -123,4 +122,4 @@ def login_register_handlers(dp: Dispatcher) -> None:
     dp.register_message_handler(start_add_new_user_handler, commands=['add_user'])
     dp.register_message_handler(check_new_user_is_exists_handler, state=AdminStates.add_new_user)
     dp.register_message_handler(set_max_tokens_for_new_user_handler, state=AdminStates.add_new_user_max_tokens)
-    dp.register_message_handler(set_expiration_for_new_user_handler, state=AdminStates.add_new_user_expiration)
+    dp.register_message_handler(check_expiration_and_add_new_user_handler, state=AdminStates.add_new_user_expiration)

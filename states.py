@@ -34,3 +34,10 @@ class AdminStates(StatesGroup):
     add_new_user = State()
     add_new_user_expiration = State()
     add_new_user_max_tokens = State()
+
+
+class TokenStates(StatesGroup):
+    select_channel = State()
+    create_channel = State()
+    add_token = State()
+    check_token = State()
