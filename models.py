@@ -901,7 +901,8 @@ class Token(BaseModel):
             cls.discord_id.alias('discord_id'),
         )
                   .join_from(cls, UserChannel, JOIN.LEFT_OUTER, on=(
-                cls.user_channel == UserChannel.id))
+                cls.user_channel == UserChannel.id
+        ))
                   .join_from(cls, Channel, JOIN.LEFT_OUTER, on=(UserChannel.channel == Channel.id))
                   .join_from(cls, User, JOIN.LEFT_OUTER, on=(UserChannel.user == User.id))
                   .where(User.telegram_id == telegram_id).namedtuples().execute())

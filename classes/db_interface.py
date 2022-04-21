@@ -215,7 +215,7 @@ class DBI:
     @classmethod
     @logger.catch
     async def get_all_discord_id(cls, telegram_id: str) -> List[str]:
-        return User.get_all_discord_id(telegram_id=telegram_id)
+        return Token.get_all_discord_id(telegram_id=telegram_id)
 
     @classmethod
     @logger.catch
