@@ -642,7 +642,7 @@ class UserChannel(BaseModel):
         """
         Function returns a list of named tuples
         list of namedtuple fields:
-            channel_pk: int
+            user_channel_pk: int
             channel_name: str
             cooldown: int
             channel_id: int
@@ -650,7 +650,7 @@ class UserChannel(BaseModel):
         """
         return list(
                     cls.select(
-                        cls.id.alias('channel_pk'),
+                        cls.id.alias('user_channel_pk'),
                         cls.name.alias('channel_name'),
                         cls.name.alias('cooldown'),
                         Channel.channel_id.alias('channel_id'),
