@@ -510,7 +510,7 @@ class User(BaseModel):
         """
         Возвращает timestamp без миллисекунд в виде целого числа
         """
-        user = cls.get_or_none(cls.expiration, cls.telegram_id == telegram_id)
+        user = cls.get_or_none(cls.telegram_id == telegram_id)
         if user:
             expiration = user.expiration
 
@@ -532,7 +532,7 @@ class User(BaseModel):
         """
          Return the maximum number of tokens for a user
         """
-        user = cls.get_or_none(cls.max_tokens, cls.telegram_id == telegram_id)
+        user = cls.get_or_none(cls.telegram_id == telegram_id)
         if user:
             return user.max_tokens
         return 0
@@ -622,13 +622,19 @@ class UserChannel(BaseModel):
             name: str = str(channel_id)
         user = User.get_user_by_telegram_id(telegram_id=telegram_id)
         channel = Channel.get_or_create_channel(guild_id=guild_id, channel_id=channel_id)
-        result, answer = cls.get_or_create(
-                                                user=user,
-                                                name=name,
-                                                channel=channel.id,
-                                                cooldown=cooldown
-                                            )
-        return result.id
+        user_channel: UserChannel = cls.select().where(cls.channel == channel.id).first()
+        if not user_channel:
+            user_channel.name = name
+            user_channel.save()
+            return user_channel.id
+
+        user_channel, answer = cls.get_or_create(
+            user=user,
+            name=name,
+            channel=channel.id,
+            cooldown=cooldown
+        )
+        return user_channel.id
 
     @classmethod
     @logger.catch
