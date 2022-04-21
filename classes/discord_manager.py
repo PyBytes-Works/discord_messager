@@ -119,7 +119,7 @@ class DiscordTokenManager:
         self.__workers = [
             elem.token
             for elem in self.__current_tokens_list
-            if await self.__get_current_time() > elem.last_message_time + elem.cooldown
+            if await self.__get_current_time() > int(elem.last_message_time.timestamp()) + elem.cooldown
         ]
 
     @logger.catch
@@ -146,12 +146,10 @@ class DiscordTokenManager:
 
     @logger.catch
     async def __get_all_tokens_busy_message(self) -> str:
-        min_token_data = {}
-        for elem in self.__current_tokens_list:
-            min_token_data: dict = min(elem.items(), key=lambda x: x[1].get('time'))
-        token: str = tuple(min_token_data)[0]
+        min_token_data: namedtuple = min(self.__current_tokens_list, key=lambda x: x.last_message_time)
+        token: str = min_token_data.token
         await self.__update_datastore(token)
-        min_token_time: int = await DBI.get_last_message_time(token)
+        min_token_time: int = int(min_token_data.last_message_time.timestamp())
         delay: int = self.__datastore.cooldown - abs(min_token_time - await self.__get_current_time())
         self.__datastore.delay = delay
         text = "секунд"
@@ -315,6 +313,7 @@ class DiscordTokenManager:
                 random.shuffle(tokens)
                 first_token = tokens.pop()
                 second_token = tokens.pop()
+                print(first_token, second_token)
                 formed_pairs += await DBI.make_tokens_pair(first_token, second_token)
 
         logger.info(f"Pairs formed: {formed_pairs}")
