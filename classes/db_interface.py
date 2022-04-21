@@ -13,6 +13,8 @@ class DBI:
 
     """Database interface class"""
 
+    # TODO write method "auto assign a proxy"
+
     def __init__(self, datastore: 'TokenDataStore' = None):
         self.datastore: 'TokenDataStore' = datastore
 
@@ -215,6 +217,7 @@ class DBI:
     @classmethod
     @logger.catch
     async def get_all_discord_id(cls, telegram_id: str) -> List[str]:
+        # TODO реализовать метод, возвращает список дискорд_ид всех токенов по телеграм_ид
         return User.get_all_discord_id(telegram_id=telegram_id)
 
     @classmethod
