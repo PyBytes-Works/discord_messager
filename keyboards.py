@@ -5,7 +5,6 @@ from aiogram.types import (
     ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton
 )
 from config import logger
-from classes.db_interface import DBI
 
 
 @logger.catch
@@ -60,11 +59,10 @@ def user_menu_keyboard() -> 'ReplyKeyboardMarkup':
 
 
 @logger.catch
-async def all_tokens_keyboard(telegram_id: str) -> 'InlineKeyboardMarkup':
+def all_tokens_keyboard(all_tokens: List[namedtuple]) -> 'InlineKeyboardMarkup':
     """Возвращает список кнопок всех токенов пользователя"""
 
     keyboard = InlineKeyboardMarkup(row_width=1)
-    all_tokens: List[namedtuple] = await DBI.get_all_tokens_info(telegram_id=telegram_id)
     if all_tokens:
         for elem in all_tokens:
             keyboard.add(InlineKeyboardButton(

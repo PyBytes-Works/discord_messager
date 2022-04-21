@@ -173,6 +173,7 @@ async def add_channel_cooldown_handler(message: Message, state: FSMContext) -> N
             "Попробуйте ещё раз. Cooldown должен быть целым положительным числом: ",
             reply_markup=cancel_keyboard())
         return
+    cooldown *= 60
     data = await state.get_data()
     user_channel_pk: int = int(data.get("user_channel_pk"))
     if not await DBI.update_user_channel_cooldown(user_channel_pk=user_channel_pk, cooldown=cooldown):
@@ -257,7 +258,8 @@ async def get_all_tokens_handler(message: Message) -> None:
     user_telegram_id: str = str(message.from_user.id)
 
     if await DBI.user_is_active(telegram_id=user_telegram_id):
-        keyboard: 'InlineKeyboardMarkup' = await all_tokens_keyboard(user_telegram_id)
+        all_tokens: List[namedtuple] = await DBI.get_all_tokens_info(telegram_id=user_telegram_id)
+        keyboard: 'InlineKeyboardMarkup' = all_tokens_keyboard(all_tokens)
         if not keyboard:
             await message.answer("Токенов нет. Нужно ввести хотя бы один.", reply_markup=cancel_keyboard())
         else:

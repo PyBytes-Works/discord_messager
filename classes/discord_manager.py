@@ -10,14 +10,13 @@ from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, R
 from classes.receiver import MessageReceiver
 from classes.token_datastorage import TokenDataStore
 
-from config import logger, DEBUG
+from config import logger
 from utils import send_report_to_admins
 from keyboards import cancel_keyboard, user_menu_keyboard
 from classes.db_interface import DBI
 
 
 class DiscordTokenManager:
-
     """Класс управления токенами и таймингами.
     Methods:
         lets_play
@@ -40,7 +39,6 @@ class DiscordTokenManager:
         """Show must go on
         Запускает рабочий цикл бота, проверяет ошибки."""
 
-        # TODO переписать метод для пользователя, а не для токена
         self.__all_tokens_ids = await DBI.get_all_discord_id(telegram_id=self.user_telegram_id)
 
         while await DBI.is_user_work(telegram_id=self.user_telegram_id):
@@ -72,7 +70,6 @@ class DiscordTokenManager:
                 elif text != 'ok':
                     if not self.__silence:
                         await self.message.answer(text, reply_markup=cancel_keyboard())
-            await asyncio.sleep(1 / 1000)
         logger.debug("Game over.")
 
     @logger.catch
@@ -103,14 +100,19 @@ class DiscordTokenManager:
             return True
         message: str = await self.__get_all_tokens_busy_message()
         await self.__send_text(text=message, check_silence=True)
-        await self.__sleep()
-        return True
+        return await self.__sleep()
 
     @logger.catch
-    async def __sleep(self):
+    async def __sleep(self) -> bool:
         logger.info(f"PAUSE: {self.__datastore.delay + 1}")
-        await asyncio.sleep(self.__datastore.delay + 1)
+        timer: int = self.__datastore.delay + 1
+        while timer > 0:
+            timer -= 5
+            if not await DBI.is_user_work(telegram_id=self.user_telegram_id):
+                return False
+            await asyncio.sleep(5)
         self.__datastore.delay = 0
+        return True
 
     @logger.catch
     async def __get_workers(self) -> None:
@@ -119,7 +121,8 @@ class DiscordTokenManager:
         self.__workers = [
             elem.token
             for elem in self.__current_tokens_list
-            if await self.__get_current_time() > int(elem.last_message_time.timestamp()) + elem.cooldown
+            if
+            await self.__get_current_time() > int(elem.last_message_time.timestamp()) + elem.cooldown
         ]
 
     @logger.catch
@@ -306,7 +309,8 @@ class DiscordTokenManager:
 
         if unpair:
             await DBI.delete_all_pairs(telegram_id=self.user_telegram_id)
-        free_tokens: Tuple[List[int], ...] = await DBI.get_all_free_tokens(telegram_id=self.user_telegram_id)
+        free_tokens: Tuple[
+            List[int], ...] = await DBI.get_all_free_tokens(telegram_id=self.user_telegram_id)
         formed_pairs: int = 0
         for tokens in free_tokens:
             while len(tokens) > 1:
