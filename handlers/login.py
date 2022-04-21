@@ -7,7 +7,7 @@ from utils import check_is_int, send_report_to_admins
 from classes.db_interface import DBI
 from config import logger, Dispatcher, admins_list
 from keyboards import user_menu_keyboard, cancel_keyboard
-from states import AdminStates
+from states import LogiStates
 
 
 @logger.catch
@@ -22,7 +22,7 @@ async def start_add_new_user_handler(message: Message) -> None:
             "Перешлите (forward) мне любое сообщение от пользователя, которого вы хотите добавить.",
             reply_markup=cancel_keyboard()
         )
-        await AdminStates.add_new_user.set()
+        await LogiStates.add_new_user.set()
 
 
 @logger.catch
@@ -54,7 +54,7 @@ async def check_new_user_is_exists_handler(message: Message, state: FSMContext) 
     )
     text: str = f"Введите количество токенов для пользователя {new_user_nickname}:"
     await message.answer(text, reply_markup=user_menu_keyboard())
-    await AdminStates.add_new_user_max_tokens.set()
+    await LogiStates.add_new_user_max_tokens.set()
 
 
 @logger.catch
@@ -70,7 +70,7 @@ async def set_max_tokens_for_new_user_handler(message: Message, state: FSMContex
         return
     await state.update_data(max_tokens=max_tokens)
     await message.answer('Введите время подписки в ЧАСАХ:: ', reply_markup=cancel_keyboard())
-    await AdminStates.add_new_user_expiration.set()
+    await LogiStates.add_new_user_expiration.set()
 
 
 @logger.catch
@@ -120,6 +120,6 @@ def login_register_handlers(dp: Dispatcher) -> None:
     Регистратор для функций данного модуля
     """
     dp.register_message_handler(start_add_new_user_handler, commands=['add_user'])
-    dp.register_message_handler(check_new_user_is_exists_handler, state=AdminStates.add_new_user)
-    dp.register_message_handler(set_max_tokens_for_new_user_handler, state=AdminStates.add_new_user_max_tokens)
-    dp.register_message_handler(check_expiration_and_add_new_user_handler, state=AdminStates.add_new_user_expiration)
+    dp.register_message_handler(check_new_user_is_exists_handler, state=LogiStates.add_new_user)
+    dp.register_message_handler(set_max_tokens_for_new_user_handler, state=LogiStates.add_new_user_max_tokens)
+    dp.register_message_handler(check_expiration_and_add_new_user_handler, state=LogiStates.add_new_user_expiration)

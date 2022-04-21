@@ -8,10 +8,12 @@ from aiogram.dispatcher import FSMContext
 
 from classes.request_sender import RequestSender
 from states import TokenStates
-from utils import check_is_int, send_report_to_admins, errors_report
+from utils import check_is_int, errors_report
 from classes.db_interface import DBI
-from config import logger, Dispatcher, admins_list
-from keyboards import user_menu_keyboard, cancel_keyboard, new_channel_key, get_yes_no_buttons
+from config import logger, Dispatcher
+from keyboards import (
+    user_menu_keyboard, cancel_keyboard, new_channel_key, get_yes_no_buttons,
+    all_tokens_keyboard)
 
 
 @logger.catch
@@ -184,6 +186,97 @@ async def add_channel_cooldown_handler(message: Message, state: FSMContext) -> N
 
 
 @logger.catch
+async def info_tokens_handler(message: Message) -> None:
+    """
+    Выводит инфо о токенах. Обработчик кнопки "Информация"
+    """
+
+    if await DBI.is_expired_user_deactivated(message):
+        return
+    telegram_id: str = str(message.from_user.id)
+    if await DBI.user_is_active(message.from_user.id):
+
+        date_expiration: int = await DBI.get_expiration_date(telegram_id)
+        all_tokens: List[namedtuple] = await DBI.get_all_tokens_info(telegram_id)
+        count_tokens: int = len(all_tokens)
+        free_slots: int = await DBI.get_number_of_free_slots_for_tokens(telegram_id)
+        if not all_tokens:
+            await message.answer(
+                f'Подписка истекает  {date_expiration}'
+                f'Данных о токенах нет.', reply_markup=user_menu_keyboard())
+            return
+
+        await TokenStates.delete_token.set()
+        await message.answer(
+            f'Подписка истекает:  {date_expiration}'
+            f'\nВсего токенов: {count_tokens}'
+            f'\nСвободно слотов: {free_slots}'
+            f'\nТокены:',
+            reply_markup=cancel_keyboard()
+        )
+
+        for token_info in all_tokens:
+            mess: str = (
+                f"Имя токена: {token_info.token_name}"
+                f"\nТокен: {token_info.token}"
+                f"\nКанал: {token_info.channel_id}"
+                f"\nДискорд id: {token_info.token_discord_id}"
+                f"\nДискорд id напарника: {token_info.mate_discord_id}"
+                f"\nКуллдаун канала: {token_info.cooldown} сек."
+            )
+            keyboard: 'InlineKeyboardMarkup' = InlineKeyboardMarkup(row_width=1)
+            keyboard.add(InlineKeyboardButton(
+                text="Удалить токен.", callback_data=f"{token_info.token_pk}"))
+            await message.answer(
+                    mess,
+                    reply_markup=keyboard
+                )
+
+
+@logger.catch
+async def delete_token_handler(callback: CallbackQuery, state: FSMContext) -> None:
+    """Хэндлер для нажатия на кнопку "Удалить токен" """
+
+    telegram_id: str = str(callback.from_user.id)
+    if await DBI.is_user_work(telegram_id=telegram_id):
+        await callback.message.answer("Бот запущен, сначала остановите бота.", reply_markup=cancel_keyboard())
+    else:
+        await DBI.delete_token_by_pk(token_pk=int(callback.data))
+        await callback.message.answer("Токен удален.", reply_markup=user_menu_keyboard())
+        await callback.message.delete()
+        await state.finish()
+    await callback.answer()
+
+
+@logger.catch
+async def get_all_tokens_handler(message: Message) -> None:
+    """Обработчик команды "Установить кулдаун"""""
+
+    if await DBI.is_expired_user_deactivated(message):
+        return
+    user_telegram_id: str = str(message.from_user.id)
+
+    if await DBI.user_is_active(telegram_id=user_telegram_id):
+        keyboard: 'InlineKeyboardMarkup' = await all_tokens_keyboard(user_telegram_id)
+        if not keyboard:
+            await message.answer("Токенов нет. Нужно ввести хотя бы один.", reply_markup=cancel_keyboard())
+        else:
+            await message.answer("Выберите токен: ", reply_markup=keyboard)
+            await message.answer("Или нажмите отмену.", reply_markup=cancel_keyboard())
+            await TokenStates.select_token.set()
+
+
+@logger.catch
+async def request_self_token_cooldown_handler(callback: CallbackQuery, state: FSMContext) -> None:
+    """Обработчик нажатия на кнопку с токеном"""
+
+    token: str = callback.data
+    await state.update_data(token=token)
+    await callback.message.answer("Введите время кулдауна в минутах", reply_markup=cancel_keyboard())
+    await callback.answer()
+
+
+@logger.catch
 def token_register_handlers(dp: Dispatcher) -> None:
     """
     Регистратор для функций данного модуля
@@ -194,3 +287,6 @@ def token_register_handlers(dp: Dispatcher) -> None:
     dp.register_message_handler(check_and_add_token_handler, state=TokenStates.check_token)
     dp.register_callback_query_handler(ask_channel_cooldown_handler, Text(startswith=["set_cooldown_"]))
     dp.register_message_handler(add_channel_cooldown_handler, state=TokenStates.add_channel_cooldown)
+    dp.register_callback_query_handler(delete_token_handler, state=TokenStates.delete_token)
+    dp.register_callback_query_handler(request_self_token_cooldown_handler, state=TokenStates.select_token)
+

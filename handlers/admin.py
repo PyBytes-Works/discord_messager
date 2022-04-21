@@ -14,13 +14,11 @@ from aiogram.types import Message, CallbackQuery, ReplyKeyboardRemove, InlineKey
 
 from classes.vocabulary import Vocabulary
 from config import logger, bot, admins_list
-from handlers.handlers import cancel_handler
+from handlers.main_handlers import cancel_handler
 from keyboards import cancel_keyboard, user_menu_keyboard, inactive_users_keyboard
-from states import UserState
+from states import AdminStates
 from classes.db_interface import DBI
-from utils import (
-    get_token, add_new_token, delete_used_token, send_report_to_admins, check_is_int
-)
+from utils import delete_used_token, send_report_to_admins, check_is_int
 
 
 @logger.catch
@@ -63,7 +61,7 @@ async def request_max_tokens_handler(message: Message) -> None:
             '\nПример: "3333333 10"',
             reply_markup=cancel_keyboard()
         )
-        await UserState.user_set_max_tokens.set()
+        await AdminStates.user_set_max_tokens.set()
 
 
 @logger.catch
@@ -107,13 +105,13 @@ async def request_proxies_handler(message: Message) -> None:
             reply_markup=cancel_keyboard()
         )
         if message.text == '/add_proxy':
-            await UserState.user_add_proxy.set()
+            await AdminStates.user_add_proxy.set()
         elif message.text == '/delete_proxy':
-            await UserState.user_delete_proxy.set()
+            await AdminStates.user_delete_proxy.set()
         elif message.text == '/delete_all_proxy':
             await message.answer(
                 "ТОЧНО удалить все прокси? (yes/No)", reply_markup=cancel_keyboard())
-            await UserState.user_delete_all_proxy.set()
+            await AdminStates.user_delete_all_proxy.set()
 
 
 @logger.catch
@@ -160,7 +158,7 @@ async def request_user_admin_handler(message: Message) -> None:
             f'Введите telegram_id пользователя для назначения его администратором:',
             reply_markup=cancel_keyboard()
         )
-        await UserState.name_for_admin.set()
+        await AdminStates.name_for_admin.set()
 
 
 @logger.catch
@@ -225,7 +223,7 @@ async def request_activate_user_handler(message: Message) -> None:
         users: dict = await DBI.get_all_inactive_users()
         if users:
             await message.answer("Выберите пользователя:", reply_markup=inactive_users_keyboard(users))
-            await UserState.user_add_token.set()
+            await AdminStates.user_add_token.set()
         else:
             await message.answer(
                 "Нет неактивных пользователей.",
@@ -245,7 +243,7 @@ async def tokens_and_hours_request_callback_handler(callback: CallbackQuery, sta
             reply_markup=cancel_keyboard()
         )
         await state.update_data(activate_user=user_telegram_id)
-        await UserState.user_activate.set()
+        await AdminStates.user_activate.set()
     else:
         await callback.message.answer(
             "ОШИБКА!!!КАКИМ ТО ОБРАЗОМ ПОЛЬЗОВАТЕЛЬ НЕ НАЙДЕН",
@@ -299,7 +297,7 @@ async def activate_user_handler(message: Message, state: FSMContext) -> None:
 #             await message.answer("Нет ни одной прокси. Добавьте хотя бы одну.", reply_markup=user_menu_keyboard())
 #             return
 #         await message.answer('Введите количество токенов для пользователя?', reply_markup=cancel_keyboard())
-#         await UserState.max_tokens_req.set()
+#         await AdminStates.max_tokens_req.set()
 #     else:
 #         logger.info(f'{message.from_user.id}:{message.from_user.username}: NOT AUTORIZATED')
 
@@ -317,7 +315,7 @@ async def activate_user_handler(message: Message, state: FSMContext) -> None:
 #         return
 #     await state.update_data(max_tokens=max_tokens)
 #     await message.answer('Введите имя для нового пользователя: ', reply_markup=cancel_keyboard())
-#     await UserState.subscribe_time.set()
+#     await AdminStates.subscribe_time.set()
 
 
 # @logger.catch
@@ -334,7 +332,7 @@ async def activate_user_handler(message: Message, state: FSMContext) -> None:
 #         return
 #     await state.update_data(name=name)
 #     await message.answer('Введите время подписки в ЧАСАХ: ', reply_markup=cancel_keyboard())
-#     await UserState.name_for_cr.set()
+#     await AdminStates.name_for_cr.set()
 
 
 # @logger.catch
@@ -419,7 +417,7 @@ async def delete_user_name_handler(message: Message) -> None:
             await message.answer(
                 f'Выберите пользователя для удаления: {index}/{lenght}', reply_markup=keyboard)
         await message.answer("Для отмены нажмите кнопку Отмена", reply_markup=cancel_keyboard())
-        await UserState.name_for_del.set()
+        await AdminStates.name_for_del.set()
 
 
 @logger.catch
@@ -445,7 +443,7 @@ async def activate_new_user_handler(message: Message) -> None:
         await message.answer("Вы уже есть в базе данных.", reply_markup=cancel_keyboard())
         return
     await message.answer("Введите токен: ", reply_markup=cancel_keyboard())
-    await UserState.name_for_activate.set()
+    await AdminStates.name_for_activate.set()
 
 
 @logger.catch
@@ -524,24 +522,24 @@ def register_admin_handlers(dp: Dispatcher) -> None:
         cancel_handler, Text(startswith=["отмена", "cancel"], ignore_case=True), state="*"
     )
     dp.register_message_handler(
-        final_add_user_handler, Text(startswith=["new_user_"]), state=UserState.name_for_activate
+        final_add_user_handler, Text(startswith=["new_user_"]), state=AdminStates.name_for_activate
     )
     dp.register_message_handler(request_user_admin_handler, commands=['add_admin'])
-    dp.register_message_handler(set_user_admin_handler, state=UserState.name_for_admin)
+    dp.register_message_handler(set_user_admin_handler, state=AdminStates.name_for_admin)
     dp.register_message_handler(request_proxies_handler, commands=['add_proxy', 'delete_proxy', 'delete_all_proxy'])
-    dp.register_message_handler(add_new_proxy_handler, state=UserState.user_add_proxy)
-    dp.register_message_handler(delete_proxy_handler, state=UserState.user_delete_proxy)
-    dp.register_message_handler(delete_all_proxies, state=UserState.user_delete_all_proxy)
+    dp.register_message_handler(add_new_proxy_handler, state=AdminStates.user_add_proxy)
+    dp.register_message_handler(delete_proxy_handler, state=AdminStates.user_delete_proxy)
+    dp.register_message_handler(delete_all_proxies, state=AdminStates.user_delete_all_proxy)
     dp.register_message_handler(delete_user_name_handler, commands=['delete_user'])
-    dp.register_callback_query_handler(delete_user_handler, Text(startswith=['user_']), state=UserState.name_for_del)
+    dp.register_callback_query_handler(delete_user_handler, Text(startswith=['user_']), state=AdminStates.name_for_del)
     dp.register_message_handler(request_activate_user_handler, commands=['activate_user'])
     dp.register_callback_query_handler(
-        tokens_and_hours_request_callback_handler, Text(startswith=['activate_']), state=UserState.user_add_token
+        tokens_and_hours_request_callback_handler, Text(startswith=['activate_']), state=AdminStates.user_add_token
     )
-    dp.register_message_handler(activate_user_handler, state=UserState.user_activate)
+    dp.register_message_handler(activate_user_handler, state=AdminStates.user_activate)
     dp.register_message_handler(show_all_users_handler, commands=['show_users', 'su'])
     dp.register_message_handler(reboot_handler, commands=['reboot'], state="*")
     dp.register_message_handler(admin_help_handler, commands=['admin', 'adm'])
     dp.register_message_handler(request_max_tokens_handler, commands=['set_max_tokens'])
-    dp.register_message_handler(set_max_tokens_handler, state=UserState.user_set_max_tokens)
+    dp.register_message_handler(set_max_tokens_handler, state=AdminStates.user_set_max_tokens)
     dp.register_message_handler(send_message_to_all_users_handler, Text(startswith=["/sendall", "/sa"]))
