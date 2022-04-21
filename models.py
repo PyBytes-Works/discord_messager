@@ -510,7 +510,7 @@ class User(BaseModel):
         """
         Возвращает timestamp без миллисекунд в виде целого числа
         """
-        user = cls.get_or_none(cls.expiration, cls.telegram_id == telegram_id)
+        user = cls.get_or_none(cls.telegram_id == telegram_id)
         if user:
             expiration = user.expiration
 
@@ -532,7 +532,7 @@ class User(BaseModel):
         """
          Return the maximum number of tokens for a user
         """
-        user = cls.get_or_none(cls.max_tokens, cls.telegram_id == telegram_id)
+        user = cls.get_or_none(cls.telegram_id == telegram_id)
         if user:
             return user.max_tokens
         return 0
