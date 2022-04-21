@@ -1,3 +1,4 @@
+from collections import namedtuple
 from itertools import groupby
 from typing import List, Tuple, Any, Union, Dict
 import datetime
@@ -51,10 +52,8 @@ class Proxy(BaseModel):
     @classmethod
     @logger.catch
     def delete_proxy(cls, proxy: str) -> bool:
-        instance: cls = cls.get_or_none(proxy=proxy)
-        if instance:
-            return instance.delete_instance()
-        return False
+        """Proxy removal"""
+        return bool(cls.delete().where(cls.proxy == proxy))
 
     @classmethod
     @logger.catch
@@ -75,29 +74,30 @@ class Proxy(BaseModel):
     def get_low_used_proxy(cls: 'Proxy') -> BaseQuery.namedtuples:
         """
         Возвращает первую прокси с самым малым использованием
-            return: str
+        return:
+        namedtuple fields:
+            proxy_pk: int
+            proxy: str
         """
-        # TODO Сделать чтоб возвращала всегда namedtuple
         proxy = (Proxy.select((Proxy.id).alias('proxy_pk'), (Proxy.proxy).alias('proxy'), )
                  .join(User, JOIN.LEFT_OUTER, on=(Proxy.id == User.proxy))
                  .group_by(Proxy.id, Proxy.proxy).order_by(fn.COUNT(User.id))
                  .limit(1).namedtuples().first())
-        return proxy
+        return proxy if proxy else namedtuple('Row', ['proxy_pk', 'proxy'])(proxy_pk=None, proxy=None)
 
     @classmethod
     @logger.catch
     def update_proxies_for_owners(cls: 'Proxy', proxy: str) -> int:
         """
         Метод получает не рабочую порокси, удаляет ее и
-        перезаписывает прокси для всех пользователей
-            methods:
-                get_or_create
+        перезаписывает прокси для всех кто ей пользовался
         """
-        cls.delete_proxy(proxy=proxy)
-        if not cls.get_proxy_count():
+        # TODO write method "auto assign a proxy"
+        removed_proxy = cls.select().where(cls.proxy == proxy).first()
+        if not cls.get_proxy_count() and not removed_proxy:
             return 0
-        users = User.select().where(User.proxy == proxy).execute()
         count = 0
+        users = User.select().where(User.proxy == removed_proxy.id).execute()
         for user in users:
             new_proxy = cls.get_low_used_proxy()
             count += 1
@@ -247,9 +247,9 @@ class User(BaseModel):
 
     @classmethod
     @logger.catch
-    def delete_all_tokens(cls, telegram_id: str) -> int:
-        """TODO Нахрена? удялить при деактивации? ждем Артема?
-        удаляет пользовательские каналы
+    def delete_channels(cls, telegram_id: str) -> int:
+        """
+        Function removes  user channels and tokens
         """
         return UserChannel.delete().where(
             UserChannel.user.in_(cls.select(User.id)
@@ -410,7 +410,7 @@ class User(BaseModel):
         set active value disabled for user
         return: 1 if good otherwise 0
         """
-        # TODO Удалить все канаты и токены пользователя
+        cls.delete_channels(telegram_id=telegram_id)
         return cls.update(active=False).where(cls.telegram_id == telegram_id).execute()
 
     @classmethod
