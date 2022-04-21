@@ -59,6 +59,7 @@ def user_menu_keyboard() -> 'ReplyKeyboardMarkup':
     return keyboard
 
 
+@logger.catch
 async def all_tokens_keyboard(telegram_id: str) -> 'InlineKeyboardMarkup':
     """Возвращает список кнопок всех токенов пользователя"""
 
@@ -72,6 +73,17 @@ async def all_tokens_keyboard(telegram_id: str) -> 'InlineKeyboardMarkup':
         return keyboard
 
 
+@logger.catch
+def get_yes_no_buttons(yes_msg: str, no_msg: str) -> 'InlineKeyboardMarkup':
+    """Возвращает кнопочки Да и Нет"""
+
+    keyboard = InlineKeyboardMarkup(row_width=1)
+    keyboard.add(
+        InlineKeyboardButton(text="Да", callback_data=yes_msg),
+        InlineKeyboardButton(text="Нет", callback_data=no_msg)
+    )
+
+    return keyboard
 
 
 #
@@ -113,17 +125,7 @@ async def all_tokens_keyboard(telegram_id: str) -> 'InlineKeyboardMarkup':
 #     return keyboard
 
 #
-# @logger.catch
-# def get_yes_no_buttons(yes_msg: str, no_msg: str) -> 'InlineKeyboardMarkup':
-#     """Возвращает кнопочки Да и Нет"""
-#
-#     keyboard = InlineKeyboardMarkup(row_width=1)
-#     keyboard.add(
-#         InlineKeyboardButton(text="Да", callback_data=yes_msg),
-#         InlineKeyboardButton(text="Нет", callback_data=no_msg)
-#     )
-#
-#     return keyboard
+
 #
 #
 #
