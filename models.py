@@ -97,7 +97,6 @@ class Proxy(BaseModel):
         Метод получает не рабочую порокси, удаляет ее и
         перезаписывает прокси для всех кто ей пользовался
         """
-        # TODO write method "auto assign a proxy"
         removed_proxy = cls.select().where(cls.proxy == proxy).first()
         if not cls.get_proxy_count() and not removed_proxy:
             return 0
@@ -689,7 +688,6 @@ class UserChannel(BaseModel):
     def update_cooldown(cls: 'UserChannel', user_channel_pk: int, cooldown: int) -> int:
         """
         Update cooldown for all users_channel by channel_id
-            TODO логично было бы всем с таким же channel_id, но можно конкретному
         """
         return cls.update(cooldown=cooldown).where(cls.id == user_channel_pk)
 
@@ -699,8 +697,6 @@ class Token(BaseModel):
     Model for table discord_users
       methods:
           add_token_by_telegram_id
-          delete_inactive_tokens
-          delete_tokens_by_user
           is_token_exists
           get_all_user_tokens
           get_all_info_tokens
@@ -740,7 +736,6 @@ class Token(BaseModel):
     @logger.catch
     def get_all_user_tokens(cls: 'Token', telegram_id: str) -> int:
         """Returns TOTAL token user amount"""
-
         return (
             cls.select()
             .join(UserChannel, JOIN.LEFT_OUTER, on=(UserChannel.id == cls.user_channel))
@@ -790,7 +785,7 @@ class Token(BaseModel):
 
     @classmethod
     @logger.catch
-    def make_tokens_pair(cls, first: Union[int, str], second: Union[int, str]) -> bool:
+    def make_tokens_pair(cls: 'Token', first: Union[int, str], second: Union[int, str]) -> bool:
         """
         Make pair
         first_id: (str) or int
@@ -801,7 +796,7 @@ class Token(BaseModel):
         if not token_first:
             return False
         token_second = (cls.select()
-                        .where(cls.token == second, cls.user_channel == token_first.user_channel)
+                        .where(cls.token == second, cls.user_channel == token_first.user_channel_id)
                         .first())
         if not token_second:
             return False
@@ -851,12 +846,12 @@ class Token(BaseModel):
             cls.token.alias('token'),
             cls.last_message_time.alias('last_message_time'),
             UserChannel.name.alias('channel_name'))
-                 .join_from(cls, UserChannel, JOIN.LEFT_OUTER,
-                            on=(cls.user_channel == UserChannel.id))
-                 .join_from(cls, Channel, JOIN.LEFT_OUTER, on=(UserChannel.channel == Channel.id))
-                 .join_from(cls, User, JOIN.LEFT_OUTER, on=(UserChannel.user == User.id))
-                 .join_from(cls, TokenPair, JOIN.RIGHT_OUTER,
-                            on=((TokenPair.first_id == cls.id) | (TokenPair.second_id == cls.id)))
+                 .join(UserChannel, JOIN.LEFT_OUTER,
+            on=(cls.user_channel == UserChannel.id))
+                 .join(Channel, JOIN.LEFT_OUTER, on=(UserChannel.channel == Channel.id))
+                 .join(User, JOIN.LEFT_OUTER, on=(UserChannel.user == User.id))
+                 .join(TokenPair, JOIN.RIGHT_OUTER,
+            on=(TokenPair.first_id == cls.id))
                  .where(User.telegram_id == telegram_id).namedtuples()
                  )
         return [data for data in query]
@@ -877,23 +872,25 @@ class Token(BaseModel):
             cooldown  int
             mate_discord_id str (discord_id)
         """
-        # TODO добавить 2 поля: mate_id ( дискорда1111111)  и МОЙ дискорд_ИД
         data = (cls.select(
             cls.token.alias('token'),
-            cls.id.alias('token_pk'),
+            cls.discord_id.alias('token_discord_id'),
+            Proxy.proxy.alias('proxy'),
             cls.name.alias('token_name'),
-            UserChannel.name.alias('channel_name'),
+            UserChannel.id.alias('user_channel_pk'),
             Channel.channel_id.alias('channel_id'),
-            User.nick_name.alias('user_name'),
-            Case(None, [((TokenPair.first_id == cls.id),
-                         TokenPair.second_id,)], TokenPair.first_id).alias('pair_pk')
+            Channel.guild_id.alias('guild_id'),
+            UserChannel.cooldown.alias('cooldown'),
+            cls.alias('pair').discord_id.alias('mate_discord_id')
         )
-                .join_from(cls, UserChannel, JOIN.LEFT_OUTER,
-                           on=(cls.user_channel == UserChannel.id))
-                .join_from(cls, Channel, JOIN.LEFT_OUTER, on=(UserChannel.channel == Channel.id))
-                .join_from(cls, User, JOIN.LEFT_OUTER, on=(UserChannel.user == User.id))
-                .join_from(cls, TokenPair, JOIN.LEFT_OUTER,
-                           on=((cls.id == TokenPair.first_id) | (cls.id == TokenPair.second_id)))
+                .join(UserChannel, JOIN.LEFT_OUTER,
+            on=(cls.user_channel == UserChannel.id))
+                .join(Channel, JOIN.LEFT_OUTER, on=(UserChannel.channel == Channel.id))
+                .join(User, JOIN.LEFT_OUTER, on=(UserChannel.user == User.id))
+                .join(Proxy, JOIN.LEFT_OUTER, on=(Proxy.id == User.proxy))
+                .join(TokenPair, JOIN.LEFT_OUTER, on=(cls.id == TokenPair.first_id))
+                .join(cls.alias('pair'), JOIN.LEFT_OUTER,
+            on=(cls.alias('pair').id == TokenPair.second_id))
                 .where(User.telegram_id == telegram_id).namedtuples()
                 )
         return list(data)
@@ -941,7 +938,7 @@ class Token(BaseModel):
             .join_from(cls, Channel, JOIN.LEFT_OUTER, on=(UserChannel.channel == Channel.id))
             .join_from(cls, User, JOIN.LEFT_OUTER, on=(UserChannel.user == User.id))
             .join_from(cls, TokenPair, JOIN.LEFT_OUTER,
-                       on=((TokenPair.first_id == cls.id) | (TokenPair.second_id == cls.id)))
+                on=(TokenPair.first_id == cls.id))
             .where(User.telegram_id == telegram_id)
             .where(TokenPair.first_id == None).namedtuples().execute()
         )
@@ -971,7 +968,7 @@ class Token(BaseModel):
 
     @classmethod
     @logger.catch
-    def get_token_info(cls, token: str) -> namedtuple:
+    def get_token_info(cls: 'Token', token: str) -> namedtuple:
         """
         Вернуть info по токену
         возвращает объект токен
@@ -981,9 +978,8 @@ class Token(BaseModel):
             'channel_id': channel_id(int),
             'cooldown': cooldown(int, seconds)}
             'mate_discord_id' str (discord_id)
-            'discord_id' str
+            'token_discord_id' str
         """
-        # TODO mate_discord_id ДОДЕЛАТЬ
         data = (
             cls.select(
                 cls.user_channel.alias('user_channel_pk'),
@@ -991,19 +987,18 @@ class Token(BaseModel):
                 Channel.guild_id.alias('guild_id'),
                 Channel.channel_id.alias('channel_id'),
                 UserChannel.cooldown.alias('cooldown'),
-                Case(None, [((TokenPair.first_id == cls.id),
-                             TokenPair.second_id,)], TokenPair.first_id).alias('mate_discord_id'),
-                cls.discord_id.alias('discord_id'),
-
+                cls.alias('pair').discord_id.alias('mate_discord_id'),
+                cls.discord_id.alias('token_discord_id'),
             )
-            .join(UserChannel, JOIN.LEFT_OUTER,
-                  on=(cls.user_channel == UserChannel.id))
-            .join(Channel, JOIN.LEFT_OUTER, on=(UserChannel.channel == Channel.id))
-            .join(User, JOIN.LEFT_OUTER, on=(UserChannel.user == User.id))
-            .join(TokenPair, JOIN.LEFT_OUTER,
-                  on=((TokenPair.first_id == cls.id) | (TokenPair.second_id == cls.id)))
-            .join(Proxy, JOIN.LEFT_OUTER, on=(Proxy.id == User.proxy))
-            .where(Token.token == token).namedtuples().first()
+                .join(UserChannel, JOIN.LEFT_OUTER,
+                on=(cls.user_channel == UserChannel.id))
+                .join(Channel, JOIN.LEFT_OUTER, on=(UserChannel.channel == Channel.id))
+                .join(User, JOIN.LEFT_OUTER, on=(UserChannel.user == User.id))
+                .join(TokenPair, JOIN.LEFT_OUTER, on=(TokenPair.first_id == cls.id))
+                .join(Proxy, JOIN.LEFT_OUTER, on=(Proxy.id == User.proxy))
+                .join(cls.alias('pair'), JOIN.LEFT_OUTER,
+                on=(cls.alias('pair').id == TokenPair.second_id))
+                .where(cls.token == token).namedtuples().first()
         )
 
         return data
@@ -1012,29 +1007,7 @@ class Token(BaseModel):
     @logger.catch
     def delete_token(cls, token: str) -> int:
         """Удалить токен по его "значению": """
-
         return cls.delete().where(cls.token == token).execute()
-
-    @classmethod
-    @logger.catch
-    def delete_inactive_tokens(cls) -> int:
-        """ TODO зачем? легче удалять каналы пользователя токены автоматом грохнутся
-        removes all tokens for inactive users
-        return: number of removed tokens
-        """
-        pass
-        # users = User.get_id_inactive_users()
-        # return cls.delete().where(cls.user.in_(users)).execute()
-
-    @classmethod
-    @logger.catch
-    def delete_tokens_by_user(cls, user: User) -> int:
-        """
-        TODO зачем? легче удалять каналы пользователя токены автоматом грохнутся
-        removes all tokens for user
-        return: number of removed tokens
-        """
-        pass
 
     @classmethod
     @logger.catch
@@ -1093,9 +1066,10 @@ class TokenPair(BaseModel):
         if (cls.select().where((cls.first_id.in_((first, second)))
                                | (cls.second_id.in_((first, second)))).count()):
             return 0
-        pair = cls.create(first_id=first, second_id=second)
-        pair_reverse = cls.create(first_id=first, second_id=second)
-        return 1 if pair_reverse and pair else 0
+        pair = [{'first_id': first, 'second_id': second},
+                {'first_id': second, 'second_id': first}
+                ]
+        return cls.insert(pair).execute()
 
     @classmethod
     @logger.catch
@@ -1105,7 +1079,7 @@ class TokenPair(BaseModel):
                 token_id: int
         """
         return bool(cls.delete().
-                where((cls.first_id == token_id) | (cls.second_id == token_id)).execute())
+            where((cls.first_id == token_id) | (cls.second_id == token_id)).execute())
 
     @classmethod
     @logger.catch
