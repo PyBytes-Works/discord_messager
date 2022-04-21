@@ -15,7 +15,8 @@ from aiogram.types import Message, CallbackQuery, ReplyKeyboardRemove, InlineKey
 from classes.vocabulary import Vocabulary
 from config import logger, bot, admins_list
 from handlers.main_handlers import cancel_handler
-from keyboards import cancel_keyboard, user_menu_keyboard, inactive_users_keyboard
+from keyboards import cancel_keyboard, user_menu_keyboard, inactive_users_keyboard, admin_keyboard, \
+    superadmin_keyboard
 from states import AdminStates
 from classes.db_interface import DBI
 from utils import delete_used_token, send_report_to_admins, check_is_int
@@ -186,13 +187,13 @@ async def admin_help_handler(message: Message) -> None:
     user_telegram_id: str = str(message.from_user.id)
     if await DBI.is_admin(telegram_id=user_telegram_id):
         commands: list = [
-            "\n/ua - команда для пользователя, для активации по токену.",
             "\n/admin - показать список команд администратора.",
             "\n/add_user - добавить нового пользователя.",
             "\n/show_users - показать список пользователей.",
             "\n/delete_user - удалить пользователя.",
             '\n/activate_user - активировать пользователя'
         ]
+        keyboard = admin_keyboard()
         if user_telegram_id in admins_list:
             superadmin: list = [
                 "\n/add_admin - команда для назначения пользователя администратором",
@@ -204,11 +205,12 @@ async def admin_help_handler(message: Message) -> None:
                 "\n/reboot - предупредить о перезагрузке, остановить работу всех ботов",
             ]
             commands.extend(superadmin)
+            keyboard = superadmin_keyboard()
         admin_commands: str = "".join(commands)
         await message.answer(f'Список команд администратора: {admin_commands}')
         await message.answer(
             f'Всего отправлено символов: {Vocabulary.get_count_symbols()}',
-            reply_markup=user_menu_keyboard()
+            reply_markup=keyboard
         )
     else:
         logger.info(f'{message.from_user.id}:{message.from_user.username}: NOT AUTORIZATED')

@@ -29,11 +29,36 @@ def inactive_users_keyboard(users: dict) -> 'InlineKeyboardMarkup':
 
 
 @logger.catch
-def admin_keyboard() -> 'InlineKeyboardMarkup':
+def admin_keyboard() -> 'ReplyKeyboardMarkup':
     """Возвращает список админских кнопок"""
-    # TODO сделать
-    keyboard = InlineKeyboardMarkup(row_width=1)
 
+    keyboard = ReplyKeyboardMarkup(
+        resize_keyboard=True,
+        one_time_keyboard=True,
+        row_width=3
+    )
+    keyboard.add(
+        KeyboardButton("/add_user"),
+        KeyboardButton("/show_users"),
+        KeyboardButton("/delete_user"),
+        KeyboardButton("/activate_user"),
+        KeyboardButton("/cancel")
+    )
+    return keyboard
+
+
+@logger.catch
+def superadmin_keyboard() -> 'ReplyKeyboardMarkup':
+    """Возвращает список админских кнопок"""
+
+    keyboard = admin_keyboard()
+    keyboard.add(
+        KeyboardButton("/add_proxy"),
+        KeyboardButton("/delete_proxy"),
+        KeyboardButton("/delete_user"),
+        KeyboardButton("/set_max_tokens"),
+        KeyboardButton("/cancel")
+    )
     return keyboard
 
 
@@ -72,7 +97,7 @@ def all_tokens_keyboard(all_tokens: List[namedtuple]) -> 'InlineKeyboardMarkup':
 
 
 @logger.catch
-async def new_channel_key() -> 'InlineKeyboardMarkup':
+def new_channel_key() -> 'InlineKeyboardMarkup':
     """Возвращает список кнопок всех токенов пользователя"""
 
     keyboard = InlineKeyboardMarkup(row_width=1)
@@ -97,7 +122,7 @@ async def new_channel_key() -> 'InlineKeyboardMarkup':
 
 
 @logger.catch
-def get_yes_no_buttons(yes_msg: str, no_msg: str) -> 'InlineKeyboardMarkup':
+def yes_no_buttons(yes_msg: str, no_msg: str) -> 'InlineKeyboardMarkup':
     """Возвращает кнопочки Да и Нет"""
 
     keyboard = InlineKeyboardMarkup(row_width=2)
