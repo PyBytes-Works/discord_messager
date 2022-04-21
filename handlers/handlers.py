@@ -66,7 +66,6 @@ async def request_self_token_cooldown_handler(callback: CallbackQuery, state: FS
     token: str = callback.data
     await state.update_data(token=token)
     await callback.message.answer("Введите время кулдауна в минутах", reply_markup=cancel_keyboard())
-    await state.finish()
     await callback.answer()
 
 

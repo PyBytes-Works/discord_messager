@@ -9,7 +9,7 @@ import aiohttp.client_exceptions
 import aiohttp.http_exceptions
 
 from classes.db_interface import DBI
-from config import logger, DISCORD_BASE_URL, PROXY_USER, PROXY_PASSWORD
+from config import logger, DISCORD_BASE_URL, PROXY_USER, PROXY_PASSWORD, DEFAULT_PROXY
 from classes.token_datastorage import TokenDataStore
 
 
@@ -29,6 +29,16 @@ class RequestSender:
         self.proxy: str = ''
         self.token: str = ''
         self.channel: Union[str, int] = 0
+        self.url: str = ''
+
+    async def get_discord_id(self, token: str, proxy: str) -> str:
+        self.proxy = proxy
+        self.token = token
+        self.url = f'https://discord.com/api/v9/users/@me'
+        answer: dict = await self._send_get_request()
+        if answer.get("status"):
+            return answer["data"]["id"]
+        return ''
 
     @logger.catch
     async def get_request(self, datastore: 'TokenDataStore') -> List[dict]:
@@ -92,11 +102,6 @@ class RequestSender:
         return answer
 
     @logger.catch
-    async def get_me(self, token: str):
-        # TODO написать
-        pass
-
-    @logger.catch
     async def check_proxy(self, proxy: str):
 
         self.proxy = proxy
@@ -121,7 +126,8 @@ class RequestSender:
     async def _send_get_request(self) -> dict:
 
         self.proxy_data: str = f"http://{PROXY_USER}:{PROXY_PASSWORD}@{self.proxy}/"
-        self.url: str = DISCORD_BASE_URL + f'{self.channel}/messages?limit={self.limit}'
+        if not self.url:
+            self.url: str = DISCORD_BASE_URL + f'{self.channel}/messages?limit={self.limit}'
 
         answer: dict = {
             "status": 0,
@@ -155,3 +161,10 @@ class RequestSender:
                     answer.update(status=407)
 
         return answer
+
+
+if __name__ == '__main__':
+    try:
+        asyncio.new_event_loop().run_until_complete(RequestSender().get_discord_id('111'))
+    except KeyboardInterrupt:
+        pass

@@ -79,7 +79,7 @@ async def new_channel_key() -> 'InlineKeyboardMarkup':
 
     keyboard = InlineKeyboardMarkup(row_width=1)
     keyboard.add(InlineKeyboardButton(
-        text="Добавить канал", callback_data="new_channel"))
+        text="Добавить новый канал", callback_data="new_channel"))
 
     return keyboard
 
@@ -102,7 +102,7 @@ async def new_channel_key() -> 'InlineKeyboardMarkup':
 def get_yes_no_buttons(yes_msg: str, no_msg: str) -> 'InlineKeyboardMarkup':
     """Возвращает кнопочки Да и Нет"""
 
-    keyboard = InlineKeyboardMarkup(row_width=1)
+    keyboard = InlineKeyboardMarkup(row_width=2)
     keyboard.add(
         InlineKeyboardButton(text="Да", callback_data=yes_msg),
         InlineKeyboardButton(text="Нет", callback_data=no_msg)

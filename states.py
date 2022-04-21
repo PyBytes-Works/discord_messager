@@ -41,3 +41,4 @@ class TokenStates(StatesGroup):
     create_channel = State()
     add_token = State()
     check_token = State()
+    add_channel_cooldown = State()
