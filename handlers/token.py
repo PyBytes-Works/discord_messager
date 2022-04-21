@@ -307,7 +307,6 @@ def token_register_handlers(dp: Dispatcher) -> None:
     """
     Регистратор для функций данного модуля
     """
-    dp.register_message_handler(select_channel_handler, Text(equals=['Добавить токен']))
     dp.register_callback_query_handler(start_create_channel_handler, Text(equals=["new_channel"]), state=TokenStates.select_channel)
     dp.register_callback_query_handler(selected_channel_handler, state=TokenStates.select_channel)
     dp.register_callback_query_handler(start_create_channel_handler, Text(equals=["new_channel"]), state=TokenStates.create_channel)

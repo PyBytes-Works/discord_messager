@@ -3,7 +3,7 @@ import datetime
 import random
 from typing import List, Tuple
 
-from classes.sender import MessageSender
+from classes.message_sender import MessageSender
 from classes.redis_interface import RedisDB
 from classes.request_sender import RequestSender
 from config import logger, DEBUG

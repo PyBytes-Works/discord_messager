@@ -134,6 +134,7 @@ def register_handlers(dp: Dispatcher) -> None:
     dp.register_message_handler(start_parsing_command_handler, Text(equals=["Старт", "Старт & Mute"]))
     dp.register_message_handler(token.info_tokens_handler, Text(equals=["Информация"]))
     dp.register_message_handler(token.get_all_tokens_handler, Text(equals=["Установить кулдаун"]))
+    dp.register_message_handler(token.select_channel_handler, Text(equals=['Добавить токен']))
     dp.register_callback_query_handler(answer_to_reply_handler, Text(startswith=["reply_"]), state=UserStates.in_work)
     dp.register_message_handler(send_message_to_reply_handler, state=UserStates.in_work)
     dp.register_message_handler(default_message)

@@ -7,7 +7,7 @@ import asyncio
 
 from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeyboardRemove
 
-from classes.receiver import MessageReceiver
+from classes.message_receiver import MessageReceiver
 from classes.token_datastorage import TokenDataStore
 
 from config import logger
