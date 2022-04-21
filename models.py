@@ -1092,9 +1092,10 @@ class TokenPair(BaseModel):
         """
         if (cls.select().where((cls.first_id.in_((first, second)))
                                | (cls.second_id.in_((first, second)))).count()):
-            return False
+            return 0
         pair = cls.create(first_id=first, second_id=second)
-        return 1 if pair else 0
+        pair_reverse = cls.create(first_id=first, second_id=second)
+        return 1 if pair_reverse and pair else 0
 
     @classmethod
     @logger.catch
@@ -1103,12 +1104,12 @@ class TokenPair(BaseModel):
             arguments:
                 token_id: int
         """
-        return (cls.delete().
+        return bool(cls.delete().
                 where((cls.first_id == token_id) | (cls.second_id == token_id)).execute())
 
     @classmethod
     @logger.catch
-    def remove_pairs_from_list(cls, token_list: list) -> bool:
+    def remove_pairs_from_list(cls, token_list: list) -> int:
         """remove  pairs from the list
             arguments:
                 token_list: list
