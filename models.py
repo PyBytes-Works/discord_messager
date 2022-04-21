@@ -510,7 +510,7 @@ class User(BaseModel):
         """
         Возвращает timestamp без миллисекунд в виде целого числа
         """
-        user = cls.get_or_none(cls.expiration, cls.telegram_id == telegram_id)
+        user = cls.get_or_none(cls.telegram_id == telegram_id)
         if user:
             expiration = user.expiration
 
@@ -532,7 +532,7 @@ class User(BaseModel):
         """
          Return the maximum number of tokens for a user
         """
-        user = cls.get_or_none(cls.max_tokens, cls.telegram_id == telegram_id)
+        user = cls.get_or_none(cls.telegram_id == telegram_id)
         if user:
             return user.max_tokens
         return 0
@@ -837,6 +837,7 @@ class Token(BaseModel):
         return:
         list of namedtuple fields:
             token str
+            token_pk int
             token_discord_id str
             proxy str
             user_channel_pk int
@@ -844,9 +845,11 @@ class Token(BaseModel):
             guild_id int
             cooldown  int
             mate_discord_id str (discord_id)
+
         """
         data = (cls.select(
             cls.token.alias('token'),
+            cls.id.alias('token_pk'),
             cls.discord_id.alias('token_discord_id'),
             Proxy.proxy.alias('proxy'),
             cls.name.alias('token_name'),

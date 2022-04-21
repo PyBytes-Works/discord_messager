@@ -266,8 +266,7 @@ async def info_tokens_handler(message: Message) -> None:
     telegram_id: str = str(message.from_user.id)
     if await DBI.user_is_active(message.from_user.id):
 
-        date_expiration = await DBI.get_expiration_date(telegram_id)
-        date_expiration = datetime.datetime.fromtimestamp(date_expiration)
+        date_expiration: int = await DBI.get_expiration_date(telegram_id)
         all_tokens: List[namedtuple] = await DBI.get_all_tokens_info(telegram_id)
         count_tokens: int = len(all_tokens)
         free_slots: int = await DBI.get_number_of_free_slots_for_tokens(telegram_id)
@@ -291,7 +290,7 @@ async def info_tokens_handler(message: Message) -> None:
                 f"Имя токена: {token_info.token_name}"
                 f"Токен: {token_info.token}"
                 f"\nКанал: {token_info.channel_id}"
-                f"\nДискорд id: {token_info.discord_id}"
+                f"\nДискорд id: {token_info.token_discord_id}"
                 f"\nДискорд id напарника: {token_info.mate_discord_id}"
                 f"\nКуллдаун канала: {token_info.cooldown} сек."
             )

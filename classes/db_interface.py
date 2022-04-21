@@ -113,12 +113,6 @@ class DBI:
 
     @classmethod
     @logger.catch
-    async def get_user_by_name(cls, name: str) -> 'User':
-        # TODO lasted... may by написать метод - возвращает юзера по его имени (nick_name)
-        return User.get_or_none(User.nick_name.contains(name))
-
-    @classmethod
-    @logger.catch
     async def get_all_inactive_users(cls) -> Dict[str, 'User']:
         return User.get_all_inactive_users()
 
