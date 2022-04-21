@@ -594,7 +594,7 @@ class UserChannel(BaseModel):
     class user channel for save user's channels and cooldown
     methods:
         add_user_channel
-        get_user_channel
+        get_user_channels
         get_all_user_channel_by_telegram_id
         update_cooldown_by_channel_id
     """
@@ -637,35 +637,12 @@ class UserChannel(BaseModel):
 
     @classmethod
     @logger.catch
-    def get_user_channel(
-            cls: 'UserChannel', telegram_id: Union[str, int], channel_id: int
-    ) -> namedtuple:
-        """
-        Function return named tuple
-            list of namedtuple fields:
-            channel_name: str
-            cooldown: int
-            channel_id: int
-            guild_id: int
-        """
-        return (cls.select(
-            cls.name.alias('channel_name'),
-            cls.name.alias('cooldown'),
-            Channel.channel_id.alias('channel_id'),
-            Channel.guild_id.alias('guild_id'),
-        )
-                .join(Channel, JOIN.LEFT_OUTER, on=(Channel.id == cls.channel))
-                .join(User, JOIN.LEFT_OUTER, on=(User.id == cls.user))
-                .where(User.telegram_id == telegram_id)
-                .where(cls.channel == channel_id).namedtuples().first())
-
-    @classmethod
-    @logger.catch
-    def get_all_user_channel_by_telegram_id(
+    def get_user_channels_by_telegram_id(
             cls: 'UserChannel', telegram_id: Union[str, int]) -> List[namedtuple]:
         """
         Function returns a list of named tuples
         list of namedtuple fields:
+            channel_pk: int
             channel_name: str
             cooldown: int
             channel_id: int
@@ -673,6 +650,7 @@ class UserChannel(BaseModel):
         """
         return list(
                     cls.select(
+                        cls.id.alias('channel_pk'),
                         cls.name.alias('channel_name'),
                         cls.name.alias('cooldown'),
                         Channel.channel_id.alias('channel_id'),
