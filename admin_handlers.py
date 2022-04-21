@@ -1,4 +1,5 @@
 """Модуль для обработчиков администратора"""
+import datetime
 from collections import namedtuple
 import re
 from typing import Tuple
@@ -377,22 +378,24 @@ async def show_all_users_handler(message: Message) -> None:
 
     if await DBI.is_admin(telegram_id=message.from_user.id):
         users: Tuple[namedtuple] = await DBI.get_all_users()
-        # TODO сделать строку представления
-        # f'{user.nick_name.rsplit("_", maxsplit=1)[0]} | '
-        # f'{"Active" if user.active else "Not active"} | '
-        # f'{"Admin" if user.admin else "Not admin"} | '
-        # f'Proxy: {user.proxy.proxy if user.proxy else "ЧТО ТО СЛОМАЛОСЬ"} | '
-        # f'\nID: {user.telegram_id if user.telegram_id else "ЧТО ТО СЛОМАЛОСЬ"} | '
-        # f'№: {user.max_tokens if user.max_tokens else "ЧТО ТО СЛОМАЛОСЬ"} | '
-        # f'{timestamp(user.expiration) if user.expiration else "ЧТО ТО СЛОМАЛОСЬ"}'
 
-        # total_values: list = list(users.values())
-        # lenght: int = len(total_values)
-        # for shift in range(0, lenght, 10):
-        #     user_list: str = "\n".join(total_values[shift:shift + 10])
-        #     await message.answer(user_list, reply_markup=ReplyKeyboardRemove())
+        lenght: int = len(users)
+        for shift in range(0, lenght, 10):
+            users_slice: tuple = users[shift:shift + 10]
+            spam = (
+                    f'{user.nick_name.rsplit("_", maxsplit=1)[0]} | '
+                    f'{"Active" if user.active else "Not active"} | '
+                    f'{"Admin" if user.admin else "Not admin"} | '
+                    f'Proxy: {user.proxy if user.proxy else "ЧТО ТО СЛОМАЛОСЬ"} | '
+                    f'\nID: {user.telegram_id if user.telegram_id else "ЧТО ТО СЛОМАЛОСЬ"} | '
+                    f'№: {user.max_tokens if user.max_tokens else "ЧТО ТО СЛОМАЛОСЬ"} | '
+                    f'{datetime.datetime.timestamp(user.expiration) if user.expiration else "ЧТО ТО СЛОМАЛОСЬ"}'
+                    for user in users_slice
+                )
+            user_list: str = '\n'.join(spam)
+            await message.answer(user_list, reply_markup=ReplyKeyboardRemove())
         await message.answer(
-            f'Список пользователей: {len(users)}',
+            f'Всего пользователей: {lenght}',
             reply_markup=ReplyKeyboardRemove()
         )
     else:
