@@ -337,21 +337,21 @@ class User(BaseModel):
         return: named tuple
         list of namedtuple fields:
             nick_name: str
-            user_active: str
-            user_admin: str
+            active: str
+            admin: str
             proxy: str
             telegram_id: str
             max_tokens: int
-            user_expiration: timestamp
+            expiration: timestamp
         """
         return tuple(User.select(
             User.nick_name.alias('nick_name'),
-            Case(None, [((User.active == True), 'Active',)], 'Not active').alias('user_active'),
-            Case(None, [((User.admin == True), 'Admin',)], 'Not admin').alias('user_admin'),
+            User.active.alias('active'),
+            User.admin.alias('admin'),
             Proxy.proxy.alias('proxy'),
             User.telegram_id.alias('telegram_id'),
             User.max_tokens.alias('max_tokens'),
-            User.expiration.alias('user_expiration'),
+            User.expiration.alias('expiration'),
         ).join(Proxy, JOIN.LEFT_OUTER, on=(User.proxy == Proxy.id)).namedtuples().execute())
 
     @classmethod
