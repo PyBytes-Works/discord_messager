@@ -19,10 +19,9 @@ class DBI:
         Возвращает True если деактивирован."""
 
         telegram_id: str = str(message.from_user.id)
-        # TODO инвертировать условие
-        user_not_expired: bool = User.check_expiration_date(telegram_id)
+        user_expired: bool = User.check_expiration_date(telegram_id)
         user_is_admin: bool = User.is_admin(telegram_id)
-        if not user_not_expired and not user_is_admin:
+        if user_expired and not user_is_admin:
             await message.answer(
                 "Время подписки истекло. Ваш аккаунт деактивирован, токены удалены.",
                 reply_markup=ReplyKeyboardRemove()
