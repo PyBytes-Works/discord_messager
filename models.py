@@ -94,7 +94,7 @@ class Proxy(BaseModel):
     @logger.catch
     def update_proxies_for_owners(cls: 'Proxy', proxy: str) -> int:
         """
-        Метод получает не рабочую порокси, удаляет ее и
+        Метод получает не рабочую прокси, удаляет ее и
         перезаписывает прокси для всех кто ей пользовался
         """
         removed_proxy = cls.select().where(cls.proxy == proxy).first()
@@ -122,11 +122,6 @@ class Channel(BaseModel):
     def get_or_create_channel(cls: 'Channel', guild_id: Any, channel_id: Any) -> 'Channel':
         user_channel, created = cls.get_or_create(guild_id=guild_id, channel_id=channel_id)
         return user_channel
-
-    # @classmethod
-    # @logger.catch
-    # def get_channel(cls: 'Channel', guild_id: Any, channel_id: Any) -> 'Channel':
-    #     return cls.get(guild_id=guild_id, channel_id=channel_id)
 
 
 class User(BaseModel):
@@ -814,7 +809,7 @@ class Token(BaseModel):
     def get_related_tokens(cls: 'User', telegram_id: Union[str, int] = None) -> List[namedtuple]:
         """
         Вернуть список всех связанных ТОКЕНОВ пользователя по его telegram_id:
-        return: list of numed tuples
+        return: list of named tuples
         list of namedtuple fields:
             token str
             cooldown  int
@@ -912,13 +907,14 @@ class Token(BaseModel):
                 cls.id.alias('token_pk'),
                 Channel.channel_id.alias('channel_id'),
             )
-            .join_from(cls, UserChannel, JOIN.LEFT_OUTER, on=(cls.user_channel == UserChannel.id))
-            .join_from(cls, Channel, JOIN.LEFT_OUTER, on=(UserChannel.channel == Channel.id))
-            .join_from(cls, User, JOIN.LEFT_OUTER, on=(UserChannel.user == User.id))
-            .join_from(cls, TokenPair, JOIN.LEFT_OUTER,
+                .join_from(cls, UserChannel, JOIN.LEFT_OUTER, on=(
+                        cls.user_channel == UserChannel.id))
+                .join_from(cls, Channel, JOIN.LEFT_OUTER, on=(UserChannel.channel == Channel.id))
+                .join_from(cls, User, JOIN.LEFT_OUTER, on=(UserChannel.user == User.id))
+                .join_from(cls, TokenPair, JOIN.LEFT_OUTER,
                 on=(TokenPair.first_id == cls.id))
-            .where(User.telegram_id == telegram_id)
-            .where(TokenPair.first_id == None).namedtuples().execute()
+                .where(User.telegram_id == telegram_id)
+                .where(TokenPair.first_id.is_null(True)).namedtuples().execute()
         )
         result: Tuple[List[int], ...] = tuple([[token.token_pk for token in tokens]
                                                for channel, tokens in
@@ -948,7 +944,7 @@ class Token(BaseModel):
     @logger.catch
     def get_token_info(cls: 'Token', token: str) -> namedtuple:
         """
-        Вернуть info по токену
+        Вернуть info по токен
         возвращает объект токен
             'user_channel_pk' int
             'proxy':proxy(str),
