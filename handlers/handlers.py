@@ -1,6 +1,5 @@
 """Модуль с основными обработчиками команд, сообщений и коллбэков"""
 
-import datetime
 from typing import List
 from collections import namedtuple
 
@@ -12,7 +11,7 @@ from aiogram.dispatcher import FSMContext
 
 from classes.request_sender import RequestSender
 from config import logger, Dispatcher, admins_list
-from keyboards import cancel_keyboard, user_menu_keyboard#, all_tokens_keyboard
+from keyboards import cancel_keyboard, user_menu_keyboard, all_tokens_keyboard
 from classes.discord_manager import DiscordTokenManager
 from states import UserState
 from utils import check_is_int, save_data_to_json, send_report_to_admins
@@ -42,33 +41,33 @@ async def cancel_handler(message: Message, state: FSMContext) -> None:
     await state.finish()
 
 
-# @logger.catch
-# async def get_all_tokens_handler(message: Message) -> None:
-#     """Обработчик команды "Установить кулдаун"""""
-#
-#     if await DBI.is_expired_user_deactivated(message):
-#         return
-#     user_telegram_id: str = str(message.from_user.id)
-#
-#     if await DBI.user_is_active(telegram_id=user_telegram_id):
-#         keyboard: 'InlineKeyboardMarkup' = all_tokens_keyboard(user_telegram_id)
-#         if not keyboard:
-#             await message.answer("Токенов нет. Нужно ввести хотя бы один.", reply_markup=cancel_keyboard())
-#         else:
-#             await message.answer("Выберите токен: ", reply_markup=keyboard)
-#             await message.answer("Или нажмите отмену.", reply_markup=cancel_keyboard())
-#             await UserState.select_token.set()
+@logger.catch
+async def get_all_tokens_handler(message: Message) -> None:
+    """Обработчик команды "Установить кулдаун"""""
+
+    if await DBI.is_expired_user_deactivated(message):
+        return
+    user_telegram_id: str = str(message.from_user.id)
+
+    if await DBI.user_is_active(telegram_id=user_telegram_id):
+        keyboard: 'InlineKeyboardMarkup' = await all_tokens_keyboard(user_telegram_id)
+        if not keyboard:
+            await message.answer("Токенов нет. Нужно ввести хотя бы один.", reply_markup=cancel_keyboard())
+        else:
+            await message.answer("Выберите токен: ", reply_markup=keyboard)
+            await message.answer("Или нажмите отмену.", reply_markup=cancel_keyboard())
+            await UserState.select_token.set()
 
 
-# @logger.catch
-# async def request_self_token_cooldown_handler(callback: CallbackQuery, state: FSMContext) -> None:
-#     """Обработчик нажатия на кнопку с токеном"""
-#
-#     token: str = callback.data
-#     await state.update_data(token=token)
-#     await callback.message.answer("Введите время кулдауна в минутах", reply_markup=cancel_keyboard())
-#     await state.finish()
-#     await callback.answer()
+@logger.catch
+async def request_self_token_cooldown_handler(callback: CallbackQuery, state: FSMContext) -> None:
+    """Обработчик нажатия на кнопку с токеном"""
+
+    token: str = callback.data
+    await state.update_data(token=token)
+    await callback.message.answer("Введите время кулдауна в минутах", reply_markup=cancel_keyboard())
+    await state.finish()
+    await callback.answer()
 
 
 @logger.catch
@@ -415,8 +414,8 @@ def register_handlers(dp: Dispatcher) -> None:
     dp.register_message_handler(activate_valid_user_handler, commands=["start"])
     dp.register_message_handler(start_parsing_command_handler, Text(equals=["Старт", "Старт & Mute"]))
     dp.register_message_handler(info_tokens_handler, Text(equals=["Информация"]))
-    # dp.register_message_handler(get_all_tokens_handler, Text(equals=["Установить кулдаун"]))
-    # dp.register_callback_query_handler(request_self_token_cooldown_handler, state=UserState.select_token)
+    dp.register_message_handler(get_all_tokens_handler, Text(equals=["Установить кулдаун"]))
+    dp.register_callback_query_handler(request_self_token_cooldown_handler, state=UserState.select_token)
     dp.register_callback_query_handler(answer_to_reply_handler, Text(startswith=["reply_"]), state=UserState.in_work)
     dp.register_message_handler(send_message_to_reply_handler, state=UserState.in_work)
     dp.register_message_handler(invitation_add_discord_token_handler, Text(equals=["Добавить токен"]))

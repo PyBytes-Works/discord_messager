@@ -1,5 +1,5 @@
-"""Модуль с клавиатурами и кнопками"""
 from typing import List
+from collections import namedtuple
 
 from aiogram.types import (
     ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton
@@ -54,23 +54,22 @@ def user_menu_keyboard() -> 'ReplyKeyboardMarkup':
         KeyboardButton("Информация"),
         KeyboardButton("Отмена"),
         KeyboardButton("Добавить токен"),
-        # KeyboardButton("Установить кулдаун")
+        KeyboardButton("Установить кулдаун")
     )
     return keyboard
 
 
-# def all_tokens_keyboard(telegram_id: str) -> 'InlineKeyboardMarkup':
-#     """Возвращает список кнопок всех токенов пользователя"""
-#
-#     keyboard = InlineKeyboardMarkup(row_width=1)
-#     all_tokens: List[dict] = await DBI.get_all_user_tokens(telegram_id=telegram_id)
-#     if all_tokens:
-#         for elem in all_tokens:
-#             token = tuple(elem.keys())[0]
-#             cooldown = elem[token]["cooldown"]
-#             keyboard.add(InlineKeyboardButton(text=f'CD: {cooldown // 60} - tkn: {token}', callback_data=f"{token}"))
-#
-#         return keyboard
+async def all_tokens_keyboard(telegram_id: str) -> 'InlineKeyboardMarkup':
+    """Возвращает список кнопок всех токенов пользователя"""
+
+    keyboard = InlineKeyboardMarkup(row_width=1)
+    all_tokens: List[namedtuple] = await DBI.get_all_tokens_info(telegram_id=telegram_id)
+    if all_tokens:
+        for elem in all_tokens:
+            keyboard.add(InlineKeyboardButton(
+                text=f'CD: {elem.cooldown // 60} - tkn: {elem.token}', callback_data=f"{elem.token}"))
+
+        return keyboard
 
 
 
