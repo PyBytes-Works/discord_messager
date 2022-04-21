@@ -911,8 +911,7 @@ class Token(BaseModel):
                         cls.user_channel == UserChannel.id))
                 .join_from(cls, Channel, JOIN.LEFT_OUTER, on=(UserChannel.channel == Channel.id))
                 .join_from(cls, User, JOIN.LEFT_OUTER, on=(UserChannel.user == User.id))
-                .join_from(cls, TokenPair, JOIN.LEFT_OUTER,
-                on=(TokenPair.first_id == cls.id))
+                .join_from(cls, TokenPair, JOIN.LEFT_OUTER, on=(TokenPair.first_id == cls.id))
                 .where(User.telegram_id == telegram_id)
                 .where(TokenPair.first_id.is_null(True)).namedtuples().execute()
         )
@@ -964,8 +963,7 @@ class Token(BaseModel):
                 cls.alias('pair').discord_id.alias('mate_discord_id'),
                 cls.discord_id.alias('token_discord_id'),
             )
-                .join(UserChannel, JOIN.LEFT_OUTER,
-                on=(cls.user_channel == UserChannel.id))
+                .join(UserChannel, JOIN.LEFT_OUTER, on=(cls.user_channel == UserChannel.id))
                 .join(Channel, JOIN.LEFT_OUTER, on=(UserChannel.channel == Channel.id))
                 .join(User, JOIN.LEFT_OUTER, on=(UserChannel.user == User.id))
                 .join(TokenPair, JOIN.LEFT_OUTER, on=(TokenPair.first_id == cls.id))
