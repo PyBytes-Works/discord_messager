@@ -11,11 +11,13 @@ import datetime
 
 from aiogram import executor
 
-from admin_handlers import register_admin_handlers
+from handlers.admin_handlers import register_admin_handlers
 from config import dp, logger, admins_list, bot, DB_FILE_NAME, VERSION
-from handlers import register_handlers
+from handlers.handlers import register_handlers
+from handlers.login_handlers import login_register_handlers
 from models import recreate_db
 
+login_register_handlers(dp=dp)
 register_admin_handlers(dp=dp)
 register_handlers(dp=dp)
 

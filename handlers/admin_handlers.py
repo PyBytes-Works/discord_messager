@@ -14,7 +14,7 @@ from aiogram.types import Message, CallbackQuery, ReplyKeyboardRemove, InlineKey
 
 from classes.vocabulary import Vocabulary
 from config import logger, bot, admins_list
-from handlers import cancel_handler
+from handlers.handlers import cancel_handler
 from keyboards import cancel_keyboard, user_menu_keyboard, inactive_users_keyboard
 from states import UserState
 from classes.db_interface import DBI
@@ -290,86 +290,86 @@ async def activate_user_handler(message: Message, state: FSMContext) -> None:
         return
 
 
-@logger.catch
-async def max_tokens_request_handler(message: Message) -> None:
-    """Обработчик для создания нового пользователя. Команда /add_user"""
-
-    if await DBI.is_admin(telegram_id=str(message.from_user.id)):
-        if not await DBI.get_proxy_count():
-            await message.answer("Нет ни одной прокси. Добавьте хотя бы одну.", reply_markup=user_menu_keyboard())
-            return
-        await message.answer('Введите количество токенов для пользователя?', reply_markup=cancel_keyboard())
-        await UserState.max_tokens_req.set()
-    else:
-        logger.info(f'{message.from_user.id}:{message.from_user.username}: NOT AUTORIZATED')
-
-
-@logger.catch
-async def user_name_request_handler(message: Message, state: FSMContext) -> None:
-    """Проверка максимального количества токенов и запрос на введение имени нового пользователя"""
-
-    max_tokens: int = check_is_int(message.text)
-    if not max_tokens:
-        await message.answer(
-            'Число должно быть целым положительным. Введите еще раз.: ',
-            reply_markup=cancel_keyboard()
-        )
-        return
-    await state.update_data(max_tokens=max_tokens)
-    await message.answer('Введите имя для нового пользователя: ', reply_markup=cancel_keyboard())
-    await UserState.subscribe_time.set()
+# @logger.catch
+# async def max_tokens_request_handler(message: Message) -> None:
+#     """Обработчик для создания нового пользователя. Команда /add_user"""
+#
+#     if await DBI.is_admin(telegram_id=str(message.from_user.id)):
+#         if not await DBI.get_proxy_count():
+#             await message.answer("Нет ни одной прокси. Добавьте хотя бы одну.", reply_markup=user_menu_keyboard())
+#             return
+#         await message.answer('Введите количество токенов для пользователя?', reply_markup=cancel_keyboard())
+#         await UserState.max_tokens_req.set()
+#     else:
+#         logger.info(f'{message.from_user.id}:{message.from_user.username}: NOT AUTORIZATED')
 
 
-@logger.catch
-async def subscribe_time_request_handler(message: Message, state: FSMContext) -> None:
-    """Проверка введеного имени и запрос времени подписки для нового пользователя"""
-
-    # TODO переделать
-    name: str = message.text
-    if await DBI.get_user_by_name(name=name):
-        await message.answer('Такой пользователь уже существует. '
-                             '\nВведите другое имя:')
-        return
-    if len(name) > 20:
-        await message.answer('Имя пользователя не должно превышать 20 символов. Введите заново.')
-        return
-    await state.update_data(name=name)
-    await message.answer('Введите время подписки в ЧАСАХ: ', reply_markup=cancel_keyboard())
-    await UserState.name_for_cr.set()
+# @logger.catch
+# async def user_name_request_handler(message: Message, state: FSMContext) -> None:
+#     """Проверка максимального количества токенов и запрос на введение имени нового пользователя"""
+#
+#     max_tokens: int = check_is_int(message.text)
+#     if not max_tokens:
+#         await message.answer(
+#             'Число должно быть целым положительным. Введите еще раз.: ',
+#             reply_markup=cancel_keyboard()
+#         )
+#         return
+#     await state.update_data(max_tokens=max_tokens)
+#     await message.answer('Введите имя для нового пользователя: ', reply_markup=cancel_keyboard())
+#     await UserState.subscribe_time.set()
 
 
-@logger.catch
-async def add_new_user_handler(message: Message, state: FSMContext) -> None:
-    """Проверка введенного времени подписки и создание токена для нового пользователя"""
-    subscribe_time: int = check_is_int(message.text)
-    if message.text == "-1":
-        subscribe_time: int = -1
-    hours_in_year: int = 8760
-    if not subscribe_time or subscribe_time > hours_in_year * 2:
-        await message.answer(
-            'Время в часах должно быть целым положительным. '
-            '\nВведите еще раз время подписки в ЧАСАХ: ',
-            reply_markup=cancel_keyboard()
-        )
-        return
-    state_data: dict = await state.get_data()
-    name: str = state_data.get("name")
-    max_tokens: int = state_data.get("max_tokens", 0)
-    new_token: str = get_token(key="user")
-    tokens: dict = {
-        new_token: {
-            "name": name,
-            "max_tokens": max_tokens,
-            "subscribe_time": subscribe_time
-            }
-        }
-    add_new_token(tokens)
-    await message.answer(
-        f"Токен для нового пользователя {name}: {new_token}"
-        f"\nМаксимум токенов: {max_tokens}",
-        reply_markup=user_menu_keyboard()
-    )
-    await state.finish()
+# @logger.catch
+# async def subscribe_time_request_handler(message: Message, state: FSMContext) -> None:
+#     """Проверка введеного имени и запрос времени подписки для нового пользователя"""
+#
+#     name: str = message.text
+#     if await DBI.get_user_by_name(name=name):
+#         await message.answer('Такой пользователь уже существует. '
+#                              '\nВведите другое имя:')
+#         return
+#     if len(name) > 20:
+#         await message.answer('Имя пользователя не должно превышать 20 символов. Введите заново.')
+#         return
+#     await state.update_data(name=name)
+#     await message.answer('Введите время подписки в ЧАСАХ: ', reply_markup=cancel_keyboard())
+#     await UserState.name_for_cr.set()
+
+
+# @logger.catch
+# async def add_new_user_handler(message: Message, state: FSMContext) -> None:
+#     """Проверка введенного времени подписки и создание токена для нового пользователя"""
+#
+#     subscribe_time: int = check_is_int(message.text)
+#     if message.text == "-1":
+#         subscribe_time: int = -1
+#     hours_in_year: int = 8760
+#     if not subscribe_time or subscribe_time > hours_in_year * 2:
+#         await message.answer(
+#             'Время в часах должно быть целым положительным. '
+#             '\nВведите еще раз время подписки в ЧАСАХ: ',
+#             reply_markup=cancel_keyboard()
+#         )
+#         return
+#     state_data: dict = await state.get_data()
+#     name: str = state_data.get("name")
+#     max_tokens: int = state_data.get("max_tokens", 0)
+#     new_token: str = get_token(key="user")
+#     tokens: dict = {
+#         new_token: {
+#             "name": name,
+#             "max_tokens": max_tokens,
+#             "subscribe_time": subscribe_time
+#             }
+#         }
+#     add_new_token(tokens)
+#     await message.answer(
+#         f"Токен для нового пользователя {name}: {new_token}"
+#         f"\nМаксимум токенов: {max_tokens}",
+#         reply_markup=user_menu_keyboard()
+#     )
+#     await state.finish()
 
 
 @logger.catch
@@ -526,10 +526,6 @@ def register_admin_handlers(dp: Dispatcher) -> None:
     dp.register_message_handler(
         final_add_user_handler, Text(startswith=["new_user_"]), state=UserState.name_for_activate
     )
-    dp.register_message_handler(max_tokens_request_handler, commands=['add_user', 'addu'])
-    dp.register_message_handler(user_name_request_handler, state=UserState.max_tokens_req)
-    dp.register_message_handler(subscribe_time_request_handler, state=UserState.subscribe_time)
-    dp.register_message_handler(activate_new_user_handler, commands=['ua'])
     dp.register_message_handler(request_user_admin_handler, commands=['add_admin'])
     dp.register_message_handler(set_user_admin_handler, state=UserState.name_for_admin)
     dp.register_message_handler(request_proxies_handler, commands=['add_proxy', 'delete_proxy', 'delete_all_proxy'])
@@ -549,4 +545,3 @@ def register_admin_handlers(dp: Dispatcher) -> None:
     dp.register_message_handler(request_max_tokens_handler, commands=['set_max_tokens'])
     dp.register_message_handler(set_max_tokens_handler, state=UserState.user_set_max_tokens)
     dp.register_message_handler(send_message_to_all_users_handler, Text(startswith=["/sendall", "/sa"]))
-    dp.register_message_handler(add_new_user_handler, state=UserState.name_for_cr)
