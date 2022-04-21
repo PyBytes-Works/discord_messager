@@ -6,7 +6,7 @@ import os
 
 from peewee import (
     Model, CharField, BooleanField, DateTimeField, ForeignKeyField, IntegerField, TimestampField,
-    JOIN, Case, fn, BaseQuery, BigIntegerField
+    JOIN, Case, fn, BigIntegerField
 )
 
 from config import logger, admins_list, db, DB_FILE_NAME, DEFAULT_PROXY
@@ -71,7 +71,7 @@ class Proxy(BaseModel):
 
     @classmethod
     @logger.catch
-    def get_low_used_proxy(cls: 'Proxy') -> BaseQuery.namedtuples:
+    def get_low_used_proxy(cls: 'Proxy') -> namedtuple:
         """
         Возвращает первую прокси с самым малым использованием
         return:
@@ -79,11 +79,16 @@ class Proxy(BaseModel):
             proxy_pk: int
             proxy: str
         """
-        proxy = (Proxy.select((Proxy.id).alias('proxy_pk'), (Proxy.proxy).alias('proxy'), )
+        proxy = (Proxy.select(Proxy.id.alias('proxy_pk'), Proxy.proxy.alias('proxy'), )
                  .join(User, JOIN.LEFT_OUTER, on=(Proxy.id == User.proxy))
                  .group_by(Proxy.id, Proxy.proxy).order_by(fn.COUNT(User.id))
                  .limit(1).namedtuples().first())
-        return proxy if proxy else namedtuple('Row', ['proxy_pk', 'proxy'])(proxy_pk=None, proxy=None)
+        return (
+            proxy
+            if proxy
+            else
+            namedtuple('Row', ['proxy_pk', 'proxy'])(proxy_pk=None, proxy=None)
+        )
 
     @classmethod
     @logger.catch
@@ -252,8 +257,8 @@ class User(BaseModel):
         Function removes  user channels and tokens
         """
         return UserChannel.delete().where(
-            UserChannel.user.in_(cls.select(User.id)
-                .where(cls.telegram_id == telegram_id)
+            UserChannel.user.in_(
+                cls.select(User.id).where(cls.telegram_id == telegram_id)
                 )
         ).execute()
 
@@ -267,15 +272,15 @@ class User(BaseModel):
         return TokenPair.delete().where(
             (TokenPair.first_id.in_(
                 Token.select(Token.id)
-                    .join(UserChannel, JOIN.LEFT_OUTER, on=(Token.user_channel == UserChannel.id))
-                    .join(User, JOIN.LEFT_OUTER, on=(UserChannel.user == User.id))
-                    .where(User.telegram_id == telegram_id)))
+                .join(UserChannel, JOIN.LEFT_OUTER, on=(Token.user_channel == UserChannel.id))
+                .join(User, JOIN.LEFT_OUTER, on=(UserChannel.user == User.id))
+                .where(User.telegram_id == telegram_id)))
             |
             (TokenPair.second_id.in_(
                 Token.select(Token.id)
-                    .join(UserChannel, JOIN.LEFT_OUTER, on=(Token.user_channel == UserChannel.id))
-                    .join(User, JOIN.LEFT_OUTER, on=(UserChannel.user == User.id))
-                    .where(User.telegram_id == telegram_id)))
+                .join(UserChannel, JOIN.LEFT_OUTER, on=(Token.user_channel == UserChannel.id))
+                .join(User, JOIN.LEFT_OUTER, on=(UserChannel.user == User.id))
+                .where(User.telegram_id == telegram_id)))
         )
 
     @classmethod
@@ -297,7 +302,7 @@ class User(BaseModel):
         return: list
         """
         return [user.id for user in cls.select(cls.id)
-            .where(cls.active == False).execute()]
+                .where(cls.active == False).execute()]
 
     @classmethod
     @logger.catch
@@ -327,7 +332,7 @@ class User(BaseModel):
 
     @classmethod
     @logger.catch
-    def get_all_users(cls: 'User') -> Tuple[BaseQuery.namedtuples]:
+    def get_all_users(cls: 'User') -> Tuple[namedtuple]:
         """
         returns dict of all users
         return: named tuple
@@ -446,7 +451,7 @@ class User(BaseModel):
 
         all_users: List['User'] = list(cls.select().execute())
         for user in all_users:
-            proxy: BaseQuery.namedtuples = Proxy.get_low_used_proxy()
+            proxy: namedtuple = Proxy.get_low_used_proxy()
             if not proxy.proxy_pk:
                 return 0
             cls.set_proxy_by_telegram_id(telegram_id=str(user.telegram_id), proxy_pk=proxy.proxy_pk)
@@ -623,14 +628,19 @@ class UserChannel(BaseModel):
             name: str = str(channel_id)
         user = User.get_user_by_telegram_id(telegram_id=telegram_id)
         channel = Channel.get_or_create_channel(guild_id=guild_id, channel_id=channel_id)
-        result, answer = cls.get_or_create(user=user, name=name, channel=channel.id, cooldown=cooldown)
+        result, answer = cls.get_or_create(
+                                                user=user,
+                                                name=name,
+                                                channel=channel.id,
+                                                cooldown=cooldown
+                                            )
         return result.id
 
     @classmethod
     @logger.catch
     def get_user_channel(
             cls: 'UserChannel', telegram_id: Union[str, int], channel_id: int
-    ) -> BaseQuery.namedtuples:
+    ) -> namedtuple:
         """
         Function return named tuple
             list of namedtuple fields:
@@ -653,7 +663,7 @@ class UserChannel(BaseModel):
     @classmethod
     @logger.catch
     def get_all_user_channel_by_telegram_id(
-            cls: 'UserChannel', telegram_id: Union[str, int]) -> List[BaseQuery.namedtuples]:
+            cls: 'UserChannel', telegram_id: Union[str, int]) -> List[namedtuple]:
         """
         Function returns a list of named tuples
         list of namedtuple fields:
@@ -663,16 +673,16 @@ class UserChannel(BaseModel):
             guild_id: int
         """
         return list(
-            cls.select(
-                cls.name.alias('channel_name'),
-                cls.name.alias('cooldown'),
-                Channel.channel_id.alias('channel_id'),
-                Channel.guild_id.alias('guild_id')
-            )
-                .join(Channel, JOIN.LEFT_OUTER, on=(Channel.id == cls.channel))
-                .join(User, JOIN.LEFT_OUTER, on=(User.id == cls.user))
-                .where(User.telegram_id == telegram_id).namedtuples().execute()
-        )
+                    cls.select(
+                        cls.name.alias('channel_name'),
+                        cls.name.alias('cooldown'),
+                        Channel.channel_id.alias('channel_id'),
+                        Channel.guild_id.alias('guild_id')
+                    )
+                    .join(Channel, JOIN.LEFT_OUTER, on=(Channel.id == cls.channel))
+                    .join(User, JOIN.LEFT_OUTER, on=(User.id == cls.user))
+                    .where(User.telegram_id == telegram_id).namedtuples().execute()
+                )
 
     @classmethod
     @logger.catch
@@ -733,9 +743,9 @@ class Token(BaseModel):
 
         return (
             cls.select()
-                .join(UserChannel, JOIN.LEFT_OUTER, on=(UserChannel.id == cls.user_channel))
-                .join(User, JOIN.LEFT_OUTER, on=(UserChannel.user == User.id))
-                .where(User.telegram_id == telegram_id).count()
+            .join(UserChannel, JOIN.LEFT_OUTER, on=(UserChannel.id == cls.user_channel))
+            .join(User, JOIN.LEFT_OUTER, on=(UserChannel.user == User.id))
+            .where(User.telegram_id == telegram_id).count()
         )
 
     @classmethod
@@ -828,8 +838,7 @@ class Token(BaseModel):
 
     @classmethod
     @logger.catch
-    def get_related_tokens(cls: 'User', telegram_id: Union[str, int] = None) -> List[
-        BaseQuery.namedtuples]:
+    def get_related_tokens(cls: 'User', telegram_id: Union[str, int] = None) -> List[namedtuple]:
         """
         Вернуть список всех связанных ТОКЕНОВ пользователя по его telegram_id:
         return: list of numed tuples
@@ -842,20 +851,19 @@ class Token(BaseModel):
             cls.token.alias('token'),
             cls.last_message_time.alias('last_message_time'),
             UserChannel.name.alias('channel_name'))
-                 .join_from(cls, UserChannel, JOIN.LEFT_OUTER, on=(
-                cls.user_channel == UserChannel.id))
+                 .join_from(cls, UserChannel, JOIN.LEFT_OUTER,
+                            on=(cls.user_channel == UserChannel.id))
                  .join_from(cls, Channel, JOIN.LEFT_OUTER, on=(UserChannel.channel == Channel.id))
                  .join_from(cls, User, JOIN.LEFT_OUTER, on=(UserChannel.user == User.id))
                  .join_from(cls, TokenPair, JOIN.RIGHT_OUTER,
-            on=((TokenPair.first_id == cls.id) | (TokenPair.second_id == cls.id)))
+                            on=((TokenPair.first_id == cls.id) | (TokenPair.second_id == cls.id)))
                  .where(User.telegram_id == telegram_id).namedtuples()
                  )
         return [data for data in query]
 
     @classmethod
     @logger.catch
-    def get_all_tokens_info(cls, telegram_id: Union[str, int] = None) -> List[
-        BaseQuery.namedtuples]:
+    def get_all_tokens_info(cls, telegram_id: Union[str, int] = None) -> List[namedtuple]:
         """
         Вернуть список всех ТОКЕНОВ пользователя по его telegram_id:
         return:
@@ -880,12 +888,12 @@ class Token(BaseModel):
             Case(None, [((TokenPair.first_id == cls.id),
                          TokenPair.second_id,)], TokenPair.first_id).alias('pair_pk')
         )
-                .join_from(cls, UserChannel, JOIN.LEFT_OUTER, on=(
-                cls.user_channel == UserChannel.id))
+                .join_from(cls, UserChannel, JOIN.LEFT_OUTER,
+                           on=(cls.user_channel == UserChannel.id))
                 .join_from(cls, Channel, JOIN.LEFT_OUTER, on=(UserChannel.channel == Channel.id))
                 .join_from(cls, User, JOIN.LEFT_OUTER, on=(UserChannel.user == User.id))
                 .join_from(cls, TokenPair, JOIN.LEFT_OUTER,
-            on=((cls.id == TokenPair.first_id) | (cls.id == TokenPair.second_id)))
+                           on=((cls.id == TokenPair.first_id) | (cls.id == TokenPair.second_id)))
                 .where(User.telegram_id == telegram_id).namedtuples()
                 )
         return list(data)
@@ -900,8 +908,8 @@ class Token(BaseModel):
         tokens = (cls.select(
             cls.discord_id.alias('discord_id'),
         )
-                  .join_from(cls, UserChannel, JOIN.LEFT_OUTER, on=(
-                cls.user_channel == UserChannel.id))
+                  .join_from(cls, UserChannel, JOIN.LEFT_OUTER,
+                             on=(cls.user_channel == UserChannel.id))
                   .join_from(cls, Channel, JOIN.LEFT_OUTER, on=(UserChannel.channel == Channel.id))
                   .join_from(cls, User, JOIN.LEFT_OUTER, on=(UserChannel.user == User.id))
                   .where(User.telegram_id == telegram_id).namedtuples().execute())
@@ -909,13 +917,13 @@ class Token(BaseModel):
 
     @classmethod
     @logger.catch
-    def get_all_discord_id_by_channel(cls, user_channel_pk: int) -> List[BaseQuery.namedtuples]:
+    def get_all_discord_id_by_channel(cls, user_channel_pk: int) -> List[namedtuple]:
         """
         return: list named tuples
 
         """
         return list(cls.select(cls.discord_id.alias('discord_id'))
-            .where(cls.user_channel == user_channel_pk).namedtuples().execute())
+                    .where(cls.user_channel == user_channel_pk).namedtuples().execute())
 
     @classmethod
     @logger.catch
@@ -929,15 +937,13 @@ class Token(BaseModel):
                 cls.id.alias('token_pk'),
                 Channel.channel_id.alias('channel_id'),
             )
-                .join_from(cls, UserChannel, JOIN.LEFT_OUTER, on=(
-                    cls.user_channel == UserChannel.id))
-                .join_from(cls, Channel, JOIN.LEFT_OUTER, on=(UserChannel.channel == Channel.id))
-                .join_from(cls, User, JOIN.LEFT_OUTER, on=(UserChannel.user == User.id))
-                .join_from(cls, TokenPair, JOIN.LEFT_OUTER,
-                on=((TokenPair.first_id == cls.id) | (TokenPair.second_id == cls.id)))
-
-                .where(User.telegram_id == telegram_id)
-                .where(TokenPair.first_id == None).namedtuples().execute()
+            .join_from(cls, UserChannel, JOIN.LEFT_OUTER, on=(cls.user_channel == UserChannel.id))
+            .join_from(cls, Channel, JOIN.LEFT_OUTER, on=(UserChannel.channel == Channel.id))
+            .join_from(cls, User, JOIN.LEFT_OUTER, on=(UserChannel.user == User.id))
+            .join_from(cls, TokenPair, JOIN.LEFT_OUTER,
+                       on=((TokenPair.first_id == cls.id) | (TokenPair.second_id == cls.id)))
+            .where(User.telegram_id == telegram_id)
+            .where(TokenPair.first_id == None).namedtuples().execute()
         )
         result: Tuple[List[int], ...] = tuple([[token.token_pk for token in tokens]
                                                for channel, tokens in
@@ -965,7 +971,7 @@ class Token(BaseModel):
 
     @classmethod
     @logger.catch
-    def get_token_info(cls, token: str) -> BaseQuery.namedtuples:
+    def get_token_info(cls, token: str) -> namedtuple:
         """
         Вернуть info по токену
         возвращает объект токен
@@ -990,14 +996,14 @@ class Token(BaseModel):
                 cls.discord_id.alias('discord_id'),
 
             )
-                .join(UserChannel, JOIN.LEFT_OUTER,
-                on=(cls.user_channel == UserChannel.id))
-                .join(Channel, JOIN.LEFT_OUTER, on=(UserChannel.channel == Channel.id))
-                .join(User, JOIN.LEFT_OUTER, on=(UserChannel.user == User.id))
-                .join(TokenPair, JOIN.LEFT_OUTER,
-                on=((TokenPair.first_id == cls.id) | (TokenPair.second_id == cls.id)))
-                .join(Proxy, JOIN.LEFT_OUTER, on=(Proxy.id == User.proxy))
-                .where(Token.token == token).namedtuples().first()
+            .join(UserChannel, JOIN.LEFT_OUTER,
+                  on=(cls.user_channel == UserChannel.id))
+            .join(Channel, JOIN.LEFT_OUTER, on=(UserChannel.channel == Channel.id))
+            .join(User, JOIN.LEFT_OUTER, on=(UserChannel.user == User.id))
+            .join(TokenPair, JOIN.LEFT_OUTER,
+                  on=((TokenPair.first_id == cls.id) | (TokenPair.second_id == cls.id)))
+            .join(Proxy, JOIN.LEFT_OUTER, on=(Proxy.id == User.proxy))
+            .where(Token.token == token).namedtuples().first()
         )
 
         return data
@@ -1038,20 +1044,22 @@ class Token(BaseModel):
         """
         return (
             User.select(
-                Case(None,
+                Case(
+                    None,
                     [
                         ((fn.MAX(User.max_tokens).is_null(False)),
-                         fn.MAX(User.max_tokens) - fn.COUNT(Token.id),)
+                            fn.MAX(User.max_tokens) - fn.COUNT(Token.id),)
                     ],
-                    0)
-                    .alias('limit')
+                    0
+                )
+                .alias('limit')
             )
-                .join(UserChannel, JOIN.LEFT_OUTER, on=(UserChannel.user == User.id))
-                .join(cls, JOIN.LEFT_OUTER, on=(cls.user_channel == UserChannel.id))
-                .where(User.telegram_id == telegram_id)
-                .namedtuples()
-                .first()
-                .limit
+            .join(UserChannel, JOIN.LEFT_OUTER, on=(UserChannel.user == User.id))
+            .join(cls, JOIN.LEFT_OUTER, on=(cls.user_channel == UserChannel.id))
+            .where(User.telegram_id == telegram_id)
+            .namedtuples()
+            .first()
+            .limit
         )
 
 
