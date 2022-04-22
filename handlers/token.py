@@ -276,10 +276,7 @@ async def info_tokens_handler(message: Message) -> None:
         keyboard: 'InlineKeyboardMarkup' = InlineKeyboardMarkup(row_width=1)
         keyboard.add(InlineKeyboardButton(
             text="Удалить токен.", callback_data=f"del_token_{token_info.token_pk}"))
-        await message.answer(
-            mess,
-            reply_markup=keyboard
-        )
+        await message.answer(mess, reply_markup=keyboard)
 
     date_expiration: int = await DBI.get_expiration_date(telegram_id)
     if not all_tokens:
