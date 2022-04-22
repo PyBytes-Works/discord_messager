@@ -91,26 +91,3 @@ class MessageSender(SendMessageToChannel):
                         "replied_user": "false"
                     }
             })
-
-
-async def tests():
-    # print(await GetMe().get_discord_id(token=token, proxy=DEFAULT_PROXY))
-    # print(await ProxyChecker().check_proxy(DEFAULT_PROXY))
-    # print(await TokenChecker().check_token(token=token, proxy=DEFAULT_PROXY, channel=channel))
-    # print(await ChannelMessages().get_messages(datastore=datastore))
-    print(await MessageSender(datastore=datastore).send_message(text = ''))
-
-
-if __name__ == '__main__':
-    token = "OTMzMTE5MDEzNzc1NjI2MzAy.YlcTyQ.AdyEjeWdZ_GL7xvMhitpSKV_qIk"
-    telegram_id = "305353027"
-    channel = 932256559394861079
-    text = "done?"
-    datastore = TokenDataStore(telegram_id=telegram_id)
-    datastore.token = token
-    datastore.proxy = DEFAULT_PROXY
-    datastore.channel = str(channel)
-    try:
-        asyncio.new_event_loop().run_until_complete(tests())
-    except KeyboardInterrupt:
-        pass

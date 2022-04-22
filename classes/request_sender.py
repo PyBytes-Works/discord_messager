@@ -11,7 +11,7 @@ import aiohttp.client_exceptions
 import aiohttp.http_exceptions
 
 from classes.db_interface import DBI
-from config import logger, DISCORD_BASE_URL, PROXY_USER, PROXY_PASSWORD, DEFAULT_PROXY
+from config import logger, DISCORD_BASE_URL, PROXY_USER, PROXY_PASSWORD
 from classes.token_datastorage import TokenDataStore
 
 
@@ -256,28 +256,3 @@ class SendMessageToChannel(PostRequest):
 
         return await self._send()
 
-
-async def tests():
-    print(await GetMe().get_discord_id(token=token, proxy=DEFAULT_PROXY))
-    print(await ProxyChecker().check_proxy(DEFAULT_PROXY))
-    print(await TokenChecker().check_token(token=token, proxy=DEFAULT_PROXY, channel=channel))
-    print(await SendMessageToChannel(datastore=datastore).send_data())
-
-
-if __name__ == '__main__':
-    token = "OTMzMTE5MDEzNzc1NjI2MzAy.YlcTyQ.AdyEjeWdZ_GL7xvMhitpSKV_qIk"
-    telegram_id = "305353027"
-    channel = 932256559394861079
-    text = "done?"
-    datastore = TokenDataStore(telegram_id=telegram_id)
-    datastore.token = token
-    datastore.proxy = DEFAULT_PROXY
-    datastore.channel = str(channel)
-    datastore.data_for_send = {
-        "content": text,
-        "tts": "false",
-    }
-    try:
-        asyncio.new_event_loop().run_until_complete(tests())
-    except KeyboardInterrupt:
-        pass

@@ -213,27 +213,3 @@ class MessageReceiver(GetChannelData):
                 })
 
         return result
-
-
-
-async def tests():
-    print(await MessageReceiver(datastore=datastore).get_message())
-
-
-if __name__ == '__main__':
-    token = "OTMzMTE5MDEzNzc1NjI2MzAy.YlcTyQ.AdyEjeWdZ_GL7xvMhitpSKV_qIk"
-    telegram_id = "305353027"
-    channel = 932256559394861079
-    text = "done?"
-    datastore = TokenDataStore(telegram_id=telegram_id)
-    datastore.token = token
-    datastore.proxy = DEFAULT_PROXY
-    datastore.channel = str(channel)
-    datastore.data_for_send = {
-        "content": text,
-        "tts": "false",
-    }
-    try:
-        asyncio.new_event_loop().run_until_complete(tests())
-    except KeyboardInterrupt:
-        pass
