@@ -6,7 +6,6 @@ from aiogram.dispatcher.filters import Text
 from aiogram.types import Message, CallbackQuery, ReplyKeyboardRemove
 from aiogram.dispatcher import FSMContext
 
-from handlers import token
 from config import logger, Dispatcher
 from keyboards import cancel_keyboard, user_menu_keyboard
 from classes.discord_manager import DiscordTokenManager
@@ -64,7 +63,6 @@ async def start_parsing_command_handler(message: Message, state: FSMContext) -> 
     await message.answer("Запускаю бота " + mute_text, reply_markup=cancel_keyboard())
     await UserStates.in_work.set()
     await DiscordTokenManager(message=message, mute=mute).lets_play()
-    # TODO добавить проверку - если все токены на КД - закончить работу
     await message.answer("Закончил работу.", reply_markup=user_menu_keyboard())
     await state.finish()
 
@@ -132,9 +130,6 @@ def register_handlers(dp: Dispatcher) -> None:
     dp.register_message_handler(cancel_handler, Text(startswith=["отмена", "cancel"], ignore_case=True), state="*")
     dp.register_message_handler(activate_valid_user_handler, commands=["start"])
     dp.register_message_handler(start_parsing_command_handler, Text(equals=["Старт", "Старт & Mute"]))
-    dp.register_message_handler(token.info_tokens_handler, Text(equals=["Информация"]))
-    dp.register_message_handler(token.get_all_tokens_handler, Text(equals=["Установить кулдаун"]))
-    dp.register_message_handler(token.select_channel_handler, Text(equals=['Добавить токен']))
     dp.register_callback_query_handler(answer_to_reply_handler, Text(startswith=["reply_"]), state=UserStates.in_work)
     dp.register_message_handler(send_message_to_reply_handler, state=UserStates.in_work)
     dp.register_message_handler(default_message)
