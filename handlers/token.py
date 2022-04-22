@@ -6,7 +6,7 @@ from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, C
 
 from aiogram.dispatcher import FSMContext
 
-from classes.request_sender import RequestSender
+from classes.request_sender import GetMe, ProxyChecker, TokenChecker
 from states import TokenStates
 from utils import check_is_int, errors_report
 from classes.db_interface import DBI
@@ -151,13 +151,13 @@ async def check_and_add_token_handler(message: Message, state: FSMContext) -> No
     guild: int = data.get('guild')
     user_channel_pk: int = int(data.get("user_channel_pk", 0))
 
-    proxy: str = await RequestSender().get_checked_proxy(telegram_id=telegram_id)
+    proxy: str = await ProxyChecker().get_checked_proxy(telegram_id=telegram_id)
     if proxy == 'no proxies':
         await errors_report(telegram_id=telegram_id, text="Ошибка прокси. Нет доступных прокси.")
         await state.finish()
         return
 
-    discord_id: str = await RequestSender().get_discord_id(token=token, proxy=proxy)
+    discord_id: str = await GetMe().get_discord_id(token=token, proxy=proxy)
     if not discord_id:
         error_text: str = (f"Не смог определить discord_id для токена:"
                            f"\nToken: [{token}]"
@@ -166,7 +166,7 @@ async def check_and_add_token_handler(message: Message, state: FSMContext) -> No
         await state.finish()
         return
 
-    result: dict = await RequestSender().check_token(token=token, proxy=proxy, channel=channel)
+    result: dict = await TokenChecker().check_token(token=token, proxy=proxy, channel=channel)
     if not result.get("success"):
         error_message: str = result.get("message")
         if error_message == 'bad proxy':

@@ -6,7 +6,7 @@ import requests
 
 from classes.open_ai import OpenAI
 from classes.redis_interface import RedisDB
-from classes.request_sender import RequestSender
+from classes.request_sender import SomeChecker
 from classes.vocabulary import Vocabulary
 from config import logger, DISCORD_BASE_URL, PROXY_USER, PROXY_PASSWORD
 from classes.token_datastorage import TokenDataStore
@@ -20,7 +20,6 @@ class MessageSender:
     def __init__(self, datastore: 'TokenDataStore', text: str = ''):
         self.__datastore: 'TokenDataStore' = datastore
         self.__answer: dict = {}
-        self.__data_for_send: dict = {}
         self.__text: str = text
 
     @logger.catch
@@ -28,8 +27,8 @@ class MessageSender:
         """Отправляет данные в канал дискорда, возвращает результат отправки."""
 
         await self.__prepare_data()
-        if self.__data_for_send:
-            await self.__send_data()
+        if self.__datastore.data_for_send:
+            await self._send()
 
         return self.__answer
 
@@ -72,12 +71,12 @@ class MessageSender:
         await self.__get_text()
         if not self.__text:
             return
-        self.__data_for_send = {
+        self.__datastore.data_for_send = {
             "content": self.__text,
             "tts": "false",
         }
         if self.__datastore.current_message_id:
-            self.__data_for_send.update({
+            self.__datastore.data_for_send.update({
                 "message_reference":
                     {
                         "guild_id": self.__datastore.guild,
@@ -111,42 +110,4 @@ class MessageSender:
             logger.warning(f"Typing: {response.status_code}: {response.text}")
         await asyncio.sleep(2)
 
-    @logger.catch
-    async def __send_data(self) -> None:
-        """Отправляет данные в дискорд канал"""
-
-        session = requests.Session()
-        session.headers['authorization'] = self.__datastore.token
-        url = DISCORD_BASE_URL + f'{self.__datastore.channel}/messages?'
-        proxies = {
-            "http": f"http://{PROXY_USER}:{PROXY_PASSWORD}@{self.__datastore.proxy}/",
-            "https": f"http://{PROXY_USER}:{PROXY_PASSWORD}@{self.__datastore.proxy}/"
-        }
-        answer_data: dict = {}
-        try:
-            await self.__typing(proxies=proxies)
-            await asyncio.sleep(1)
-            await self.__typing(proxies=proxies)
-            response = session.post(url=url, json=self.__data_for_send, proxies=proxies)
-            status_code = response.status_code
-            if status_code != 200:
-                logger.error(f"F: __send_data_to_api error: {status_code}: {response.text}")
-                try:
-                    answer_data: dict = response.json()
-                except JSONDecodeError as err:
-                    error_text = "F: __send_data_to_api: JSON ERROR:"
-                    logger.error(error_text, err)
-                    status_code = -1
-                    answer_data: dict = {"message": error_text}
-        except (requests.exceptions.ProxyError, requests.exceptions.ConnectionError) as err:
-            logger.error(f"F: _send_data Error: {err}")
-            status_code = 407
-        self.__answer = {"status_code": status_code, "data": answer_data}
-        # TODO перенести в сендер
-        if status_code == 407:
-            new_proxy: str = await RequestSender().get_checked_proxy(self.__datastore.telegram_id)
-            if new_proxy == 'no proxies':
-                return
-            self.__datastore.proxy = new_proxy
-            await self.__send_data()
 

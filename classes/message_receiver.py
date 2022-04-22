@@ -5,7 +5,7 @@ from typing import List, Tuple
 
 from classes.message_sender import MessageSender
 from classes.redis_interface import RedisDB
-from classes.request_sender import RequestSender
+from classes.request_sender import ChannelMessages
 from config import logger, DEBUG
 from classes.token_datastorage import TokenDataStore
 
@@ -91,7 +91,7 @@ class MessageReceiver:
     async def __get_filtered_data(self) -> dict:
         """Отправляет запрос к АПИ"""
 
-        data: List[dict] = await RequestSender().get_request(datastore=self.__datastore)
+        data: List[dict] = await ChannelMessages().get_messages(datastore=self.__datastore)
         if not data:
             return {}
         result: dict = await self.__data_filter(data=data)
