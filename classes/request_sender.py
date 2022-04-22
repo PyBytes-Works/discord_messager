@@ -174,30 +174,6 @@ class TokenChecker(GetChannelData):
         return answer
 
 
-class ChannelMessages(GetChannelData):
-    def __init__(self):
-        super().__init__()
-        self.limit: int = 100
-
-    @logger.catch
-    async def get_messages(self, datastore: 'TokenDataStore') -> Union[List[dict], dict]:
-        """Отправляет GET запрос к АПИ, возвращает полученные данные"""
-
-        self.proxy: str = datastore.proxy
-        self.token: str = datastore.token
-        self.channel: Union[str, int] = datastore.channel
-
-        answer: dict = await self._send()
-        status: int = answer.get("status")
-        if not status:
-            logger.error(f"get_data_from_channel error: ")
-        elif status == 200:
-            try:
-                return json.loads(answer.get("data"))
-            except JSONDecodeError as err:
-                logger.error("F: get_data_from_channel: JSON ERROR:", err)
-
-
 class PostRequest(RequestSender):
 
     def __init__(self):
@@ -277,19 +253,14 @@ class SendMessageToChannel(PostRequest):
         await self.typing()
         await self.typing()
         self.url = DISCORD_BASE_URL + f'{self._datastore.channel}/messages?'
-        answer: dict = await self._send()
-        if answer.get("status") != 200:
-            logger.debug(answer)
-            return {}
-        data: str = answer.get("data")
-        return json.loads(data)
+
+        return await self._send()
 
 
 async def tests():
-    # print(await GetMe().get_discord_id(token=token, proxy=DEFAULT_PROXY))
-    # print(await ProxyChecker().check_proxy(DEFAULT_PROXY))
-    # print(await TokenChecker().check_token(token=token, proxy=DEFAULT_PROXY, channel=channel))
-    # print(await ChannelMessages().get_messages(datastore=datastore))
+    print(await GetMe().get_discord_id(token=token, proxy=DEFAULT_PROXY))
+    print(await ProxyChecker().check_proxy(DEFAULT_PROXY))
+    print(await TokenChecker().check_token(token=token, proxy=DEFAULT_PROXY, channel=channel))
     print(await SendMessageToChannel(datastore=datastore).send_data())
 
 

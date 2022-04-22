@@ -16,7 +16,6 @@ class MessageSender(SendMessageToChannel):
 
     def __init__(self, datastore: 'TokenDataStore'):
         super().__init__(datastore)
-        self.__answer: dict = {}
         self.__text: str = ''
 
     @logger.catch
@@ -26,13 +25,14 @@ class MessageSender(SendMessageToChannel):
         self.__text = text
         await self.__prepare_data()
         if self._datastore.data_for_send:
-            await self.send_data()
+            return await self.send_data()
 
-        return self.__answer
+        return {}
 
     @logger.catch
     async def __get_text_from_vocabulary(self) -> str:
-        text: str = Vocabulary.get_message()
+        # text: str = Vocabulary.get_message()
+        text = "hello world"
         if text == "Vocabulary error":
             self.__answer = {"status_code": -2, "data": {"message": text}}
             return ''

@@ -1,4 +1,5 @@
 import datetime
+import json
 import random
 from typing import List, Tuple, Optional
 from collections import namedtuple
@@ -204,8 +205,10 @@ class DiscordTokenManager:
         text: str = discord_data.get("message", "ERROR")
         token: str = discord_data.get("token")
         answer: dict = discord_data.get("answer", {})
-        data: dict = answer.get("data", {})
-        status_code: int = answer.get("status_code", 0)
+        data = answer.get("data")
+        if isinstance(data, str):
+            data: dict = json.loads(answer.get("data", {}))
+        status_code: int = answer.get("status", 0)
         sender_text: str = answer.get("message", "SEND_ERROR")
         discord_code_error: int = answer.get("data", {}).get("code", 0)
 

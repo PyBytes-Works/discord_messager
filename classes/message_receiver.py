@@ -1,24 +1,45 @@
 import asyncio
 import datetime
+import json
 import random
-from typing import List, Tuple
+from json import JSONDecodeError
+from typing import List, Tuple, Union
 
 from classes.message_sender import MessageSender
 from classes.redis_interface import RedisDB
-from classes.request_sender import ChannelMessages
-from config import logger, DEBUG
+from classes.request_sender import GetChannelData
+from config import logger, DEBUG, DEFAULT_PROXY
 from classes.token_datastorage import TokenDataStore
 
 
-class MessageReceiver:
+class MessageReceiver(GetChannelData):
 
     """Выбирает токен для отправки сообщения и вызывает метод вызова сообщения,
     проверяет его ответ, и, если есть свободные токены - повторяет процесс.
     При ошибке возвращает ее в телеграм"""
 
-    @logger.catch
     def __init__(self, datastore: 'TokenDataStore'):
-        self.__datastore: 'TokenDataStore' = datastore
+        super().__init__()
+        self._datastore: 'TokenDataStore' = datastore
+        self.limit: int = 100
+
+    @logger.catch
+    async def get_messages(self) -> Union[List[dict], dict]:
+        """Отправляет GET запрос к АПИ, возвращает полученные данные"""
+
+        self.proxy: str = self._datastore.proxy
+        self.token: str = self._datastore.token
+        self.channel: Union[str, int] = self._datastore.channel
+
+        answer: dict = await self._send()
+        status: int = answer.get("status")
+        if not status:
+            logger.error(f"get_data_from_channel error: ")
+        elif status == 200:
+            try:
+                return json.loads(answer.get("data"))
+            except JSONDecodeError as err:
+                logger.error("F: get_data_from_channel: JSON ERROR:", err)
 
     @logger.catch
     async def get_message(self) -> dict:
@@ -39,21 +60,20 @@ class MessageReceiver:
         result.update({"replies": replies})
 
         if message_id:
-            self.__datastore.current_message_id = message_id
+            self._datastore.current_message_id = message_id
         elif filtered_data:
-            self.__datastore.current_message_id = filtered_data.get("last_message_id", 0)
+            self._datastore.current_message_id = filtered_data.get("last_message_id", 0)
         text_to_send: str = user_message if user_message else ''
-        answer: dict = await MessageSender(datastore=self.__datastore).send_message(text=text_to_send)
-        # TODO вынести эту обработку в класс message_sender
+        answer: dict = await MessageSender(datastore=self._datastore).send_message(text=text_to_send)
         if not answer:
             logger.error("F: get_message ERROR: NO ANSWER ERROR")
             result.update({"message": "ERROR"})
             return result
-        elif answer.get("status_code") != 200:
-            result.update({"answer": answer, "token": self.__datastore.token})
+        elif answer.get("status") != 200:
+            result.update({"answer": answer, "token": self._datastore.token})
             return result
 
-        self.__datastore.current_message_id = 0
+        self._datastore.current_message_id = 0
         result.update({"work": True})
         if not DEBUG:
             timer: float = 7 + random.randint(0, 6)
@@ -68,7 +88,7 @@ class MessageReceiver:
 
         answer: str = ''
         message_id = 0
-        redis_data: List[dict] = await RedisDB(redis_key=self.__datastore.telegram_id).load()
+        redis_data: List[dict] = await RedisDB(redis_key=self._datastore.telegram_id).load()
         if not redis_data:
             return answer, message_id
 
@@ -77,12 +97,12 @@ class MessageReceiver:
                 continue
             answered = elem.get("answered", False)
             if not answered:
-                if elem.get("token") == self.__datastore.token:
+                if elem.get("token") == self._datastore.token:
                     answer = elem.get("answer_text", '')
                     if answer:
                         message_id = elem.get("message_id", 0)
                         elem.update({"answered": True})
-                        await RedisDB(redis_key=self.__datastore.telegram_id).save(data=redis_data)
+                        await RedisDB(redis_key=self._datastore.telegram_id).save(data=redis_data)
                         break
 
         return answer, message_id
@@ -91,7 +111,7 @@ class MessageReceiver:
     async def __get_filtered_data(self) -> dict:
         """Отправляет запрос к АПИ"""
 
-        data: List[dict] = await ChannelMessages().get_messages(datastore=self.__datastore)
+        data: List[dict] = await self.get_messages()
         if not data:
             return {}
         result: dict = await self.__data_filter(data=data)
@@ -110,12 +130,12 @@ class MessageReceiver:
             message_time: 'datetime' = elem.get("timestamp")
             mes_time = datetime.datetime.fromisoformat(message_time).replace(tzinfo=None)
             delta = datetime.datetime.utcnow().replace(tzinfo=None) - mes_time
-            if delta.seconds < self.__datastore.last_message_time:
+            if delta.seconds < self._datastore.last_message_time:
                 filtered_replies: dict = self.__get_replies_for_my_tokens(elem=elem)
                 if filtered_replies:
                     replies.append(filtered_replies)
-                is_author_mate: bool = str(self.__datastore.mate_id) == str(elem["author"]["id"])
-                my_message: bool = str(elem["author"]["id"]) == str(self.__datastore.my_discord_id)
+                is_author_mate: bool = str(self._datastore.mate_id) == str(elem["author"]["id"])
+                my_message: bool = str(elem["author"]["id"]) == str(self._datastore.my_discord_id)
                 if is_author_mate and not my_message:
                     spam: dict = {
                             "id": elem.get("id"),
@@ -144,7 +164,7 @@ class MessageReceiver:
 
         if not new_replies:
             return []
-        total_replies: List[dict] = await RedisDB(redis_key=self.__datastore.telegram_id).load()
+        total_replies: List[dict] = await RedisDB(redis_key=self._datastore.telegram_id).load()
         old_messages: list = list(map(lambda x: x.get("message_id"), total_replies))
         result: List[dict] = [
             elem
@@ -153,7 +173,7 @@ class MessageReceiver:
         ]
 
         total_replies.extend(result)
-        await RedisDB(redis_key=self.__datastore.telegram_id).save(data=total_replies)
+        await RedisDB(redis_key=self._datastore.telegram_id).save(data=total_replies)
 
         return result
 
@@ -171,20 +191,20 @@ class MessageReceiver:
         reply_for_author_id: str = ref_messages_author.get("id", '')
         mentions: tuple = tuple(
             filter(
-                lambda x: int(x.get("id", '')) == int(self.__datastore.my_discord_id),
+                lambda x: int(x.get("id", '')) == int(self._datastore.my_discord_id),
                 elem.get("mentions", [])
             )
         )
         author: str = elem.get("author", {}).get("username", '')
         author_id: str = elem.get("author", {}).get("id", '')
-        message_for_me: bool = reply_for_author_id == self.__datastore.my_discord_id
+        message_for_me: bool = reply_for_author_id == self._datastore.my_discord_id
         if any(mentions) or message_for_me:
-            all_discord_tokens: List[str] = self.__datastore.all_tokens_ids
+            all_discord_tokens: List[str] = self._datastore.all_tokens_ids
             print(f"Author ID: {author_id}")
             print(f"IDS: {all_discord_tokens}")
             if author_id not in all_discord_tokens:
                 result.update({
-                    "token": self.__datastore.token,
+                    "token": self._datastore.token,
                     "author": author,
                     "text": elem.get("content", ''),
                     "message_id": elem.get("id", ''),
@@ -193,3 +213,27 @@ class MessageReceiver:
                 })
 
         return result
+
+
+
+async def tests():
+    print(await MessageReceiver(datastore=datastore).get_message())
+
+
+if __name__ == '__main__':
+    token = "OTMzMTE5MDEzNzc1NjI2MzAy.YlcTyQ.AdyEjeWdZ_GL7xvMhitpSKV_qIk"
+    telegram_id = "305353027"
+    channel = 932256559394861079
+    text = "done?"
+    datastore = TokenDataStore(telegram_id=telegram_id)
+    datastore.token = token
+    datastore.proxy = DEFAULT_PROXY
+    datastore.channel = str(channel)
+    datastore.data_for_send = {
+        "content": text,
+        "tts": "false",
+    }
+    try:
+        asyncio.new_event_loop().run_until_complete(tests())
+    except KeyboardInterrupt:
+        pass
