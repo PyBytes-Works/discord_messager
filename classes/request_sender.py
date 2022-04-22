@@ -1,6 +1,7 @@
 import asyncio
 import json
 import ssl
+import time
 from abc import abstractmethod, ABC
 from json import JSONDecodeError
 from typing import Union, List
@@ -125,7 +126,7 @@ class ProxyChecker(GetRequest):
         return await self.get_checked_proxy()
 
 
-class ChannelData(GetRequest):
+class GetChannelData(GetRequest):
     def __init__(self):
         super().__init__()
         self.limit: int = 1
@@ -136,7 +137,7 @@ class ChannelData(GetRequest):
         return await super()._send()
 
 
-class TokenChecker(ChannelData):
+class TokenChecker(GetChannelData):
 
     @logger.catch
     async def _check_token(self, proxy: str, token, channel: Union[str, int]) -> int:
@@ -173,7 +174,7 @@ class TokenChecker(ChannelData):
         return answer
 
 
-class ChannelMessages(ChannelData):
+class ChannelMessages(GetChannelData):
     def __init__(self):
         super().__init__()
         self.limit: int = 100
@@ -199,29 +200,25 @@ class ChannelMessages(ChannelData):
 
 class PostRequest(RequestSender):
 
-    # TODO Реализовать
-
-    def __init__(self, datastore: 'TokenDataStore'):
+    def __init__(self):
         super().__init__()
-        self.__datastore: 'TokenDataStore' = datastore
+        self.data_for_send: dict = {}
 
     @logger.catch
     async def _send(self) -> dict:
         """Отправляет данные в дискорд канал"""
 
         answer: dict = await super()._send()
-        self.url = DISCORD_BASE_URL + f'{self.__datastore.channel}/messages?'
         async with aiohttp.ClientSession() as session:
             params: dict = {
                 'url': self.url,
                 "proxy": self.proxy_data,
                 "ssl": False,
                 "timeout": 10,
-                "json": self.__datastore.data_for_send
+                "json": self.data_for_send
             }
             if self.token:
                 session.headers['authorization']: str = self.token
-                params.update(url=self.url)
             try:
                 async with session.post(**params) as response:
                     answer.update(
@@ -238,8 +235,7 @@ class PostRequest(RequestSender):
                 logger.error("Ошибка авторизации прокси:", err)
                 if "Proxy Authentication Required" in err:
                     answer.update(status=407)
-        #         self.__answer = {"status_code": status_code, "data": answer_data}
-
+                # TODO
         #         if status_code == 407:
         #             new_proxy: str = await SomeChecker().get_checked_proxy(self.__datastore.telegram_id)
         #             if new_proxy == 'no proxies':
@@ -249,48 +245,67 @@ class PostRequest(RequestSender):
         return answer
 
 
-        #old
-        # session = requests.Session()
-        # session.headers['authorization'] = self.__datastore.token
-        # proxies = {
-        #     "http": f"http://{PROXY_USER}:{PROXY_PASSWORD}@{self.__datastore.proxy}/",
-        #     "https": f"http://{PROXY_USER}:{PROXY_PASSWORD}@{self.__datastore.proxy}/"
-        # }
-        # answer_data: dict = {}
-        # try:
-        #     await self.__typing(proxies=proxies)
-        #     await asyncio.sleep(1)
-        #     await self.__typing(proxies=proxies)
-        #     response = session.post(url=url, json=self.__data_for_send, proxies=proxies)
-        #     status_code = response.status_code
-        #     if status_code != 200:
-        #         logger.error(f"F: __send_data_to_api error: {status_code}: {response.text}")
-        #         try:
-        #             answer_data: dict = response.json()
-        #         except JSONDecodeError as err:
-        #             error_text = "F: __send_data_to_api: JSON ERROR:"
-        #             logger.error(error_text, err)
-        #             status_code = -1
-        #             answer_data: dict = {"message": error_text}
-        #
-        #
-        # return answer
+class SendMessageToChannel(PostRequest):
+
+    def __init__(self, datastore: 'TokenDataStore'):
+        super().__init__()
+        self._datastore: 'TokenDataStore' = datastore
+
+    @logger.catch
+    async def typing(self) -> None:
+        """Имитирует "Пользователь печатает" в чате дискорда."""
+
+        logger.debug("Typing...")
+
+        self.url = f'https://discord.com/api/v9/channels/{self._datastore.channel}/typing'
+        answer: dict = await self._send()
+        if answer.get("status") != 204:
+            logger.warning(f"Typing: {answer}")
+        await asyncio.sleep(2)
+
+    async def send_data(self) -> dict:
+        """
+        Sends data to discord channel
+        :param datastore:
+        :return:
+        """
+
+        self.token = self._datastore.token
+        self.proxy = self._datastore.proxy
+        self.data_for_send = self._datastore.data_for_send
+
+        await self.typing()
+        await self.typing()
+        self.url = DISCORD_BASE_URL + f'{self._datastore.channel}/messages?'
+        answer: dict = await self._send()
+        if answer.get("status") != 200:
+            logger.debug(answer)
+            return {}
+        data: str = answer.get("data")
+        return json.loads(data)
 
 
 async def tests():
-    print(await GetMe().get_discord_id(token=token, proxy=DEFAULT_PROXY))
+    # print(await GetMe().get_discord_id(token=token, proxy=DEFAULT_PROXY))
     # print(await ProxyChecker().check_proxy(DEFAULT_PROXY))
     # print(await TokenChecker().check_token(token=token, proxy=DEFAULT_PROXY, channel=channel))
     # print(await ChannelMessages().get_messages(datastore=datastore))
+    print(await SendMessageToChannel(datastore=datastore).send_data())
+
 
 if __name__ == '__main__':
     token = "OTMzMTE5MDEzNzc1NjI2MzAy.YlcTyQ.AdyEjeWdZ_GL7xvMhitpSKV_qIk"
     telegram_id = "305353027"
     channel = 932256559394861079
+    text = "done?"
     datastore = TokenDataStore(telegram_id=telegram_id)
     datastore.token = token
     datastore.proxy = DEFAULT_PROXY
     datastore.channel = str(channel)
+    datastore.data_for_send = {
+        "content": text,
+        "tts": "false",
+    }
     try:
         asyncio.new_event_loop().run_until_complete(tests())
     except KeyboardInterrupt:

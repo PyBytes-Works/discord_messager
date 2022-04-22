@@ -43,7 +43,7 @@ class MessageReceiver:
         elif filtered_data:
             self.__datastore.current_message_id = filtered_data.get("last_message_id", 0)
         text_to_send: str = user_message if user_message else ''
-        answer: dict = await MessageSender(datastore=self.__datastore, text=text_to_send).send_message()
+        answer: dict = await MessageSender(datastore=self.__datastore).send_message(text=text_to_send)
         # TODO вынести эту обработку в класс message_sender
         if not answer:
             logger.error("F: get_message ERROR: NO ANSWER ERROR")
