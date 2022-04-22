@@ -1,14 +1,12 @@
-import asyncio
 import datetime
 import json
-import random
 from json import JSONDecodeError
-from typing import List, Tuple, Union
+from typing import List, Tuple, Optional
 
-from classes.message_sender import MessageSender
 from classes.redis_interface import RedisDB
 from classes.request_sender import ChannelData
-from config import logger, DEBUG
+from classes.token_datastorage import TokenData
+from config import logger
 
 
 class MessageReceiver(ChannelData):
@@ -18,7 +16,7 @@ class MessageReceiver(ChannelData):
     При ошибке возвращает ее в телеграм"""
 
     @logger.catch
-    async def get_messages(self) -> Union[List[dict], dict]:
+    async def __get_all_messages(self) -> List[dict]:
         """Отправляет GET запрос к АПИ, возвращает полученные данные"""
 
         self.proxy: str = self._datastore.proxy
@@ -33,9 +31,10 @@ class MessageReceiver(ChannelData):
                 return json.loads(answer.get("data"))
             except JSONDecodeError as err:
                 logger.error("F: get_data_from_channel: JSON ERROR:", err)
+        return []
 
     @logger.catch
-    async def get_message(self) -> dict:
+    async def get_message(self) -> Optional['TokenData']:
         """Получает данные из АПИ, выбирает случайное сообщение и возвращает ID сообщения
         и само сообщение"""
 
@@ -45,35 +44,19 @@ class MessageReceiver(ChannelData):
         #  отправлять в телеграм юзеру
         # TODO выделить реплаи и работу с ними в отдельный класс
 
-        result = {"work": False}
         user_message, message_id = await self.__get_user_message_from_redis()
 
-        filtered_data: dict = await self.__get_filtered_data()
-        replies: List[dict] = filtered_data.get("replies", [])
-        result.update({"replies": replies})
+        filtered_data: List[dict] = await self.__get_all_messages()
+        if not filtered_data:
+            return
+        lms_id_and_replies: Tuple[int, List[dict]] = await self.__set_replies_and_message_id_to_datastore(data=filtered_data)
+        self._datastore.current_message_id = lms_id_and_replies[0]
+        self._datastore.replies = lms_id_and_replies[1]
 
         if message_id:
             self._datastore.current_message_id = message_id
-        elif filtered_data:
-            self._datastore.current_message_id = filtered_data.get("last_message_id", 0)
-        text_to_send: str = user_message if user_message else ''
-        answer: dict = await MessageSender(datastore=self._datastore).send_message(text=text_to_send)
-        if not answer:
-            logger.error("F: get_message ERROR: NO ANSWER ERROR")
-            result.update({"message": "ERROR"})
-            return result
-        elif answer.get("status") != 200:
-            result.update({"answer": answer, "token": self._datastore.token})
-            return result
-
-        self._datastore.current_message_id = 0
-        result.update({"work": True})
-        if not DEBUG:
-            timer: float = 7 + random.randint(0, 6)
-            logger.info(f"Пауза между отправкой сообщений: {timer}")
-            await asyncio.sleep(timer)
-
-        return result
+        self._datastore.text_to_send = user_message if user_message else ''
+        return self._datastore
 
     @logger.catch
     async def __get_user_message_from_redis(self) -> Tuple[str, int]:
@@ -101,23 +84,11 @@ class MessageReceiver(ChannelData):
         return answer, message_id
 
     @logger.catch
-    async def __get_filtered_data(self) -> dict:
-        """Отправляет запрос к АПИ"""
-
-        data: List[dict] = await self.get_messages()
-        if not data:
-            return {}
-        result: dict = await self.__data_filter(data=data)
-
-        return result
-
-    @logger.catch
-    async def __data_filter(self, data: List[dict]) -> dict:
-        """Фильтрует полученные данные"""
+    async def __set_replies_and_message_id_to_datastore(self, data: List[dict]) -> Tuple[int, List[dict]]:
+        """Сохраняет реплаи и последнее сообщение в datastore"""
 
         messages = []
         replies = []
-        result = {}
         for elem in data:
 
             message_time: 'datetime' = elem.get("timestamp")
@@ -135,14 +106,11 @@ class MessageReceiver(ChannelData):
                             "timestamp": message_time,
                         }
                     messages.append(spam)
-        last_message_id: int = await self.__get_last_message_id(data=messages)
-        result.update({"last_message_id": last_message_id})
-        print("Replies before:", replies)
-        replies: List[dict] = await self.__update_replies_to_redis(new_replies=replies)
-        result.update({"replies": replies})
-        print("Replies after:", replies)
 
-        return result
+        last_message_id: int = await self.__get_last_message_id(data=messages)
+        replies: List[dict] = await self.__update_replies_to_redis(new_replies=replies)
+
+        return last_message_id, replies
 
     @logger.catch
     async def __get_last_message_id(self, data: list) -> int:

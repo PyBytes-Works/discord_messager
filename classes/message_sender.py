@@ -5,7 +5,7 @@ from classes.redis_interface import RedisDB
 from classes.request_sender import SendMessageToChannel
 from classes.vocabulary import Vocabulary
 from config import logger
-from classes.token_datastorage import TokenDataStore
+from classes.token_datastorage import TokenData
 
 
 class MessageSender(SendMessageToChannel):
@@ -13,15 +13,15 @@ class MessageSender(SendMessageToChannel):
     связанного токена
     Возвращает сообщение об ошибке или об успехе"""
 
-    def __init__(self, datastore: 'TokenDataStore'):
+    def __init__(self, datastore: 'TokenData'):
         super().__init__(datastore)
         self.__text: str = ''
 
     @logger.catch
-    async def send_message(self, text: str) -> dict:
+    async def send_message(self) -> dict:
         """Отправляет данные в канал дискорда, возвращает результат отправки."""
 
-        self.__text = text
+        self.__text = self._datastore.text_to_send
         await self.__prepare_data()
         if self._datastore.data_for_send:
             return await self.send_data()
@@ -34,7 +34,8 @@ class MessageSender(SendMessageToChannel):
         if text == "Vocabulary error":
             self.__answer = {"status_code": -2, "data": {"message": text}}
             return ''
-        await RedisDB(redis_key=self._datastore.mate_id).save(data=[text], timeout_sec=self._datastore.delay + 300)
+        await RedisDB(redis_key=self._datastore.mate_id).save(data=[
+            text], timeout_sec=self._datastore.delay + 300)
         return text
 
     @logger.catch
@@ -69,10 +70,10 @@ class MessageSender(SendMessageToChannel):
             return
         self._datastore.data_for_send = {
             "content": self.__text,
-            "tts": "false",
+            "tts": "false"
         }
         if self._datastore.current_message_id:
-            self._datastore.data_for_send.update({
+            params: dict = {
                 "message_reference":
                     {
                         "guild_id": self._datastore.guild,
@@ -88,4 +89,5 @@ class MessageSender(SendMessageToChannel):
                         ],
                         "replied_user": "false"
                     }
-            })
+            }
+            self._datastore.data_for_send.update(**params)

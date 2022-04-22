@@ -10,7 +10,7 @@ import aiohttp.http_exceptions
 
 from classes.db_interface import DBI
 from config import logger, DISCORD_BASE_URL, PROXY_USER, PROXY_PASSWORD
-from classes.token_datastorage import TokenDataStore
+from classes.token_datastorage import TokenData
 
 
 class RequestSender(ABC):
@@ -36,6 +36,13 @@ class RequestSender(ABC):
             "data": ''
         }
         return answer
+
+    async def send_message(self):
+        # TODO
+        try:
+            await self._send()
+        except Exception:
+            pass
 
 
 class GetRequest(RequestSender):
@@ -75,9 +82,9 @@ class GetRequest(RequestSender):
 
 class ChannelData(GetRequest):
 
-    def __init__(self, datastore: 'TokenDataStore'):
+    def __init__(self, datastore: 'TokenData'):
         super().__init__()
-        self._datastore: 'TokenDataStore' = datastore
+        self._datastore: 'TokenData' = datastore
         self.limit: int = 100
 
     async def _send(self) -> dict:
@@ -174,7 +181,7 @@ class PostRequest(RequestSender):
 
     def __init__(self):
         super().__init__()
-        self.data_for_send: dict = {}
+        self._data_for_send: dict = {}
 
     @logger.catch
     async def _send(self) -> dict:
@@ -187,7 +194,7 @@ class PostRequest(RequestSender):
                 "proxy": self.proxy_data,
                 "ssl": False,
                 "timeout": 10,
-                "json": self.data_for_send
+                "json": self._data_for_send
             }
             if self.token:
                 session.headers['authorization']: str = self.token
@@ -213,9 +220,9 @@ class PostRequest(RequestSender):
 
 class SendMessageToChannel(PostRequest):
 
-    def __init__(self, datastore: 'TokenDataStore'):
+    def __init__(self, datastore: 'TokenData'):
         super().__init__()
-        self._datastore: 'TokenDataStore' = datastore
+        self._datastore: 'TokenData' = datastore
 
     @logger.catch
     async def typing(self) -> None:
@@ -236,7 +243,7 @@ class SendMessageToChannel(PostRequest):
 
         self.token = self._datastore.token
         self.proxy = self._datastore.proxy
-        self.data_for_send = self._datastore.data_for_send
+        self._data_for_send = self._datastore.data_for_send
 
         await self.typing()
         await self.typing()
