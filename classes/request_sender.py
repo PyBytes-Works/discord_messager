@@ -37,10 +37,10 @@ class RequestSender(ABC):
         }
         return answer
 
-    async def send_message(self):
+    async def send_message(self) -> dict:
         # TODO
         try:
-            await self._send()
+            return await self._send()
         except Exception:
             pass
 
@@ -77,6 +77,7 @@ class GetRequest(RequestSender):
                 logger.error("Ошибка авторизации прокси:", err)
                 if "Proxy Authentication Required" in err:
                     answer.update(status=407)
+
         return answer
 
 
@@ -132,14 +133,6 @@ class ProxyChecker(GetRequest):
             return 'no proxies'
 
         return await self.get_checked_proxy(telegram_id=telegram_id)
-
-    @logger.catch
-    async def check_proxy(self, proxy: str):
-
-        answer: int = await self._check_proxy(proxy=proxy)
-        if answer == 200:
-            return proxy
-        return await self.get_checked_proxy()
 
 
 class TokenChecker(GetRequest):
