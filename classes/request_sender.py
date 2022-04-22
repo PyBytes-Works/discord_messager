@@ -1,10 +1,8 @@
 import asyncio
 import json
 import ssl
-import time
 from abc import abstractmethod, ABC
-from json import JSONDecodeError
-from typing import Union, List
+from typing import Union
 
 import aiohttp
 import aiohttp.client_exceptions
@@ -16,19 +14,19 @@ from classes.token_datastorage import TokenDataStore
 
 
 class RequestSender(ABC):
-    _EXCEPTIONS: tuple = (
-        asyncio.exceptions.TimeoutError,
-        aiohttp.client_exceptions.ServerDisconnectedError,
-        aiohttp.client_exceptions.ClientProxyConnectionError,
-        aiohttp.client_exceptions.ClientHttpProxyError,
-        aiohttp.client_exceptions.ClientOSError,
-        aiohttp.client_exceptions.TooManyRedirects,
-    )
 
     def __init__(self):
         self.proxy: str = ''
         self.token: str = ''
         self.url: str = ''
+        self._EXCEPTIONS: tuple = (
+            asyncio.exceptions.TimeoutError,
+            aiohttp.client_exceptions.ServerDisconnectedError,
+            aiohttp.client_exceptions.ClientProxyConnectionError,
+            aiohttp.client_exceptions.ClientHttpProxyError,
+            aiohttp.client_exceptions.ClientOSError,
+            aiohttp.client_exceptions.TooManyRedirects,
+        )
 
     @abstractmethod
     async def _send(self) -> dict:
@@ -47,12 +45,12 @@ class GetRequest(RequestSender):
         answer: dict = await super()._send()
 
         async with aiohttp.ClientSession() as session:
-            print(f"URL: {self.url}")
+
             params: dict = {
                 'url': self.url,
                 "proxy": self.proxy_data,
                 "ssl": False,
-                "timeout": 10
+                "timeout": 5
             }
             if self.token:
                 session.headers['authorization']: str = self.token
@@ -72,8 +70,19 @@ class GetRequest(RequestSender):
                 logger.error("Ошибка авторизации прокси:", err)
                 if "Proxy Authentication Required" in err:
                     answer.update(status=407)
-
         return answer
+
+
+class ChannelData(GetRequest):
+
+    def __init__(self, datastore: 'TokenDataStore'):
+        super().__init__()
+        self._datastore: 'TokenDataStore' = datastore
+        self.limit: int = 100
+
+    async def _send(self) -> dict:
+        self.url: str = DISCORD_BASE_URL + f'{self._datastore.channel}/messages?limit={self.limit}'
+        return await super()._send()
 
 
 class GetMe(GetRequest):
@@ -126,39 +135,24 @@ class ProxyChecker(GetRequest):
         return await self.get_checked_proxy()
 
 
-class GetChannelData(GetRequest):
+class TokenChecker(GetRequest):
+
     def __init__(self):
         super().__init__()
         self.limit: int = 1
         self.channel: Union[str, int] = 0
 
-    async def _send(self) -> dict:
-        self.url: str = DISCORD_BASE_URL + f'{self.channel}/messages?limit={self.limit}'
-        return await super()._send()
-
-
-class TokenChecker(GetChannelData):
-
-    @logger.catch
-    async def _check_token(self, proxy: str, token, channel: Union[str, int]) -> int:
-        """Отправляет запрос через прокси, возвращает статус код ответа"""
-
-        self.proxy: str = proxy
-        self.token: str = token
-        self.channel: int = channel
-        answer: dict = await self._send()
-
-        return answer.get("status")
-
     @logger.catch
     async def check_token(self, proxy: str, token: str, channel: int) -> dict:
         """Returns valid token else 'bad token'"""
 
-        answer: dict = {
-            "success": False,
-            "message": '',
-        }
-        status: int = await self._check_token(proxy=proxy, token=token, channel=channel)
+        self.proxy: str = proxy
+        self.token: str = token
+        self.channel: int = channel
+        self.url: str = DISCORD_BASE_URL + f'{self.channel}/messages?limit={self.limit}'
+
+        answer: dict = await self._send()
+        status: int = answer.get("status")
         if status == 200:
             answer.update({
                 "success": True,
@@ -168,8 +162,10 @@ class TokenChecker(GetChannelData):
             })
         elif status == 407:
             answer.update(message='bad proxy')
-        else:
+        elif status == 401:
             answer.update(message='bad token')
+        else:
+            answer.update(message='check_token failed')
 
         return answer
 
@@ -211,13 +207,7 @@ class PostRequest(RequestSender):
                 logger.error("Ошибка авторизации прокси:", err)
                 if "Proxy Authentication Required" in err:
                     answer.update(status=407)
-                # TODO
-        #         if status_code == 407:
-        #             new_proxy: str = await SomeChecker().get_checked_proxy(self.__datastore.telegram_id)
-        #             if new_proxy == 'no proxies':
-        #                 return
-        #             self.__datastore.proxy = new_proxy
-        #             await self.__send_data()
+
         return answer
 
 
@@ -231,11 +221,9 @@ class SendMessageToChannel(PostRequest):
     async def typing(self) -> None:
         """Имитирует "Пользователь печатает" в чате дискорда."""
 
-        logger.debug("Typing...")
-
         self.url = f'https://discord.com/api/v9/channels/{self._datastore.channel}/typing'
         answer: dict = await self._send()
-        if answer.get("status") != 204:
+        if answer.get("status") not in range(200, 205):
             logger.warning(f"Typing: {answer}")
         await asyncio.sleep(2)
 
@@ -255,4 +243,3 @@ class SendMessageToChannel(PostRequest):
         self.url = DISCORD_BASE_URL + f'{self._datastore.channel}/messages?'
 
         return await self._send()
-

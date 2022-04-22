@@ -1,11 +1,10 @@
-import asyncio
 import random
 
 from classes.open_ai import OpenAI
 from classes.redis_interface import RedisDB
 from classes.request_sender import SendMessageToChannel
 from classes.vocabulary import Vocabulary
-from config import logger, DEFAULT_PROXY
+from config import logger
 from classes.token_datastorage import TokenDataStore
 
 
@@ -31,8 +30,7 @@ class MessageSender(SendMessageToChannel):
 
     @logger.catch
     async def __get_text_from_vocabulary(self) -> str:
-        # text: str = Vocabulary.get_message()
-        text = "hello world"
+        text: str = Vocabulary.get_message()
         if text == "Vocabulary error":
             self.__answer = {"status_code": -2, "data": {"message": text}}
             return ''

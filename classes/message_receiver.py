@@ -7,21 +7,16 @@ from typing import List, Tuple, Union
 
 from classes.message_sender import MessageSender
 from classes.redis_interface import RedisDB
-from classes.request_sender import GetChannelData
-from config import logger, DEBUG, DEFAULT_PROXY
+from classes.request_sender import ChannelData
+from config import logger, DEBUG
 from classes.token_datastorage import TokenDataStore
 
 
-class MessageReceiver(GetChannelData):
+class MessageReceiver(ChannelData):
 
     """Выбирает токен для отправки сообщения и вызывает метод вызова сообщения,
     проверяет его ответ, и, если есть свободные токены - повторяет процесс.
     При ошибке возвращает ее в телеграм"""
-
-    def __init__(self, datastore: 'TokenDataStore'):
-        super().__init__()
-        self._datastore: 'TokenDataStore' = datastore
-        self.limit: int = 100
 
     @logger.catch
     async def get_messages(self) -> Union[List[dict], dict]:
@@ -29,7 +24,6 @@ class MessageReceiver(GetChannelData):
 
         self.proxy: str = self._datastore.proxy
         self.token: str = self._datastore.token
-        self.channel: Union[str, int] = self._datastore.channel
 
         answer: dict = await self._send()
         status: int = answer.get("status")

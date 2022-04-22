@@ -112,7 +112,7 @@ class Proxy(BaseModel):
 class Channel(BaseModel):
     """The Channel class have fields guild_id and channel_id"""
     guild_id = BigIntegerField(unique=True, verbose_name="Гильдия для подключения")
-    channel_id = BigIntegerField(unique=True, verbose_name="Канал для подключения")
+    channel_id = BigIntegerField(verbose_name="Канал для подключения")
 
     class Meta:
         table_name = 'channel'
@@ -688,16 +688,11 @@ class Token(BaseModel):
           check_token_by_discord_id
           update_token_time
     """
-    # user = ForeignKeyField(User, on_delete="CASCADE")
     user_channel = ForeignKeyField(
         UserChannel, backref='token', verbose_name="Канал для подключения", on_delete='CASCADE')
     name = CharField(max_length=100, verbose_name="Название токена")
     token = CharField(max_length=255, unique=True, verbose_name="Токен пользователя в discord")
     discord_id = CharField(max_length=255, unique=True, verbose_name="ID пользователя в discord")
-
-    language = CharField(
-        default='en', max_length=10, unique=False, verbose_name="Язык канала в discord"
-    )
     last_message_time = TimestampField(
         default=datetime.datetime.now().timestamp() - 60 * 5,
         verbose_name="Время отправки последнего сообщения"
