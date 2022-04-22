@@ -24,7 +24,7 @@ class TokenDataStore:
         self.__MATE_DISCORD_ID: str = ''
         self.__DELAY: int = 0
         self.__MY_DISCORD_ID: str = ''
-        self.__current_message_text: str = ''
+        self.__data_for_send: dict = {}
         self.__all_tokens_ids: List[str] = []
         self.user_channel_pk: int = 0
 
@@ -40,12 +40,16 @@ class TokenDataStore:
         self.user_channel_pk: int = token_data.user_channel_pk
 
     @property
-    def current_message_text(self) -> str:
-        return self.__current_message_text
+    def data_for_send(self) -> dict:
+        return self.__data_for_send
 
-    @current_message_text.setter
-    def current_message_text(self, message_text: str):
-        self.__current_message_text = message_text
+    @data_for_send.setter
+    def data_for_send(self, data: dict):
+        if not isinstance(data, dict):
+            raise TypeError("Error data_for_send")
+        if not data.get('content', None):
+            raise ValueError("Nothing for send")
+        self.__data_for_send = data
 
     @property
     def all_tokens_ids(self) -> List[str]:

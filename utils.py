@@ -5,9 +5,11 @@ import string
 
 import aiogram
 import aiogram.utils.exceptions
+from aiogram.types import Message
 
 from typing import Union
 from config import logger, bot, admins_list
+from keyboards import user_menu_keyboard
 
 
 @logger.catch
@@ -102,3 +104,12 @@ async def send_report_to_admins(text: str) -> None:
             await bot.send_message(chat_id=admin_id, text=text)
         except aiogram.utils.exceptions.ChatNotFound as err:
             logger.error(f"Не смог отправить сообщение пользователю {admin_id}.", err)
+
+
+@logger.catch
+async def errors_report(telegram_id: str, text: str) -> None:
+    """Errors report"""
+
+    logger.error(f"Errors report: {text}")
+    await send_report_to_admins(text)
+    await bot.send_message(chat_id=telegram_id, reply_markup=user_menu_keyboard())
