@@ -28,7 +28,7 @@ class MessageSender:
 
         await self.__prepare_data()
         if self.__datastore.data_for_send:
-            await self._send()
+            await PostRequest()._send()
 
         return self.__answer
 

@@ -30,7 +30,7 @@ class RequestSender(ABC):
         self.url: str = ''
 
     @abstractmethod
-    def _send(self) -> dict:
+    async def _send(self) -> dict:
         self.proxy_data: str = f"http://{PROXY_USER}:{PROXY_PASSWORD}@{self.proxy}/"
         answer: dict = {
             "status": 0,
@@ -43,7 +43,7 @@ class GetRequest(RequestSender):
 
     @logger.catch
     async def _send(self) -> dict:
-        answer: dict = super()._send()
+        answer: dict = await super()._send()
 
         async with aiohttp.ClientSession() as session:
             print(f"URL: {self.url}")
@@ -131,8 +131,9 @@ class ChannelData(GetRequest):
         self.limit: int = 1
         self.channel: Union[str, int] = 0
 
-    def _set_url(self):
+    async def _send(self) -> dict:
         self.url: str = DISCORD_BASE_URL + f'{self.channel}/messages?limit={self.limit}'
+        return await super()._send()
 
 
 class TokenChecker(ChannelData):
@@ -144,7 +145,6 @@ class TokenChecker(ChannelData):
         self.proxy: str = proxy
         self.token: str = token
         self.channel: int = channel
-        self._set_url()
         answer: dict = await self._send()
 
         return answer.get("status")
@@ -185,7 +185,6 @@ class ChannelMessages(ChannelData):
         self.proxy: str = datastore.proxy
         self.token: str = datastore.token
         self.channel: Union[str, int] = datastore.channel
-        self._set_url()
 
         answer: dict = await self._send()
         status: int = answer.get("status")
@@ -200,21 +199,21 @@ class ChannelMessages(ChannelData):
 
 class PostRequest(RequestSender):
 
+    # TODO Реализовать
+
     def __init__(self, datastore: 'TokenDataStore'):
         super().__init__()
         self.__datastore: 'TokenDataStore' = datastore
-        self.token = datastore.token
-        # self.url = url if url else DISCORD_BASE_URL + f'{self.__datastore.channel}/messages?'
 
     @logger.catch
     async def _send(self) -> dict:
         """Отправляет данные в дискорд канал"""
 
-        answer: dict = super()._send()
-
+        answer: dict = await super()._send()
+        self.url = DISCORD_BASE_URL + f'{self.__datastore.channel}/messages?'
         async with aiohttp.ClientSession() as session:
             params: dict = {
-                'url': "https://www.google.com",
+                'url': self.url,
                 "proxy": self.proxy_data,
                 "ssl": False,
                 "timeout": 10,
@@ -250,6 +249,7 @@ class PostRequest(RequestSender):
         return answer
 
 
+        #old
         # session = requests.Session()
         # session.headers['authorization'] = self.__datastore.token
         # proxies = {
