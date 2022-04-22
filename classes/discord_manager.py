@@ -231,7 +231,8 @@ class DiscordTokenManager:
             await send_report_to_admins(sender_text)
         elif status_code == 401:
             if discord_code_error == 0:
-                await self.message.answer("Сменился токен."
+                await DBI.delete_token(token=token)
+                await self.message.answer("Токен сменился и будет удален."
                                           f"\nToken: {token}")
             else:
                 await self.message.answer(

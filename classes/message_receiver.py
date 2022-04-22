@@ -9,7 +9,6 @@ from classes.message_sender import MessageSender
 from classes.redis_interface import RedisDB
 from classes.request_sender import ChannelData
 from config import logger, DEBUG
-from classes.token_datastorage import TokenDataStore
 
 
 class MessageReceiver(ChannelData):
