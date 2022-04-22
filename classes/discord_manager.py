@@ -205,12 +205,12 @@ class DiscordTokenManager:
         text: str = discord_data.get("message", "ERROR")
         token: str = discord_data.get("token")
         answer: dict = discord_data.get("answer", {})
+        status_code: int = answer.get("status", 0)
+        sender_text: str = answer.get("message", "SEND_ERROR")
         data = answer.get("data")
         if isinstance(data, str):
             data: dict = json.loads(answer.get("data", {}))
-        status_code: int = answer.get("status", 0)
-        sender_text: str = answer.get("message", "SEND_ERROR")
-        discord_code_error: int = answer.get("data", {}).get("code", 0)
+        discord_code_error: int = data.get("code", 0)
 
         result: str = 'ok'
 
@@ -280,13 +280,14 @@ class DiscordTokenManager:
             if discord_code_error == 20016:
                 cooldown: int = int(data.get("retry_after", None))
                 if cooldown:
-                    cooldown += self.__datastore.cooldown + 2
+                    cooldown += self.__datastore.cooldown
                     await DBI.update_user_channel_cooldown(
                         user_channel_pk=self.__datastore.user_channel_pk, cooldown=cooldown)
                     self.__datastore.delay = cooldown
                 await self.message.answer(
                     "Для данного токена сообщения отправляются чаще, чем разрешено в канале."
                     f"\nToken: {token}"
+                    f"\nГильдия/Канал: {self.__datastore.guild}/{self.__datastore.channel}"
                     f"\nВремя скорректировано. Кулдаун установлен: {cooldown} секунд"
                 )
             else:
