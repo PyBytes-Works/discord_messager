@@ -1,4 +1,4 @@
-from classes.request_sender import *
+from classes.request_classes import *
 from fake_data import *
 
 

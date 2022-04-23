@@ -34,6 +34,15 @@ class DiscordTokenManager:
         self.__current_tokens_list: List[namedtuple] = []
         self.__workers: List[str] = []
         self._datastore: Optional['TokenData'] = None
+        self.working: bool = False
+
+    # TODO Написать декоратор для проверки работы класса
+    # def check_working(self, func):
+    #     def wrapper(*args, **kwargs):
+    #         if self.working:
+    #             return func(*args, **kwargs)
+    #
+    #     return wrapper
 
     @logger.catch
     async def lets_play(self) -> None:
@@ -42,9 +51,10 @@ class DiscordTokenManager:
 
         self._datastore: 'TokenData' = TokenData(self.user_telegram_id)
         self._datastore.all_tokens_ids = await DBI.get_all_discord_id(telegram_id=self.user_telegram_id)
-        await self.__send_text(
-            text="Начинаю работу.", keyboard=cancel_keyboard(), check_silence=True)
-        while await DBI.is_user_work(telegram_id=self.user_telegram_id):
+        self.working = await DBI.is_user_work(telegram_id=self.user_telegram_id)
+        logger.debug(f"\tUSER: {self.__username}: {self.user_telegram_id} - Game begin.")
+
+        while self.working:
             if not await self.__prepare_data():
                 logger.debug("Not prepared")
                 break
@@ -77,7 +87,6 @@ class DiscordTokenManager:
 
     @logger.catch
     async def __prepare_data(self) -> bool:
-        logger.debug(f"\tUSER: {self.__username}:{self.user_telegram_id} - Game begin.")
         if await DBI.is_expired_user_deactivated(self.message):
             return False
         return await self.__is_datastore_ready()
@@ -154,11 +163,18 @@ class DiscordTokenManager:
         timer: int = self._datastore.delay + 1
         while timer > 0:
             timer -= 5
-            if not await DBI.is_user_work(telegram_id=self.user_telegram_id):
+            if not self.working:
                 return False
             await asyncio.sleep(5)
         self._datastore.delay = 0
         return True
+
+    @logger.catch
+    async def __get_max_message_time(self, elem: namedtuple) -> int:
+        """Возвращает максимальное время фильтрации сообщения. Сообщения с временем меньше
+        данного будут отфильтрованы"""
+
+        return int(elem.last_message_time.timestamp()) + elem.cooldown
 
     @logger.catch
     async def __get_workers(self) -> None:
@@ -167,8 +183,7 @@ class DiscordTokenManager:
         self.__workers = [
             elem.token
             for elem in self.__current_tokens_list
-            if
-            await self.__get_current_time() > int(elem.last_message_time.timestamp()) + elem.cooldown
+            if await self.__get_current_time() > await self.__get_max_message_time(elem)
         ]
 
     @logger.catch

@@ -6,7 +6,7 @@ from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, C
 
 from aiogram.dispatcher import FSMContext
 
-from classes.request_sender import GetMe, ProxyChecker, TokenChecker
+from classes.request_classes import GetMe, ProxyChecker, TokenChecker
 from states import TokenStates
 from utils import check_is_int, errors_report
 from classes.db_interface import DBI
