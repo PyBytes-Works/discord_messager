@@ -147,27 +147,31 @@ class MessageReceiver(ChannelData):
         return await self.__get_last_message_id(messages)
 
     @logger.catch
-    async def __set_replies_and_message_id_to_datastore(self, data: List[dict]) -> Tuple[
-        int, List[dict]]:
+    async def __update_redis_replies(self, data: List[dict]) -> int:
+        """"""
+        pass
+
+    @logger.catch
+    async def __set_replies_and_message_id_to_datastore(self, data: List[dict]) -> Tuple[int, List[dict]]:
         """Сохраняет реплаи и последнее сообщение в datastore"""
 
         # messages = []
         # replies = []
-        utils.save_data_to_json(data=data, file_name="all_messages.json")
-
         messages_in_time_range: List[dict] = await self.__get_last_messages(data)
-        utils.save_data_to_json(data=messages_in_time_range, file_name="messages_in_time_range.json")
 
         new_replies: List[
-            dict] = await self.__get_replies_for_my_tokens_from_all_messages(data=messages_in_time_range)
-
+            dict] = await self.__get_replies_for_my_tokens_from_all_messages(messages_in_time_range)
         utils.save_data_to_json(data=new_replies, file_name="new_replies.json")
 
         new_ready_replies: List[dict] = await self.__get_replies_for_work(new_replies)
-
         utils.save_data_to_json(data=new_ready_replies, file_name="new_ready_replies.json")
 
-        new_last_message_id: int = await self.__get_last_message_id_from_messages_in_time(data=messages_in_time_range)
+        replies: List[dict] = await self.__update_replies_to_redis(new_ready_replies)
+
+        # replies_ids: List[str] = [elem.get("message_id") for elem in new_ready_replies]
+        # await self.__update_redis_replies(replies_ids)
+
+        last_message_id: int = await self.__get_last_message_id_from_messages_in_time(messages_in_time_range)
 
         # for elem in data:
         #
@@ -192,9 +196,6 @@ class MessageReceiver(ChannelData):
         #
         # logger.debug(f"Replies from messages: {replies}")
         # replies: List[dict] = await self.__update_replies_to_redis(new_replies=replies)
-
-        last_message_id = new_last_message_id
-        replies = new_ready_replies
 
         return last_message_id, replies
 
