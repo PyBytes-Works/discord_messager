@@ -34,6 +34,7 @@ class DiscordTokenManager:
         self.__current_tokens_list: List[namedtuple] = []
         self.__workers: List[str] = []
         self._datastore: Optional['TokenData'] = None
+        self.working: bool = False
 
     @logger.catch
     async def lets_play(self) -> None:
@@ -44,7 +45,8 @@ class DiscordTokenManager:
         self._datastore.all_tokens_ids = await DBI.get_all_discord_id(telegram_id=self.user_telegram_id)
         await self.__send_text(
             text="Начинаю работу.", keyboard=cancel_keyboard(), check_silence=True)
-        while await DBI.is_user_work(telegram_id=self.user_telegram_id):
+        self.working = await DBI.is_user_work(telegram_id=self.user_telegram_id)
+        while self.working:
             if not await self.__prepare_data():
                 logger.debug("Not prepared")
                 break
@@ -154,7 +156,7 @@ class DiscordTokenManager:
         timer: int = self._datastore.delay + 1
         while timer > 0:
             timer -= 5
-            if not await DBI.is_user_work(telegram_id=self.user_telegram_id):
+            if not self.working:
                 return False
             await asyncio.sleep(5)
         self._datastore.delay = 0

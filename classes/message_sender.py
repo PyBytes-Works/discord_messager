@@ -2,7 +2,7 @@ import random
 
 from classes.open_ai import OpenAI
 from classes.redis_interface import RedisDB
-from classes.request_sender import SendMessageToChannel
+from classes.request_classes import SendMessageToChannel
 from classes.vocabulary import Vocabulary
 from config import logger
 from classes.token_datastorage import TokenData

@@ -7,6 +7,7 @@ from aiogram.types import Message, CallbackQuery, ReplyKeyboardRemove
 from aiogram.dispatcher import FSMContext
 
 import utils
+from classes.manager_storage import InstancesStorage
 from config import logger, Dispatcher, DEBUG
 from keyboards import cancel_keyboard, user_menu_keyboard
 from classes.discord_manager import DiscordTokenManager
@@ -33,6 +34,7 @@ async def cancel_handler(message: Message, state: FSMContext) -> None:
         "Вы отменили текущую команду." + text, reply_markup=keyboard()
     )
     logger.debug(f"\n\t{user_telegram_id}: canceled command.")
+    await InstancesStorage.stop_work(telegram_id=user_telegram_id)
     await DBI.set_user_is_not_work(telegram_id=user_telegram_id)
     await state.finish()
 
@@ -64,7 +66,9 @@ async def start_parsing_command_handler(message: Message, state: FSMContext) -> 
     await message.answer("Запускаю бота " + mute_text, reply_markup=cancel_keyboard())
     await DBI.set_user_is_work(telegram_id=user_telegram_id)
     await UserStates.in_work.set()
-    await DiscordTokenManager(message=message, mute=mute).lets_play()
+    manager = DiscordTokenManager(message=message, mute=mute)
+    await InstancesStorage.add_or_update(telegram_id=user_telegram_id, data=manager)
+    await manager.lets_play()
     await DBI.set_user_is_not_work(telegram_id=user_telegram_id)
     await message.answer("Закончил работу.", reply_markup=user_menu_keyboard())
     await state.finish()
@@ -107,9 +111,7 @@ async def send_message_to_reply_handler(message: Message, state: FSMContext):
 async def default_message(message: Message) -> None:
     """Ответ на любое необработанное действие активного пользователя."""
 
-    if await DBI.user_is_active(message.from_user.id):
-        if await DBI.is_expired_user_deactivated(message):
-            return
+    if not await DBI.is_expired_user_deactivated(message):
         await message.answer('Выберите команду.', reply_markup=user_menu_keyboard())
 
 

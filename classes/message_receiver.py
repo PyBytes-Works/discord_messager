@@ -6,7 +6,7 @@ from typing import List, Tuple, Optional
 
 import utils
 from classes.redis_interface import RedisDB
-from classes.request_sender import ChannelData
+from classes.request_classes import ChannelData
 from classes.token_datastorage import TokenData
 from config import logger, DEBUG
 
