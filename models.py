@@ -214,10 +214,12 @@ class User(BaseModel):
         """
         if the user is already in the database, returns None
         if created user will return user id
-        nik_name: str
+        nick_name: str
         telegram_id: str
-                # proxy: str
+        proxy_pk: int
         expiration: int  (hours)
+        max_tokens: int
+
         return: str
         """
         user = cls.select().where(cls.telegram_id == telegram_id).count()
