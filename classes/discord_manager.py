@@ -34,14 +34,14 @@ class DiscordTokenManager:
         self.__current_tokens_list: List[namedtuple] = []
         self.__workers: List[str] = []
         self._datastore: Optional['TokenData'] = None
-        self.__all_tokens_ids: List[str] = []
 
     @logger.catch
     async def lets_play(self) -> None:
         """Show must go on
         Запускает рабочий цикл бота, проверяет ошибки."""
 
-        self.__all_tokens_ids = await DBI.get_all_discord_id(telegram_id=self.user_telegram_id)
+        self._datastore: 'TokenData' = TokenData(self.user_telegram_id)
+        self._datastore.all_tokens_ids = await DBI.get_all_discord_id(telegram_id=self.user_telegram_id)
 
         while await DBI.is_user_work(telegram_id=self.user_telegram_id):
             if not await self.__prepare_data():
@@ -57,7 +57,7 @@ class DiscordTokenManager:
                 logger.debug("Not discord data")
                 break
 
-            await self.__send_replies(replies=discord_data.get("replies", []))
+            await self.__send_replies()
 
             if not DEBUG:
                 timer: float = 7 + random.randint(0, 6)
@@ -81,8 +81,6 @@ class DiscordTokenManager:
         logger.debug(f"\tUSER: {self.__username}:{self.user_telegram_id} - Game begin.")
         if await DBI.is_expired_user_deactivated(self.message):
             return False
-        self._datastore: 'TokenData' = TokenData(self.user_telegram_id)
-        self._datastore.all_tokens_ids = self.__all_tokens_ids
         return await self.__is_datastore_ready()
 
     @logger.catch
@@ -217,10 +215,11 @@ class DiscordTokenManager:
         return f"Все токены отработали. Следующий старт через {delay} {text}."
 
     @logger.catch
-    async def __send_replies(self, replies: list) -> None:
+    async def __send_replies(self) -> None:
         """Отправляет реплаи из дискорда в телеграм с кнопкой Ответить"""
 
-        for reply in replies:
+        logger.debug(f"Replies: {self._datastore.replies}")
+        for reply in self._datastore.replies:
             answered: bool = reply.get("answered", False)
             if not answered:
                 answer_keyboard: 'InlineKeyboardMarkup' = InlineKeyboardMarkup(row_width=1)
