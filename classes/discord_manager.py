@@ -75,9 +75,7 @@ class DiscordTokenManager:
             return False
         self._datastore: 'TokenData' = TokenData(self.user_telegram_id)
         self._datastore.all_tokens_ids = self.__all_tokens_ids
-        if not await self.__is_datastore_ready():
-            return False
-        return True
+        return await self.__is_datastore_ready()
 
     @logger.catch
     async def __getting_messages(self) -> bool:
