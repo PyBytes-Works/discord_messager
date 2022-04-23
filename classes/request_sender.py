@@ -1,8 +1,8 @@
 import asyncio
 import json
 import ssl
-from json import JSONDecodeError
-from typing import Union, List
+from abc import abstractmethod, ABC
+from typing import Union
 
 import aiohttp
 import aiohttp.client_exceptions
@@ -13,46 +13,104 @@ from config import logger, DISCORD_BASE_URL, PROXY_USER, PROXY_PASSWORD
 from classes.token_datastorage import TokenDataStore
 
 
-class RequestSender:
-
-    __EXCEPTIONS: tuple = (
-        asyncio.exceptions.TimeoutError,
-        aiohttp.client_exceptions.ServerDisconnectedError,
-        aiohttp.client_exceptions.ClientProxyConnectionError,
-        aiohttp.client_exceptions.ClientHttpProxyError,
-        aiohttp.client_exceptions.ClientOSError,
-        aiohttp.client_exceptions.TooManyRedirects,
-    )
+class RequestSender(ABC):
 
     def __init__(self):
-        self.limit: int = 1
         self.proxy: str = ''
         self.token: str = ''
-        self.channel: Union[str, int] = 0
+        self.url: str = ''
+        self._EXCEPTIONS: tuple = (
+            asyncio.exceptions.TimeoutError,
+            aiohttp.client_exceptions.ServerDisconnectedError,
+            aiohttp.client_exceptions.ClientProxyConnectionError,
+            aiohttp.client_exceptions.ClientHttpProxyError,
+            aiohttp.client_exceptions.ClientOSError,
+            aiohttp.client_exceptions.TooManyRedirects,
+        )
+
+    @abstractmethod
+    async def _send(self) -> dict:
+        self.proxy_data: str = f"http://{PROXY_USER}:{PROXY_PASSWORD}@{self.proxy}/"
+        answer: dict = {
+            "status": 0,
+            "data": ''
+        }
+        return answer
+
+
+class GetRequest(RequestSender):
 
     @logger.catch
-    async def get_request(self, datastore: 'TokenDataStore') -> List[dict]:
-        """Отправляет GET запрос к АПИ"""
+    async def _send(self) -> dict:
+        answer: dict = await super()._send()
 
-        self.proxy: str = datastore.proxy
-        self.token: str = datastore.token
-        self.channel: Union[str, int] = datastore.channel
+        async with aiohttp.ClientSession() as session:
 
-        answer: dict = await self._send_get_request()
-        status: int = answer.get("status")
-        if not status:
-            logger.error(f"get_data_from_channel error: ")
-        elif status == 200:
+            params: dict = {
+                'url': self.url,
+                "proxy": self.proxy_data,
+                "ssl": False,
+                "timeout": 5
+            }
+            if self.token:
+                session.headers['authorization']: str = self.token
             try:
-                return json.loads(answer.get("data"))
-            except JSONDecodeError as err:
-                logger.error("F: get_data_from_channel: JSON ERROR:", err)
+                async with session.get(**params) as response:
+                    answer.update(
+                        status=response.status,
+                        data=await response.text()
+                    )
+            except self._EXCEPTIONS as err:
+                logger.info(f"Token check Error: {err}")
+            except aiohttp.http_exceptions.BadHttpMessage as err:
+                logger.error("МУДАК ПРОВЕРЬ ПОРТ ПРОКСИ!!!", err)
+                if "Proxy Authentication Required" in err:
+                    answer.update(status=407)
+            except (ssl.SSLError, OSError) as err:
+                logger.error("Ошибка авторизации прокси:", err)
+                if "Proxy Authentication Required" in err:
+                    answer.update(status=407)
+        return answer
+
+
+class ChannelData(GetRequest):
+
+    def __init__(self, datastore: 'TokenDataStore'):
+        super().__init__()
+        self._datastore: 'TokenDataStore' = datastore
+        self.limit: int = 100
+
+    async def _send(self) -> dict:
+        self.url: str = DISCORD_BASE_URL + f'{self._datastore.channel}/messages?limit={self.limit}'
+        return await super()._send()
+
+
+class GetMe(GetRequest):
+
+    async def get_discord_id(self, token: str, proxy: str) -> str:
+        self.proxy = proxy
+        self.token = token
+        self.url: str = f'https://discord.com/api/v9/users/@me'
+        answer: dict = await self._send()
+        if answer.get("status"):
+            return json.loads(answer["data"])["id"]
+        return ''
+
+
+class ProxyChecker(GetRequest):
+
+    def __init__(self):
+        super().__init__()
+        self.url: str = 'https://www.google.com'
 
     @logger.catch
-    async def post_request(self, datastore: 'TokenDataStore', data: dict):
-        """Отправляет POST запрос к АПИ"""
-        # TODO Написать из сендера
-        pass
+    async def _check_proxy(self, proxy: str) -> int:
+        """Отправляет запрос через прокси, возвращает статус код ответа"""
+
+        self.proxy: str = proxy
+        answer: dict = await self._send()
+
+        return answer.get("status")
 
     @logger.catch
     async def get_checked_proxy(self, telegram_id: str) -> str:
@@ -69,14 +127,32 @@ class RequestSender:
         return await self.get_checked_proxy(telegram_id=telegram_id)
 
     @logger.catch
+    async def check_proxy(self, proxy: str):
+
+        answer: int = await self._check_proxy(proxy=proxy)
+        if answer == 200:
+            return proxy
+        return await self.get_checked_proxy()
+
+
+class TokenChecker(GetRequest):
+
+    def __init__(self):
+        super().__init__()
+        self.limit: int = 1
+        self.channel: Union[str, int] = 0
+
+    @logger.catch
     async def check_token(self, proxy: str, token: str, channel: int) -> dict:
         """Returns valid token else 'bad token'"""
 
-        answer: dict = {
-            "success": False,
-            "message": '',
-        }
-        status: int = await self._check_proxy(proxy=proxy, token=token, channel=channel)
+        self.proxy: str = proxy
+        self.token: str = token
+        self.channel: int = channel
+        self.url: str = DISCORD_BASE_URL + f'{self.channel}/messages?limit={self.limit}'
+
+        answer: dict = await self._send()
+        status: int = answer.get("status")
         if status == 200:
             answer.update({
                 "success": True,
@@ -86,64 +162,42 @@ class RequestSender:
             })
         elif status == 407:
             answer.update(message='bad proxy')
-        else:
+        elif status == 401:
             answer.update(message='bad token')
+        else:
+            answer.update(message='check_token failed')
 
         return answer
 
-    @logger.catch
-    async def get_me(self, token: str):
-        # TODO написать
-        pass
+
+class PostRequest(RequestSender):
+
+    def __init__(self):
+        super().__init__()
+        self.data_for_send: dict = {}
 
     @logger.catch
-    async def check_proxy(self, proxy: str):
+    async def _send(self) -> dict:
+        """Отправляет данные в дискорд канал"""
 
-        self.proxy = proxy
-        answer: dict = await self._send_get_request()
-        if answer.get("status") == 200:
-            return proxy
-        return await self.get_checked_proxy()
-
-    @logger.catch
-    async def _check_proxy(self, proxy: str, token: str = '', channel: Union[str, int] = 0) -> int:
-        """Отправляет запрос через прокси, возвращает статус код ответа"""
-
-        # TODO отрефакторить метод, у него двойной функционал
-        self.proxy: str = proxy
-        self.token: str = token
-        self.channel: int = channel
-        answer: dict = await self._send_get_request()
-
-        return answer.get("status")
-
-    @logger.catch
-    async def _send_get_request(self) -> dict:
-
-        self.proxy_data: str = f"http://{PROXY_USER}:{PROXY_PASSWORD}@{self.proxy}/"
-        self.url: str = DISCORD_BASE_URL + f'{self.channel}/messages?limit={self.limit}'
-
-        answer: dict = {
-            "status": 0,
-            "data": ''
-        }
+        answer: dict = await super()._send()
         async with aiohttp.ClientSession() as session:
             params: dict = {
-                'url': "https://www.google.com",
+                'url': self.url,
                 "proxy": self.proxy_data,
                 "ssl": False,
-                "timeout": 10
+                "timeout": 10,
+                "json": self.data_for_send
             }
             if self.token:
                 session.headers['authorization']: str = self.token
-                params.update(url=self.url)
             try:
-                async with session.get(**params) as response:
+                async with session.post(**params) as response:
                     answer.update(
                         status=response.status,
                         data=await response.text()
                     )
-            except self.__EXCEPTIONS as err:
+            except self._EXCEPTIONS as err:
                 logger.info(f"Token check Error: {err}")
             except aiohttp.http_exceptions.BadHttpMessage as err:
                 logger.error("МУДАК ПРОВЕРЬ ПОРТ ПРОКСИ!!!", err)
@@ -155,3 +209,37 @@ class RequestSender:
                     answer.update(status=407)
 
         return answer
+
+
+class SendMessageToChannel(PostRequest):
+
+    def __init__(self, datastore: 'TokenDataStore'):
+        super().__init__()
+        self._datastore: 'TokenDataStore' = datastore
+
+    @logger.catch
+    async def typing(self) -> None:
+        """Имитирует "Пользователь печатает" в чате дискорда."""
+
+        self.url = f'https://discord.com/api/v9/channels/{self._datastore.channel}/typing'
+        answer: dict = await self._send()
+        if answer.get("status") not in range(200, 205):
+            logger.warning(f"Typing: {answer}")
+        await asyncio.sleep(2)
+
+    async def send_data(self) -> dict:
+        """
+        Sends data to discord channel
+        :param datastore:
+        :return:
+        """
+
+        self.token = self._datastore.token
+        self.proxy = self._datastore.proxy
+        self.data_for_send = self._datastore.data_for_send
+
+        await self.typing()
+        await self.typing()
+        self.url = DISCORD_BASE_URL + f'{self._datastore.channel}/messages?'
+
+        return await self._send()

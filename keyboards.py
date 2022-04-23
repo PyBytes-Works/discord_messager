@@ -5,7 +5,6 @@ from aiogram.types import (
     ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton
 )
 from config import logger
-from classes.db_interface import DBI
 
 
 @logger.catch
@@ -30,11 +29,36 @@ def inactive_users_keyboard(users: dict) -> 'InlineKeyboardMarkup':
 
 
 @logger.catch
-def admin_keyboard() -> 'InlineKeyboardMarkup':
+def admin_keyboard() -> 'ReplyKeyboardMarkup':
     """Возвращает список админских кнопок"""
-    # TODO сделать
-    keyboard = InlineKeyboardMarkup(row_width=1)
 
+    keyboard = ReplyKeyboardMarkup(
+        resize_keyboard=True,
+        one_time_keyboard=True,
+        row_width=3
+    )
+    keyboard.add(
+        KeyboardButton("/add_user"),
+        KeyboardButton("/show_users"),
+        KeyboardButton("/delete_user"),
+        KeyboardButton("/activate_user"),
+        KeyboardButton("/cancel")
+    )
+    return keyboard
+
+
+@logger.catch
+def superadmin_keyboard() -> 'ReplyKeyboardMarkup':
+    """Возвращает список админских кнопок"""
+
+    keyboard = admin_keyboard()
+    keyboard.add(
+        KeyboardButton("/add_proxy"),
+        KeyboardButton("/delete_proxy"),
+        KeyboardButton("/delete_user"),
+        KeyboardButton("/set_max_tokens"),
+        KeyboardButton("/cancel")
+    )
     return keyboard
 
 
@@ -60,11 +84,10 @@ def user_menu_keyboard() -> 'ReplyKeyboardMarkup':
 
 
 @logger.catch
-async def all_tokens_keyboard(telegram_id: str) -> 'InlineKeyboardMarkup':
+def all_tokens_keyboard(all_tokens: List[namedtuple]) -> 'InlineKeyboardMarkup':
     """Возвращает список кнопок всех токенов пользователя"""
 
     keyboard = InlineKeyboardMarkup(row_width=1)
-    all_tokens: List[namedtuple] = await DBI.get_all_tokens_info(telegram_id=telegram_id)
     if all_tokens:
         for elem in all_tokens:
             keyboard.add(InlineKeyboardButton(
@@ -74,10 +97,35 @@ async def all_tokens_keyboard(telegram_id: str) -> 'InlineKeyboardMarkup':
 
 
 @logger.catch
-def get_yes_no_buttons(yes_msg: str, no_msg: str) -> 'InlineKeyboardMarkup':
-    """Возвращает кнопочки Да и Нет"""
+def new_channel_key() -> 'InlineKeyboardMarkup':
+    """Возвращает список кнопок всех токенов пользователя"""
 
     keyboard = InlineKeyboardMarkup(row_width=1)
+    keyboard.add(InlineKeyboardButton(
+        text="Добавить новый канал", callback_data="new_channel"))
+
+    return keyboard
+
+
+# @logger.catch
+# async def all_channels_key(channels: List[namedtuple]) -> 'InlineKeyboardMarkup':
+#     """Возвращает список кнопок всех токенов пользователя"""
+#
+#     keyboard = InlineKeyboardMarkup(row_width=1)
+#     for elem in channels:
+#         keyboard.add(InlineKeyboardButton(
+#             text=f"{elem.channel_name}: {elem.guild_id}/{elem.channel_id}",
+#             callback_data=f"{elem.user_channel_pk}")
+#         )
+#
+#     return keyboard
+
+
+@logger.catch
+def yes_no_buttons(yes_msg: str, no_msg: str) -> 'InlineKeyboardMarkup':
+    """Возвращает кнопочки Да и Нет"""
+
+    keyboard = InlineKeyboardMarkup(row_width=2)
     keyboard.add(
         InlineKeyboardButton(text="Да", callback_data=yes_msg),
         InlineKeyboardButton(text="Нет", callback_data=no_msg)
