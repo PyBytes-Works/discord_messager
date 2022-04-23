@@ -68,13 +68,13 @@ class GetRequest(RequestSender):
                         data=await response.text()
                     )
             except self._EXCEPTIONS as err:
-                logger.info(f"Token check Error: {err}")
+                logger.info(f"GetRequest: Token check Error: {err}")
             except aiohttp.http_exceptions.BadHttpMessage as err:
-                logger.error("МУДАК ПРОВЕРЬ ПОРТ ПРОКСИ!!!", err)
+                logger.error("GetRequest: МУДАК ПРОВЕРЬ ПОРТ ПРОКСИ!!!", err)
                 if "Proxy Authentication Required" in err:
                     answer.update(status=407)
             except (ssl.SSLError, OSError) as err:
-                logger.error("Ошибка авторизации прокси:", err)
+                logger.error("GetRequest: Ошибка авторизации прокси:", err)
                 if "Proxy Authentication Required" in err:
                     answer.update(status=407)
 
@@ -198,13 +198,13 @@ class PostRequest(RequestSender):
                         data=await response.text()
                     )
             except self._EXCEPTIONS as err:
-                logger.info(f"Token check Error: {err}")
+                logger.info(f"PostRequest: Error: {err}")
             except aiohttp.http_exceptions.BadHttpMessage as err:
-                logger.error("МУДАК ПРОВЕРЬ ПОРТ ПРОКСИ!!!", err)
+                logger.error("PostRequest: МУДАК ПРОВЕРЬ ПОРТ ПРОКСИ!!!", err)
                 if "Proxy Authentication Required" in err:
                     answer.update(status=407)
             except (ssl.SSLError, OSError) as err:
-                logger.error("Ошибка авторизации прокси:", err)
+                logger.error("PostRequest: Ошибка авторизации прокси:", err)
                 if "Proxy Authentication Required" in err:
                     answer.update(status=407)
 

@@ -85,7 +85,7 @@ class DiscordTokenManager:
         await DBI.update_token_last_message_time(token=self._datastore.token)
         datastore: Optional['TokenData'] = await message_manager.get_message()
         if datastore:
-           return True
+            return True
         return False
 
     @logger.catch
