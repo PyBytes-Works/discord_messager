@@ -120,8 +120,8 @@ class Channel(BaseModel):
     @classmethod
     @logger.catch
     def get_or_create_channel(cls: 'Channel', guild_id: Any, channel_id: Any) -> 'Channel':
-        user_channel, created = cls.get_or_create(guild_id=guild_id, channel_id=channel_id)
-        return user_channel
+        channel, created = cls.get_or_create(guild_id=guild_id, channel_id=channel_id)
+        return channel
 
 
 class User(BaseModel):
@@ -488,7 +488,7 @@ class User(BaseModel):
         telegram_id:  str
         proxy_pk:  int
         """
-        return cls.update(proxy=proxy_pk).where(cls.telegram_id == telegram_id).execute
+        return cls.update(proxy=proxy_pk).where(cls.telegram_id == telegram_id).execute()
 
     @classmethod
     @logger.catch
@@ -622,7 +622,10 @@ class UserChannel(BaseModel):
             name: str = str(channel_id)
         user = User.get_user_by_telegram_id(telegram_id=telegram_id)
         channel = Channel.get_or_create_channel(guild_id=guild_id, channel_id=channel_id)
-        user_channel: UserChannel = cls.select().where(cls.channel == channel.id).first()
+        user_channel: UserChannel = (cls.select()
+                                     .where(cls.channel == channel.id)
+                                     .where(cls.user == user.id)
+                                     .first())
         if user_channel:
             user_channel.name = name
             user_channel.save()
