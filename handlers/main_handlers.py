@@ -8,7 +8,7 @@ from aiogram.dispatcher import FSMContext
 
 import utils
 from classes.manager_storage import InstancesStorage
-from config import logger, Dispatcher, DEBUG
+from config import logger, Dispatcher, DEBUG, VERSION
 from keyboards import cancel_keyboard, user_menu_keyboard
 from classes.discord_manager import DiscordTokenManager
 from classes.redis_interface import RedisDB
@@ -112,7 +112,7 @@ async def default_message(message: Message) -> None:
     """Ответ на любое необработанное действие активного пользователя."""
 
     if not await DBI.is_expired_user_deactivated(message):
-        await message.answer('Выберите команду.', reply_markup=user_menu_keyboard())
+        await message.answer(f'Текущая версия: {VERSION}', reply_markup=user_menu_keyboard())
 
 
 @logger.catch
