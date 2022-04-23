@@ -1,3 +1,4 @@
+import datetime
 import os
 import json
 import random
@@ -113,3 +114,7 @@ async def errors_report(telegram_id: str, text: str) -> None:
     logger.error(f"Errors report: {text}")
     await send_report_to_admins(text)
     await bot.send_message(chat_id=telegram_id, reply_markup=user_menu_keyboard())
+
+
+if __name__ == '__main__':
+    print(datetime.datetime.fromtimestamp(1654314146))

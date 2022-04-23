@@ -492,17 +492,19 @@ class User(BaseModel):
 
     @classmethod
     @logger.catch
-    def check_expiration_date(cls: 'User', telegram_id: str) -> bool:
+    def is_user_expired(cls: 'User', telegram_id: str) -> bool:
         """
         Возвращает статус подписки пользователя,
-        True если подписка ещё действует
-        False если срок подписки истёк
+
+        False если подписка ещё действует
+
+        True если срок подписки истёк
         """
 
         user: User = cls.get_or_none(cls.telegram_id == telegram_id)
         expiration: 'datetime.datetime' = user.expiration if user else datetime.datetime.now()
 
-        return expiration > datetime.datetime.now() if expiration else False
+        return expiration >= datetime.datetime.now() if expiration else False
 
     @classmethod
     @logger.catch

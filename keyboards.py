@@ -55,9 +55,7 @@ def superadmin_keyboard() -> 'ReplyKeyboardMarkup':
     keyboard.add(
         KeyboardButton("/add_proxy"),
         KeyboardButton("/delete_proxy"),
-        KeyboardButton("/delete_user"),
         KeyboardButton("/set_max_tokens"),
-        KeyboardButton("/cancel")
     )
     return keyboard
 

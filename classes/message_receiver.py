@@ -8,7 +8,7 @@ import utils
 from classes.redis_interface import RedisDB
 from classes.request_sender import ChannelData
 from classes.token_datastorage import TokenData
-from config import logger
+from config import logger, DEBUG
 
 
 class MessageReceiver(ChannelData):
@@ -50,7 +50,7 @@ class MessageReceiver(ChannelData):
         filtered_data: List[dict] = await self.__get_all_messages()
         if filtered_data:
             lms_id_and_replies: Tuple[int, List[
-                dict]] = await self.__set_replies_and_message_id_to_datastore(data=filtered_data)
+                dict]] = await self.__get_replies_and_message_id(data=filtered_data)
             self._datastore.current_message_id = lms_id_and_replies[0]
             self._datastore.replies = lms_id_and_replies[1]
 
@@ -96,7 +96,7 @@ class MessageReceiver(ChannelData):
         return delta.seconds
 
     @logger.catch
-    async def __get_replies_for_my_tokens_from_all_messages(self, data: List[dict]) -> List[dict]:
+    async def __get_my_replies(self, data: List[dict]) -> List[dict]:
         """Возвращает список всех упоминаний и реплаев наших токенов в сообщениях за последнее время"""
 
         return [
@@ -121,7 +121,7 @@ class MessageReceiver(ChannelData):
         )
 
     @logger.catch
-    async def __get_replies_for_work(self, data: List[dict]) -> List[dict]:
+    async def __get_filtered_replies(self, data: List[dict]) -> List[dict]:
         """"""
         return [
             {
@@ -136,7 +136,7 @@ class MessageReceiver(ChannelData):
         ]
 
     @logger.catch
-    async def __get_last_message_id_from_messages_in_time(self, data: List[dict]) -> int:
+    async def __get_last_message_id_from_last_messages(self, data: List[dict]) -> int:
         """"""
 
         messages: List[dict] = [
@@ -147,78 +147,62 @@ class MessageReceiver(ChannelData):
         return await self.__get_last_message_id(messages)
 
     @logger.catch
-    async def __update_redis_replies(self, data: List[dict]) -> int:
+    async def __update_redis_replies_list(self, data: List[str], answered: bool = False) -> None:
         """"""
-        pass
+
+        text: str = "answered" if answered else "unanswered"
+        redis_key: str = f"{text}_{self._datastore.telegram_id}"
+
+        if not data:
+            return
+        total_replies: List[str] = await RedisDB(redis_key=redis_key).load()
+        total_replies.extend(data)
+        if DEBUG:
+            utils.save_data_to_json(data=total_replies, file_name="updated_replies_list.json")
+
+        await RedisDB(redis_key=redis_key).save(data=total_replies)
 
     @logger.catch
-    async def __set_replies_and_message_id_to_datastore(self, data: List[dict]) -> Tuple[int, List[dict]]:
+    async def __get_replies_and_message_id(self, data: List[dict]) -> Tuple[int, List[dict]]:
         """Сохраняет реплаи и последнее сообщение в datastore"""
 
-        # messages = []
-        # replies = []
-        messages_in_time_range: List[dict] = await self.__get_last_messages(data)
+        last_messages: List[dict] = await self.__get_last_messages(data)
+        all_replies: List[dict] = await self.__get_my_replies(last_messages)
+        new_replies: List[dict] = await self.__get_filtered_replies(all_replies)
+        replies: List[dict] = await self.__get_redis_checked_replies(new_replies)
 
-        new_replies: List[
-            dict] = await self.__get_replies_for_my_tokens_from_all_messages(messages_in_time_range)
-        utils.save_data_to_json(data=new_replies, file_name="new_replies.json")
+        replies_ids: List[str] = [elem.get("message_id") for elem in new_replies]
+        await self.__update_redis_replies_list(replies_ids)
 
-        new_ready_replies: List[dict] = await self.__get_replies_for_work(new_replies)
-        utils.save_data_to_json(data=new_ready_replies, file_name="new_ready_replies.json")
+        last_message_id: int = await self.__get_last_message_id_from_last_messages(last_messages)
 
-        replies: List[dict] = await self.__update_replies_to_redis(new_ready_replies)
-
-        # replies_ids: List[str] = [elem.get("message_id") for elem in new_ready_replies]
-        # await self.__update_redis_replies(replies_ids)
-
-        last_message_id: int = await self.__get_last_message_id_from_messages_in_time(messages_in_time_range)
-
-        # for elem in data:
-        #
-        #     message_time: 'datetime' = elem.get("timestamp")
-        #     mes_time = datetime.datetime.fromisoformat(message_time).replace(tzinfo=None)
-        #     delta = datetime.datetime.utcnow().replace(tzinfo=None) - mes_time
-        #     if delta.seconds < self._datastore.last_message_time:
-        #         filtered_replies: dict = self.__get_replies_for_my_tokens(elem=elem)
-        #         if filtered_replies:
-        #             replies.append(filtered_replies)
-        #         is_author_mate: bool = str(self._datastore.mate_id) == str(elem["author"]["id"])
-        #         my_message: bool = str(elem["author"]["id"]) == str(self._datastore.my_discord_id)
-        #         if is_author_mate and not my_message:
-        #             spam: dict = {
-        #                 "id": elem.get("id"),
-        #                 "timestamp": message_time,
-        #             }
-        #             messages.append(spam)
-
-        # last_message_id: int = await self.__get_last_message_id(data=messages)
-        # logger.debug(f"Last message id: {last_message_id}")
-        #
-        # logger.debug(f"Replies from messages: {replies}")
-        # replies: List[dict] = await self.__update_replies_to_redis(new_replies=replies)
+        if DEBUG:
+            utils.save_data_to_json(data=last_messages, file_name="last_messages.json")
+            utils.save_data_to_json(data=all_replies, file_name="all_replies.json")
+            utils.save_data_to_json(data=new_replies, file_name="new_replies.json")
+            utils.save_data_to_json(data=[last_message_id], file_name="last_message_id.json")
 
         return last_message_id, replies
 
     @logger.catch
     async def __get_last_message_id(self, data: list) -> int:
-        if not data:
-            return 0
-        return int(max(data, key=lambda x: x.get("timestamp"))["id"])
+        return int(max(data, key=lambda x: x.get("timestamp"))["id"]) if data else 0
 
     @logger.catch
-    async def __update_replies_to_redis(self, new_replies: list) -> list:
+    async def __get_redis_checked_replies(self, new_replies: List[dict]) -> List[dict]:
         """Возвращает разницу между старыми и новыми данными в редисе,
         записывает полные данные в редис"""
 
         if not new_replies:
             return []
         total_replies: List[dict] = await RedisDB(redis_key=self._datastore.telegram_id).load()
-        old_messages: list = list(map(lambda x: x.get("message_id"), total_replies))
-        result: List[dict] = [
-            elem
-            for elem in new_replies
-            if elem.get("message_id") not in old_messages
-        ]
+        old_messages: List[str] = list(map(lambda x: x.get("message_id"), total_replies))
+        result: List[dict] = list(filter(lambda x: x.get("message_id") not in old_messages, new_replies))
+        #     [
+        #     elem
+        #     for elem in new_replies
+        #     if elem.get("message_id") not in old_messages
+        # ]
 
         total_replies.extend(result)
         await RedisDB(redis_key=self._datastore.telegram_id).save(data=total_replies)

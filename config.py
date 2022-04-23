@@ -30,7 +30,7 @@ admins_list = [deskent]
 DEBUG = os.getenv("DEBUG")
 DEBUG = True if (bool(DEBUG) or DEBUG.lower() == "true") else False
 if not DEBUG:
-    admins_list = [deskent, artem, vova]
+    admins_list = [deskent, artem]
 
 # Proxy config
 PROXY_USER = os.getenv("PROXY_USER")

@@ -57,7 +57,7 @@ class RedisDB:
         await self.__send_request_do_redis_db(key="set")
 
     @logger.catch
-    async def load(self) -> List[dict]:
+    async def load(self) -> list:
         """Возвращает десериализованные данные из Редис (список)"""
 
         return await self.__send_request_do_redis_db(key="get")

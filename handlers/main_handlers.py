@@ -6,7 +6,8 @@ from aiogram.dispatcher.filters import Text
 from aiogram.types import Message, CallbackQuery, ReplyKeyboardRemove
 from aiogram.dispatcher import FSMContext
 
-from config import logger, Dispatcher
+import utils
+from config import logger, Dispatcher, DEBUG
 from keyboards import cancel_keyboard, user_menu_keyboard
 from classes.discord_manager import DiscordTokenManager
 from classes.redis_interface import RedisDB
@@ -95,6 +96,8 @@ async def send_message_to_reply_handler(message: Message, state: FSMContext):
         logger.warning("f: send_message_to_reply_handler: elem in Redis data not found.")
         await message.answer('Время хранения данных истекло.', reply_markup=cancel_keyboard())
         return
+    if DEBUG:
+        utils.save_data_to_json(data=redis_data, file_name="redis_answer_from_user.json")
     await message.answer('Добавляю сообщение в очередь. Это займет несколько секунд.', reply_markup=ReplyKeyboardRemove())
     await RedisDB(redis_key=user_telegram_id).save(data=redis_data)
     await message.answer('Сообщение добавлено в очередь сообщений.', reply_markup=cancel_keyboard())
@@ -115,9 +118,9 @@ async def activate_valid_user_handler(message: Message):
     """Активирует пользователя если он продлил оплату при команде /start"""
 
     user_telegram_id: str = str(message.from_user.id)
-    user_not_expired: bool = await DBI.check_expiration_date(telegram_id=user_telegram_id)
+    is_user_expired: bool = await DBI.is_user_expired(telegram_id=user_telegram_id)
     user_activated: bool = await DBI.user_is_active(telegram_id=user_telegram_id)
-    if user_not_expired and not user_activated:
+    if not is_user_expired and not user_activated:
         await DBI.activate_user(telegram_id=user_telegram_id)
         await message.answer("Аккаунт активирован.")
 
