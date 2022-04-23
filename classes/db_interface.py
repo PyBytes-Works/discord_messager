@@ -4,7 +4,7 @@ from collections import namedtuple
 from aiogram.types import ReplyKeyboardRemove, Message
 
 from models import User, Token, Proxy, UserChannel
-from config import logger
+from config import logger, admins_list
 from utils import send_report_to_admins
 
 
@@ -19,9 +19,10 @@ class DBI:
         Возвращает True если деактивирован."""
 
         telegram_id: str = str(message.from_user.id)
-        user_expired: bool = User.check_expiration_date(telegram_id)
+        user_expired: bool = User.is_user_expired(telegram_id)
         user_is_admin: bool = User.is_admin(telegram_id)
-        if user_expired and not user_is_admin:
+        user_is_superadmin: bool = telegram_id in admins_list
+        if user_expired and not user_is_admin and not user_is_superadmin:
             await message.answer(
                 "Время подписки истекло. Ваш аккаунт деактивирован, токены удалены.",
                 reply_markup=ReplyKeyboardRemove()
@@ -112,8 +113,15 @@ class DBI:
 
     @classmethod
     @logger.catch
-    async def check_expiration_date(cls, telegram_id: str) -> bool:
-        return User.check_expiration_date(telegram_id=telegram_id)
+    async def is_user_expired(cls, telegram_id: str) -> bool:
+        """
+        Возвращает статус подписки пользователя,
+
+        False если подписка ещё действует
+
+        True если срок подписки истёк
+        """
+        return User.is_user_expired(telegram_id=telegram_id)
 
     @classmethod
     @logger.catch
