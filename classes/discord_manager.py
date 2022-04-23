@@ -42,7 +42,8 @@ class DiscordTokenManager:
 
         self._datastore: 'TokenData' = TokenData(self.user_telegram_id)
         self._datastore.all_tokens_ids = await DBI.get_all_discord_id(telegram_id=self.user_telegram_id)
-
+        await self.__send_text(
+            text="Начинаю работу.", keyboard=cancel_keyboard(), check_silence=True)
         while await DBI.is_user_work(telegram_id=self.user_telegram_id):
             if not await self.__prepare_data():
                 logger.debug("Not prepared")
@@ -76,8 +77,6 @@ class DiscordTokenManager:
 
     @logger.catch
     async def __prepare_data(self) -> bool:
-        await self.__send_text(
-            text="Начинаю работу.", keyboard=cancel_keyboard(), check_silence=True)
         logger.debug(f"\tUSER: {self.__username}:{self.user_telegram_id} - Game begin.")
         if await DBI.is_expired_user_deactivated(self.message):
             return False
