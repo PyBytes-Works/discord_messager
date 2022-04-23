@@ -282,7 +282,7 @@ async def info_tokens_handler(message: Message) -> None:
     if not all_tokens:
         await message.answer(
             f'Подписка истекает  {date_expiration}'
-            f'Данных о токенах нет.', reply_markup=user_menu_keyboard())
+            f'\nНет ни одного токена в данном канале.', reply_markup=user_menu_keyboard())
         return
 
     free_slots: int = await DBI.get_number_of_free_slots_for_tokens(telegram_id)

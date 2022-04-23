@@ -47,11 +47,10 @@ class MessageReceiver(ChannelData):
         user_message, message_id = await self.__get_user_message_from_redis()
 
         filtered_data: List[dict] = await self.__get_all_messages()
-        if not filtered_data:
-            return
-        lms_id_and_replies: Tuple[int, List[dict]] = await self.__set_replies_and_message_id_to_datastore(data=filtered_data)
-        self._datastore.current_message_id = lms_id_and_replies[0]
-        self._datastore.replies = lms_id_and_replies[1]
+        if filtered_data:
+            lms_id_and_replies: Tuple[int, List[dict]] = await self.__set_replies_and_message_id_to_datastore(data=filtered_data)
+            self._datastore.current_message_id = lms_id_and_replies[0]
+            self._datastore.replies = lms_id_and_replies[1]
 
         if message_id:
             self._datastore.current_message_id = message_id

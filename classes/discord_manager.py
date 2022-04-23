@@ -45,16 +45,24 @@ class DiscordTokenManager:
 
         while await DBI.is_user_work(telegram_id=self.user_telegram_id):
             if not await self.__prepare_data():
+                logger.debug("Not prepared")
                 break
 
             if not await self.__getting_messages():
+                logger.debug("Not get messages")
                 break
 
             discord_data: dict = await self.__sending_messages()
             if not discord_data:
+                logger.debug("Not discord data")
                 break
 
             await self.__send_replies(replies=discord_data.get("replies", []))
+
+            if not DEBUG:
+                timer: float = 7 + random.randint(0, 6)
+                logger.info(f"Пауза между отправкой сообщений: {timer}")
+                await asyncio.sleep(timer)
 
             token_work: bool = discord_data.get("work")
             if not token_work:
@@ -101,7 +109,7 @@ class DiscordTokenManager:
         result: dict = {"work": False}
         answer: dict = await MessageSender(datastore=self._datastore).send_message()
         if not answer:
-            logger.error("F: get_message ERROR: NO ANSWER ERROR")
+            logger.error("F: Manager.__message_send ERROR: NO ANSWER ERROR")
             result.update({"message": "ERROR"})
             return result
         elif answer.get("status") != 200:
@@ -110,10 +118,6 @@ class DiscordTokenManager:
 
         self._datastore.current_message_id = 0
         result.update({"work": True})
-        if not DEBUG:
-            timer: float = 7 + random.randint(0, 6)
-            logger.info(f"Пауза между отправкой сообщений: {timer}")
-            await asyncio.sleep(timer)
 
         return result
 
