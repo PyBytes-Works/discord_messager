@@ -263,25 +263,7 @@ async def info_tokens_handler(message: Message) -> None:
     if await DBI.is_expired_user_deactivated(message):
         return
     telegram_id: str = str(message.from_user.id)
-    date_expiration: int = await DBI.get_expiration_date(telegram_id)
     all_tokens: List[namedtuple] = await DBI.get_all_tokens_info(telegram_id)
-    count_tokens: int = len(all_tokens)
-    free_slots: int = await DBI.get_number_of_free_slots_for_tokens(telegram_id)
-    if not all_tokens:
-        await message.answer(
-            f'Подписка истекает  {date_expiration}'
-            f'Данных о токенах нет.', reply_markup=user_menu_keyboard())
-        return
-
-    await TokenStates.delete_token.set()
-    await message.answer(
-        f'Подписка истекает:  {date_expiration}'
-        f'\nВсего токенов: {count_tokens}'
-        f'\nСвободно слотов: {free_slots}'
-        f'\nТокены:',
-        reply_markup=user_menu_keyboard()
-    )
-
     for token_info in all_tokens:
         mess: str = (
             f"Имя токена: {token_info.token_name}"
@@ -293,11 +275,24 @@ async def info_tokens_handler(message: Message) -> None:
         )
         keyboard: 'InlineKeyboardMarkup' = InlineKeyboardMarkup(row_width=1)
         keyboard.add(InlineKeyboardButton(
-            text="Удалить токен.", callback_data=f"{token_info.token_pk}"))
+            text="Удалить токен.", callback_data=f"del_token_{token_info.token_pk}"))
+        await message.answer(mess, reply_markup=keyboard)
+
+    date_expiration: int = await DBI.get_expiration_date(telegram_id)
+    if not all_tokens:
         await message.answer(
-            mess,
-            reply_markup=keyboard
-        )
+            f'Подписка истекает  {date_expiration}'
+            f'\nНет ни одного токена в данном канале.', reply_markup=user_menu_keyboard())
+        return
+
+    free_slots: int = await DBI.get_number_of_free_slots_for_tokens(telegram_id)
+    count_tokens: int = len(all_tokens)
+    await message.answer(
+        f'Подписка истекает:  {date_expiration}'
+        f'\nВсего токенов: {count_tokens}'
+        f'\nСвободно слотов: {free_slots}',
+        reply_markup=user_menu_keyboard()
+    )
 
 
 @logger.catch
@@ -308,7 +303,8 @@ async def delete_token_handler(callback: CallbackQuery, state: FSMContext) -> No
     if await DBI.is_user_work(telegram_id=telegram_id):
         await callback.message.answer("Бот запущен, сначала остановите бота.", reply_markup=cancel_keyboard())
     else:
-        await DBI.delete_token_by_pk(token_pk=int(callback.data))
+        token_pk: int = int(callback.data.rsplit('_', maxsplit=1)[-1])
+        await DBI.delete_token_by_pk(token_pk=token_pk)
         await callback.message.answer("Токен удален.", reply_markup=user_menu_keyboard())
         await callback.message.delete()
         await state.finish()
@@ -329,7 +325,7 @@ def token_register_handlers(dp: Dispatcher) -> None:
         "set_cooldown_"]))
     dp.register_callback_query_handler(ask_channel_cooldown_handler, state=TokenStates.add_channel_cooldown)
     dp.register_message_handler(add_channel_cooldown_handler, state=TokenStates.add_channel_cooldown)
-    dp.register_callback_query_handler(delete_token_handler, state=TokenStates.delete_token)
+    dp.register_callback_query_handler(delete_token_handler, Text(startswith=["del_token_"]))
     dp.register_message_handler(info_tokens_handler, Text(equals=["Информация"]))
     dp.register_message_handler(select_channel_handler, Text(equals=["Установить кулдаун"]))
     dp.register_message_handler(select_channel_handler, Text(equals=['Добавить токен']))

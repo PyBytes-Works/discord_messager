@@ -9,9 +9,9 @@ from aiogram.dispatcher import FSMContext
 from config import logger, Dispatcher
 from keyboards import cancel_keyboard, user_menu_keyboard
 from classes.discord_manager import DiscordTokenManager
-from states import UserStates
 from classes.redis_interface import RedisDB
 from classes.db_interface import DBI
+from states import UserStates
 
 
 @logger.catch
@@ -54,15 +54,17 @@ async def start_parsing_command_handler(message: Message, state: FSMContext) -> 
     if await DBI.is_user_work(telegram_id=user_telegram_id):
         await DBI.set_user_is_not_work(telegram_id=user_telegram_id)
         await state.finish()
-    await DBI.set_user_is_work(telegram_id=user_telegram_id)
+
     mute: bool = False
     mute_text: str = ''
     if message.text == "Старт & Mute":
         mute_text: str = "в тихом режиме."
         mute = True
     await message.answer("Запускаю бота " + mute_text, reply_markup=cancel_keyboard())
+    await DBI.set_user_is_work(telegram_id=user_telegram_id)
     await UserStates.in_work.set()
     await DiscordTokenManager(message=message, mute=mute).lets_play()
+    await DBI.set_user_is_not_work(telegram_id=user_telegram_id)
     await message.answer("Закончил работу.", reply_markup=user_menu_keyboard())
     await state.finish()
 

@@ -1,10 +1,10 @@
-from typing import List
+from typing import List, Dict, Any
 from collections import namedtuple
 
 from config import logger
 
 
-class TokenDataStore:
+class TokenData:
     """
     Класс для хранения текущих данных для отправки и получения сообщений дискорда
 
@@ -24,9 +24,11 @@ class TokenDataStore:
         self.__MATE_DISCORD_ID: str = ''
         self.__DELAY: int = 0
         self.__MY_DISCORD_ID: str = ''
-        self.__data_for_send: dict = {}
+        self.data_for_send: dict = {}
+        self.text_to_send: str = ''
         self.__all_tokens_ids: List[str] = []
         self.user_channel_pk: int = 0
+        self.replies: List[dict] = []
 
     @logger.catch
     def update(self, token: str, token_data: namedtuple):
@@ -38,18 +40,6 @@ class TokenDataStore:
         self.mate_id: str = token_data.mate_discord_id
         self.my_discord_id: str = token_data.token_discord_id
         self.user_channel_pk: int = token_data.user_channel_pk
-
-    @property
-    def data_for_send(self) -> dict:
-        return self.__data_for_send
-
-    @data_for_send.setter
-    def data_for_send(self, data: dict):
-        if not isinstance(data, dict):
-            raise TypeError("Error data_for_send")
-        if not data.get('content', None):
-            raise ValueError("Nothing for send")
-        self.__data_for_send = data
 
     @property
     def all_tokens_ids(self) -> List[str]:

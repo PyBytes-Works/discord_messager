@@ -55,8 +55,10 @@ async def send_message_to_all_users_handler(message: Message) -> None:
 async def request_max_tokens_handler(message: Message) -> None:
     """Обработчик команды /set_max_tokens"""
 
-    user_id: str = str(message.from_user.id)
-    if user_id in admins_list:
+    user_telegram_id: str = str(message.from_user.id)
+    user_is_admin: bool = await DBI.is_admin(telegram_id=user_telegram_id)
+    user_is_superadmin: bool = user_telegram_id in admins_list
+    if user_is_admin or user_is_superadmin:
         await message.answer(
             'Введите telegram_id пользователя и количество токенов через пробел. '
             '\nПример: "3333333 10"',
@@ -99,8 +101,9 @@ async def set_max_tokens_handler(message: Message, state: FSMContext) -> None:
 async def request_proxies_handler(message: Message) -> None:
     """Обработчик команды /add_proxy /delete_proxy, /delete_all_proxy"""
 
-    user_id: str = str(message.from_user.id)
-    if user_id in admins_list:
+    user_telegram_id: str = str(message.from_user.id)
+    user_is_superadmin: bool = user_telegram_id in admins_list
+    if user_is_superadmin:
         await message.answer(
             'Введите прокси в формате "123.123.123.123:5555" (можно несколько через пробел)',
             reply_markup=cancel_keyboard()
@@ -185,7 +188,9 @@ async def admin_help_handler(message: Message) -> None:
     """Обработчик команды /admin"""
 
     user_telegram_id: str = str(message.from_user.id)
-    if await DBI.is_admin(telegram_id=user_telegram_id):
+    user_is_admin: bool = await DBI.is_admin(telegram_id=user_telegram_id)
+    user_is_superadmin: bool = user_telegram_id in admins_list
+    if user_is_admin or user_is_superadmin:
         commands: list = [
             "\n/admin - показать список команд администратора.",
             "\n/add_user - добавить нового пользователя.",
@@ -194,7 +199,7 @@ async def admin_help_handler(message: Message) -> None:
             '\n/activate_user - активировать пользователя'
         ]
         keyboard = admin_keyboard()
-        if user_telegram_id in admins_list:
+        if user_is_superadmin:
             superadmin: list = [
                 "\n/add_admin - команда для назначения пользователя администратором",
                 "\n/sendall 'тут текст сообщения без кавычек' - отправить сообщение всем активным пользователям",
@@ -221,7 +226,9 @@ async def request_activate_user_handler(message: Message) -> None:
     """Обработчик команды /activate_user"""
 
     user_telegram_id: str = str(message.from_user.id)
-    if await DBI.is_admin(telegram_id=user_telegram_id):
+    user_is_admin: bool = await DBI.is_admin(telegram_id=user_telegram_id)
+    user_is_superadmin: bool = user_telegram_id in admins_list
+    if user_is_admin or user_is_superadmin:
         users: dict = await DBI.get_all_inactive_users()
         if users:
             await message.answer("Выберите пользователя:", reply_markup=inactive_users_keyboard(users))
@@ -376,7 +383,10 @@ async def activate_user_handler(message: Message, state: FSMContext) -> None:
 async def show_all_users_handler(message: Message) -> None:
     """Обработчик команды /show_users. Показывает список всех пользователей"""
 
-    if await DBI.is_admin(telegram_id=message.from_user.id):
+    user_telegram_id: str = str(message.from_user.id)
+    user_is_admin: bool = await DBI.is_admin(telegram_id=user_telegram_id)
+    user_is_superadmin: bool = user_telegram_id in admins_list
+    if user_is_admin or user_is_superadmin:
         users: Tuple[namedtuple] = await DBI.get_all_users()
 
         lenght: int = len(users)
@@ -406,7 +416,10 @@ async def show_all_users_handler(message: Message) -> None:
 async def delete_user_name_handler(message: Message) -> None:
     """Обработчик для удаления пользователя. Команда /delete_user"""
 
-    if await DBI.is_admin(telegram_id=message.from_user.id):
+    user_telegram_id: str = str(message.from_user.id)
+    user_is_admin: bool = await DBI.is_admin(telegram_id=user_telegram_id)
+    user_is_superadmin: bool = user_telegram_id in admins_list
+    if user_is_admin or user_is_superadmin:
         all_users: 'Tuple[namedtuple]' = await DBI.get_all_users()
         lenght: int = len(all_users)
         for index in range(0, lenght, 10):
@@ -503,8 +516,9 @@ async def final_add_user_handler(message: Message, state: FSMContext) -> None:
 async def reboot_handler(message: Message) -> None:
     """Команда /reboot"""
 
-    user_id: str = str(message.from_user.id)
-    if user_id in admins_list:
+    user_telegram_id: str = str(message.from_user.id)
+    user_is_superadmin: bool = user_telegram_id in admins_list
+    if user_is_superadmin:
         text: str = "Перезагрузка через 1 минуту. Работа бота будет остановлена автоматически."
         for user_telegram_id in await DBI.get_working_users():
             try:

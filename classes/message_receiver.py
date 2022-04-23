@@ -1,25 +1,23 @@
-import asyncio
 import datetime
 import json
-import random
+from datetime import timedelta
 from json import JSONDecodeError
-from typing import List, Tuple, Union
+from typing import List, Tuple, Optional
 
-from classes.message_sender import MessageSender
+import utils
 from classes.redis_interface import RedisDB
 from classes.request_sender import ChannelData
-from config import logger, DEBUG
-from classes.token_datastorage import TokenDataStore
+from classes.token_datastorage import TokenData
+from config import logger
 
 
 class MessageReceiver(ChannelData):
-
     """Выбирает токен для отправки сообщения и вызывает метод вызова сообщения,
     проверяет его ответ, и, если есть свободные токены - повторяет процесс.
     При ошибке возвращает ее в телеграм"""
 
     @logger.catch
-    async def get_messages(self) -> Union[List[dict], dict]:
+    async def __get_all_messages(self) -> List[dict]:
         """Отправляет GET запрос к АПИ, возвращает полученные данные"""
 
         self.proxy: str = self._datastore.proxy
@@ -34,9 +32,10 @@ class MessageReceiver(ChannelData):
                 return json.loads(answer.get("data"))
             except JSONDecodeError as err:
                 logger.error("F: get_data_from_channel: JSON ERROR:", err)
+        return []
 
     @logger.catch
-    async def get_message(self) -> dict:
+    async def get_message(self) -> Optional['TokenData']:
         """Получает данные из АПИ, выбирает случайное сообщение и возвращает ID сообщения
         и само сообщение"""
 
@@ -46,35 +45,19 @@ class MessageReceiver(ChannelData):
         #  отправлять в телеграм юзеру
         # TODO выделить реплаи и работу с ними в отдельный класс
 
-        result = {"work": False}
         user_message, message_id = await self.__get_user_message_from_redis()
 
-        filtered_data: dict = await self.__get_filtered_data()
-        replies: List[dict] = filtered_data.get("replies", [])
-        result.update({"replies": replies})
+        filtered_data: List[dict] = await self.__get_all_messages()
+        if filtered_data:
+            lms_id_and_replies: Tuple[int, List[
+                dict]] = await self.__set_replies_and_message_id_to_datastore(data=filtered_data)
+            self._datastore.current_message_id = lms_id_and_replies[0]
+            self._datastore.replies = lms_id_and_replies[1]
 
         if message_id:
             self._datastore.current_message_id = message_id
-        elif filtered_data:
-            self._datastore.current_message_id = filtered_data.get("last_message_id", 0)
-        text_to_send: str = user_message if user_message else ''
-        answer: dict = await MessageSender(datastore=self._datastore).send_message(text=text_to_send)
-        if not answer:
-            logger.error("F: get_message ERROR: NO ANSWER ERROR")
-            result.update({"message": "ERROR"})
-            return result
-        elif answer.get("status") != 200:
-            result.update({"answer": answer, "token": self._datastore.token})
-            return result
-
-        self._datastore.current_message_id = 0
-        result.update({"work": True})
-        if not DEBUG:
-            timer: float = 7 + random.randint(0, 6)
-            logger.info(f"Пауза между отправкой сообщений: {timer}")
-            await asyncio.sleep(timer)
-
-        return result
+        self._datastore.text_to_send = user_message if user_message else ''
+        return self._datastore
 
     @logger.catch
     async def __get_user_message_from_redis(self) -> Tuple[str, int]:
@@ -101,49 +84,120 @@ class MessageReceiver(ChannelData):
 
         return answer, message_id
 
+    @staticmethod
     @logger.catch
-    async def __get_filtered_data(self) -> dict:
-        """Отправляет запрос к АПИ"""
+    def __get_delta_seconds(elem: dict) -> int:
+        """Возвращает время, в пределах которого надо найти сообщения которое в секундах"""
 
-        data: List[dict] = await self.get_messages()
-        if not data:
-            return {}
-        result: dict = await self.__data_filter(data=data)
+        message_time: 'datetime' = elem.get("timestamp")
+        mes_time: 'datetime' = datetime.datetime.fromisoformat(message_time).replace(tzinfo=None)
+        delta: 'timedelta' = datetime.datetime.utcnow().replace(tzinfo=None) - mes_time
 
-        return result
+        return delta.seconds
 
     @logger.catch
-    async def __data_filter(self, data: List[dict]) -> dict:
-        """Фильтрует полученные данные"""
+    async def __get_replies_for_my_tokens_from_all_messages(self, data: List[dict]) -> List[dict]:
+        """Возвращает список всех упоминаний и реплаев наших токенов в сообщениях за последнее время"""
 
-        messages = []
-        replies = []
-        result = {}
-        for elem in data:
+        return [
+            elem
+            for elem in data
+            if (
+                    elem.get("mentions")
+                    and elem.get("mentions")[0].get("id", '') in self._datastore.all_tokens_ids
+                    and elem.get("id") != self._datastore.mate_id
+            )
+        ]
 
-            message_time: 'datetime' = elem.get("timestamp")
-            mes_time = datetime.datetime.fromisoformat(message_time).replace(tzinfo=None)
-            delta = datetime.datetime.utcnow().replace(tzinfo=None) - mes_time
-            if delta.seconds < self._datastore.last_message_time:
-                filtered_replies: dict = self.__get_replies_for_my_tokens(elem=elem)
-                if filtered_replies:
-                    replies.append(filtered_replies)
-                is_author_mate: bool = str(self._datastore.mate_id) == str(elem["author"]["id"])
-                my_message: bool = str(elem["author"]["id"]) == str(self._datastore.my_discord_id)
-                if is_author_mate and not my_message:
-                    spam: dict = {
-                            "id": elem.get("id"),
-                            "timestamp": message_time,
-                        }
-                    messages.append(spam)
-        last_message_id: int = await self.__get_last_message_id(data=messages)
-        result.update({"last_message_id": last_message_id})
-        print("Replies before:", replies)
-        replies: List[dict] = await self.__update_replies_to_redis(new_replies=replies)
-        result.update({"replies": replies})
-        print("Replies after:", replies)
+    @logger.catch
+    async def __get_last_messages(self, data: List[dict]) -> List[dict]:
+        """Возвращает список всех сообщений за последнее время"""
 
-        return result
+        return list(
+            filter(
+                lambda x: self.__get_delta_seconds(x) < self._datastore.last_message_time,
+                data
+            )
+        )
+
+    @logger.catch
+    async def __get_replies_for_work(self, data: List[dict]) -> List[dict]:
+        """"""
+        return [
+            {
+                "token": self._datastore.token,
+                "author": elem.get("author", {}).get("username", ''),
+                "text": elem.get("content", '[no content]'),
+                "message_id": elem.get("id", ''),
+                "to_message": elem.get("referenced_message", {}).get("content"),
+                "to_user": elem.get("referenced_message", {}).get("author", {}).get("username")
+            }
+            for elem in data
+        ]
+
+    @logger.catch
+    async def __get_last_message_id_from_messages_in_time(self, data: List[dict]) -> int:
+        """"""
+
+        messages: List[dict] = [
+            elem
+            for elem in data
+            if self._datastore.mate_id == str(elem["author"]["id"])
+        ]
+        return await self.__get_last_message_id(messages)
+
+    @logger.catch
+    async def __update_redis_replies(self, data: List[dict]) -> int:
+        """"""
+        pass
+
+    @logger.catch
+    async def __set_replies_and_message_id_to_datastore(self, data: List[dict]) -> Tuple[int, List[dict]]:
+        """Сохраняет реплаи и последнее сообщение в datastore"""
+
+        # messages = []
+        # replies = []
+        messages_in_time_range: List[dict] = await self.__get_last_messages(data)
+
+        new_replies: List[
+            dict] = await self.__get_replies_for_my_tokens_from_all_messages(messages_in_time_range)
+        utils.save_data_to_json(data=new_replies, file_name="new_replies.json")
+
+        new_ready_replies: List[dict] = await self.__get_replies_for_work(new_replies)
+        utils.save_data_to_json(data=new_ready_replies, file_name="new_ready_replies.json")
+
+        replies: List[dict] = await self.__update_replies_to_redis(new_ready_replies)
+
+        # replies_ids: List[str] = [elem.get("message_id") for elem in new_ready_replies]
+        # await self.__update_redis_replies(replies_ids)
+
+        last_message_id: int = await self.__get_last_message_id_from_messages_in_time(messages_in_time_range)
+
+        # for elem in data:
+        #
+        #     message_time: 'datetime' = elem.get("timestamp")
+        #     mes_time = datetime.datetime.fromisoformat(message_time).replace(tzinfo=None)
+        #     delta = datetime.datetime.utcnow().replace(tzinfo=None) - mes_time
+        #     if delta.seconds < self._datastore.last_message_time:
+        #         filtered_replies: dict = self.__get_replies_for_my_tokens(elem=elem)
+        #         if filtered_replies:
+        #             replies.append(filtered_replies)
+        #         is_author_mate: bool = str(self._datastore.mate_id) == str(elem["author"]["id"])
+        #         my_message: bool = str(elem["author"]["id"]) == str(self._datastore.my_discord_id)
+        #         if is_author_mate and not my_message:
+        #             spam: dict = {
+        #                 "id": elem.get("id"),
+        #                 "timestamp": message_time,
+        #             }
+        #             messages.append(spam)
+
+        # last_message_id: int = await self.__get_last_message_id(data=messages)
+        # logger.debug(f"Last message id: {last_message_id}")
+        #
+        # logger.debug(f"Replies from messages: {replies}")
+        # replies: List[dict] = await self.__update_replies_to_redis(new_replies=replies)
+
+        return last_message_id, replies
 
     @logger.catch
     async def __get_last_message_id(self, data: list) -> int:
@@ -175,6 +229,8 @@ class MessageReceiver(ChannelData):
     def __get_replies_for_my_tokens(self, elem: dict) -> dict:
         """Возвращает реплаи не из нашего села."""
 
+        utils.save_data_to_json(data=elem, file_name='elem.json')
+
         result = {}
         ref_messages: dict = elem.get("referenced_message", {})
         if not ref_messages:
@@ -185,17 +241,15 @@ class MessageReceiver(ChannelData):
         reply_for_author_id: str = ref_messages_author.get("id", '')
         mentions: tuple = tuple(
             filter(
-                lambda x: int(x.get("id", '')) == int(self._datastore.my_discord_id),
+                lambda x: str(x.get("id", '')) in self._datastore.all_tokens_ids,
                 elem.get("mentions", [])
             )
         )
         author: str = elem.get("author", {}).get("username", '')
         author_id: str = elem.get("author", {}).get("id", '')
-        message_for_me: bool = reply_for_author_id == self._datastore.my_discord_id
+        message_for_me: bool = reply_for_author_id in self._datastore.all_tokens_ids
         if any(mentions) or message_for_me:
             all_discord_tokens: List[str] = self._datastore.all_tokens_ids
-            print(f"Author ID: {author_id}")
-            print(f"IDS: {all_discord_tokens}")
             if author_id not in all_discord_tokens:
                 result.update({
                     "token": self._datastore.token,

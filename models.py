@@ -440,7 +440,7 @@ class User(BaseModel):
 
     @classmethod
     @logger.catch
-    def set_new_proxy_for_all_users(cls) -> int:
+    def set_new_proxy_for_all_users(cls: 'User') -> int:
         """Set up proxies for all users"""
 
         all_users: List['User'] = list(cls.select().execute())

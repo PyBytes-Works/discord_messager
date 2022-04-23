@@ -10,7 +10,7 @@ import aiohttp.http_exceptions
 
 from classes.db_interface import DBI
 from config import logger, DISCORD_BASE_URL, PROXY_USER, PROXY_PASSWORD
-from classes.token_datastorage import TokenDataStore
+from classes.token_datastorage import TokenData
 
 
 class RequestSender(ABC):
@@ -37,6 +37,13 @@ class RequestSender(ABC):
         }
         return answer
 
+    async def send_message(self) -> dict:
+        # TODO
+        try:
+            return await self._send()
+        except Exception:
+            pass
+
 
 class GetRequest(RequestSender):
 
@@ -61,23 +68,24 @@ class GetRequest(RequestSender):
                         data=await response.text()
                     )
             except self._EXCEPTIONS as err:
-                logger.info(f"Token check Error: {err}")
+                logger.info(f"GetRequest: Token check Error: {err}")
             except aiohttp.http_exceptions.BadHttpMessage as err:
-                logger.error("МУДАК ПРОВЕРЬ ПОРТ ПРОКСИ!!!", err)
+                logger.error("GetRequest: МУДАК ПРОВЕРЬ ПОРТ ПРОКСИ!!!", err)
                 if "Proxy Authentication Required" in err:
                     answer.update(status=407)
             except (ssl.SSLError, OSError) as err:
-                logger.error("Ошибка авторизации прокси:", err)
+                logger.error("GetRequest: Ошибка авторизации прокси:", err)
                 if "Proxy Authentication Required" in err:
                     answer.update(status=407)
+
         return answer
 
 
 class ChannelData(GetRequest):
 
-    def __init__(self, datastore: 'TokenDataStore'):
+    def __init__(self, datastore: 'TokenData'):
         super().__init__()
-        self._datastore: 'TokenDataStore' = datastore
+        self._datastore: 'TokenData' = datastore
         self.limit: int = 100
 
     async def _send(self) -> dict:
@@ -126,14 +134,6 @@ class ProxyChecker(GetRequest):
 
         return await self.get_checked_proxy(telegram_id=telegram_id)
 
-    @logger.catch
-    async def check_proxy(self, proxy: str):
-
-        answer: int = await self._check_proxy(proxy=proxy)
-        if answer == 200:
-            return proxy
-        return await self.get_checked_proxy()
-
 
 class TokenChecker(GetRequest):
 
@@ -174,7 +174,7 @@ class PostRequest(RequestSender):
 
     def __init__(self):
         super().__init__()
-        self.data_for_send: dict = {}
+        self._data_for_send: dict = {}
 
     @logger.catch
     async def _send(self) -> dict:
@@ -187,7 +187,7 @@ class PostRequest(RequestSender):
                 "proxy": self.proxy_data,
                 "ssl": False,
                 "timeout": 10,
-                "json": self.data_for_send
+                "json": self._data_for_send
             }
             if self.token:
                 session.headers['authorization']: str = self.token
@@ -198,13 +198,13 @@ class PostRequest(RequestSender):
                         data=await response.text()
                     )
             except self._EXCEPTIONS as err:
-                logger.info(f"Token check Error: {err}")
+                logger.info(f"PostRequest: Error: {err}")
             except aiohttp.http_exceptions.BadHttpMessage as err:
-                logger.error("МУДАК ПРОВЕРЬ ПОРТ ПРОКСИ!!!", err)
+                logger.error("PostRequest: МУДАК ПРОВЕРЬ ПОРТ ПРОКСИ!!!", err)
                 if "Proxy Authentication Required" in err:
                     answer.update(status=407)
             except (ssl.SSLError, OSError) as err:
-                logger.error("Ошибка авторизации прокси:", err)
+                logger.error("PostRequest: Ошибка авторизации прокси:", err)
                 if "Proxy Authentication Required" in err:
                     answer.update(status=407)
 
@@ -213,9 +213,9 @@ class PostRequest(RequestSender):
 
 class SendMessageToChannel(PostRequest):
 
-    def __init__(self, datastore: 'TokenDataStore'):
+    def __init__(self, datastore: 'TokenData'):
         super().__init__()
-        self._datastore: 'TokenDataStore' = datastore
+        self._datastore: 'TokenData' = datastore
 
     @logger.catch
     async def typing(self) -> None:
@@ -236,7 +236,7 @@ class SendMessageToChannel(PostRequest):
 
         self.token = self._datastore.token
         self.proxy = self._datastore.proxy
-        self.data_for_send = self._datastore.data_for_send
+        self._data_for_send = self._datastore.data_for_send
 
         await self.typing()
         await self.typing()
