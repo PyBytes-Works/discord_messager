@@ -118,9 +118,10 @@ async def activate_valid_user_handler(message: Message):
     """Активирует пользователя если он продлил оплату при команде /start"""
 
     user_telegram_id: str = str(message.from_user.id)
+    is_user_exists: bool = await DBI.get_user_by_telegram_id(telegram_id=user_telegram_id)
     is_user_expired: bool = await DBI.is_user_expired(telegram_id=user_telegram_id)
-    user_activated: bool = await DBI.user_is_active(telegram_id=user_telegram_id)
-    if not is_user_expired and not user_activated:
+    is_user_active: bool = await DBI.user_is_active(telegram_id=user_telegram_id)
+    if is_user_exists and not is_user_expired and not is_user_active:
         await DBI.activate_user(telegram_id=user_telegram_id)
         await message.answer("Аккаунт активирован.")
 
