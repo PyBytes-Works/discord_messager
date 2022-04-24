@@ -6,6 +6,9 @@ from keyboards import user_menu_keyboard
 
 class ErrorsSender:
 
+    """Отправляет сообщения об ошибках"""
+    # TODO
+
     @classmethod
     async def send_message_check_token(cls, status: int, telegram_id: str) -> None:
         if status == 407:
