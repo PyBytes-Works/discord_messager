@@ -19,12 +19,13 @@ class Vocabulary:
             cls.__set_vocabulary(vocabulary)
         except (ValueError, TypeError, FileNotFoundError) as err:
             logger.error(f"ERROR: __get_random_message_from_vocabulary: {err}")
-            return "Vocabulary error"
-        length: int = len(message_text)
-        if length > 60:
-            return cls.get_message()
-        cls.__count_symbols(length)
-        return message_text
+            return ''
+        else:
+            length: int = len(message_text)
+            if length > 60:
+                return cls.get_message()
+            cls.__count_symbols(length)
+            return message_text
 
     @classmethod
     @logger.catch

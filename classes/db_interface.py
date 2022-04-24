@@ -1,3 +1,4 @@
+import random
 from typing import List, Tuple, Dict
 from collections import namedtuple
 
@@ -5,7 +6,6 @@ from aiogram.types import ReplyKeyboardRemove, Message
 
 from models import User, Token, Proxy, UserChannel
 from config import logger, admins_list
-from classes.errors_sender import ErrorsSender
 
 
 class DBI:
@@ -33,10 +33,24 @@ class DBI:
                 f"пользователь декативирован, его токены удалены"
             )
             logger.info(text)
-            await ErrorsSender.send_report_to_admins(text)
             return True
 
         return False
+
+    @classmethod
+    @logger.catch
+    async def form_new_tokens_pairs(cls, telegram_id: str):
+        free_tokens: Tuple[
+            List[int], ...] = await DBI.get_all_free_tokens(telegram_id)
+        formed_pairs: int = 0
+        for tokens in free_tokens:
+            while len(tokens) > 1:
+                random.shuffle(tokens)
+                first_token = tokens.pop()
+                second_token = tokens.pop()
+                formed_pairs += await DBI.make_tokens_pair(first_token, second_token)
+
+        logger.info(f"Pairs formed: {formed_pairs}")
 
     @classmethod
     @logger.catch
@@ -307,3 +321,13 @@ class DBI:
     @logger.catch
     async def get_user_channels(cls, telegram_id: str) -> List[namedtuple]:
         return UserChannel.get_user_channels_by_telegram_id(telegram_id=telegram_id)
+
+    @classmethod
+    @logger.catch
+    async def get_channel(cls, user_channel_pk: int) -> int:
+        # TODO вернуть данные о канале по его user_channel_pk
+        # return UserChannel.get_channel(user_channel_pk=user_channel_pk)
+
+        # заглушка, удалить
+        user_channel = UserChannel.get_or_none(UserChannel.id == user_channel_pk)
+        return user_channel.channel.channel_id

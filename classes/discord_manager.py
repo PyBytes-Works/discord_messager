@@ -1,7 +1,7 @@
 import datetime
 import json
 import random
-from typing import List, Tuple, Optional
+from typing import List, Optional
 from collections import namedtuple
 
 import asyncio
@@ -66,9 +66,10 @@ class DiscordManager:
 
             await self._getting_messages()
 
-            timer: float = 7 + random.randint(0, 6)
-            logger.info(f"Пауза между отправкой сообщений: {timer}")
-            await asyncio.sleep(timer)
+            if self.working:
+                timer: float = 7 + random.randint(0, 6)
+                logger.info(f"Пауза между отправкой сообщений: {timer}")
+                await asyncio.sleep(timer)
 
             await self._sending_messages()
 
@@ -90,11 +91,15 @@ class DiscordManager:
     @check_working
     @logger.catch
     async def _getting_messages(self) -> None:
+        """Получает сообщения из чата и обрабатывает их
+        Если удачно - перезаписывает кулдаун текущего токена"""
+
         message_manager: 'MessageReceiver' = MessageReceiver(datastore=self._datastore)
-        await DBI.update_token_last_message_time(token=self._datastore.token)
         datastore: Optional['TokenData'] = await message_manager.get_message()
         if not datastore:
             self.working = False
+            return
+        await DBI.update_token_last_message_time(token=self._datastore.token)
 
     @check_working
     @logger.catch
@@ -103,17 +108,21 @@ class DiscordManager:
         словарь атрибута класса"""
 
         self.working = False
-        answer: dict = await MessageSender(datastore=self._datastore).send_message()
-        if answer.get("status") == 200:
+        if await MessageSender(datastore=self._datastore).send_message():
             self._discord_data = {}
             self._datastore.current_message_id = 0
             self.working = True
-            return
-        elif not answer:
-            logger.error("F: Manager.__message_send ERROR: NO ANSWER ERROR")
-            self._discord_data = {"message": "ERROR"}
-        elif answer.get("status") != 200:
-            self._discord_data = {"answer": answer, "token": self._datastore.token}
+        # answer: dict = await MessageSender(datastore=self._datastore).send_message()
+        # if answer.get("status") == 200:
+        #     self._discord_data = {}
+        #     self._datastore.current_message_id = 0
+        #     self.working = True
+        #     return
+        # # elif not answer:
+        #     logger.error("F: Manager.__message_send ERROR: NO ANSWER ERROR")
+        #     self._discord_data = {"message": "ERROR"}
+        # elif answer.get("status") != 200:
+        #     self._discord_data = {"answer": answer, "token": self._datastore.token}
 
     @logger.catch
     async def __send_text(self, text: str, keyboard=None, check_silence: bool = False) -> None:
@@ -142,9 +151,9 @@ class DiscordManager:
                 await self.__send_text(
                     text="Не смог сформировать пары токенов.", keyboard=user_menu_keyboard())
                 self.working = False
+                return
             await self.__get_workers()
-        is_workers: bool = await self.__get_worker_from_list()
-        if not is_workers:
+        if not await self.__get_worker_from_list():
             await self._get_all_tokens_busy_message()
 
         self.working = await self._sleep()
@@ -206,19 +215,8 @@ class DiscordManager:
         min_token_data: namedtuple = min(self.__current_tokens_list, key=lambda x: x.last_message_time)
         token: str = min_token_data.token
         await self._update_datastore(token)
-        logger.debug(f"\tlast_message_time {min_token_data.last_message_time}")
-
         min_token_time: int = int(min_token_data.last_message_time.timestamp())
-
-        logger.debug(f"\tself._datastore.cooldown {self._datastore.cooldown}")
-        logger.debug(f"\tmin_token_time {min_token_time}")
-        logger.debug(f"\tself.__get_current_time() {self.__get_current_time()}")
-        logger.debug(f"\tRAZNICA {min_token_time - self.__get_current_time()}")
-
         delay: int = self._datastore.cooldown - abs(min_token_time - self.__get_current_time())
-
-        logger.debug(f"\tdelay = {delay}")
-
         self._datastore.delay = delay
         text = "секунд"
         if delay > 60:
@@ -369,24 +367,12 @@ class DiscordManager:
             self._datastore.delay = 10
 
     @logger.catch
-    async def form_token_pairs(self, unpair: bool = False) -> int:
+    async def form_token_pairs(self, unpair: bool = False) -> None:
         """Формирует пары из свободных токенов если они в одном канале"""
 
         if unpair:
             await DBI.delete_all_pairs(telegram_id=self.user_telegram_id)
-        free_tokens: Tuple[
-            List[int], ...] = await DBI.get_all_free_tokens(telegram_id=self.user_telegram_id)
-        formed_pairs: int = 0
-        for tokens in free_tokens:
-            while len(tokens) > 1:
-                random.shuffle(tokens)
-                first_token = tokens.pop()
-                second_token = tokens.pop()
-                formed_pairs += await DBI.make_tokens_pair(first_token, second_token)
-
-        logger.info(f"Pairs formed: {formed_pairs}")
-
-        return formed_pairs
+        await DBI.form_new_tokens_pairs(telegram_id=self.user_telegram_id)
 
     @property
     def silence(self) -> bool:

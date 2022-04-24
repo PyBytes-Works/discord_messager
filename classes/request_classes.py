@@ -105,8 +105,9 @@ class GetMe(GetRequest):
         self.token = token
         self.url: str = f'https://discord.com/api/v9/users/@me'
         answer: dict = await self._send()
-        if answer.get("status"):
+        if answer.get("status") == 200:
             return json.loads(answer["data"])["id"]
+        logger.debug(f"GetMe Error: {answer}")
         return ''
 
 
@@ -157,10 +158,23 @@ class TokenChecker(GetRequest):
         self.url: str = DISCORD_BASE_URL + f'{self.channel}/messages?limit={self.limit}'
 
         answer: dict = await self._send()
+
         status: int = answer.get("status")
+
         if status == 200:
             return True
-        await ErrorsSender.send_message_check_token(status=status, telegram_id=telegram_id)
+        data: dict = json.loads(answer.get("data"))
+        code: int = data.get("code")
+        logger.debug(f"\tToken Checker answer: "
+                     f"\n\t\t{answer}")
+        params: dict = {
+            "status": status,
+            "code": code if code else None,
+            "telegram_id": telegram_id,
+            "token": token,
+            "proxy": proxy
+        }
+        await ErrorsSender.send_message_check_token(**params)
 
 
 class PostRequest(RequestSender):
@@ -224,7 +238,7 @@ class SendMessageToChannel(PostRequest):
             logger.warning(f"Typing: {answer}")
         await asyncio.sleep(2)
 
-    async def send_data(self) -> dict:
+    async def send_data(self) -> bool:
         """
         Sends data to discord channel
         :param datastore:
@@ -239,4 +253,40 @@ class SendMessageToChannel(PostRequest):
         await self.typing()
         self.url = DISCORD_BASE_URL + f'{self._datastore.channel}/messages?'
         answer: dict = await self._send()
-        return answer
+        status: int = answer.get("status")
+
+        if status == 200:
+            return True
+
+        elif status == 429:
+            data: dict = json.loads(answer.get("data"))
+            code: int = data.get("code")
+            if code == 20016:
+                logger.debug(f"SendMessageToChannel.send_data: {answer}")
+                cooldown: int = int(data.get("retry_after", None))
+                if cooldown:
+                    cooldown += self._datastore.cooldown
+                    await DBI.update_user_channel_cooldown(
+                        user_channel_pk=self._datastore.user_channel_pk, cooldown=cooldown)
+                    self._datastore.delay = cooldown
+                await ErrorsSender.errors_report(
+                    telegram_id=self._datastore.telegram_id,
+                    text=(
+                        "Для данного токена сообщения отправляются чаще, чем разрешено в канале."
+                        f"\nToken: {self._datastore.token}"
+                        f"\nГильдия/Канал: {self._datastore.guild}/{self._datastore.channel}"
+                        f"\nВремя скорректировано. Кулдаун установлен: {cooldown} секунд"
+                    )
+                )
+        else:
+            data: dict = json.loads(answer.get("data"))
+            code: int = data.get("code")
+            logger.debug(f"SendMessageToChannel.send_data: {answer}")
+            params: dict = {
+                "status": status,
+                "code": code if code else None,
+                "telegram_id": self._datastore.telegram_id,
+                "token": self._datastore.token,
+                "proxy": self._datastore.proxy
+            }
+            await ErrorsSender.send_message_check_token(**params)

@@ -1,12 +1,13 @@
 import aiogram.utils.exceptions
 
+from classes.db_interface import DBI
 from config import logger, admins_list, bot
 from keyboards import user_menu_keyboard
 
 
 class ErrorsSender:
-
     """Отправляет сообщения об ошибках"""
+
     # TODO
 
     @classmethod
@@ -14,21 +15,88 @@ class ErrorsSender:
             cls,
             status: int,
             telegram_id: str,
-            admins: bool,
+            admins: bool = False,
+            users: bool = True,
             token: str = '',
-            proxy: str = ''
+            proxy: str = '',
+            code: int = None,
+            *args,
+            **kwargs
     ) -> None:
-        if status == 407:
-            text = f'Ошибка прокси: {proxy}'
+        error_message: str = (
+            f"Error status: {status}"
+            f"\nTelegram_id: {telegram_id}"
+            f"\nToken: {token}"
+            f"\nProxy: {proxy}")
+        code_message: str = f"\nError code: {code}"
+        error_message = error_message + code_message if code else error_message
+        logger.error(error_message)
+        text: str = ''
+        if status == -2:
+            text: str = "Ошибка словаря."
+            admins = True
+        elif status == 400:
+            if code == 50035:
+                text: str = 'Ошибка токена.'
+                admins = False
         elif status == 401:
+            if code == 0:
+                await DBI.delete_token(token=token)
+                text: str = ("Токен сменился и будет удален.\nToken: {token}")
+            else:
+                text: str = (
+                    "Произошла ошибка данных."
+                    "\nУбедитесь, что вы ввели верные данные. Код ошибки - 401."
+                )
             text = (
-                f"Токен {token} не прошел проверку в канале. "
+                f"Токен "
+                f"\n{token} "
+                f"\nне прошел проверку в канале. "
                 "\nЛибо канал не существует либо токен отсутствует данном канале, либо поменялся."
                 "\nТокен удален."
             )
+            admins = False
+        elif status == 403:
+            if code == 50013:
+                text: str = (
+                    "Не могу отправить сообщение для токена. (Ошибка 403 - 50013)"
+                    "Токен в муте."
+                    f"\nToken: {token}"
+                )
+            elif code == 50001:
+                await DBI.delete_token(token=token)
+                text: str = (
+                    "Не могу отправить сообщение для токена. (Ошибка 403 - 50001)"
+                    "Токен забанили."
+                    f"\nТокен: {token} удален."
+                    f"\nФормирую новые пары."
+                )
+                await DBI.form_new_tokens_pairs(telegram_id=telegram_id)
+            else:
+                text: str = (f"Ошибка {status}")
+        elif status == 404:
+            if code == 10003:
+                text: str = (
+                    "Ошибка отправки сообщения. Неверный канал. (Ошибка 404 - 10003)"
+                    f"\nToken: {token}"
+                )
+            else:
+                text: str = (f"Ошибка {status}")
+        elif status == 407:
+            text = f'Ошибка прокси: {proxy}. Обратитесь к администратору. Код ошибки 407'
+            users = True
+            admins = True
+        elif status == 500:
+            text = (
+                f"Внутренняя ошибка сервера Дискорда. "
+                f"\nПауза 10 секунд. Код ошибки - 500."
+            )
         else:
-            text = 'check_token failed'
-        await cls.errors_report(telegram_id=telegram_id, text=text)
+            text = 'Unrecognised error!'
+            users = False
+            admins = True
+        if users:
+            await cls.errors_report(telegram_id=telegram_id, text=text)
         if admins:
             await cls.send_report_to_admins(text)
 
