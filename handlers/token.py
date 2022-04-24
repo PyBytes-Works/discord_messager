@@ -7,9 +7,11 @@ from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, C
 from aiogram.dispatcher import FSMContext
 
 from classes.request_classes import GetMe, ProxyChecker, TokenChecker
+from handlers import main_handlers
 from states import TokenStates
-from utils import check_is_int, errors_report
+from utils import check_is_int
 from classes.db_interface import DBI
+from classes.errors_sender import ErrorsSender
 from config import logger, Dispatcher
 from keyboards import (
     user_menu_keyboard, cancel_keyboard, new_channel_key, yes_no_buttons,
@@ -29,16 +31,17 @@ async def select_channel_handler(message: Message) -> None:
         return
     telegram_id: str = str(message.from_user.id)
     channels: List[namedtuple] = await DBI.get_user_channels(telegram_id=telegram_id)
+    keyboard = InlineKeyboardMarkup(row_width=1)
     if not channels:
         await message.answer(
             "У вас нет ни одного канала. Сначала нужно создать новый канал и добавить в него токен.",
-            reply_markup=new_channel_key()
+            reply_markup=cancel_keyboard()
         )
-        await TokenStates.create_channel.set()
-        return
+        # await TokenStates.create_channel.set()
+        # return
     if message.text == 'Установить кулдаун':
         for elem in channels:
-            keyboard = InlineKeyboardMarkup(row_width=1).add(InlineKeyboardButton(
+            keyboard.add(InlineKeyboardButton(
                 text="Добавить сюда",
                 callback_data=f"{elem.user_channel_pk}")
             )
@@ -48,7 +51,7 @@ async def select_channel_handler(message: Message) -> None:
             await TokenStates.add_channel_cooldown.set()
     elif message.text == "Добавить токен":
         for elem in channels:
-            keyboard = InlineKeyboardMarkup(row_width=1).add(InlineKeyboardButton(
+            keyboard.add(InlineKeyboardButton(
                 text="Добавить сюда",
                 callback_data=f"{elem.user_channel_pk}")
             )
@@ -153,7 +156,7 @@ async def check_and_add_token_handler(message: Message, state: FSMContext) -> No
 
     proxy: str = await ProxyChecker().get_checked_proxy(telegram_id=telegram_id)
     if proxy == 'no proxies':
-        await errors_report(telegram_id=telegram_id, text="Ошибка прокси. Нет доступных прокси.")
+        await ErrorsSender.errors_report(telegram_id=telegram_id, text="Ошибка прокси. Нет доступных прокси.")
         await state.finish()
         return
 
@@ -162,32 +165,18 @@ async def check_and_add_token_handler(message: Message, state: FSMContext) -> No
         error_text: str = (f"Не смог определить discord_id для токена:"
                            f"\nToken: [{token}]"
                            f"\nGuild/channel: [{guild}: {channel}]")
-        await errors_report(telegram_id=telegram_id, text=error_text)
+        await ErrorsSender.errors_report(telegram_id=telegram_id, text=error_text)
         await state.finish()
         return
 
-    result: dict = await TokenChecker().check_token(token=token, proxy=proxy, channel=channel)
-    if not result.get("success"):
-        error_message: str = result.get("message")
-        if error_message == 'bad proxy':
-            await errors_report(telegram_id=telegram_id, text=error_message)
-            await state.finish()
-            return
-        elif error_message == 'bad token':
-            await message.answer(
-                f"Ваш токен {token} не прошел проверку в канале {channel}. "
-                "\nЛибо канал не существует либо токен отсутствует данном канале, ",
-                reply_markup=cancel_keyboard()
-            )
-            await state.finish()
-            return
-        else:
-            logger.error("f: check_and_add_token_handler: error: Don`t know why"
-                         f"\nToken: {token}\nProxy: {proxy}\nChanel: {channel}")
+    if not await TokenChecker().check_token(token=token, proxy=proxy, channel=channel):
+        await state.finish()
+        return
+
     if user_channel_pk == 0:
         user_channel_pk: int = await DBI.add_user_channel(telegram_id=telegram_id, channel_id=channel, guild_id=guild)
         if not user_channel_pk:
-            await errors_report(
+            await ErrorsSender.errors_report(
                 telegram_id=telegram_id,
                 text=f"Не смог добавить канал:\n{telegram_id}:{channel}:{guild}"
             )
@@ -200,7 +189,7 @@ async def check_and_add_token_handler(message: Message, state: FSMContext) -> No
         error_text: str = (f"Не добавить токен:"
                            f"\nToken: [{token}]"
                            f"\nGuild/channel: [{guild}: {channel}]")
-        await errors_report(telegram_id=telegram_id, text=error_text)
+        await ErrorsSender.errors_report(telegram_id=telegram_id, text=error_text)
         await state.finish()
         return
     await message.answer(
@@ -247,7 +236,7 @@ async def add_channel_cooldown_handler(message: Message, state: FSMContext) -> N
     if not await DBI.update_user_channel_cooldown(user_channel_pk=user_channel_pk, cooldown=cooldown):
         error_text: str = (f"Не смог установить кулдаун для канала:"
                            f"\nuser_channel_pk: [{user_channel_pk}: cooldown: {cooldown}]")
-        await errors_report(telegram_id=str(message.from_user.id), text=error_text)
+        await ErrorsSender.errors_report(telegram_id=str(message.from_user.id), text=error_text)
         await state.finish()
         return
     await message.answer("Кулдаун установлен.", reply_markup=user_menu_keyboard())
@@ -316,9 +305,12 @@ def token_register_handlers(dp: Dispatcher) -> None:
     """
     Регистратор для функций данного модуля
     """
-    dp.register_callback_query_handler(start_create_channel_handler, Text(equals=["new_channel"]), state=TokenStates.select_channel)
+    dp.register_callback_query_handler(main_handlers.callback_cancel_handler, Text(startswith=["отмена", "cancel"], ignore_case=True), state="*")
+    dp.register_callback_query_handler(start_create_channel_handler, Text(equals=[
+        "new_channel"]), state=TokenStates.select_channel)
     dp.register_callback_query_handler(ask_token_for_selected_channel_handler, state=TokenStates.select_channel)
-    dp.register_callback_query_handler(start_create_channel_handler, Text(equals=["new_channel"]), state=TokenStates.create_channel)
+    dp.register_callback_query_handler(start_create_channel_handler, Text(equals=[
+        "new_channel"]), state=TokenStates.create_channel)
     dp.register_message_handler(check_channel_and_add_token_handler, state=TokenStates.add_token)
     dp.register_message_handler(check_and_add_token_handler, state=TokenStates.check_token)
     dp.register_callback_query_handler(ask_channel_cooldown_handler, Text(startswith=[

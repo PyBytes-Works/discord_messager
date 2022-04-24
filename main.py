@@ -11,8 +11,9 @@ import datetime
 
 from aiogram import executor
 
+from classes.errors_sender import ErrorsSender
 from handlers.admin import register_admin_handlers
-from config import dp, logger, admins_list, bot, DB_FILE_NAME, VERSION
+from config import dp, logger, DB_FILE_NAME, VERSION
 from handlers.main_handlers import register_handlers
 from handlers.login import login_register_handlers
 from handlers.token import token_register_handlers
@@ -24,21 +25,15 @@ token_register_handlers(dp=dp)
 register_handlers(dp=dp)
 
 
-async def send_report_to_admins(text: str) -> None:
-    """Отправляет сообщение в телеграме всем администраторам из списка"""
-
-    for admin_id in admins_list:
-        await bot.send_message(chat_id=admin_id, text=text)
-
-
 @logger.catch
 async def on_startup(_) -> None:
     """Функция выполняющаяся при старте бота."""
 
     try:
         # Отправляет сообщение админам при запуске бота
-        await send_report_to_admins(text="Discord_mailer started."
-                                         f"\nVersion: {VERSION}")
+        await ErrorsSender.send_report_to_admins(
+            text="Discord_mailer started."
+            f"\nVersion: {VERSION}")
     except Exception:
         pass
     if not os.path.exists('./db'):
@@ -55,7 +50,7 @@ async def on_startup(_) -> None:
 async def on_shutdown(dp) -> None:
     """Действия при отключении бота."""
     try:
-        await send_report_to_admins(text="Discord_mailer stopping.")
+        await ErrorsSender.send_report_to_admins(text="Discord_mailer stopping.")
     except Exception:
         pass
     logger.warning("BOT shutting down.")

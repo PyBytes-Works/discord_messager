@@ -5,7 +5,7 @@ from aiogram.types import ReplyKeyboardRemove, Message
 
 from models import User, Token, Proxy, UserChannel
 from config import logger, admins_list
-from utils import send_report_to_admins
+from classes.errors_sender import ErrorsSender
 
 
 class DBI:
@@ -19,21 +19,21 @@ class DBI:
         Возвращает True если деактивирован."""
 
         telegram_id: str = str(message.from_user.id)
-        user_expired: bool = User.is_user_expired(telegram_id)
-        user_is_admin: bool = User.is_admin(telegram_id)
+        user_expired: bool = await cls.is_user_expired(telegram_id)
+        user_is_admin: bool = await cls.is_admin(telegram_id)
         user_is_superadmin: bool = telegram_id in admins_list
         if user_expired and not user_is_admin and not user_is_superadmin:
             await message.answer(
                 "Время подписки истекло. Ваш аккаунт деактивирован, токены удалены.",
                 reply_markup=ReplyKeyboardRemove()
             )
-            User.deactivate_user(telegram_id)
+            await cls.deactivate_user(telegram_id)
             text = (
                 f"Время подписки {telegram_id} истекло, "
                 f"пользователь декативирован, его токены удалены"
             )
             logger.info(text)
-            await send_report_to_admins(text)
+            await ErrorsSender.send_report_to_admins(text)
             return True
 
         return False
@@ -177,6 +177,15 @@ class DBI:
     @classmethod
     @logger.catch
     async def get_all_related_user_tokens(cls, telegram_id: str) -> List[namedtuple]:
+        """
+        Возвращает список всех связанных ТОКЕНОВ пользователя по его telegram_id:
+        return: list of named tuples
+        list of namedtuple fields:
+            token str
+            cooldown  int
+            last_message_time Timestamp
+        """
+
         return Token.get_related_tokens(telegram_id=telegram_id)
 
     @classmethod
@@ -242,6 +251,14 @@ class DBI:
             telegram_id=telegram_id, token=token, discord_id=discord_id,
             user_channel_pk=user_channel_pk
         )
+
+    @classmethod
+    @logger.catch
+    async def get_min_last_time_token_data(cls, telegram_id: str) -> namedtuple:
+        # TODO Возвращает данные о токене У КОТОРОГО ЕСТЬ НАПАРНИК (get_related_token), у которого минимальное last_message_time. Формат
+        #  данных как в методе get_info_by_token(token)
+
+        return Token.get_min_last_time_token_data(telegram_id=telegram_id)
 
     @classmethod
     @logger.catch
