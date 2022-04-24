@@ -8,8 +8,6 @@ from keyboards import user_menu_keyboard
 class ErrorsSender:
     """Отправляет сообщения об ошибках"""
 
-    # TODO
-
     @classmethod
     async def send_message_check_token(
             cls,
@@ -95,10 +93,11 @@ class ErrorsSender:
             text = 'Unrecognised error!'
             users = False
             admins = True
-        if users:
-            await cls.errors_report(telegram_id=telegram_id, text=text)
-        if admins:
-            await cls.send_report_to_admins(text)
+        if text:
+            if users:
+                await cls.errors_report(telegram_id=telegram_id, text=text)
+            if admins:
+                await cls.send_report_to_admins(text)
 
     @classmethod
     @logger.catch
@@ -121,6 +120,7 @@ class ErrorsSender:
                 logger.error(f"Не смог отправить сообщение пользователю {admin_id}.", err)
 
     @classmethod
+    @logger.catch
     async def proxy_not_found_error(cls):
         text: str = "Нет доступных прокси."
         await cls.send_report_to_admins(text)

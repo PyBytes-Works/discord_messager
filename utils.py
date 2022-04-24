@@ -18,7 +18,10 @@ def save_data_to_json(data, file_name: str = "data.json", key: str = 'w'):
         if os.path.exists(file_name):
             with open(file_name, 'r', encoding='utf-8') as f:
                 result: dict = json.load(f)
-        result.update(data)
+        if isinstance(result, list):
+            result.extend(data)
+        elif isinstance(result, dict):
+            result.update(data)
         save_data_to_json(data=result, file_name=file_name, key='w')
 
     logger.debug(f"{file_name} saved.")

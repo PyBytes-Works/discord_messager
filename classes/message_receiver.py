@@ -55,11 +55,9 @@ class MessageReceiver(ChannelData):
         user_message, message_id = await self.__get_user_message_from_redis()
 
         discord_messages: List[dict] = await self.__get_all_messages()
-        logger.debug(f"Discord messages: {discord_messages}")
         if not discord_messages:
             return
-        lms_id_and_replies: Tuple[int, List[
-            dict]] = await self.__get_replies_and_message_id(data=discord_messages)
+        lms_id_and_replies: Tuple[int, List[dict]] = await self.__get_replies_and_message_id(discord_messages)
         self._datastore.current_message_id = lms_id_and_replies[0]
         self._datastore.replies = lms_id_and_replies[1]
 
@@ -67,29 +65,6 @@ class MessageReceiver(ChannelData):
             self._datastore.current_message_id = message_id
         self._datastore.text_to_send = user_message if user_message else ''
         return self._datastore
-
-    @logger.catch
-    async def __get_user_message_from_redis(self) -> Tuple[str, int]:
-        """Возвращает данные из Редиса"""
-
-        answer: str = ''
-        message_id = 0
-        redis_data: List[dict] = await RedisDB(redis_key=self._datastore.my_discord_id).load()
-        if not redis_data:
-            return answer, message_id
-
-        for elem in redis_data:
-            # if not isinstance(elem, dict):
-            #     continue
-            answered = elem.get("answered", False)
-            if not answered:
-                answer = elem.get("answer_text", '')
-                message_id = elem.get("message_id", 0)
-                elem.update({"answered": True})
-                await RedisDB(redis_key=self._datastore.my_discord_id).save(data=redis_data)
-                break
-
-        return answer, message_id
 
     @staticmethod
     @logger.catch
@@ -199,15 +174,41 @@ class MessageReceiver(ChannelData):
         """Возвращает разницу между старыми и новыми данными в редисе,
         записывает полные данные в редис"""
 
+        # TODO переделать хранение данных
         if not new_replies:
             return []
-        total_replies: List[dict] = await RedisDB(redis_key=self._datastore.my_discord_id).load()
+        total_replies: List[dict] = await RedisDB(redis_key=self._datastore.telegram_id).load()
         old_messages: List[str] = list(map(lambda x: x.get("message_id"), total_replies))
         result: List[dict] = list(filter(lambda x: x.get("message_id") not in old_messages, new_replies))
         total_replies.extend(result)
-        await RedisDB(redis_key=self._datastore.my_discord_id).save(data=total_replies)
+        logger.debug(f"\n\t\ttotal_replies saved: {total_replies}")
+        await RedisDB(redis_key=self._datastore.telegram_id).save(data=total_replies)
 
         return result
+
+    @logger.catch
+    async def __get_user_message_from_redis(self) -> Tuple[str, int]:
+        """Возвращает данные из Редиса"""
+
+        # TODO сделать получение данных
+        answer: str = ''
+        message_id = 0
+        redis_data: List[dict] = await RedisDB(redis_key=self._datastore.telegram_id).load()
+        logger.debug(f"\n\t\tREDIS DATA: {redis_data}")
+        if not redis_data:
+            return answer, message_id
+
+        for elem in redis_data:
+            answered: bool = elem.get("answered", False)
+            for_me: bool = elem.get("target_id") == self._datastore.my_discord_id
+            if for_me and not answered:
+                answer = elem.get("answer_text", '')
+                message_id = elem.get("message_id", 0)
+                elem.update({"answered": True})
+                await RedisDB(redis_key=self._datastore.telegram_id).save(data=redis_data)
+                break
+
+        return answer, message_id
 
     # @logger.catch
     # def __get_replies_for_my_tokens(self, elem: dict) -> dict:

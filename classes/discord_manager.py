@@ -139,8 +139,6 @@ class DiscordManager:
     @check_working
     @logger.catch
     async def _is_datastore_ready(self) -> None:
-        if not self.working:
-            return
         if not self.__workers:
             await self.form_token_pairs(unpair=True)
             self.__current_tokens_list: List[namedtuple] = await DBI.get_all_related_user_tokens(
