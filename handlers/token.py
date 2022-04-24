@@ -170,25 +170,9 @@ async def check_and_add_token_handler(message: Message, state: FSMContext) -> No
         return
 
     if not await TokenChecker().check_token(token=token, proxy=proxy, channel=channel):
+        await state.finish()
         return
-    # result: dict = await TokenChecker().check_token(token=token, proxy=proxy, channel=channel)
-    # if not result.get("success"):
-    #     error_message: str = result.get("message")
-    #     if error_message == 'bad proxy':
-    #         await errors_report(telegram_id=telegram_id, text=error_message)
-    #         await state.finish()
-    #         return
-    #     elif error_message == 'bad token':
-    #         await message.answer(
-    #             f"Ваш токен {token} не прошел проверку в канале {channel}. "
-    #             "\nЛибо канал не существует либо токен отсутствует данном канале, ",
-    #             reply_markup=cancel_keyboard()
-    #         )
-    #         await state.finish()
-    #         return
-    #     else:
-    #         logger.error("f: check_and_add_token_handler: error: Don`t know why"
-    #                      f"\nToken: {token}\nProxy: {proxy}\nChanel: {channel}")
+
     if user_channel_pk == 0:
         user_channel_pk: int = await DBI.add_user_channel(telegram_id=telegram_id, channel_id=channel, guild_id=guild)
         if not user_channel_pk:

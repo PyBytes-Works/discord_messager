@@ -68,8 +68,10 @@ class GetRequest(RequestSender):
                         status=response.status,
                         data=await response.text()
                     )
-            except self._EXCEPTIONS as err:
-                logger.error(f"GetRequest: Token check Error: {err}")
+            except aiohttp.client_exceptions.ClientConnectorError as err:
+                logger.error(f"GetRequest: Proxy check Error: {err}")
+                await ErrorsSender.proxy_not_found_error()
+                answer.update(status=407)
             except aiohttp.http_exceptions.BadHttpMessage as err:
                 logger.error("GetRequest: МУДАК ПРОВЕРЬ ПОРТ ПРОКСИ!!!", err)
                 if "Proxy Authentication Required" in err:
@@ -78,6 +80,8 @@ class GetRequest(RequestSender):
                 logger.error("GetRequest: Ошибка авторизации прокси:", err)
                 if "Proxy Authentication Required" in err:
                     answer.update(status=407)
+            except self._EXCEPTIONS as err:
+                logger.error("GetRequest: _EXCEPTIONS: ", err)
 
         return answer
 
@@ -156,23 +160,7 @@ class TokenChecker(GetRequest):
         status: int = answer.get("status")
         if status == 200:
             return True
-        await ErrorsSender.send_message(status=status, telegram_id=telegram_id)
-        # return {
-        #     "success": True,
-        #     "proxy": proxy,
-        #     "token": token,
-        #     "channel": channel
-        # }
-
-        # elif status == 407:
-        #     await ErrorsSender.send_message(error=status)
-        #     answer.update(message='bad proxy')
-        # elif status == 401:
-        #     answer.update(message='bad token')
-        # else:
-        #     answer.update(message='check_token failed')
-        #
-        # return answer
+        await ErrorsSender.send_message_check_token(status=status, telegram_id=telegram_id)
 
 
 class PostRequest(RequestSender):
@@ -202,16 +190,20 @@ class PostRequest(RequestSender):
                         status=response.status,
                         data=await response.text()
                     )
-            except self._EXCEPTIONS as err:
-                logger.error(f"PostRequest: Error: {err}")
+            except aiohttp.client_exceptions.ClientConnectorError as err:
+                logger.error(f"GetRequest: Proxy check Error: {err}")
+                await ErrorsSender.proxy_not_found_error()
+                answer.update(status=407)
             except aiohttp.http_exceptions.BadHttpMessage as err:
-                logger.error("PostRequest: МУДАК ПРОВЕРЬ ПОРТ ПРОКСИ!!!", err)
+                logger.error("GetRequest: МУДАК ПРОВЕРЬ ПОРТ ПРОКСИ!!!", err)
                 if "Proxy Authentication Required" in err:
                     answer.update(status=407)
             except (ssl.SSLError, OSError) as err:
-                logger.error("PostRequest: Ошибка авторизации прокси:", err)
+                logger.error("GetRequest: Ошибка авторизации прокси:", err)
                 if "Proxy Authentication Required" in err:
                     answer.update(status=407)
+            except self._EXCEPTIONS as err:
+                logger.error("GetRequest: _EXCEPTIONS: ", err)
 
         return answer
 
