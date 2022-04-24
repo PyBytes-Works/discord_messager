@@ -99,8 +99,10 @@ def new_channel_key() -> 'InlineKeyboardMarkup':
     """Возвращает список кнопок всех токенов пользователя"""
 
     keyboard = InlineKeyboardMarkup(row_width=1)
-    keyboard.add(InlineKeyboardButton(
-        text="Добавить новый канал", callback_data="new_channel"))
+    keyboard.add(
+        InlineKeyboardButton(text="Добавить новый канал", callback_data="new_channel"),
+        InlineKeyboardButton(text="Отмена", callback_data="cancel")
+    )
 
     return keyboard
 

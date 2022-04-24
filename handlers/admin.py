@@ -14,7 +14,7 @@ from aiogram.types import Message, CallbackQuery, ReplyKeyboardRemove, InlineKey
 
 from classes.vocabulary import Vocabulary
 from config import logger, bot, admins_list
-from handlers.main_handlers import cancel_handler
+from handlers.main_handlers import message_cancel_handler
 from keyboards import cancel_keyboard, user_menu_keyboard, inactive_users_keyboard, admin_keyboard, \
     superadmin_keyboard
 from states import AdminStates
@@ -533,9 +533,9 @@ def register_admin_handlers(dp: Dispatcher) -> None:
     """
     Регистратор для функций данного модуля
     """
-    dp.register_message_handler(cancel_handler, commands=['отмена', 'cancel'], state="*")
+    dp.register_message_handler(message_cancel_handler, commands=['отмена', 'cancel'], state="*")
     dp.register_message_handler(
-        cancel_handler, Text(startswith=["отмена", "cancel"], ignore_case=True), state="*"
+        message_cancel_handler, Text(startswith=["отмена", "cancel"], ignore_case=True), state="*"
     )
     # dp.register_message_handler(
     #     final_add_user_handler, Text(startswith=["new_user_"]), state=AdminStates.name_for_activate

@@ -8,7 +8,7 @@ from aiogram.dispatcher import FSMContext
 
 import utils
 from classes.manager_storage import InstancesStorage
-from config import logger, Dispatcher, DEBUG, VERSION
+from config import logger, Dispatcher, DEBUG, VERSION, bot
 from keyboards import cancel_keyboard, user_menu_keyboard
 from classes.discord_manager import DiscordManager
 from classes.redis_interface import RedisDB
@@ -17,25 +17,40 @@ from states import UserStates
 
 
 @logger.catch
-async def cancel_handler(message: Message, state: FSMContext) -> None:
+async def callback_cancel_handler(callback: CallbackQuery, state: FSMContext) -> None:
+    """Ловит коллбэк инлайн кнопки Отмена и вызывает обработик для нее"""
+
+    await send_cancel_message(telegram_id=str(callback.from_user.id), state=state)
+    await callback.answer()
+
+
+@logger.catch
+async def message_cancel_handler(message: Message, state: FSMContext) -> None:
+    """Ловит сообщение или команду отмена, Отмена, cancel и вызывает обработик для нее"""
+
+    await send_cancel_message(telegram_id=str(message.from_user.id), state=state)
+
+
+@logger.catch
+async def send_cancel_message(telegram_id: str, state: FSMContext) -> None:
     """
     Отменяет текущие запросы и сбрасывает состояние.
     Ставит пользователя в нерабочее состояние.
-    Обработчик команды /cancel
+    Обработчик команды /cancel, /Отмена, кнопки Отмена и инлайн кнопки Отмена
     """
-
-    user_telegram_id: str = str(message.from_user.id)
     text: str = ''
     keyboard = user_menu_keyboard
-    if await DBI.is_user_work(telegram_id=user_telegram_id):
+    if await DBI.is_user_work(telegram_id=telegram_id):
         text: str = "\nДождитесь завершения работы бота. Это займет несколько секунд..."
         keyboard = ReplyKeyboardRemove
-    await message.answer(
-        "Вы отменили текущую команду." + text, reply_markup=keyboard()
+    await bot.send_message(
+        chat_id=telegram_id,
+        text="Вы отменили текущую команду." + text,
+        reply_markup=keyboard()
     )
-    logger.debug(f"\n\t{user_telegram_id}: canceled command.")
-    await InstancesStorage.stop_work(telegram_id=user_telegram_id)
-    await DBI.set_user_is_not_work(telegram_id=user_telegram_id)
+    logger.debug(f"\n\t{telegram_id}: canceled command.")
+    await InstancesStorage.stop_work(telegram_id=telegram_id)
+    await DBI.set_user_is_not_work(telegram_id=telegram_id)
     await state.finish()
 
 
@@ -137,8 +152,8 @@ def register_handlers(dp: Dispatcher) -> None:
     Регистратор для функций данного модуля
     """
 
-    dp.register_message_handler(cancel_handler, commands=['отмена', 'cancel'], state="*")
-    dp.register_message_handler(cancel_handler, Text(startswith=["отмена", "cancel"], ignore_case=True), state="*")
+    dp.register_message_handler(message_cancel_handler, commands=['отмена', 'cancel'], state="*")
+    dp.register_message_handler(message_cancel_handler, Text(startswith=["отмена", "cancel"], ignore_case=True), state="*")
     dp.register_message_handler(activate_valid_user_handler, commands=["start"])
     dp.register_message_handler(start_parsing_command_handler, Text(equals=["Старт", "Старт & Mute"]))
     dp.register_callback_query_handler(answer_to_reply_handler, Text(startswith=["reply_"]), state=UserStates.in_work)
