@@ -241,5 +241,5 @@ class SendMessageToChannel(PostRequest):
         await self.typing()
         await self.typing()
         self.url = DISCORD_BASE_URL + f'{self._datastore.channel}/messages?'
-
-        return await self._send()
+        answer: dict = await self._send()
+        return answer

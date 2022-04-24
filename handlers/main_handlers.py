@@ -10,7 +10,7 @@ import utils
 from classes.manager_storage import InstancesStorage
 from config import logger, Dispatcher, DEBUG, VERSION
 from keyboards import cancel_keyboard, user_menu_keyboard
-from classes.discord_manager import DiscordTokenManager
+from classes.discord_manager import DiscordManager
 from classes.redis_interface import RedisDB
 from classes.db_interface import DBI
 from states import UserStates
@@ -66,7 +66,7 @@ async def start_parsing_command_handler(message: Message, state: FSMContext) -> 
     await message.answer("Запускаю бота " + mute_text, reply_markup=cancel_keyboard())
     await DBI.set_user_is_work(telegram_id=user_telegram_id)
     await UserStates.in_work.set()
-    manager = DiscordTokenManager(message=message, mute=mute)
+    manager = DiscordManager(message=message, mute=mute)
     await InstancesStorage.add_or_update(telegram_id=user_telegram_id, data=manager)
     await manager.lets_play()
     await DBI.set_user_is_not_work(telegram_id=user_telegram_id)
