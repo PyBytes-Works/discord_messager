@@ -68,7 +68,7 @@ class GetRequest(RequestSender):
                         data=await response.text()
                     )
             except self._EXCEPTIONS as err:
-                logger.info(f"GetRequest: Token check Error: {err}")
+                logger.error(f"GetRequest: Token check Error: {err}")
             except aiohttp.http_exceptions.BadHttpMessage as err:
                 logger.error("GetRequest: МУДАК ПРОВЕРЬ ПОРТ ПРОКСИ!!!", err)
                 if "Proxy Authentication Required" in err:
@@ -198,7 +198,7 @@ class PostRequest(RequestSender):
                         data=await response.text()
                     )
             except self._EXCEPTIONS as err:
-                logger.info(f"PostRequest: Error: {err}")
+                logger.error(f"PostRequest: Error: {err}")
             except aiohttp.http_exceptions.BadHttpMessage as err:
                 logger.error("PostRequest: МУДАК ПРОВЕРЬ ПОРТ ПРОКСИ!!!", err)
                 if "Proxy Authentication Required" in err:
