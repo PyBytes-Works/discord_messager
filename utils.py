@@ -4,13 +4,8 @@ import json
 import random
 import string
 
-import aiogram
-import aiogram.utils.exceptions
-from aiogram.types import Message
-
 from typing import Union
-from config import logger, bot, admins_list
-from keyboards import user_menu_keyboard
+from config import logger
 
 
 @logger.catch
@@ -93,27 +88,6 @@ def delete_used_token(token: str) -> dict:
         json.dump(tokens, f, indent=4, ensure_ascii=False)
 
     return user_data
-
-
-@logger.catch
-async def send_report_to_admins(text: str) -> None:
-    """Отправляет сообщение в телеграме всем администраторам из списка"""
-
-    text = f'[Рассылка][Superusers]: {text}'
-    for admin_id in admins_list:
-        try:
-            await bot.send_message(chat_id=admin_id, text=text)
-        except aiogram.utils.exceptions.ChatNotFound as err:
-            logger.error(f"Не смог отправить сообщение пользователю {admin_id}.", err)
-
-
-@logger.catch
-async def errors_report(telegram_id: str, text: str) -> None:
-    """Errors report"""
-
-    logger.error(f"Errors report: {text}")
-    await send_report_to_admins(text)
-    await bot.send_message(chat_id=telegram_id, text=text, reply_markup=user_menu_keyboard())
 
 
 if __name__ == '__main__':

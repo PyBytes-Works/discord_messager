@@ -47,12 +47,13 @@ class MessageReceiver(ChannelData):
 
         user_message, message_id = await self.__get_user_message_from_redis()
 
-        filtered_data: List[dict] = await self.__get_all_messages()
-        if filtered_data:
-            lms_id_and_replies: Tuple[int, List[
-                dict]] = await self.__get_replies_and_message_id(data=filtered_data)
-            self._datastore.current_message_id = lms_id_and_replies[0]
-            self._datastore.replies = lms_id_and_replies[1]
+        discord_messages: List[dict] = await self.__get_all_messages()
+        if not discord_messages:
+            return
+        lms_id_and_replies: Tuple[int, List[
+            dict]] = await self.__get_replies_and_message_id(data=discord_messages)
+        self._datastore.current_message_id = lms_id_and_replies[0]
+        self._datastore.replies = lms_id_and_replies[1]
 
         if message_id:
             self._datastore.current_message_id = message_id
@@ -198,12 +199,6 @@ class MessageReceiver(ChannelData):
         total_replies: List[dict] = await RedisDB(redis_key=self._datastore.telegram_id).load()
         old_messages: List[str] = list(map(lambda x: x.get("message_id"), total_replies))
         result: List[dict] = list(filter(lambda x: x.get("message_id") not in old_messages, new_replies))
-        #     [
-        #     elem
-        #     for elem in new_replies
-        #     if elem.get("message_id") not in old_messages
-        # ]
-
         total_replies.extend(result)
         await RedisDB(redis_key=self._datastore.telegram_id).save(data=total_replies)
 

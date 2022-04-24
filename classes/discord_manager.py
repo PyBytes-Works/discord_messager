@@ -12,8 +12,8 @@ from classes.message_receiver import MessageReceiver
 from classes.message_sender import MessageSender
 from classes.token_datastorage import TokenData
 
-from config import logger, DEBUG
-from utils import send_report_to_admins
+from config import logger
+from classes.errors_sender import ErrorsSender
 from keyboards import cancel_keyboard, user_menu_keyboard
 from classes.db_interface import DBI
 
@@ -280,18 +280,18 @@ class DiscordManager:
         if status_code == -1:
             error_text = sender_text
             await self.message.answer("Ошибка десериализации отправки ответа.")
-            await send_report_to_admins(error_text)
+            await ErrorsSender.send_report_to_admins(error_text)
             self.working = False
         elif status_code == -2:
             await self.message.answer("Ошибка словаря.", reply_markup=user_menu_keyboard())
-            await send_report_to_admins("Ошибка словаря.")
+            await ErrorsSender.send_report_to_admins("Ошибка словаря.")
             self.working = False
         elif status_code == 400:
             if discord_code_error == 50035:
                 sender_text = 'Сообщение для ответа удалено из дискорд канала.'
             else:
                 self.working = False
-            await send_report_to_admins(sender_text)
+            await ErrorsSender.send_report_to_admins(sender_text)
         elif status_code == 401:
             if discord_code_error == 0:
                 await DBI.delete_token(token=token)
@@ -338,7 +338,7 @@ class DiscordManager:
                 "Ошибка прокси. Обратитесь к администратору. Код ошибки 407.",
                 reply_markup=ReplyKeyboardRemove()
             )
-            await send_report_to_admins(f"Ошибка прокси. Время действия proxy истекло.")
+            await ErrorsSender.send_report_to_admins(f"Ошибка прокси. Время действия proxy истекло.")
             self.working = False
         elif status_code == 429:
             if discord_code_error == 20016:
@@ -364,7 +364,7 @@ class DiscordManager:
                 f"\nПауза 10 секунд. Код ошибки - 500."
             )
             await self.message.answer(error_text)
-            await send_report_to_admins(error_text)
+            await ErrorsSender.send_report_to_admins(error_text)
             self._datastore.delay = 10
 
     @logger.catch
