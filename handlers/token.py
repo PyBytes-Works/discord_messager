@@ -7,6 +7,7 @@ from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, C
 from aiogram.dispatcher import FSMContext
 
 from classes.request_classes import GetMe, ProxyChecker, TokenChecker
+from handlers import main_handlers
 from states import TokenStates
 from utils import check_is_int, errors_report
 from classes.db_interface import DBI
@@ -29,16 +30,17 @@ async def select_channel_handler(message: Message) -> None:
         return
     telegram_id: str = str(message.from_user.id)
     channels: List[namedtuple] = await DBI.get_user_channels(telegram_id=telegram_id)
+    keyboard = InlineKeyboardMarkup(row_width=1)
     if not channels:
         await message.answer(
             "У вас нет ни одного канала. Сначала нужно создать новый канал и добавить в него токен.",
-            reply_markup=new_channel_key()
+            reply_markup=cancel_keyboard()
         )
-        await TokenStates.create_channel.set()
-        return
+        # await TokenStates.create_channel.set()
+        # return
     if message.text == 'Установить кулдаун':
         for elem in channels:
-            keyboard = InlineKeyboardMarkup(row_width=1).add(InlineKeyboardButton(
+            keyboard.add(InlineKeyboardButton(
                 text="Добавить сюда",
                 callback_data=f"{elem.user_channel_pk}")
             )
@@ -48,7 +50,7 @@ async def select_channel_handler(message: Message) -> None:
             await TokenStates.add_channel_cooldown.set()
     elif message.text == "Добавить токен":
         for elem in channels:
-            keyboard = InlineKeyboardMarkup(row_width=1).add(InlineKeyboardButton(
+            keyboard.add(InlineKeyboardButton(
                 text="Добавить сюда",
                 callback_data=f"{elem.user_channel_pk}")
             )
@@ -316,9 +318,12 @@ def token_register_handlers(dp: Dispatcher) -> None:
     """
     Регистратор для функций данного модуля
     """
-    dp.register_callback_query_handler(start_create_channel_handler, Text(equals=["new_channel"]), state=TokenStates.select_channel)
+    dp.register_callback_query_handler(main_handlers.callback_cancel_handler, Text(startswith=["отмена", "cancel"], ignore_case=True), state="*")
+    dp.register_callback_query_handler(start_create_channel_handler, Text(equals=[
+        "new_channel"]), state=TokenStates.select_channel)
     dp.register_callback_query_handler(ask_token_for_selected_channel_handler, state=TokenStates.select_channel)
-    dp.register_callback_query_handler(start_create_channel_handler, Text(equals=["new_channel"]), state=TokenStates.create_channel)
+    dp.register_callback_query_handler(start_create_channel_handler, Text(equals=[
+        "new_channel"]), state=TokenStates.create_channel)
     dp.register_message_handler(check_channel_and_add_token_handler, state=TokenStates.add_token)
     dp.register_message_handler(check_and_add_token_handler, state=TokenStates.check_token)
     dp.register_callback_query_handler(ask_channel_cooldown_handler, Text(startswith=[

@@ -167,8 +167,8 @@ class User(BaseModel):
         default=datetime.datetime.now(),
         verbose_name='Дата добавления в базу'
     )
-    expiration = TimestampField(
-        default=datetime.datetime.now().timestamp(),
+    expiration = DateTimeField(
+        default=datetime.datetime.now(),
         verbose_name='Срок истечения подписки'
     )
     proxy = ForeignKeyField(
@@ -224,9 +224,9 @@ class User(BaseModel):
         """
         user = cls.select().where(cls.telegram_id == telegram_id).count()
         if not user:
-            expiration = 100 * 365 * 24 if expiration == -1 else expiration
-            expiration = int(datetime.datetime.now().timestamp()) + expiration * 60 * 60
-
+            new_expiration: int = 10 * 365 * 24 if expiration == -1 else expiration
+            expiration_time_stamp: float = datetime.datetime.now().timestamp() + new_expiration * 60 * 60
+            expiration: 'datetime' = datetime.datetime.fromtimestamp(expiration_time_stamp)
             result, answer = cls.get_or_create(
                 nick_name=f'{nick_name}_{telegram_id}',
                 telegram_id=telegram_id,
@@ -396,7 +396,7 @@ class User(BaseModel):
     @logger.catch
     def get_subscribers_list(cls: 'User') -> list:
         """ Возвращает список пользователей которым должна отправляться рассылка"""
-        now = datetime.datetime.now().timestamp()
+        now = datetime.datetime.now()
         return [user.telegram_id
                 for user in cls
                     .select(cls.telegram_id)
@@ -421,7 +421,7 @@ class User(BaseModel):
         return list of telegram ids for active users without admins
         return: list
         """
-        now = datetime.datetime.now().timestamp()
+        now = datetime.datetime.now()
         return cls.update(active=False).where(cls.expiration < now).execute()
 
     @classmethod
@@ -471,7 +471,8 @@ class User(BaseModel):
         """
         now = datetime.datetime.now().timestamp()
         period = subscription_period * 60 * 60 + now
-        return cls.update(expiration=period).where(cls.telegram_id == telegram_id).execute()
+        new_period = datetime.datetime.fromtimestamp(period)
+        return cls.update(expiration=new_period).where(cls.telegram_id == telegram_id).execute()
 
     @classmethod
     @logger.catch
@@ -504,9 +505,11 @@ class User(BaseModel):
         """
 
         user: User = cls.get_or_none(cls.telegram_id == telegram_id)
-        expiration: 'datetime.datetime' = user.expiration if user else datetime.datetime.now()
+        expiration = user.expiration if user else datetime.datetime.now()
 
-        return expiration >= datetime.datetime.now() if expiration else False
+        # TODO убрать заглушку
+        #  return expiration >= datetime.datetime.now() if expiration else False
+        return False
 
     @classmethod
     @logger.catch
@@ -584,7 +587,7 @@ class User(BaseModel):
         """
         set work status enabled fo all users
         """
-        now = datetime.datetime.now().timestamp()
+        now = datetime.datetime.now()
         return cls.update(active=True).where(cls.expiration > now).execute()
 
 
@@ -761,8 +764,8 @@ class Token(BaseModel):
         set last_time: now datetime last message
         token: (str)
         """
-        last_time = datetime.datetime.now().timestamp()
-        return cls.update(last_message_time=last_time).where(cls.token == token).execute()
+        current_time = datetime.datetime.now().timestamp()
+        return cls.update(last_message_time=current_time).where(cls.token == token).execute()
 
     @classmethod
     @logger.catch
