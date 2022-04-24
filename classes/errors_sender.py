@@ -39,7 +39,7 @@ class ErrorsSender:
         text = f'[Рассылка][Superusers]: {text}'
         for admin_id in admins_list:
             try:
-                await bot.send_message(chat_id=admin_id, text=text)
+                await bot.send_message(chat_id=admin_id, text=text, reply_markup=user_menu_keyboard())
             except aiogram.utils.exceptions.ChatNotFound as err:
                 logger.error(f"Не смог отправить сообщение пользователю {admin_id}.", err)
 
