@@ -1,4 +1,4 @@
-name: discord_mailer
+name: discord_mailer_test
 env:
   DOCKER_USER: "deskent"
   DOCKER_REPOSITORY_NAME: "deskent"
@@ -8,7 +8,7 @@ env:
   COUNT: "4.0-develop"
 on:
   push:
-    branches: [ dev ]
+    branches: [ test1 ]
 jobs:
   create_docker_build:
     runs-on: ubuntu-latest
