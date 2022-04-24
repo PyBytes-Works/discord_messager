@@ -10,17 +10,27 @@ class ErrorsSender:
     # TODO
 
     @classmethod
-    async def send_message_check_token(cls, status: int, telegram_id: str) -> None:
+    async def send_message_check_token(
+            cls,
+            status: int,
+            telegram_id: str,
+            admins: bool,
+            token: str = '',
+            proxy: str = ''
+    ) -> None:
         if status == 407:
-            text = 'bad proxy'
+            text = f'Ошибка прокси: {proxy}'
         elif status == 401:
             text = (
-                f"Токен не прошел проверку в канале . "
-                "\nЛибо канал не существует либо токен отсутствует данном канале, "
+                f"Токен {token} не прошел проверку в канале. "
+                "\nЛибо канал не существует либо токен отсутствует данном канале, либо поменялся."
+                "\nТокен удален."
             )
         else:
             text = 'check_token failed'
         await cls.errors_report(telegram_id=telegram_id, text=text)
+        if admins:
+            await cls.send_report_to_admins(text)
 
     @classmethod
     @logger.catch
@@ -28,7 +38,6 @@ class ErrorsSender:
         """Errors report"""
 
         logger.error(f"Errors report: {text}")
-        await cls.send_report_to_admins(text)
         await bot.send_message(chat_id=telegram_id, text=text, reply_markup=user_menu_keyboard())
 
     @classmethod

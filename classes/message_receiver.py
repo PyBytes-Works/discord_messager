@@ -5,6 +5,8 @@ from json import JSONDecodeError
 from typing import List, Tuple, Optional
 
 import utils
+from classes.db_interface import DBI
+from classes.errors_sender import ErrorsSender
 from classes.redis_interface import RedisDB
 from classes.request_classes import ChannelData
 from classes.token_datastorage import TokenData
@@ -32,6 +34,11 @@ class MessageReceiver(ChannelData):
                 return json.loads(answer.get("data"))
             except JSONDecodeError as err:
                 logger.error("F: get_data_from_channel: JSON ERROR:", err)
+        elif status == 401:
+            await ErrorsSender.send_message_check_token(
+                status=status, telegram_id=self._datastore.telegram_id, admins=False,
+                token=self._datastore.token)
+            await DBI.delete_token(token=self.token)
         return []
 
     @logger.catch
@@ -48,6 +55,7 @@ class MessageReceiver(ChannelData):
         user_message, message_id = await self.__get_user_message_from_redis()
 
         discord_messages: List[dict] = await self.__get_all_messages()
+        logger.debug(f"Discord messages: {discord_messages}")
         if not discord_messages:
             return
         lms_id_and_replies: Tuple[int, List[

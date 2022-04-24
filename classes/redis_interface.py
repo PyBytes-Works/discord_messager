@@ -3,6 +3,7 @@ import json
 import aioredis
 from typing import Optional, List
 
+from classes.errors_sender import ErrorsSender
 from config import logger, REDIS_DB
 
 
@@ -20,6 +21,7 @@ class RedisDB:
         """Запрашивает или записывает данные в редис, возвращает список если запрашивали"""
 
         result: List[dict] = []
+        error = None
         try:
             async with self.redis_db.client() as conn:
                 if key == "set":
@@ -40,10 +42,14 @@ class RedisDB:
                     raise ValueError("RedisInterface.__get_or_set_from_db(key=???) error")
         except ConnectionRefusedError as err:
             logger.error(f"Unable to connect to redis, data: '{self.data}' not saved!", err)
+            error = err
         except aioredis.exceptions.ConnectionError as err:
             logger.error(f"RedisInterface.__get_or_set_from_db(): Connection error: {err}")
+            error = err
         except Exception as err:
             logger.error(f"RedisInterface.__get_or_set_from_db(): {err}")
+            error = err
+        await ErrorsSender.send_report_to_admins(str(error))
         return result
 
     @logger.catch

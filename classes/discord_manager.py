@@ -21,12 +21,13 @@ from classes.db_interface import DBI
 def check_working(func):
     async def wrapper(*args, **kwargs):
         name: str = func.__name__
+        logger.debug(f"\t{name} start:")
         if args and hasattr(args[0].__class__, name):
             working: bool = getattr(args[0], "working")
             if working:
-                logger.debug(f"DiscordManager.@check_working: {name} end working")
+                logger.debug(f"\t{name} start: OK")
                 return await func(*args, **kwargs)
-        print(f"{name} end of working")
+        logger.debug(f"\t{name} start: ERROR")
         return
     return wrapper
 
