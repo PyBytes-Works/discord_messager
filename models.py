@@ -111,8 +111,8 @@ class Proxy(BaseModel):
 
 class Channel(BaseModel):
     """The Channel class have fields guild_id and channel_id"""
-    guild_id = BigIntegerField(unique=True, verbose_name="Гильдия для подключения")
-    channel_id = BigIntegerField(verbose_name="Канал для подключения")
+    guild_id = BigIntegerField(verbose_name="Гильдия для подключения")
+    channel_id = BigIntegerField(unique=True, verbose_name="Канал для подключения")
 
     class Meta:
         table_name = 'channel'
