@@ -264,7 +264,7 @@ class User(BaseModel):
         """
         remove all associations of user token pairs and User channels
         """
-        # TODO упростить
+        # TODO упростить ????
         return TokenPair.delete().where(
             (TokenPair.first_id.in_(
                 Token.select(Token.id)
@@ -688,8 +688,9 @@ class Token(BaseModel):
           get_all_user_tokens
           get_all_info_tokens
           get_number_of_free_slots_for_tokens
+          get_min_last_time_token_data
           get_time_by_token
-          get_info_by_token
+          get_token_info
           get_all_free_tokens
           get_all_discord_id
           get_all_discord_id_by_channel
@@ -979,6 +980,48 @@ class Token(BaseModel):
         )
 
         return data
+
+    @classmethod
+    @logger.catch
+    def get_min_last_time_token_data(cls: 'Token', telegram_id: str) -> namedtuple:
+        """
+        Вернуть info по токен
+        возвращает объект токен
+            'user_channel_pk' int
+            'proxy':proxy(str),
+            'guild_id':guild_id(int),
+            'channel_id': channel_id(int),
+            'cooldown': cooldown(int, seconds)}
+            'mate_discord_id' str (discord_id)
+            'token_discord_id' str
+        """
+        data = (
+            cls.select(
+                cls.user_channel.alias('user_channel_pk'),
+                Proxy.proxy.alias('proxy'),
+                Channel.guild_id.alias('guild_id'),
+                Channel.channel_id.alias('channel_id'),
+                UserChannel.cooldown.alias('cooldown'),
+                cls.alias('pair').discord_id.alias('mate_discord_id'),
+                cls.discord_id.alias('token_discord_id'),
+            )
+                .join(UserChannel, JOIN.LEFT_OUTER, on=(cls.user_channel == UserChannel.id))
+                .join(Channel, JOIN.LEFT_OUTER, on=(UserChannel.channel == Channel.id))
+                .join(User, JOIN.LEFT_OUTER, on=(UserChannel.user == User.id))
+                .join(TokenPair, JOIN.LEFT_OUTER, on=(TokenPair.first_id == cls.id))
+                .join(Proxy, JOIN.LEFT_OUTER, on=(Proxy.id == User.proxy))
+                .join(cls.alias('pair'), JOIN.LEFT_OUTER,
+                on=(cls.alias('pair').id == TokenPair.second_id))
+                .where(User.telegram_id == telegram_id)
+                .order_by(cls.last_message_time).namedtuples().first()
+        )
+
+        return data if data else namedtuple(
+            'Row',
+            ['user_channel_pk', 'proxy', 'guild_id', 'channel_id', 'cooldown', 'mate_discord_id',
+             'token_discord_id']
+        )(user_channel_pk=None, proxy=None, guild_id=None, channel_id=None, mate_discord_id=None)
+
 
     @classmethod
     @logger.catch
