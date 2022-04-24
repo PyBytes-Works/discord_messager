@@ -9,6 +9,7 @@ import aiohttp.client_exceptions
 import aiohttp.http_exceptions
 
 from classes.db_interface import DBI
+from classes.errors_sender import ErrorsSender
 from config import logger, DISCORD_BASE_URL, PROXY_USER, PROXY_PASSWORD
 from classes.token_datastorage import TokenData
 
@@ -143,7 +144,7 @@ class TokenChecker(GetRequest):
         self.channel: Union[str, int] = 0
 
     @logger.catch
-    async def check_token(self, proxy: str, token: str, channel: int) -> dict:
+    async def check_token(self, proxy: str, token: str, channel: int, telegram_id: str) -> bool:
         """Returns valid token else 'bad token'"""
 
         self.proxy: str = proxy
@@ -154,20 +155,24 @@ class TokenChecker(GetRequest):
         answer: dict = await self._send()
         status: int = answer.get("status")
         if status == 200:
-            answer.update({
-                "success": True,
-                "proxy": proxy,
-                "token": token,
-                "channel": channel
-            })
-        elif status == 407:
-            answer.update(message='bad proxy')
-        elif status == 401:
-            answer.update(message='bad token')
-        else:
-            answer.update(message='check_token failed')
+            return True
+        await ErrorsSender.send_message(status=status, telegram_id=telegram_id)
+        # return {
+        #     "success": True,
+        #     "proxy": proxy,
+        #     "token": token,
+        #     "channel": channel
+        # }
 
-        return answer
+        # elif status == 407:
+        #     await ErrorsSender.send_message(error=status)
+        #     answer.update(message='bad proxy')
+        # elif status == 401:
+        #     answer.update(message='bad token')
+        # else:
+        #     answer.update(message='check_token failed')
+        #
+        # return answer
 
 
 class PostRequest(RequestSender):
