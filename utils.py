@@ -117,4 +117,8 @@ async def errors_report(telegram_id: str, text: str) -> None:
 
 
 if __name__ == '__main__':
-    print(datetime.datetime.fromtimestamp(1654314146))
+    expiration = 1
+    expiration = datetime.datetime.now().timestamp() + expiration * 60 * 60
+    expiration = datetime.datetime.fromtimestamp(expiration)
+    print(expiration)
+    print(expiration > datetime.datetime.now())

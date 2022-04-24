@@ -399,7 +399,7 @@ async def show_all_users_handler(message: Message) -> None:
                     f'Proxy: {user.proxy if user.proxy else "ЧТО ТО СЛОМАЛОСЬ"} | '
                     f'\nID: {user.telegram_id if user.telegram_id else "ЧТО ТО СЛОМАЛОСЬ"} | '
                     f'№: {user.max_tokens if user.max_tokens else "ЧТО ТО СЛОМАЛОСЬ"} | '
-                    f'{datetime.datetime.timestamp(user.expiration) if user.expiration else "ЧТО ТО СЛОМАЛОСЬ"}'
+                    f'{user.expiration if user.expiration else "ЧТО ТО СЛОМАЛОСЬ"}'
                     for user in users_slice
                 )
             user_list: str = '\n'.join(spam)
