@@ -1,4 +1,3 @@
-import datetime
 from typing import List, Tuple, Dict
 from collections import namedtuple
 
@@ -6,7 +5,7 @@ from aiogram.types import ReplyKeyboardRemove, Message
 
 from models import User, Token, Proxy, UserChannel
 from config import logger, admins_list
-from utils import send_report_to_admins
+from classes.errors_sender import ErrorsSender
 
 
 class DBI:
@@ -34,7 +33,7 @@ class DBI:
                 f"пользователь декативирован, его токены удалены"
             )
             logger.info(text)
-            await send_report_to_admins(text)
+            await ErrorsSender.send_report_to_admins(text)
             return True
 
         return False

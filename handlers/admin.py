@@ -1,5 +1,5 @@
 """Модуль для обработчиков администратора"""
-import datetime
+
 from collections import namedtuple
 import re
 from typing import Tuple
@@ -19,7 +19,8 @@ from keyboards import cancel_keyboard, user_menu_keyboard, inactive_users_keyboa
     superadmin_keyboard
 from states import AdminStates
 from classes.db_interface import DBI
-from utils import delete_used_token, send_report_to_admins, check_is_int
+from classes.errors_sender import ErrorsSender
+from utils import check_is_int
 
 
 @logger.catch
@@ -47,8 +48,9 @@ async def send_message_to_all_users_handler(message: Message) -> None:
                 logger.error(f"Пользователь {user} заблокировал бота", err)
                 result: bool = await DBI.deactivate_user(telegram_id=user)
                 if result:
-                    await send_report_to_admins(f"Пользователь {user} заблокировал бота. "
-                                                f"\nЕго аккаунт деактивирован.")
+                    await ErrorsSender.send_report_to_admins(
+                        f"Пользователь {user} заблокировал бота. "
+                        f"\nЕго аккаунт деактивирован.")
 
 
 @logger.catch
@@ -136,7 +138,8 @@ async def delete_all_proxies(message: Message, state: FSMContext) -> None:
 
     if message.text.lower() == "yes":
         await DBI.delete_all_proxy()
-        await send_report_to_admins(f"Пользователь {message.from_user.id} удалил ВСЕ прокси.")
+        await ErrorsSender.send_report_to_admins(
+            f"Пользователь {message.from_user.id} удалил ВСЕ прокси.")
         await state.finish()
         return
     await message.answer("Прокси не удалены.")
