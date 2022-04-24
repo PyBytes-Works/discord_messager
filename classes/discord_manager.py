@@ -75,7 +75,7 @@ class DiscordManager:
 
             await self._send_replies()
 
-            await self._get_error_text()
+            # await self._get_error_text()
             if not self.__silence and self._error_text:
                 await self.message.answer(self._error_text, reply_markup=cancel_keyboard())
         logger.debug("Game over.")
@@ -258,113 +258,113 @@ class DiscordManager:
                     f"\nText: {reply_text}",
                     reply_markup=answer_keyboard
                 )
-
-    @check_working
-    @logger.catch
-    async def _get_error_text(self) -> None:
-        """Обработка ошибок от сервера"""
-
-        if not self._discord_data:
-            return
-        self._error_text: str = self._discord_data.get("message", "")
-        token: str = self._discord_data.get("token")
-        answer: dict = self._discord_data.get("answer", {})
-        status_code: int = answer.get("status", 0)
-        sender_text: str = answer.get("message", "SEND_ERROR")
-        data = answer.get("data")
-        if isinstance(data, str):
-            data: dict = json.loads(answer.get("data", {}))
-        discord_code_error: int = data.get("code", 0)
-
-        if status_code == -1:
-            error_text = sender_text
-            await self.message.answer("Ошибка десериализации отправки ответа.")
-            await ErrorsSender.send_report_to_admins(error_text)
-            self.working = False
-        elif status_code == -2:
-            await self.message.answer("Ошибка словаря.", reply_markup=user_menu_keyboard())
-            await ErrorsSender.send_report_to_admins("Ошибка словаря.")
-            self.working = False
-        elif status_code == 400:
-            if discord_code_error == 50035:
-                sender_text = 'Сообщение для ответа удалено из дискорд канала.'
-            else:
-                self.working = False
-            await ErrorsSender.send_report_to_admins(sender_text)
-        elif status_code == 401:
-            if discord_code_error == 0:
-                await DBI.delete_token(token=token)
-                await self.message.answer("Токен сменился и будет удален."
-                                          f"\nToken: {token}")
-            else:
-                await self.message.answer(
-                    "Произошла ошибка данных. "
-                    "Убедитесь, что вы ввели верные данные. Код ошибки - 401.",
-                    reply_markup=user_menu_keyboard()
-                )
-            self.working = False
-        elif status_code == 403:
-            if discord_code_error == 50013:
-                await self.message.answer(
-                    "Не могу отправить сообщение для токена. (Ошибка 403 - 50013)"
-                    "Токен в муте."
-                    f"\nToken: {token}"
-                    f"\nGuild: {self._datastore.guild}"
-                    f"\nChannel: {self._datastore.channel}"
-                )
-            elif discord_code_error == 50001:
-                await DBI.delete_token(token=token)
-                await self.message.answer(
-                    "Не могу отправить сообщение для токена. (Ошибка 403 - 50001)"
-                    "Токен забанили."
-                    f"\nТокен: {token} удален."
-                    f"\nФормирую новые пары.",
-                    reply_markup=user_menu_keyboard()
-                )
-                await self.form_token_pairs(unpair=False)
-            else:
-                await self.message.answer(f"Ошибка {status_code}: {data}")
-        elif status_code == 404:
-            if discord_code_error == 10003:
-                await self.message.answer(
-                    "Ошибка отправки сообщения. Неверный канал. (Ошибка 404 - 10003)"
-                    f"\nToken: {token}"
-                )
-            else:
-                await self.message.answer(f"Ошибка {status_code}: {data}")
-        elif status_code == 407:
-            await self.message.answer(
-                "Ошибка прокси. Обратитесь к администратору. Код ошибки 407.",
-                reply_markup=ReplyKeyboardRemove()
-            )
-            await ErrorsSender.send_report_to_admins(f"Ошибка прокси. Время действия proxy истекло.")
-            self.working = False
-        elif status_code == 429:
-            if discord_code_error == 20016:
-                cooldown: int = int(data.get("retry_after", None))
-                if cooldown:
-                    cooldown += self._datastore.cooldown
-                    await DBI.update_user_channel_cooldown(
-                        user_channel_pk=self._datastore.user_channel_pk, cooldown=cooldown)
-                    self._datastore.delay = cooldown
-                await self.message.answer(
-                    "Для данного токена сообщения отправляются чаще, чем разрешено в канале."
-                    f"\nToken: {token}"
-                    f"\nГильдия/Канал: {self._datastore.guild}/{self._datastore.channel}"
-                    f"\nВремя скорректировано. Кулдаун установлен: {cooldown} секунд"
-                )
-            else:
-                await self.message.answer(f"Ошибка: "
-                                          f"{status_code}:{discord_code_error}:{sender_text}")
-        elif status_code == 500:
-            error_text = (
-                f"Внутренняя ошибка сервера Дискорда. "
-                f"\nГильдия:Канал: {self._datastore.guild}:{self._datastore.channel} "
-                f"\nПауза 10 секунд. Код ошибки - 500."
-            )
-            await self.message.answer(error_text)
-            await ErrorsSender.send_report_to_admins(error_text)
-            self._datastore.delay = 10
+    #
+    # @check_working
+    # @logger.catch
+    # async def _get_error_text(self) -> None:
+    #     """Обработка ошибок от сервера"""
+    #
+    #     if not self._discord_data:
+    #         return
+    #     self._error_text: str = self._discord_data.get("message", "")
+    #     token: str = self._discord_data.get("token")
+    #     answer: dict = self._discord_data.get("answer", {})
+    #     status_code: int = answer.get("status", 0)
+    #     sender_text: str = answer.get("message", "SEND_ERROR")
+    #     data = answer.get("data")
+    #     if isinstance(data, str):
+    #         data: dict = json.loads(answer.get("data", {}))
+    #     discord_code_error: int = data.get("code", 0)
+    #
+    #     if status_code == -1:
+    #         error_text = sender_text
+    #         await self.message.answer("Ошибка десериализации отправки ответа.")
+    #         await ErrorsSender.send_report_to_admins(error_text)
+    #         self.working = False
+    #     elif status_code == -2:
+    #         await self.message.answer("Ошибка словаря.", reply_markup=user_menu_keyboard())
+    #         await ErrorsSender.send_report_to_admins("Ошибка словаря.")
+    #         self.working = False
+    #     elif status_code == 400:
+    #         if discord_code_error == 50035:
+    #             sender_text = 'Сообщение для ответа удалено из дискорд канала.'
+    #         else:
+    #             self.working = False
+    #         await ErrorsSender.send_report_to_admins(sender_text)
+    #     elif status_code == 401:
+    #         if discord_code_error == 0:
+    #             await DBI.delete_token(token=token)
+    #             await self.message.answer("Токен сменился и будет удален."
+    #                                       f"\nToken: {token}")
+    #         else:
+    #             await self.message.answer(
+    #                 "Произошла ошибка данных. "
+    #                 "Убедитесь, что вы ввели верные данные. Код ошибки - 401.",
+    #                 reply_markup=user_menu_keyboard()
+    #             )
+    #         self.working = False
+    #     elif status_code == 403:
+    #         if discord_code_error == 50013:
+    #             await self.message.answer(
+    #                 "Не могу отправить сообщение для токена. (Ошибка 403 - 50013)"
+    #                 "Токен в муте."
+    #                 f"\nToken: {token}"
+    #                 f"\nGuild: {self._datastore.guild}"
+    #                 f"\nChannel: {self._datastore.channel}"
+    #             )
+    #         elif discord_code_error == 50001:
+    #             await DBI.delete_token(token=token)
+    #             await self.message.answer(
+    #                 "Не могу отправить сообщение для токена. (Ошибка 403 - 50001)"
+    #                 "Токен забанили."
+    #                 f"\nТокен: {token} удален."
+    #                 f"\nФормирую новые пары.",
+    #                 reply_markup=user_menu_keyboard()
+    #             )
+    #             await self.form_token_pairs(unpair=False)
+    #         else:
+    #             await self.message.answer(f"Ошибка {status_code}: {data}")
+    #     elif status_code == 404:
+    #         if discord_code_error == 10003:
+    #             await self.message.answer(
+    #                 "Ошибка отправки сообщения. Неверный канал. (Ошибка 404 - 10003)"
+    #                 f"\nToken: {token}"
+    #             )
+    #         else:
+    #             await self.message.answer(f"Ошибка {status_code}: {data}")
+    #     elif status_code == 407:
+    #         await self.message.answer(
+    #             "Ошибка прокси. Обратитесь к администратору. Код ошибки 407.",
+    #             reply_markup=ReplyKeyboardRemove()
+    #         )
+    #         await ErrorsSender.send_report_to_admins(f"Ошибка прокси. Время действия proxy истекло.")
+    #         self.working = False
+    #     elif status_code == 429:
+    #         if discord_code_error == 20016:
+    #             cooldown: int = int(data.get("retry_after", None))
+    #             if cooldown:
+    #                 cooldown += self._datastore.cooldown
+    #                 await DBI.update_user_channel_cooldown(
+    #                     user_channel_pk=self._datastore.user_channel_pk, cooldown=cooldown)
+    #                 self._datastore.delay = cooldown
+    #             await self.message.answer(
+    #                 "Для данного токена сообщения отправляются чаще, чем разрешено в канале."
+    #                 f"\nToken: {token}"
+    #                 f"\nГильдия/Канал: {self._datastore.guild}/{self._datastore.channel}"
+    #                 f"\nВремя скорректировано. Кулдаун установлен: {cooldown} секунд"
+    #             )
+    #         else:
+    #             await self.message.answer(f"Ошибка: "
+    #                                       f"{status_code}:{discord_code_error}:{sender_text}")
+    #     elif status_code == 500:
+    #         error_text = (
+    #             f"Внутренняя ошибка сервера Дискорда. "
+    #             f"\nГильдия:Канал: {self._datastore.guild}:{self._datastore.channel} "
+    #             f"\nПауза 10 секунд. Код ошибки - 500."
+    #         )
+    #         await self.message.answer(error_text)
+    #         await ErrorsSender.send_report_to_admins(error_text)
+    #         self._datastore.delay = 10
 
     @logger.catch
     async def form_token_pairs(self, unpair: bool = False) -> None:

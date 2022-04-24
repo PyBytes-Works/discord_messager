@@ -18,6 +18,9 @@ from keyboards import (
 )
 
 
+# Написать обработчик для ввода имени токена и канала
+
+
 @logger.catch
 async def select_channel_handler(message: Message) -> None:
     """
@@ -144,7 +147,7 @@ async def check_and_add_token_handler(message: Message, state: FSMContext) -> No
     if await DBI.is_token_exists(token):
         await message.answer(
             "Такой токен токен уже есть в база данных."
-            "\n Повторите ввод токена.",
+            "\nПовторите ввод токена.",
             reply_markup=cancel_keyboard()
         )
         return
