@@ -111,8 +111,11 @@ async def send_message_to_reply_handler(message: Message, state: FSMContext):
 async def default_message(message: Message) -> None:
     """Ответ на любое необработанное действие активного пользователя."""
 
-    if not await DBI.is_expired_user_deactivated(message):
-        await message.answer(f'Текущая версия: {VERSION}', reply_markup=user_menu_keyboard())
+    user_telegram_id: str = str(message.from_user.id)
+    is_user_exists: bool = await DBI.get_user_by_telegram_id(telegram_id=user_telegram_id)
+    if is_user_exists:
+        if not await DBI.is_expired_user_deactivated(message):
+            await message.answer(f'Текущая версия: {VERSION}', reply_markup=user_menu_keyboard())
 
 
 @logger.catch

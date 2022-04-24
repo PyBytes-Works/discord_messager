@@ -167,6 +167,7 @@ class User(BaseModel):
         default=datetime.datetime.now(),
         verbose_name='Дата добавления в базу'
     )
+    # TODO Хранить НЕ таймстамп, а обычную дату и проверить чтоб везде работало
     expiration = TimestampField(
         default=datetime.datetime.now().timestamp(),
         verbose_name='Срок истечения подписки'
@@ -504,9 +505,9 @@ class User(BaseModel):
         """
 
         user: User = cls.get_or_none(cls.telegram_id == telegram_id)
-        expiration: 'datetime.datetime' = user.expiration if user else datetime.datetime.now()
+        expiration: float = user.expiration if user else datetime.datetime.now().timestamp()
 
-        return expiration >= datetime.datetime.now() if expiration else False
+        return expiration >= datetime.datetime.now().timestamp() if expiration else False
 
     @classmethod
     @logger.catch

@@ -27,7 +27,7 @@ def check_working(func):
                 logger.debug(f"DiscordManager.@check_working: {name} end working")
                 return await func(*args, **kwargs)
         print(f"{name} end of working")
-        return False
+        return
     return wrapper
 
 
@@ -65,14 +65,13 @@ class DiscordManager:
 
             await self._getting_messages()
 
+            timer: float = 7 + random.randint(0, 6)
+            logger.info(f"Пауза между отправкой сообщений: {timer}")
+            await asyncio.sleep(timer)
+
             await self._sending_messages()
 
             await self._send_replies()
-
-            if not DEBUG:
-                timer: float = 7 + random.randint(0, 6)
-                logger.info(f"Пауза между отправкой сообщений: {timer}")
-                await asyncio.sleep(timer)
 
             await self._get_error_text()
             if not self.__silence and self._error_text:
@@ -82,9 +81,10 @@ class DiscordManager:
     @check_working
     @logger.catch
     async def _prepare_data(self) -> None:
-        if not await DBI.is_expired_user_deactivated(self.message):
-            return await self._is_datastore_ready()
-        self.working = False
+        if await DBI.is_expired_user_deactivated(self.message):
+            self.working = False
+            return
+        await self._is_datastore_ready()
 
     @check_working
     @logger.catch
@@ -129,20 +129,23 @@ class DiscordManager:
     @check_working
     @logger.catch
     async def _is_datastore_ready(self) -> None:
-
+        if not self.working:
+            return
         if not self.__workers:
             await self.form_token_pairs(unpair=True)
             self.__current_tokens_list: List[namedtuple] = await DBI.get_all_related_user_tokens(
                 telegram_id=self._datastore.telegram_id
             )
+            logger.debug(f"Current token list: {self.__current_tokens_list}")
             if not self.__current_tokens_list:
                 await self.__send_text(
                     text="Не смог сформировать пары токенов.", keyboard=user_menu_keyboard())
                 self.working = False
             await self.__get_workers()
-        self.working = await self.__get_worker_from_list()
-        message: str = await self.__get_all_tokens_busy_message()
-        await self.__send_text(text=message, check_silence=True)
+        is_workers: bool = await self.__get_worker_from_list()
+        if not is_workers:
+            await self._get_all_tokens_busy_message()
+
         self.working = await self._sleep()
 
     @check_working
@@ -159,7 +162,7 @@ class DiscordManager:
         return True
 
     @logger.catch
-    async def __get_max_message_time(self, elem: namedtuple) -> int:
+    def __get_max_message_time(self, elem: namedtuple) -> int:
         """Возвращает максимальное время фильтрации сообщения. Сообщения с временем меньше
         данного будут отфильтрованы"""
 
@@ -172,7 +175,7 @@ class DiscordManager:
         self.__workers = [
             elem.token
             for elem in self.__current_tokens_list
-            if await self.__get_current_time() > await self.__get_max_message_time(elem)
+            if self.__get_current_time() > self.__get_max_message_time(elem)
         ]
 
     @logger.catch
@@ -187,24 +190,34 @@ class DiscordManager:
         return True
 
     @logger.catch
-    async def __get_current_time(self) -> int:
+    def __get_current_time(self) -> int:
         """Возвращает текущее время (timestamp) целое."""
 
         return int(datetime.datetime.now().timestamp())
 
-    @check_working
     @logger.catch
     async def _update_datastore(self, token: str) -> None:
         token_data: namedtuple = await DBI.get_info_by_token(token)
         self._datastore.update(token=token, token_data=token_data)
 
     @logger.catch
-    async def __get_all_tokens_busy_message(self) -> str:
+    async def _get_all_tokens_busy_message(self) -> None:
         min_token_data: namedtuple = min(self.__current_tokens_list, key=lambda x: x.last_message_time)
         token: str = min_token_data.token
         await self._update_datastore(token)
+        logger.debug(f"\tlast_message_time {min_token_data.last_message_time}")
+
         min_token_time: int = int(min_token_data.last_message_time.timestamp())
-        delay: int = self._datastore.cooldown - abs(min_token_time - await self.__get_current_time())
+
+        logger.debug(f"\tself._datastore.cooldown {self._datastore.cooldown}")
+        logger.debug(f"\tmin_token_time {min_token_time}")
+        logger.debug(f"\tself.__get_current_time() {self.__get_current_time()}")
+        logger.debug(f"\tRAZNICA {min_token_time - self.__get_current_time()}")
+
+        delay: int = self._datastore.cooldown - abs(min_token_time - self.__get_current_time())
+
+        logger.debug(f"\tdelay = {delay}")
+
         self._datastore.delay = delay
         text = "секунд"
         if delay > 60:
@@ -216,7 +229,8 @@ class DiscordManager:
                 seconds: str = f'0{seconds}'
             delay: str = f"{minutes}:{seconds}"
             text = "минут"
-        return f"Все токены отработали. Следующий старт через {delay} {text}."
+        message: str =  f"Все токены отработали. Следующий старт через {delay} {text}."
+        await self.__send_text(text=message, check_silence=True)
 
     @check_working
     @logger.catch
@@ -325,7 +339,6 @@ class DiscordManager:
                 reply_markup=ReplyKeyboardRemove()
             )
             await send_report_to_admins(f"Ошибка прокси. Время действия proxy истекло.")
-            # result = "stop"
             self.working = False
         elif status_code == 429:
             if discord_code_error == 20016:
@@ -368,7 +381,6 @@ class DiscordManager:
                 random.shuffle(tokens)
                 first_token = tokens.pop()
                 second_token = tokens.pop()
-                print(first_token, second_token)
                 formed_pairs += await DBI.make_tokens_pair(first_token, second_token)
 
         logger.info(f"Pairs formed: {formed_pairs}")

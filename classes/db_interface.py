@@ -1,3 +1,4 @@
+import datetime
 from typing import List, Tuple, Dict
 from collections import namedtuple
 
@@ -177,6 +178,15 @@ class DBI:
     @classmethod
     @logger.catch
     async def get_all_related_user_tokens(cls, telegram_id: str) -> List[namedtuple]:
+        """
+        Возвращает список всех связанных ТОКЕНОВ пользователя по его telegram_id:
+        return: list of named tuples
+        list of namedtuple fields:
+            token str
+            cooldown  int
+            last_message_time Timestamp
+        """
+
         return Token.get_related_tokens(telegram_id=telegram_id)
 
     @classmethod
@@ -242,6 +252,14 @@ class DBI:
             telegram_id=telegram_id, token=token, discord_id=discord_id,
             user_channel_pk=user_channel_pk
         )
+
+    @classmethod
+    @logger.catch
+    async def get_min_last_time_token_data(cls, telegram_id: str) -> namedtuple:
+        # TODO Возвращает данные о токене У КОТОРОГО ЕСТЬ НАПАРНИК (get_related_token), у которого минимальное last_message_time. Формат
+        #  данных как в методе get_info_by_token(token)
+
+        return Token.get_min_last_time_token_data(telegram_id=telegram_id)
 
     @classmethod
     @logger.catch

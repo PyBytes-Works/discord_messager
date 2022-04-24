@@ -18,12 +18,12 @@ async def start_add_new_user_handler(message: Message) -> None:
     user_is_admin: bool = telegram_id in admins_list
     user_is_superadmin: bool = await DBI.is_admin(telegram_id)
     if user_is_admin or user_is_superadmin:
-        await message.answer("Функция временно недоступна.", reply_markup=user_menu_keyboard())
-        # await message.answer(
-        #     "Перешлите (forward) мне любое сообщение от пользователя, которого вы хотите добавить.",
-        #     reply_markup=cancel_keyboard()
-        # )
-        # await LogiStates.add_new_user.set()
+        # await message.answer("Функция временно недоступна.", reply_markup=user_menu_keyboard())
+        await message.answer(
+            "Перешлите (forward) мне любое сообщение от пользователя, которого вы хотите добавить.",
+            reply_markup=cancel_keyboard()
+        )
+        await LogiStates.add_new_user.set()
 
 
 @logger.catch
@@ -111,6 +111,7 @@ async def check_expiration_and_add_new_user_handler(message: Message, state: FSM
         text: str = (f"ОШИБКА ДОБАВЛЕНИЯ ПОЛЬЗОВАТЕЛЯ В БД: "
                      f"\nИмя: {new_user_nickname}  ID:{new_user_telegram_id}")
         await send_report_to_admins(text)
+    await DBI.activate_user(telegram_id=new_user_telegram_id)
     await message.answer(text, reply_markup=user_menu_keyboard())
     await state.finish()
 
