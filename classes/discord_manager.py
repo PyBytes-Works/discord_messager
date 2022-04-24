@@ -82,10 +82,9 @@ class DiscordManager:
     @check_working
     @logger.catch
     async def _prepare_data(self) -> None:
-        if await DBI.is_expired_user_deactivated(self.message):
-            self.working = False
-            return
-        await self._is_datastore_ready()
+        if not await DBI.is_expired_user_deactivated(self.message):
+            return await self._is_datastore_ready()
+        self.working = False
 
     @check_working
     @logger.catch
@@ -141,8 +140,7 @@ class DiscordManager:
                     text="Не смог сформировать пары токенов.", keyboard=user_menu_keyboard())
                 self.working = False
             await self.__get_workers()
-        if await self.__get_worker_from_list():
-            self.working = True
+        self.working = await self.__get_worker_from_list()
         message: str = await self.__get_all_tokens_busy_message()
         await self.__send_text(text=message, check_silence=True)
         self.working = await self._sleep()

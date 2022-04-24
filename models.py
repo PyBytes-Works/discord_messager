@@ -761,8 +761,8 @@ class Token(BaseModel):
         set last_time: now datetime last message
         token: (str)
         """
-        last_time = datetime.datetime.now().timestamp()
-        return cls.update(last_message_time=last_time).where(cls.token == token).execute()
+        current_time = datetime.datetime.now().timestamp()
+        return cls.update(last_message_time=current_time).where(cls.token == token).execute()
 
     @classmethod
     @logger.catch
