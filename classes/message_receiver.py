@@ -88,10 +88,18 @@ class MessageReceiver(ChannelData):
         )
 
     @logger.catch
-    async def __get_target_username(self, elem: dict) -> str:
+    async def __get_target_id(self, elem: dict) -> str:
         return (
                 elem.get("referenced_message", {}).get("author", {}).get("id")
                 or elem.get("mentions", [{"id": '[no id]'}])[0].get("id")
+        )
+
+    @logger.catch
+    async def __get_target_username(self, elem: dict) -> str:
+        return (
+                elem.get("referenced_message", {}).get("author", {}).get("username")
+                or elem.get("mentions", [{"id": '[no id]'}])[0].get("username")
+                or self._datastore.token
         )
 
     @logger.catch
@@ -106,8 +114,8 @@ class MessageReceiver(ChannelData):
                 "text": elem.get("content", '[no content]'),
                 "message_id": elem.get("id", 0),
                 "to_message": elem.get("referenced_message", {}).get("content"),
-                "to_user": elem.get("referenced_message", {}).get("author", {}).get("username"),
-                "target_id": await self.__get_target_username(elem)
+                "to_user": await self.__get_target_username(elem),
+                "target_id": await self.__get_target_id(elem)
             }
             for elem in data
         ]
