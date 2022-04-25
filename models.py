@@ -596,6 +596,7 @@ class UserChannel(BaseModel):
         add_user_channel
         get_user_channels
         get_all_user_channel_by_telegram_id
+        set_user_channel_name
         update_cooldown_by_channel_id
     """
 
@@ -665,10 +666,19 @@ class UserChannel(BaseModel):
                         Channel.channel_id.alias('channel_id'),
                         Channel.guild_id.alias('guild_id')
                     )
-                    .join(Channel, JOIN.LEFT_OUTER, on=(Channel.id == cls.channel))
-                    .join(User, JOIN.LEFT_OUTER, on=(User.id == cls.user))
-                    .where(User.telegram_id == telegram_id).namedtuples().execute()
-                )
+                        .join(Channel, JOIN.LEFT_OUTER, on=(Channel.id == cls.channel))
+                        .join(User, JOIN.LEFT_OUTER, on=(User.id == cls.user))
+                        .where(User.telegram_id == telegram_id).namedtuples().execute()
+        )
+
+    @classmethod
+    @logger.catch
+    def set_user_channel_name(cls: 'UserChannel', user_channel_pk: int, name: str) -> None:
+        """
+        Update name for one users_channel by user_channel_id
+        """
+        return cls.update(name=name).where(cls.id == user_channel_pk).execute()
+
 
     @classmethod
     @logger.catch
