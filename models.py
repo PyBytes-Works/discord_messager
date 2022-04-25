@@ -970,6 +970,7 @@ class Token(BaseModel):
             'cooldown': cooldown(int, seconds)}
             'mate_discord_id' str (discord_id)
             'token_discord_id' str
+            'token_name' str
         """
         data = (
             cls.select(
@@ -980,6 +981,7 @@ class Token(BaseModel):
                 UserChannel.cooldown.alias('cooldown'),
                 cls.alias('pair').discord_id.alias('mate_discord_id'),
                 cls.discord_id.alias('token_discord_id'),
+                cls.name.alias('token_name'),
             )
                 .join(UserChannel, JOIN.LEFT_OUTER, on=(cls.user_channel == UserChannel.id))
                 .join(Channel, JOIN.LEFT_OUTER, on=(UserChannel.channel == Channel.id))
