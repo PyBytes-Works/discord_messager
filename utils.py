@@ -9,19 +9,26 @@ from config import logger
 
 
 @logger.catch
-def save_data_to_json(data, file_name: str = "data.json", key: str = 'w'):
+def save_data_to_json(data: Union[dict, list], file_name: str = "data.json", key: str = 'w'):
+    folder_for_saving = 'logs/saved_files'
+    if not os.path.exists(folder_for_saving):
+        os.mkdir(folder_for_saving)
+    path: str = f"{folder_for_saving}/{file_name}"
     if key == 'w':
-        with open(file_name, 'w', encoding='utf-8') as f:
+        with open(path, 'w', encoding='utf-8') as f:
             json.dump(data, f, ensure_ascii=False, indent=4)
     elif key == 'a':
         result = {}
-        if os.path.exists(file_name):
-            with open(file_name, 'r', encoding='utf-8') as f:
+        if os.path.exists(path):
+            with open(path, 'r', encoding='utf-8') as f:
                 result: dict = json.load(f)
-        result.update(data)
+        if isinstance(result, list) and isinstance(data, list):
+            result.extend(data)
+        elif isinstance(result, dict) and isinstance(data, dict):
+            result.update(data)
         save_data_to_json(data=result, file_name=file_name, key='w')
 
-    logger.debug(f"{file_name} saved.")
+    logger.debug(f"{path} saved.")
 
 
 @logger.catch
