@@ -25,8 +25,7 @@ class MessageReceiver(ChannelData):
         user_message, message_id = await self.__get_user_message_from_redis()
 
         discord_messages: List[dict] = await self.__get_all_messages()
-        if discord_messages:
-            await self.__get_replies_and_message_id(discord_messages)
+        await self.__get_replies_and_message_id(discord_messages)
         if message_id:
             self._datastore.current_message_id = message_id
         self._datastore.text_to_send = user_message if user_message else ''
@@ -114,10 +113,10 @@ class MessageReceiver(ChannelData):
         return [
             {
                 "token": self._datastore.token_name,
-                "author": elem.get("author", {}).get("username", ''),
+                "author": elem.get("author", {}).get("username", 'no author'),
                 "text": elem.get("content", '[no content]'),
                 "message_id": elem.get("id", 0),
-                "to_message": elem.get("referenced_message", {}).get("content"),
+                "to_message": elem.get("referenced_message", {}).get("content", 'mention'),
                 "to_user": await self.__get_target_username(elem),
                 "target_id": await self.__get_target_id(elem)
             }
@@ -140,6 +139,8 @@ class MessageReceiver(ChannelData):
         """Сохраняет реплаи и последнее сообщение в datastore"""
 
         if not data:
+            self._datastore.replies = []
+            self._datastore.current_message_id = 0
             return
         last_messages: List[dict] = await self.__get_last_messages(data)
         all_replies: List[dict] = await self.__get_my_replies(last_messages)
@@ -147,6 +148,9 @@ class MessageReceiver(ChannelData):
         self._datastore.replies = await self.__save_replies_to_redis(new_replies)
         self._datastore.current_message_id = await self.__get_last_message_id_from_last_messages(last_messages)
         logger.error(f"NEW REPLIES: {self._datastore.replies}")
+        logger.error(f"MESSAGE ID: {self._datastore.current_message_id}")
+        utils.save_data_to_json(data=last_messages, file_name="last_messages.json", key='a')
+
         if DEBUG and SAVING:
             utils.save_data_to_json(data=last_messages, file_name="last_messages.json")
             utils.save_data_to_json(data=all_replies, file_name="all_replies.json")

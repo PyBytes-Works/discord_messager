@@ -244,7 +244,6 @@ class SendMessageToChannel(PostRequest):
     async def send_data(self) -> bool:
         """
         Sends data to discord channel
-        :param datastore:
         :return:
         """
 
@@ -262,34 +261,40 @@ class SendMessageToChannel(PostRequest):
             return True
 
         elif status == 429:
-            data: dict = json.loads(answer.get("data"))
-            code: int = data.get("code")
-            if code == 20016:
-                logger.debug(f"SendMessageToChannel.send_data: {answer}")
-                cooldown: int = int(data.get("retry_after", None))
-                if cooldown:
-                    cooldown += self._datastore.cooldown
-                    await DBI.update_user_channel_cooldown(
-                        user_channel_pk=self._datastore.user_channel_pk, cooldown=cooldown)
-                    self._datastore.delay = cooldown
-                await ErrorsSender.errors_report(
-                    telegram_id=self._datastore.telegram_id,
-                    text=(
-                        "Для данного токена сообщения отправляются чаще, чем разрешено в канале."
-                        f"\nToken: {self._datastore.token}"
-                        f"\nГильдия/Канал: {self._datastore.guild}/{self._datastore.channel}"
-                        f"\nВремя скорректировано. Кулдаун установлен: {cooldown} секунд"
+            try:
+                data: dict = json.loads(answer.get("data"))
+                code: int = data.get("code")
+                if code == 20016:
+                    logger.debug(f"SendMessageToChannel.send_data: {answer}")
+                    cooldown: int = int(data.get("retry_after", None))
+                    if cooldown:
+                        cooldown += self._datastore.cooldown
+                        await DBI.update_user_channel_cooldown(
+                            user_channel_pk=self._datastore.user_channel_pk, cooldown=cooldown)
+                        self._datastore.delay = cooldown
+                    await ErrorsSender.errors_report(
+                        telegram_id=self._datastore.telegram_id,
+                        text=(
+                            "Для данного токена сообщения отправляются чаще, чем разрешено в канале."
+                            f"\nToken: {self._datastore.token}"
+                            f"\nГильдия/Канал: {self._datastore.guild}/{self._datastore.channel}"
+                            f"\nВремя скорректировано. Кулдаун установлен: {cooldown} секунд"
+                        )
                     )
-                )
+            except Exception as err:
+                logger.error(f"SendMessageToChannel.send_data error: 429: {err}]")
         else:
-            data: dict = json.loads(answer.get("data"))
-            code: int = data.get("code")
-            logger.debug(f"SendMessageToChannel.send_data: {answer}")
-            params: dict = {
-                "status": status,
-                "code": code if code else None,
-                "telegram_id": self._datastore.telegram_id,
-                "token": self._datastore.token,
-                "proxy": self._datastore.proxy
-            }
-            await ErrorsSender.send_message_check_token(**params)
+            try:
+                data: dict = json.loads(answer.get("data"))
+                code: int = data.get("code")
+                logger.debug(f"SendMessageToChannel.send_data: {answer}")
+                params: dict = {
+                    "status": status,
+                    "code": code if code else None,
+                    "telegram_id": self._datastore.telegram_id,
+                    "token": self._datastore.token,
+                    "proxy": self._datastore.proxy
+                }
+                await ErrorsSender.send_message_check_token(**params)
+            except Exception as err:
+                logger.error(f"SendMessageToChannel.send_data error: {err}")

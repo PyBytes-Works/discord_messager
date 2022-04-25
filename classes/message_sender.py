@@ -43,7 +43,8 @@ class MessageSender(SendMessageToChannel):
         mate_message: list = await RedisDB(redis_key=self._datastore.my_discord_id).load()
         if mate_message:
             self.__text: str = OpenAI().get_answer(mate_message[0].strip())
-            await RedisDB(redis_key=self._datastore.my_discord_id).delete(mate_id=self._datastore.mate_id)
+            await RedisDB(
+                redis_key=self._datastore.my_discord_id).delete(mate_id=self._datastore.mate_id)
         if not self.__text:
             self.__text: str = await self.__get_text_from_vocabulary()
 
@@ -91,3 +92,4 @@ class MessageSender(SendMessageToChannel):
                     }
             }
             self._datastore.data_for_send.update(**params)
+            print(f"Data for send", self._datastore.data_for_send)
