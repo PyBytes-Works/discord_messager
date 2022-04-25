@@ -231,8 +231,13 @@ class DBI:
 
     @classmethod
     @logger.catch
-    async def set_token_name(cls, token: str, name: str) -> int:
-        return Token.set_token_name(token=token, name=name)
+    async def get_info_by_token_pk(cls, token_pk: int) -> 'namedtuple':
+        return Token.get_token_info_by_token_pk(token_pk=token_pk)
+
+    @classmethod
+    @logger.catch
+    async def set_token_name(cls, token_pk: int, name: str) -> int:
+        return Token.set_token_name(token_pk=token_pk, name=name)
 
     @classmethod
     @logger.catch
