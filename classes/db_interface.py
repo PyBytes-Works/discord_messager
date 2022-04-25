@@ -50,8 +50,6 @@ class DBI:
                 second_token = tokens.pop()
                 formed_pairs += await DBI.make_tokens_pair(first_token, second_token)
 
-        logger.info(f"Pairs formed: {formed_pairs}")
-
     @classmethod
     @logger.catch
     async def add_new_user(

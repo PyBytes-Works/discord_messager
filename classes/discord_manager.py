@@ -12,7 +12,7 @@ from classes.message_sender import MessageSender
 from classes.token_datastorage import TokenData
 
 from config import logger
-from keyboards import cancel_keyboard, user_menu_keyboard
+from keyboards import user_menu_keyboard
 from classes.db_interface import DBI
 
 
@@ -48,14 +48,26 @@ class DiscordManager:
         self.__workers: List[str] = []
         self._datastore: Optional['TokenData'] = None
         self.is_working: bool = True
-        self._error_text: str = ''
         self._discord_data: dict = {}
+        self.delay: int = 0
+
+    @check_working
+    @logger.catch
+    async def _lets_play(self) -> None:
+        await self._prepare_data()
+        await self._getting_messages()
+        await self._send_replies()
+        await self._sending_messages()
 
     @check_working
     @logger.catch
     async def lets_play(self) -> None:
         """Show must go on
         Запускает рабочий цикл бота, проверяет ошибки."""
+
+        # TODO Сделать флаг автоответа (если флаг стоит - то отвечает бот Давинчи, иначе -
+        #  отправлять в телеграм юзеру
+        # TODO выделить реплаи и работу с ними в отдельный класс
 
         self._datastore: 'TokenData' = TokenData(self.user_telegram_id)
         self._datastore.all_tokens_ids = await DBI.get_all_discord_id(telegram_id=self.user_telegram_id)
@@ -64,22 +76,9 @@ class DiscordManager:
         while self.is_working:
             t0 = datetime.datetime.now()
             logger.info(f"\n\t\tCircle start at: {t0}")
-            await self._prepare_data()
-            await self._getting_messages()
-
-            # TODO Сделать флаг автоответа (если флаг стоит - то отвечает бот Давинчи, иначе -
-            #  отправлять в телеграм юзеру
-            # TODO выделить реплаи и работу с ними в отдельный класс
-
-            await self._send_replies()
-            await self._sending_messages()
-
-            # await self._get_error_text()
-            if not self.__silence and self._error_text:
-                await self.message.answer(self._error_text, reply_markup=cancel_keyboard())
-
+            await self._lets_play()
             await self._sleep()
-            logger.info(f"\n\t\tToken {self._datastore.token} finish. Total time: {datetime.datetime.now() - t0}")
+            logger.info(f"\n\t\tCircle finish. Total time: {datetime.datetime.now() - t0}")
 
         logger.debug("Game over.")
 
@@ -108,11 +107,11 @@ class DiscordManager:
         """Отправляет сообщение в дискор и сохраняет данные об ошибках в
         словарь атрибута класса"""
 
-        self.is_working = False
-        if await MessageSender(datastore=self._datastore).send_message():
-            self._discord_data = {}
-            self._datastore.current_message_id = 0
-            self.is_working = True
+        if not await MessageSender(datastore=self._datastore).send_message():
+            self.is_working = False
+            return
+        self._discord_data = {}
+        self._datastore.current_message_id = 0
         # answer: dict = await MessageSender(datastore=self._datastore).send_message()
         # if answer.get("status") == 200:
         #     self._discord_data = {}
@@ -160,7 +159,6 @@ class DiscordManager:
             await self.make_token_pairs(unpair=True)
             await self._make_tokens_list()
             await self._make_workers_list()
-        logger.debug(f"WOKERS: {self.__workers}")
         await self._get_worker_from_list()
 
     @check_working
@@ -170,10 +168,12 @@ class DiscordManager:
 
         if self.__workers:
             return
-        await self.__set_datastore_delay()
+        await self.__set_delay()
+        if self.delay <= 0:
+            return
         await self._send_delay_message()
-        logger.info(f"PAUSE: {self._datastore.delay}")
-        timer: int = self._datastore.delay
+        logger.info(f"PAUSE: {self.delay}")
+        timer: int = self.delay
         while timer > 0:
             timer -= 5
             if not self.is_working:
@@ -226,18 +226,18 @@ class DiscordManager:
         return min(self.__related_tokens, key=lambda x: x.last_message_time)
 
     @logger.catch
-    async def __set_datastore_delay(self) -> None:
+    async def __set_delay(self) -> None:
         closest_token_data: namedtuple = await self.__get_closes_token_data()
         await self._update_datastore(closest_token_data.token)
         min_token_time: int = int(closest_token_data.last_message_time.timestamp())
-        self._datastore.delay = self._datastore.cooldown - abs(min_token_time - self.__get_current_time())
+        self.delay = self._datastore.cooldown - abs(min_token_time - self.__get_current_time())
 
     @check_working
     @logger.catch
     async def _send_delay_message(self) -> None:
         """Отправляет сообщение что все токены заняты"""
 
-        delay: int = self._datastore.delay
+        delay: int = self.delay
         text = "секунд"
         if delay > 60:
             minutes: int = delay // 60
@@ -249,14 +249,14 @@ class DiscordManager:
             delay: str = f"{minutes}:{seconds}"
             text = "минут"
         text: str = f"Все токены отработали. Следующий старт через {delay} {text}."
-        await self.__send_text(text=text, check_silence=True)
+        if not self.silence:
+            await self.__send_text(text=text, check_silence=True)
 
     @check_working
     @logger.catch
     async def _send_replies(self) -> None:
         """Отправляет реплаи из дискорда в телеграм с кнопкой Ответить"""
 
-        logger.debug(f"Replies for sending: {self._datastore.replies}")
         for reply in self._datastore.replies:
             if not reply.get("answered", False):
                 answer_keyboard: 'InlineKeyboardMarkup' = InlineKeyboardMarkup(row_width=1)
