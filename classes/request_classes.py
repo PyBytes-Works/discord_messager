@@ -79,12 +79,12 @@ class GetRequest(RequestSender):
                 if "Proxy Authentication Required" in err:
                     answer.update(status=407)
             except (ssl.SSLError, OSError) as err:
-                logger.error("GetRequest: Ошибка авторизации прокси: {err}"
+                logger.error(f"GetRequest: Ошибка авторизации прокси: {err}"
                              f"\nProxy: {self.proxy}")
                 if "Proxy Authentication Required" in err:
                     answer.update(status=407)
             except self._EXCEPTIONS as err:
-                logger.error("GetRequest: _EXCEPTIONS: ", err)
+                logger.error(f"GetRequest: _EXCEPTIONS: {err}")
 
         return answer
 
@@ -133,6 +133,8 @@ class ProxyChecker(GetRequest):
     async def get_checked_proxy(self, telegram_id: str) -> str:
         """Возвращает рабочую прокси из базы данных, если нет рабочих возвращает 'no proxies'"""
 
+        # TODO переписать без рекурсии
+
         if not await DBI.get_proxy_count():
             return 'no proxies'
         proxy: str = str(await DBI.get_user_proxy(telegram_id=telegram_id))
@@ -141,7 +143,7 @@ class ProxyChecker(GetRequest):
         if not await DBI.update_proxies_for_owners(proxy=proxy):
             return 'no proxies'
 
-        return await self.get_checked_proxy(telegram_id=telegram_id)
+        # return await self.get_checked_proxy(telegram_id=telegram_id)
 
 
 class TokenChecker(GetRequest):
