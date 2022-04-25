@@ -96,6 +96,7 @@ async def answer_to_reply_handler(callback: CallbackQuery, state: FSMContext):
     """Запрашивает текст ответа на реплай для отправки в дискорд"""
 
     message_id: str = callback.data.rsplit("_", maxsplit=1)[-1]
+    await bot.delete_message(callback.message.chat.id, callback.message.message_id)
     await callback.message.answer('Введите текст ответа:', reply_markup=cancel_keyboard())
     await state.update_data(message_id=message_id)
     await callback.answer()
