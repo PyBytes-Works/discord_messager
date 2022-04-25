@@ -278,7 +278,10 @@ class DiscordManager:
         logger.debug("Start autoreply:")
         reply_id: str = data.get("message_id")
         reply_text: str = data.get("text")
-        reply_text: str = OpenAI.get_answer(message=reply_text)
+        ai_reply_text: str = OpenAI(davinchi=True).get_answer(message=reply_text)
+        logger.debug(f"Davinci text: {ai_reply_text}")
+
+
 
 
     # @check_working
