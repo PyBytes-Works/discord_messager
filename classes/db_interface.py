@@ -1,4 +1,3 @@
-import datetime
 import random
 from typing import List, Tuple, Dict
 from collections import namedtuple
@@ -10,7 +9,6 @@ from config import logger, admins_list
 
 
 class DBI:
-
     """Database interface class"""
 
     @classmethod
@@ -276,7 +274,8 @@ class DBI:
     async def add_user_channel(cls, telegram_id: str, channel_id: int, guild_id: int,
                                name: str = '', cooldown: int = 60
                                ) -> int:
-        return UserChannel.add_user_channel(telegram_id=telegram_id, channel_id=channel_id,
+        return UserChannel.add_user_channel(
+            telegram_id=telegram_id, channel_id=channel_id,
             guild_id=guild_id, name=name, cooldown=cooldown)
 
     @classmethod
