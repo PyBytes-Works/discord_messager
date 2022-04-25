@@ -38,5 +38,5 @@ class TokenStates(StatesGroup):
     set_name_for_token = State()
 
 
-class UserChannel(StatesGroup):
+class UserChannelStates(StatesGroup):
     set_name_for_user_channel = State()
