@@ -115,11 +115,12 @@ async def send_message_to_reply_handler(message: Message, state: FSMContext):
             elem.update({"answer_text": message.text})
             break
     else:
-        logger.warning("f: send_message_to_reply_handler: elem in Redis data not found.")
+        logger.warning("f: send_message_to_reply_handler: elem in Redis data not found or timeout error")
         await message.answer('Время хранения данных истекло.', reply_markup=cancel_keyboard())
         return
     if DEBUG and SAVING:
         utils.save_data_to_json(data=redis_data, file_name="redis_answer_from_user.json")
+    print(f"REPLY ANSWERED:", redis_data)
     await message.answer('Добавляю сообщение в очередь. Это займет несколько секунд.', reply_markup=ReplyKeyboardRemove())
     await RedisDB(redis_key=user_telegram_id).save(data=redis_data)
     await message.answer('Сообщение добавлено в очередь сообщений.', reply_markup=cancel_keyboard())

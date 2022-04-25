@@ -13,11 +13,13 @@ from config import logger, DEBUG, SAVING
 
 
 class MessageReceiver(ChannelData):
-    """Получает сообщения из дискорда и формирует данные для ответа и реплаев"""
+    """Получает сообщения из дискорда и формирует данные для ответа
+    и реплаев"""
 
     @logger.catch
     async def get_message(self) -> None:
-        """Получает данные из АПИ, выбирает случайное сообщение и возвращает ID сообщения
+        """Получает данные из АПИ, выбирает случайное сообщение и
+        возвращает ID сообщения
         и само сообщение"""
 
         user_message, message_id = await self.__get_user_message_from_redis()
@@ -54,7 +56,8 @@ class MessageReceiver(ChannelData):
     @staticmethod
     @logger.catch
     def __get_delta_seconds(elem: dict) -> int:
-        """Возвращает время, в пределах которого надо найти сообщения которое в секундах"""
+        """Возвращает время, в пределах которого надо найти сообщения
+        которое в секундах"""
 
         message_time: 'datetime' = elem.get("timestamp")
         mes_time: 'datetime' = datetime.datetime.fromisoformat(message_time).replace(tzinfo=None)
@@ -64,7 +67,8 @@ class MessageReceiver(ChannelData):
 
     @logger.catch
     async def __get_my_replies(self, data: List[dict]) -> List[dict]:
-        """Возвращает список всех упоминаний и реплаев наших токенов в сообщениях за последнее время"""
+        """Возвращает список всех упоминаний и реплаев наших токенов в
+        сообщениях за последнее время"""
 
         return [
             elem
@@ -181,10 +185,10 @@ class MessageReceiver(ChannelData):
 
         for elem in redis_data:
             answered: bool = elem.get("answered", False)
-            for_me: bool = elem.get("target_id") == self._datastore.my_discord_id
+            for_me: bool = int(elem.get("target_id")) == int(self._datastore.my_discord_id)
             if for_me and not answered:
-                answer = elem.get("answer_text", '')
-                message_id = elem.get("message_id", 0)
+                answer: str = elem.get("answer_text", '')
+                message_id: int = elem.get("message_id", 0)
                 elem.update({"answered": True})
                 await RedisDB(redis_key=self._datastore.telegram_id).save(data=redis_data)
                 break
