@@ -105,7 +105,7 @@ class Proxy(BaseModel):
         for user in users:
             new_proxy = cls.get_low_used_proxy()
             count += 1
-            User.set_proxy_by_telegram_id(telegram_id=user.telegram_id, proxy=new_proxy)
+            User.set_proxy_by_telegram_id(telegram_id=user.telegram_id, proxy_pk=new_proxy.proxy_pk)
         return count
 
 
@@ -1280,8 +1280,3 @@ if __name__ == '__main__':
         t_telegram_id = ''
         t_max_tokens = 0
         User.set_max_tokens(telegram_id=t_telegram_id, max_tokens=t_max_tokens)
-
-    if set_proxy:
-        t_telegram_id = ''
-        t_proxy = ""
-        User.set_proxy_by_telegram_id(telegram_id=t_telegram_id, proxy=t_proxy)
