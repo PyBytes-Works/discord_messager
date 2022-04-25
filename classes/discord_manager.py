@@ -60,6 +60,7 @@ class DiscordManager:
         await self._getting_messages()
         await self._send_replies()
         await self._sending_messages()
+        await self._sleep()
 
     @logger.catch
     async def __make_datastore(self) -> None:
@@ -162,16 +163,17 @@ class DiscordManager:
         """Спит на время ближайшего токена."""
 
         logger.debug(f"WORKERS: {self.__workers}")
-        if not self.__workers:
-            await self._get_delay()
-            await self._send_delay_message()
-            logger.info(f"PAUSE: {self.delay}")
-            timer: int = self.delay
-            while timer > 0:
-                timer -= 5
-                if not self.is_working:
-                    return
-                await asyncio.sleep(5)
+        if self.__workers:
+            return
+        await self._get_delay()
+        await self._send_delay_message()
+        logger.info(f"SLEEP PAUSE: {self.delay}")
+        timer: int = self.delay
+        while timer > 0:
+            timer -= 5
+            if not self.is_working:
+                return
+            await asyncio.sleep(5)
 
     @logger.catch
     def __get_max_message_time(self, elem: namedtuple) -> int:
@@ -217,7 +219,6 @@ class DiscordManager:
     async def __get_min_last_message_time_of_token(self) -> int:
         return min(self.__related_tokens, key=lambda x: x.last_message_time).timestamp()
 
-    @check_working
     @logger.catch
     async def _get_delay(self) -> None:
         # TODO получать время ИЗ БАЗЫ
