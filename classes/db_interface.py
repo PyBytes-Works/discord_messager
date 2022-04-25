@@ -269,9 +269,6 @@ class DBI:
     @classmethod
     @logger.catch
     async def get_min_last_time_token_data(cls, telegram_id: str) -> namedtuple:
-        # TODO Возвращает данные о токене У КОТОРОГО ЕСТЬ НАПАРНИК (get_related_token), у которого минимальное last_message_time. Формат
-        #  данных как в методе get_info_by_token(token)
-
         return Token.get_min_last_time_token_data(telegram_id=telegram_id)
 
     @classmethod
