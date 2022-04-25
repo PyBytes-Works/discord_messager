@@ -214,25 +214,17 @@ class DiscordManager:
     async def _update_datastore(self, token: str) -> None:
         token_data: namedtuple = await DBI.get_info_by_token(token)
         self._datastore.update(token=token, token_data=token_data)
-
-    @logger.catch
-    async def __get_min_last_message_time_of_token(self) -> int:
-        return min(self.__related_tokens, key=lambda x: x.last_message_time).timestamp()
+    #
+    # @logger.catch
+    # async def __get_closest_token_time(self) -> int:
+    #     return min(self.__related_tokens, key=lambda x: x.last_message_time).timestamp()
 
     @logger.catch
     async def _get_delay(self) -> None:
-        # TODO получать время ИЗ БАЗЫ
-
-        min_token_time: int = await self.__get_min_last_message_time_of_token()
-        logger.debug(
-            f"\n\t\tTOKEN: {self._datastore.token}"
-            f"\n\t\tMY DISCORD: {self._datastore.my_discord_id}"
-            f"\n\t\tMATE: {self._datastore.mate_id}"
-            f"\n\t\tCOOLDOWN: {self._datastore.cooldown}"
-            f"\n\t\tmin_token_time: {min_token_time} "
-            f"- current_timestamp: {self.__get_current_timestamp()} "
-            f"= {min_token_time - self.__get_current_timestamp()}")
-        self.delay = self._datastore.cooldown - abs(min_token_time - self.__get_current_timestamp())
+        token_data: namedtuple = await DBI.get_closest_token_time(self._datastore.telegram_id)
+        min_token_time: int = token_data.last_message_time
+        cooldown: int = token_data.cooldown
+        self.delay = cooldown - abs(min_token_time - self.__get_current_timestamp())
 
     @check_working
     @logger.catch

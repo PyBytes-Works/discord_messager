@@ -268,8 +268,8 @@ class DBI:
 
     @classmethod
     @logger.catch
-    async def get_min_last_time_token_data(cls, telegram_id: str) -> namedtuple:
-        return Token.get_min_last_time_token_data(telegram_id=telegram_id)
+    async def get_closest_token_time(cls, telegram_id: str) -> namedtuple:
+        return Token.get_closest_token_time(telegram_id=telegram_id)
 
     @classmethod
     @logger.catch
