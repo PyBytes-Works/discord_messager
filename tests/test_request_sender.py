@@ -3,10 +3,10 @@ from fake_data import *
 
 
 async def tests():
-    print(await GetMe().get_discord_id(token=token, proxy=proxy))
+    # print(await GetMe().get_discord_id(token=token, proxy=proxy))
     print(await ProxyChecker().get_checked_proxy(telegram_id=telegram_id))
-    print(await TokenChecker().check_token(token=token, proxy=proxy, channel=channel))
-    print(await SendMessageToChannel(datastore=datastore).send_data())
+    # print(await TokenChecker().check_token(token=token, proxy=proxy, channel=channel))
+    # print(await SendMessageToChannel(datastore=datastore).send_data())
 
 
 if __name__ == '__main__':
