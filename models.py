@@ -997,6 +997,48 @@ class Token(BaseModel):
 
     @classmethod
     @logger.catch
+    def get_token_info_by_token_pk(cls: 'Token', token_pk: int) -> namedtuple:
+        """
+        Вернуть info по токен
+        возвращает namedtuple
+        list of namedtuple fields:
+            token str
+            token_pk int
+            token_discord_id str
+            proxy str
+            user_channel_pk int
+            channel_id int
+            guild_id int
+            cooldown  int
+            mate_discord_id str (discord_id)
+
+        """
+        data = (cls.select(
+            cls.token.alias('token'),
+            cls.id.alias('token_pk'),
+            cls.discord_id.alias('token_discord_id'),
+            Proxy.proxy.alias('proxy'),
+            cls.name.alias('token_name'),
+            UserChannel.id.alias('user_channel_pk'),
+            Channel.channel_id.alias('channel_id'),
+            Channel.guild_id.alias('guild_id'),
+            UserChannel.cooldown.alias('cooldown'),
+            cls.alias('pair').discord_id.alias('mate_discord_id')
+        )
+                .join(UserChannel, JOIN.LEFT_OUTER, on=(cls.user_channel == UserChannel.id))
+                .join(Channel, JOIN.LEFT_OUTER, on=(UserChannel.channel == Channel.id))
+                .join(User, JOIN.LEFT_OUTER, on=(UserChannel.user == User.id))
+                .join(TokenPair, JOIN.LEFT_OUTER, on=(TokenPair.first_id == cls.id))
+                .join(Proxy, JOIN.LEFT_OUTER, on=(Proxy.id == User.proxy))
+                .join(cls.alias('pair'), JOIN.LEFT_OUTER,
+            on=(cls.alias('pair').id == TokenPair.second_id))
+                .where(cls.id == token_pk).namedtuples().first()
+                )
+
+        return data
+
+    @classmethod
+    @logger.catch
     def get_min_last_time_token_data(cls: 'Token', telegram_id: str) -> namedtuple:
         """
         Вернуть info по токен
@@ -1045,9 +1087,9 @@ class Token(BaseModel):
 
     @classmethod
     @logger.catch
-    def set_token_name(cls: 'Token', token: str, name: str) -> int:
+    def set_token_name(cls: 'Token', token_pk: int, name: str) -> int:
         """Set new name for token"""
-        return cls.update(name=name).where(cls.token == token).execute()
+        return cls.update(name=name).where(cls.id == token_pk).execute()
 
     @classmethod
     @logger.catch
