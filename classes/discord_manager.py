@@ -9,6 +9,7 @@ from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
 
 from classes.message_receiver import MessageReceiver
 from classes.message_sender import MessageSender
+from classes.open_ai import OpenAI
 from classes.token_datastorage import TokenData
 
 from config import logger
@@ -259,16 +260,27 @@ class DiscordManager:
                     text="Ответить",
                     callback_data=f'reply_{reply_id}'
                 ))
-                await self.message.answer(
-                    f"Вам пришло сообщение из ДИСКОРДА:"
-                    f"\nКому: {reply_to_author}"
-                    f"\nНа сообщение: {reply_to_message}"
-                    f"\nОт: {author}"
-                    f"\nText: {reply_text}",
-                    reply_markup=answer_keyboard
-                )
+                if not self.autoanswer:
+                    await self.message.answer(
+                        f"Вам пришло сообщение из ДИСКОРДА:"
+                        f"\nКому: {reply_to_author}"
+                        f"\nНа сообщение: {reply_to_message}"
+                        f"\nОт: {author}"
+                        f"\nText: {reply_text}",
+                        reply_markup=answer_keyboard
+                    )
+                else:
+                    await self._auto_replies(reply)
 
-    #
+    @logger.catch
+    async def _auto_replies(self, data: dict) -> None:
+
+        logger.debug("Start autoreply:")
+        reply_id: str = data.get("message_id")
+        reply_text: str = data.get("text")
+        reply_text: str = OpenAI.get_answer(message=reply_text)
+
+
     # @check_working
     # @logger.catch
     # async def _get_error_text(self) -> None:

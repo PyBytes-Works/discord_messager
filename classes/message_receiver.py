@@ -9,11 +9,7 @@ from classes.db_interface import DBI
 from classes.errors_sender import ErrorsSender
 from classes.redis_interface import RedisDB
 from classes.request_classes import ChannelData
-from config import logger, DEBUG
-
-
-# IF true - data saving to files
-SAVING: bool = False
+from config import logger, DEBUG, SAVING
 
 
 class MessageReceiver(ChannelData):
