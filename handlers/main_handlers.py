@@ -41,7 +41,9 @@ async def send_cancel_message(telegram_id: str, state: FSMContext) -> None:
     text: str = ''
     keyboard = user_menu_keyboard
     if await DBI.is_user_work(telegram_id=telegram_id):
-        text: str = "\nДождитесь завершения работы бота. Это займет несколько секунд..."
+        text: str = ("\nДождитесь завершения работы бота. Это займет около 5 секунд..."
+                     "\nЕсли бот не завершил работу - введите 'Отмена' или любую команду для вызова "
+                     "клавиатуры")
         keyboard = ReplyKeyboardRemove
     await bot.send_message(
         chat_id=telegram_id,
@@ -153,9 +155,12 @@ def register_handlers(dp: Dispatcher) -> None:
     """
 
     dp.register_message_handler(message_cancel_handler, commands=['отмена', 'cancel'], state="*")
-    dp.register_message_handler(message_cancel_handler, Text(startswith=["отмена", "cancel"], ignore_case=True), state="*")
+    dp.register_message_handler(message_cancel_handler, Text(startswith=["отмена",
+                                                                         "cancel"], ignore_case=True), state="*")
     dp.register_message_handler(activate_valid_user_handler, commands=["start"])
-    dp.register_message_handler(start_parsing_command_handler, Text(equals=["Старт", "Старт & Mute"]))
-    dp.register_callback_query_handler(answer_to_reply_handler, Text(startswith=["reply_"]), state=UserStates.in_work)
+    dp.register_message_handler(start_parsing_command_handler, Text(equals=["Старт",
+                                                                            "Старт & Mute"]))
+    dp.register_callback_query_handler(answer_to_reply_handler, Text(startswith=[
+        "reply_"]), state=UserStates.in_work)
     dp.register_message_handler(send_message_to_reply_handler, state=UserStates.in_work)
     dp.register_message_handler(default_message)

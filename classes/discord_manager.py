@@ -1,19 +1,17 @@
 import datetime
-import json
 import random
 from typing import List, Optional
 from collections import namedtuple
 
 import asyncio
 
-from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeyboardRemove
+from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
 
 from classes.message_receiver import MessageReceiver
 from classes.message_sender import MessageSender
 from classes.token_datastorage import TokenData
 
 from config import logger
-from classes.errors_sender import ErrorsSender
 from keyboards import cancel_keyboard, user_menu_keyboard
 from classes.db_interface import DBI
 
@@ -21,13 +19,13 @@ from classes.db_interface import DBI
 def check_working(func):
     async def wrapper(*args, **kwargs):
         name: str = func.__name__
-        logger.debug(f"\t{name} start:")
+        # logger.debug(f"\t{name} start:")
         if args and hasattr(args[0].__class__, name):
             working: bool = getattr(args[0], "working")
             if working:
-                logger.debug(f"\t{name} start: OK")
+                # logger.debug(f"\t{name} start: OK")
                 return await func(*args, **kwargs)
-        logger.debug(f"\t{name} start: ERROR")
+        # logger.debug(f"\t{name} start: ERROR")
         return
     return wrapper
 
@@ -52,6 +50,7 @@ class DiscordManager:
         self._error_text: str = ''
         self._discord_data: dict = {}
 
+    @check_working
     @logger.catch
     async def lets_play(self) -> None:
         """Show must go on
@@ -66,14 +65,14 @@ class DiscordManager:
 
             await self._getting_messages()
 
+            await self._send_replies()
+
             if self.working:
                 timer: float = 7 + random.randint(0, 6)
                 logger.info(f"Пауза между отправкой сообщений: {timer}")
                 await asyncio.sleep(timer)
 
             await self._sending_messages()
-
-            await self._send_replies()
 
             # await self._get_error_text()
             if not self.__silence and self._error_text:
@@ -95,8 +94,7 @@ class DiscordManager:
         Если удачно - перезаписывает кулдаун текущего токена"""
 
         message_manager: 'MessageReceiver' = MessageReceiver(datastore=self._datastore)
-        datastore: Optional['TokenData'] = await message_manager.get_message()
-        if not datastore:
+        if not await message_manager.get_message():
             self.working = False
             return
         await DBI.update_token_last_message_time(token=self._datastore.token)
@@ -144,7 +142,6 @@ class DiscordManager:
             self.__current_tokens_list: List[namedtuple] = await DBI.get_all_related_user_tokens(
                 telegram_id=self._datastore.telegram_id
             )
-            logger.debug(f"Current token list: {self.__current_tokens_list}")
             if not self.__current_tokens_list:
                 await self.__send_text(
                     text="Не смог сформировать пары токенов.", keyboard=user_menu_keyboard())
@@ -208,6 +205,7 @@ class DiscordManager:
         token_data: namedtuple = await DBI.get_info_by_token(token)
         self._datastore.update(token=token, token_data=token_data)
 
+    @check_working
     @logger.catch
     async def _get_all_tokens_busy_message(self) -> None:
         min_token_data: namedtuple = min(self.__current_tokens_list, key=lambda x: x.last_message_time)
@@ -234,7 +232,7 @@ class DiscordManager:
     async def _send_replies(self) -> None:
         """Отправляет реплаи из дискорда в телеграм с кнопкой Ответить"""
 
-        logger.debug(f"Replies: {self._datastore.replies}")
+        logger.debug(f"Replies for sending: {self._datastore.replies}")
         for reply in self._datastore.replies:
             answered: bool = reply.get("answered", False)
             if not answered:

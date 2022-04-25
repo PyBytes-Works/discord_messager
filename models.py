@@ -958,6 +958,8 @@ class Token(BaseModel):
             'mate_discord_id' str (discord_id)
             'token_discord_id' str
         """
+        # TODO Добавить в возвращаеммые значения еще имя токена: 'token_name' str
+
         data = (
             cls.select(
                 cls.user_channel.alias('user_channel_pk'),

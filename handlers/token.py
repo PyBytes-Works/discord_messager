@@ -18,9 +18,7 @@ from keyboards import (
 )
 
 
-# TODO Написать обработчик для ввода имени токена и канала
 # TODO Удалять реплай сообщения после ответа.
-
 
 @logger.catch
 async def select_channel_handler(message: Message) -> None:

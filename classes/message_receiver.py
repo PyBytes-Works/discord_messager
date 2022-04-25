@@ -42,7 +42,7 @@ class MessageReceiver(ChannelData):
         return []
 
     @logger.catch
-    async def get_message(self) -> Optional['TokenData']:
+    async def get_message(self) -> bool:
         """Получает данные из АПИ, выбирает случайное сообщение и возвращает ID сообщения
         и само сообщение"""
 
@@ -56,15 +56,16 @@ class MessageReceiver(ChannelData):
 
         discord_messages: List[dict] = await self.__get_all_messages()
         if not discord_messages:
-            return
-        lms_id_and_replies: Tuple[int, List[dict]] = await self.__get_replies_and_message_id(discord_messages)
+            return False
+        lms_id_and_replies: Tuple[
+            int, List[dict]] = await self.__get_replies_and_message_id(discord_messages)
         self._datastore.current_message_id = lms_id_and_replies[0]
         self._datastore.replies = lms_id_and_replies[1]
 
         if message_id:
             self._datastore.current_message_id = message_id
         self._datastore.text_to_send = user_message if user_message else ''
-        return self._datastore
+        return True
 
     @staticmethod
     @logger.catch
@@ -103,17 +104,26 @@ class MessageReceiver(ChannelData):
         )
 
     @logger.catch
+    async def __get_target_username(self, elem: dict) -> str:
+        return (
+                elem.get("referenced_message", {}).get("author", {}).get("username")
+                or elem.get("mentions", [{"username": '[no name]'}])[0].get("username")
+        )
+
+    @logger.catch
     async def __get_filtered_replies(self, data: List[dict]) -> List[dict]:
         """"""
+        if data and DEBUG:
+            utils.save_data_to_json(data, "replies_data.json", key='a')
         return [
             {
-                "token": self._datastore.token,
+                "token": self._datastore.token_name,
                 "author": elem.get("author", {}).get("username", ''),
                 "text": elem.get("content", '[no content]'),
-                "message_id": elem.get("id", ''),
+                "message_id": elem.get("id", 0),
                 "to_message": elem.get("referenced_message", {}).get("content"),
                 "to_user": elem.get("referenced_message", {}).get("author", {}).get("username"),
-                "target_id": elem.get("mentions", [{"id": 0}][0].get("id", 0))
+                "target_id": elem.get("referenced_message", {}).get("author", {}).get("id", 0)
             }
             for elem in data
         ]
@@ -131,7 +141,7 @@ class MessageReceiver(ChannelData):
 
     # @logger.catch
     # async def __add_redis_replies(self, data: List[str]) -> None:
-    #     """Adds data from list to Redis using discord id as key"""
+    #     """Adds ids from list to Redis using discord id as key"""
     #
     #     if not data:
     #         return
@@ -151,10 +161,6 @@ class MessageReceiver(ChannelData):
         all_replies: List[dict] = await self.__get_my_replies(last_messages)
         new_replies: List[dict] = await self.__get_filtered_replies(all_replies)
         replies: List[dict] = await self.__save_replies_to_redis(new_replies)
-
-        # replies_ids: List[str] = [elem.get("message_id") for elem in new_replies]
-        # await self.__add_redis_replies(replies_ids)
-
         last_message_id: int = await self.__get_last_message_id_from_last_messages(last_messages)
 
         if DEBUG:
@@ -179,9 +185,9 @@ class MessageReceiver(ChannelData):
             return []
         total_replies: List[dict] = await RedisDB(redis_key=self._datastore.telegram_id).load()
         old_messages: List[str] = list(map(lambda x: x.get("message_id"), total_replies))
-        result: List[dict] = list(filter(lambda x: x.get("message_id") not in old_messages, new_replies))
+        result: List[
+            dict] = list(filter(lambda x: x.get("message_id") not in old_messages, new_replies))
         total_replies.extend(result)
-        logger.debug(f"\n\t\ttotal_replies saved: {total_replies}")
         await RedisDB(redis_key=self._datastore.telegram_id).save(data=total_replies)
 
         return result
@@ -194,7 +200,6 @@ class MessageReceiver(ChannelData):
         answer: str = ''
         message_id = 0
         redis_data: List[dict] = await RedisDB(redis_key=self._datastore.telegram_id).load()
-        logger.debug(f"\n\t\tREDIS DATA: {redis_data}")
         if not redis_data:
             return answer, message_id
 
