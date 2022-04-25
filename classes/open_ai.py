@@ -12,18 +12,16 @@ openai.api_key = os.getenv("OPEN_AI_KEY")
 
 class OpenAI:
 
-    __curie: str = "text-curie-001"
-    __davinchi: str = "text-davinci-002"
-
-    def __init__(self):
+    def __init__(self, davinchi: bool = False):
         self.__message: str = ''
+        self.__mode: str = "text-davinci-002" if davinchi else "text-curie-001"
 
     @logger.catch
     def __send_message(self) -> dict:
         time.sleep(0.5)
         try:
             response: dict = openai.Completion.create(
-                engine=OpenAI.__curie,
+                engine=self.__mode,
                 prompt=self.__message,
                 temperature=0.5,
                 max_tokens=60,

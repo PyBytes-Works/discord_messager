@@ -9,26 +9,23 @@ from classes.db_interface import DBI
 from classes.errors_sender import ErrorsSender
 from classes.redis_interface import RedisDB
 from classes.request_classes import ChannelData
-from config import logger, DEBUG
-
-
-# IF true - data saving to files
-SAVING: bool = False
+from config import logger, DEBUG, SAVING
 
 
 class MessageReceiver(ChannelData):
-    """Получает сообщения из дискорда и формирует данные для ответа и реплаев"""
+    """Получает сообщения из дискорда и формирует данные для ответа
+    и реплаев"""
 
     @logger.catch
     async def get_message(self) -> None:
-        """Получает данные из АПИ, выбирает случайное сообщение и возвращает ID сообщения
+        """Получает данные из АПИ, выбирает случайное сообщение и
+        возвращает ID сообщения
         и само сообщение"""
 
         user_message, message_id = await self.__get_user_message_from_redis()
 
         discord_messages: List[dict] = await self.__get_all_messages()
-        if discord_messages:
-            await self.__get_replies_and_message_id(discord_messages)
+        await self.__get_replies_and_message_id(discord_messages)
         if message_id:
             self._datastore.current_message_id = message_id
         self._datastore.text_to_send = user_message if user_message else ''
@@ -58,7 +55,8 @@ class MessageReceiver(ChannelData):
     @staticmethod
     @logger.catch
     def __get_delta_seconds(elem: dict) -> int:
-        """Возвращает время, в пределах которого надо найти сообщения которое в секундах"""
+        """Возвращает время, в пределах которого надо найти сообщения
+        которое в секундах"""
 
         message_time: 'datetime' = elem.get("timestamp")
         mes_time: 'datetime' = datetime.datetime.fromisoformat(message_time).replace(tzinfo=None)
@@ -68,7 +66,8 @@ class MessageReceiver(ChannelData):
 
     @logger.catch
     async def __get_my_replies(self, data: List[dict]) -> List[dict]:
-        """Возвращает список всех упоминаний и реплаев наших токенов в сообщениях за последнее время"""
+        """Возвращает список всех упоминаний и реплаев наших токенов в
+        сообщениях за последнее время"""
 
         return [
             elem
@@ -92,26 +91,34 @@ class MessageReceiver(ChannelData):
         )
 
     @logger.catch
-    async def __get_target_username(self, elem: dict) -> str:
+    async def __get_target_id(self, elem: dict) -> str:
         return (
                 elem.get("referenced_message", {}).get("author", {}).get("id")
                 or elem.get("mentions", [{"id": '[no id]'}])[0].get("id")
         )
 
     @logger.catch
+    async def __get_target_username(self, elem: dict) -> str:
+        return (
+                elem.get("referenced_message", {}).get("author", {}).get("username")
+                or elem.get("mentions", [{"id": '[no id]'}])[0].get("username")
+                or self._datastore.token
+        )
+
+    @logger.catch
     async def __get_filtered_replies(self, data: List[dict]) -> List[dict]:
         """"""
-        if data and DEBUG:
+        if data and DEBUG and SAVING:
             utils.save_data_to_json(data, "replies_data.json", key='a')
         return [
             {
                 "token": self._datastore.token_name,
-                "author": elem.get("author", {}).get("username", ''),
+                "author": elem.get("author", {}).get("username", 'no author'),
                 "text": elem.get("content", '[no content]'),
                 "message_id": elem.get("id", 0),
-                "to_message": elem.get("referenced_message", {}).get("content"),
-                "to_user": elem.get("referenced_message", {}).get("author", {}).get("username"),
-                "target_id": await self.__get_target_username(elem)
+                "to_message": elem.get("referenced_message", {}).get("content", 'mention'),
+                "to_user": await self.__get_target_username(elem),
+                "target_id": await self.__get_target_id(elem)
             }
             for elem in data
         ]
@@ -132,12 +139,17 @@ class MessageReceiver(ChannelData):
         """Сохраняет реплаи и последнее сообщение в datastore"""
 
         if not data:
+            self._datastore.replies = []
+            self._datastore.current_message_id = 0
             return
         last_messages: List[dict] = await self.__get_last_messages(data)
         all_replies: List[dict] = await self.__get_my_replies(last_messages)
         new_replies: List[dict] = await self.__get_filtered_replies(all_replies)
         self._datastore.replies = await self.__save_replies_to_redis(new_replies)
         self._datastore.current_message_id = await self.__get_last_message_id_from_last_messages(last_messages)
+        logger.error(f"NEW REPLIES: {self._datastore.replies}")
+        logger.error(f"MESSAGE ID: {self._datastore.current_message_id}")
+        utils.save_data_to_json(data=last_messages, file_name="last_messages.json", key='a')
 
         if DEBUG and SAVING:
             utils.save_data_to_json(data=last_messages, file_name="last_messages.json")
@@ -177,10 +189,10 @@ class MessageReceiver(ChannelData):
 
         for elem in redis_data:
             answered: bool = elem.get("answered", False)
-            for_me: bool = elem.get("target_id") == self._datastore.my_discord_id
+            for_me: bool = int(elem.get("target_id")) == int(self._datastore.my_discord_id)
             if for_me and not answered:
-                answer = elem.get("answer_text", '')
-                message_id = elem.get("message_id", 0)
+                answer: str = elem.get("answer_text", '')
+                message_id: int = elem.get("message_id", 0)
                 elem.update({"answered": True})
                 await RedisDB(redis_key=self._datastore.telegram_id).save(data=redis_data)
                 break
