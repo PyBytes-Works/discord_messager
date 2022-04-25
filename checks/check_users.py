@@ -3,16 +3,16 @@ from models import User
 from config import admins_list
 
 
-def is_admin(message: Message) -> bool:
+def is_admin(telegram_id: str) -> bool:
     """check is admin"""
-    return User.is_admin(message.from_user.id)
+    return User.is_admin(telegram_id=telegram_id)
 
 
-def is_super_admin(message: Message) -> bool:
+def is_super_admin(telegram_id: str) -> bool:
     """check is super admin"""
-    return str(message.from_user.id) in admins_list
+    return str(telegram_id) in admins_list
 
 
-def is_user_subscribe_active(message: Message):
+def is_user_subscribe_active(telegram_id: str):
     """check subscribe"""
-    return User.is_subscribe_active(telegram_id=message.from_user.id)
+    return User.is_subscribe_active(telegram_id=telegram_id)
