@@ -62,6 +62,7 @@ class DiscordManager:
         await self._get_worker()
         await self._getting_messages()
         await self._send_replies()
+        await asyncio.sleep(5)
         await self._sending_messages()
         await self._sleep()
 
@@ -107,6 +108,17 @@ class DiscordManager:
 
         await MessageReceiver(datastore=self._datastore).get_message()
         await DBI.update_token_last_message_time(token=self._datastore.token)
+        # await self.__update_token_last_message_time(token=self._datastore.token)
+    # TODO реализовать:
+    # @logger.catch
+    # async def __update_token_last_message_time(self, token: str) -> None:
+    #     """Отправляет сообщение в дискор и сохраняет данные об ошибках в
+    #     словарь атрибута класса"""
+    #
+    #     for elem in self.__related_tokens:
+    #         if elem.token == token:
+    #             elem._replace(last_message_time=int(datetime.datetime.now().timestamp()))
+    #             return
 
     @check_working
     @logger.catch
@@ -134,9 +146,10 @@ class DiscordManager:
 
     @logger.catch
     async def __make_related_tokens_list(self) -> None:
-        self.__related_tokens: List[namedtuple] = await DBI.get_all_related_user_tokens(
-            telegram_id=self._datastore.telegram_id
-        )
+        if not self.__related_tokens:
+            self.__related_tokens: List[namedtuple] = await DBI.get_all_related_user_tokens(
+                telegram_id=self._datastore.telegram_id
+            )
 
     @check_working
     @logger.catch
@@ -204,6 +217,7 @@ class DiscordManager:
             return
         random.shuffle(self.__workers)
         random_token: str = self.__workers.pop()
+        print(f"Random token: {random_token}")
         await self._update_datastore(random_token)
 
     @logger.catch
@@ -218,8 +232,13 @@ class DiscordManager:
         self._datastore.update(token=token, token_data=token_data)
 
     @logger.catch
+    async def __get_closest_token_time(self) -> namedtuple:
+        return await DBI.get_closest_token_time(self._datastore.telegram_id)
+        # return min(self.__related_tokens, key=lambda x: x.last_message_time)
+
+    @logger.catch
     async def _get_delay(self) -> None:
-        token_data: namedtuple = await DBI.get_closest_token_time(self._datastore.telegram_id)
+        token_data: namedtuple = await self.__get_closest_token_time()
         min_token_time: int = int(token_data.last_message_time.timestamp())
         cooldown: int = token_data.cooldown
         self.delay = cooldown - abs(min_token_time - self.__get_current_timestamp())
@@ -251,14 +270,14 @@ class DiscordManager:
 
         result_replies: List[dict] = []
         for reply in self._datastore.replies:
-            if not reply.get("answered", False):
+            if not reply.get("answered"):
                 if self.autoanswer:
                     result_replies.append(await self._auto_reply_with_davinchi(reply))
                 else:
                     await self.__reply_to_telegram(reply)
                     result_replies.append(reply)
-
-        await RedisDB(redis_key=self._datastore.telegram_id).save(data=result_replies)
+        if self.autoanswer:
+            await RedisDB(redis_key=self._datastore.telegram_id).save(data=result_replies)
 
     @logger.catch
     async def _auto_reply_with_davinchi(self, data: dict) -> dict:

@@ -33,7 +33,6 @@ class MessageSender(SendMessageToChannel):
         if not text:
             await ErrorsSender.send_message_check_token(
                 status=-2, telegram_id=self._datastore.telegram_id, admins=True)
-            # self.__answer = {"status_code": -2, "data": {"message": text}}
             return ''
         await RedisDB(redis_key=self._datastore.mate_id).save(data=[
             text], timeout_sec=self._datastore.delay + 300)

@@ -97,7 +97,7 @@ class MessageReceiver(ChannelData):
     @logger.catch
     async def __get_filtered_replies(self, data: List[dict]) -> List[dict]:
         """"""
-        if data and DEBUG:
+        if data and DEBUG and SAVING:
             utils.save_data_to_json(data, "replies_data.json", key='a')
         return [
             {
@@ -134,7 +134,7 @@ class MessageReceiver(ChannelData):
         new_replies: List[dict] = await self.__get_filtered_replies(all_replies)
         self._datastore.replies = await self.__save_replies_to_redis(new_replies)
         self._datastore.current_message_id = await self.__get_last_message_id_from_last_messages(last_messages)
-
+        logger.error(f"NEW REPLIES: {self._datastore.replies}")
         if DEBUG and SAVING:
             utils.save_data_to_json(data=last_messages, file_name="last_messages.json")
             utils.save_data_to_json(data=all_replies, file_name="all_replies.json")
