@@ -20,20 +20,18 @@ class MessageReceiver(ChannelData):
     """Получает сообщения из дискорда и формирует данные для ответа и реплаев"""
 
     @logger.catch
-    async def get_message(self) -> bool:
+    async def get_message(self) -> None:
         """Получает данные из АПИ, выбирает случайное сообщение и возвращает ID сообщения
         и само сообщение"""
 
         user_message, message_id = await self.__get_user_message_from_redis()
 
         discord_messages: List[dict] = await self.__get_all_messages()
-        if not discord_messages:
-            return False
-        await self.__set_replies_and_message_id(discord_messages)
+        if discord_messages:
+            await self.__get_replies_and_message_id(discord_messages)
         if message_id:
             self._datastore.current_message_id = message_id
         self._datastore.text_to_send = user_message if user_message else ''
-        return True
 
     @logger.catch
     async def __get_all_messages(self) -> List[dict]:
@@ -130,7 +128,7 @@ class MessageReceiver(ChannelData):
         return await self.__get_last_message_id(messages)
 
     @logger.catch
-    async def __set_replies_and_message_id(self, data: List[dict]) -> None:
+    async def __get_replies_and_message_id(self, data: List[dict]) -> None:
         """Сохраняет реплаи и последнее сообщение в datastore"""
 
         if not data:

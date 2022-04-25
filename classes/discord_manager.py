@@ -46,13 +46,13 @@ class DiscordManager:
         self.__related_tokens: List[namedtuple] = []
         self.__workers: List[str] = []
         self._datastore: Optional['TokenData'] = None
-        self.is_working: bool = True
+        self.is_working: bool = False
         self._discord_data: dict = {}
         self.delay: int = 0
 
-    @check_working
     @logger.catch
     async def _lets_play(self) -> None:
+
         if await DBI.is_expired_user_deactivated(self.message):
             self.is_working = False
             return
@@ -67,9 +67,12 @@ class DiscordManager:
 
     @logger.catch
     async def __make_all_token_ids(self) -> None:
-        self._datastore.all_tokens_ids = await DBI.get_all_discord_id(telegram_id=self.user_telegram_id)
+        self._datastore.all_tokens_ids = await DBI.get_all_discord_id(self.user_telegram_id)
+        if not self._datastore.all_tokens_ids:
+            logger.debug(f"No all_tokens_ids.")
+            return
+        self.is_working = True
 
-    @check_working
     @logger.catch
     async def lets_play(self) -> None:
         """Show must go on
@@ -87,7 +90,7 @@ class DiscordManager:
             t0 = datetime.datetime.now()
             logger.info(f"\n\t\tCircle start at: {t0}")
             await self._lets_play()
-            await self._sleep()
+
             logger.info(f"\n\t\tCircle finish. Total time: {datetime.datetime.now() - t0}")
 
         logger.debug("\n\tGame over.")
@@ -98,10 +101,9 @@ class DiscordManager:
         """Получает сообщения из чата и обрабатывает их
         Если удачно - перезаписывает кулдаун текущего токена"""
 
-        message_manager: 'MessageReceiver' = MessageReceiver(datastore=self._datastore)
-        if not await message_manager.get_message():
-            self.is_working = False
+        await MessageReceiver(datastore=self._datastore).get_message()
         await DBI.update_token_last_message_time(token=self._datastore.token)
+        await asyncio.sleep(5)
 
     @check_working
     @logger.catch
@@ -114,17 +116,6 @@ class DiscordManager:
             return
         self._discord_data = {}
         self._datastore.current_message_id = 0
-        # answer: dict = await MessageSender(datastore=self._datastore).send_message()
-        # if answer.get("status") == 200:
-        #     self._discord_data = {}
-        #     self._datastore.current_message_id = 0
-        #     self.working = True
-        #     return
-        # # elif not answer:
-        #     logger.error("F: Manager.__message_send ERROR: NO ANSWER ERROR")
-        #     self._discord_data = {"message": "ERROR"}
-        # elif answer.get("status") != 200:
-        #     self._discord_data = {"answer": answer, "token": self._datastore.token}
 
     @logger.catch
     async def __send_text(self, text: str, keyboard=None, check_silence: bool = False) -> None:
@@ -146,7 +137,8 @@ class DiscordManager:
 
     @check_working
     @logger.catch
-    async def _make_tokens_list(self) -> None:
+    async def _make_related_tokens(self) -> None:
+
         await self.__make_related_tokens_list()
         if not self.__related_tokens:
             await self.__send_text(
@@ -157,9 +149,10 @@ class DiscordManager:
     @check_working
     @logger.catch
     async def _get_worker(self) -> None:
+
         if not self.__workers:
             await self.make_token_pairs(unpair=True)
-            await self._make_tokens_list()
+            await self._make_related_tokens()
             await self._make_workers_list()
         await self._get_worker_from_list()
 
@@ -168,20 +161,17 @@ class DiscordManager:
     async def _sleep(self) -> None:
         """Спит на время ближайшего токена."""
 
-        if self.__workers:
-            return
-        await self.__set_delay()
-        # if self.delay <= 0:
-        #     return
-        await self._send_delay_message()
-        logger.info(f"PAUSE: {self.delay}")
-        timer: int = self.delay
-        while timer > 0:
-            timer -= 5
-            if not self.is_working:
-                return
-            await asyncio.sleep(5)
-        self._datastore.delay = 0
+        logger.debug(f"WORKERS: {self.__workers}")
+        if not self.__workers:
+            await self._get_delay()
+            await self._send_delay_message()
+            logger.info(f"PAUSE: {self.delay}")
+            timer: int = self.delay
+            while timer > 0:
+                timer -= 5
+                if not self.is_working:
+                    return
+                await asyncio.sleep(5)
 
     @logger.catch
     def __get_max_message_time(self, elem: namedtuple) -> int:
@@ -198,7 +188,7 @@ class DiscordManager:
         self.__workers = [
             elem.token
             for elem in self.__related_tokens
-            if self.__get_current_time() > self.__get_max_message_time(elem)
+            if self.__get_current_timestamp() > self.__get_max_message_time(elem)
         ]
 
     @check_working
@@ -213,7 +203,7 @@ class DiscordManager:
         await self._update_datastore(random_token)
 
     @logger.catch
-    def __get_current_time(self) -> int:
+    def __get_current_timestamp(self) -> int:
         """Возвращает текущее время (timestamp) целое."""
 
         return int(datetime.datetime.now().timestamp())
@@ -224,14 +214,24 @@ class DiscordManager:
         self._datastore.update(token=token, token_data=token_data)
 
     @logger.catch
-    async def __get_closest_token_data(self) -> namedtuple:
-        return min(self.__related_tokens, key=lambda x: x.last_message_time)
+    async def __get_min_last_message_time_of_token(self) -> int:
+        return min(self.__related_tokens, key=lambda x: x.last_message_time).timestamp()
 
+    @check_working
     @logger.catch
-    async def __set_delay(self) -> None:
-        closest_token_data: namedtuple = await self.__get_closest_token_data()
-        min_token_time: int = int(closest_token_data.last_message_time.timestamp())
-        self.delay = self._datastore.cooldown - abs(min_token_time - self.__get_current_time())
+    async def _get_delay(self) -> None:
+        # TODO получать время ИЗ БАЗЫ
+
+        min_token_time: int = await self.__get_min_last_message_time_of_token()
+        logger.debug(
+            f"\n\t\tTOKEN: {self._datastore.token}"
+            f"\n\t\tMY DISCORD: {self._datastore.my_discord_id}"
+            f"\n\t\tMATE: {self._datastore.mate_id}"
+            f"\n\t\tCOOLDOWN: {self._datastore.cooldown}"
+            f"\n\t\tmin_token_time: {min_token_time} "
+            f"- current_timestamp: {self.__get_current_timestamp()} "
+            f"= {min_token_time - self.__get_current_timestamp()}")
+        self.delay = self._datastore.cooldown - abs(min_token_time - self.__get_current_timestamp())
 
     @check_working
     @logger.catch

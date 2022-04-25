@@ -1,3 +1,4 @@
+import datetime
 import random
 from typing import List, Tuple, Dict
 from collections import namedtuple
@@ -39,7 +40,8 @@ class DBI:
 
     @classmethod
     @logger.catch
-    async def form_new_tokens_pairs(cls, telegram_id: str):
+    async def form_new_tokens_pairs(cls, telegram_id: str) -> None:
+        """ВОзвращает количество сформированных пар токенов"""
         free_tokens: Tuple[
             List[int], ...] = await DBI.get_all_free_tokens(telegram_id)
         formed_pairs: int = 0
