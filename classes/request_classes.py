@@ -58,7 +58,7 @@ class GetRequest(RequestSender):
                 'url': self.url,
                 "proxy": self.proxy_data,
                 "ssl": False,
-                "timeout": 5
+                "timeout": 10
             }
             if self.token:
                 session.headers['authorization']: str = self.token
@@ -69,15 +69,18 @@ class GetRequest(RequestSender):
                         data=await response.text()
                     )
             except aiohttp.client_exceptions.ClientConnectorError as err:
-                logger.error(f"GetRequest: Proxy check Error: {err}")
+                logger.error(f"GetRequest: Proxy check Error: {err}"
+                             f"\nProxy: {self.proxy}")
                 await ErrorsSender.proxy_not_found_error()
                 answer.update(status=407)
             except aiohttp.http_exceptions.BadHttpMessage as err:
-                logger.error("GetRequest: МУДАК ПРОВЕРЬ ПОРТ ПРОКСИ!!!", err)
+                logger.error(f"GetRequest: МУДАК ПРОВЕРЬ ПОРТ ПРОКСИ!!! {err}"
+                             f"\nProxy: {self.proxy}")
                 if "Proxy Authentication Required" in err:
                     answer.update(status=407)
             except (ssl.SSLError, OSError) as err:
-                logger.error("GetRequest: Ошибка авторизации прокси:", err)
+                logger.error("GetRequest: Ошибка авторизации прокси: {err}"
+                             f"\nProxy: {self.proxy}")
                 if "Proxy Authentication Required" in err:
                     answer.update(status=407)
             except self._EXCEPTIONS as err:

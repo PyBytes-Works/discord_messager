@@ -19,13 +19,12 @@ from classes.db_interface import DBI
 def check_working(func):
     async def wrapper(*args, **kwargs):
         name: str = func.__name__
-        # logger.debug(f"\t{name} start:")
         if args and hasattr(args[0].__class__, name):
             is_working: bool = getattr(args[0], "is_working")
             if is_working:
-                # logger.debug(f"\t{name} start: OK")
+                logger.debug(f"\t{name}: OK")
                 return await func(*args, **kwargs)
-        # logger.debug(f"\t{name} start: ERROR")
+        logger.debug(f"\t{name}: FAIL")
         return
 
     return wrapper
@@ -54,10 +53,21 @@ class DiscordManager:
     @check_working
     @logger.catch
     async def _lets_play(self) -> None:
-        await self._prepare_data()
+        if await DBI.is_expired_user_deactivated(self.message):
+            self.is_working = False
+            return
+        await self._get_worker()
         await self._getting_messages()
         await self._send_replies()
         await self._sending_messages()
+
+    @logger.catch
+    async def __make_datastore(self) -> None:
+        self._datastore: 'TokenData' = TokenData(self.user_telegram_id)
+
+    @logger.catch
+    async def __make_all_token_ids(self) -> None:
+        self._datastore.all_tokens_ids = await DBI.get_all_discord_id(telegram_id=self.user_telegram_id)
 
     @check_working
     @logger.catch
@@ -69,9 +79,9 @@ class DiscordManager:
         #  отправлять в телеграм юзеру
         # TODO выделить реплаи и работу с ними в отдельный класс
 
-        self._datastore: 'TokenData' = TokenData(self.user_telegram_id)
-        self._datastore.all_tokens_ids = await DBI.get_all_discord_id(telegram_id=self.user_telegram_id)
-        logger.debug(f"\tUSER: {self.__username}: {self.user_telegram_id} - Game begin.")
+        await self.__make_datastore()
+        await self.__make_all_token_ids()
+        logger.debug(f"\n\tUSER: {self.__username}: {self.user_telegram_id} - Game begin.")
 
         while self.is_working:
             t0 = datetime.datetime.now()
@@ -80,15 +90,7 @@ class DiscordManager:
             await self._sleep()
             logger.info(f"\n\t\tCircle finish. Total time: {datetime.datetime.now() - t0}")
 
-        logger.debug("Game over.")
-
-    @check_working
-    @logger.catch
-    async def _prepare_data(self) -> None:
-        if await DBI.is_expired_user_deactivated(self.message):
-            self.is_working = False
-            return
-        await self._is_datastore_ready()
+        logger.debug("\n\tGame over.")
 
     @check_working
     @logger.catch
@@ -154,7 +156,7 @@ class DiscordManager:
 
     @check_working
     @logger.catch
-    async def _is_datastore_ready(self) -> None:
+    async def _get_worker(self) -> None:
         if not self.__workers:
             await self.make_token_pairs(unpair=True)
             await self._make_tokens_list()
@@ -169,8 +171,8 @@ class DiscordManager:
         if self.__workers:
             return
         await self.__set_delay()
-        if self.delay <= 0:
-            return
+        # if self.delay <= 0:
+        #     return
         await self._send_delay_message()
         logger.info(f"PAUSE: {self.delay}")
         timer: int = self.delay
@@ -222,13 +224,12 @@ class DiscordManager:
         self._datastore.update(token=token, token_data=token_data)
 
     @logger.catch
-    async def __get_closes_token_data(self) -> namedtuple:
+    async def __get_closest_token_data(self) -> namedtuple:
         return min(self.__related_tokens, key=lambda x: x.last_message_time)
 
     @logger.catch
     async def __set_delay(self) -> None:
-        closest_token_data: namedtuple = await self.__get_closes_token_data()
-        await self._update_datastore(closest_token_data.token)
+        closest_token_data: namedtuple = await self.__get_closest_token_data()
         min_token_time: int = int(closest_token_data.last_message_time.timestamp())
         self.delay = self._datastore.cooldown - abs(min_token_time - self.__get_current_time())
 
