@@ -8,7 +8,7 @@ def is_admin(message: Message) -> bool:
 
 
 def is_super_admin(message: Message) -> bool:
-    return message.from_user.id in admins_list
+    return str(message.from_user.id) in admins_list
 
 
 def is_expired(message: Message):

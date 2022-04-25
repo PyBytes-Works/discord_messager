@@ -18,11 +18,11 @@ class CheckAccess:
         """decorator for handler check expired for user"""
 
         @wraps(func)
-        def wrapper(*args, **kwargs) -> Any:
+        async def wrapper(*args, **kwargs) -> Any:
             if is_expired(args[0]):
                 return
 
-            return func(*args, **kwargs)
+            return await func(*args, **kwargs)
 
         return wrapper
 
@@ -31,8 +31,19 @@ class CheckAccess:
         """decorator for handler check user on admin and super admin"""
 
         @wraps(func)
-        def wrapper(*args, **kwargs) -> Any:
+        async def wrapper(*args, **kwargs) -> Any:
             if is_admin(args[0]) or is_super_admin(args[0]):
-                return func(*args, **kwargs)
+                return await func(*args, **kwargs)
+
+        return wrapper
+
+    @classmethod
+    def check_super_admin(cls, func: Callable) -> Callable:
+        """decorator for handler check user on super admin"""
+
+        @wraps(func)
+        async def wrapper(*args, **kwargs) -> Any:
+            if is_admin(args[0]) or is_super_admin(args[0]):
+                return await func(*args, **kwargs)
 
         return wrapper
