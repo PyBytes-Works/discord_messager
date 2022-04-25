@@ -1,7 +1,7 @@
 from functools import wraps
 from typing import Callable, Any
 
-from checks.check_users import is_admin, is_super_admin, is_expired
+from checks.check_users import is_admin, is_super_admin, is_user_subscribe_active
 
 
 class CheckAccess:
@@ -19,10 +19,8 @@ class CheckAccess:
 
         @wraps(func)
         async def wrapper(*args, **kwargs) -> Any:
-            if is_expired(args[0]):
-                return
-
-            return await func(*args, **kwargs)
+            if is_user_subscribe_active(args[0]):
+                return await func(*args, **kwargs)
 
         return wrapper
 

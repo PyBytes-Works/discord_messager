@@ -19,10 +19,10 @@ class DBI:
         Возвращает True если деактивирован."""
 
         telegram_id: str = str(message.from_user.id)
-        user_expired: bool = await cls.is_user_expired(telegram_id)
+        subscribe_active: bool = await cls.is_subscribe_active(telegram_id)
         user_is_admin: bool = await cls.is_admin(telegram_id)
         user_is_superadmin: bool = telegram_id in admins_list
-        if user_expired and not user_is_admin and not user_is_superadmin:
+        if not subscribe_active and not user_is_admin and not user_is_superadmin:
             await message.answer(
                 "Время подписки истекло. Ваш аккаунт деактивирован, токены удалены.",
                 reply_markup=ReplyKeyboardRemove()
@@ -113,15 +113,15 @@ class DBI:
 
     @classmethod
     @logger.catch
-    async def is_user_expired(cls, telegram_id: str) -> bool:
+    async def is_subscribe_active(cls, telegram_id: str) -> bool:
         """
         Возвращает статус подписки пользователя,
 
-        False если подписка ещё действует
+        False если срок подписки истек
 
-        True если срок подписки истёк
+        True если подписка действует
         """
-        return User.is_user_expired(telegram_id=telegram_id)
+        return User.is_subscribe_active(telegram_id=telegram_id)
 
     @classmethod
     @logger.catch

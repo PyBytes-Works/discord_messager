@@ -139,9 +139,9 @@ async def activate_valid_user_handler(message: Message):
 
     user_telegram_id: str = str(message.from_user.id)
     is_user_exists: bool = await DBI.get_user_by_telegram_id(telegram_id=user_telegram_id)
-    is_user_expired: bool = await DBI.is_user_expired(telegram_id=user_telegram_id)
+    is_subscribe_active: bool = await DBI.is_subscribe_active(telegram_id=user_telegram_id)
     is_user_active: bool = await DBI.user_is_active(telegram_id=user_telegram_id)
-    if is_user_exists and not is_user_expired and not is_user_active:
+    if is_user_exists and is_subscribe_active and not is_user_active:
         await DBI.activate_user(telegram_id=user_telegram_id)
         await message.answer("Аккаунт активирован.")
 
