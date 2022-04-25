@@ -6,6 +6,7 @@ from aiogram.types import ReplyKeyboardRemove, Message
 from models import User, Token, Proxy, UserChannel
 from config import logger, admins_list
 from classes.errors_sender import ErrorsSender
+from checks import check_users
 
 
 class DBI:
@@ -230,12 +231,21 @@ class DBI:
 
     @classmethod
     @logger.catch
+    async def set_token_name(cls, token: str, name: str) -> int:
+        return Token.set_token_name(token=token, name=name)
+
+    @classmethod
+    @logger.catch
     async def make_tokens_pair(cls, first_token, second_token) -> bool:
         return Token.make_tokens_pair(first_token, second_token)
 
     @classmethod
     @logger.catch
     async def get_number_of_free_slots_for_tokens(cls, telegram_id: str) -> int:
+        """Todo вот убрать проверку и что возвращать?"""
+        if (check_users.is_super_admin(telegram_id=telegram_id) or
+                check_users.is_super_admin(telegram_id=telegram_id)):
+            return 100
         return Token.get_number_of_free_slots_for_tokens(telegram_id)
 
     @classmethod
@@ -299,6 +309,11 @@ class DBI:
     @logger.catch
     async def update_user_channel_cooldown(cls, user_channel_pk: int, cooldown: int) -> int:
         return UserChannel.update_cooldown(user_channel_pk=user_channel_pk, cooldown=cooldown)
+
+    @classmethod
+    @logger.catch
+    async def set_user_channel_name(cls, user_channel_pk: int, name: str) -> int:
+        return UserChannel.set_user_channel_name(user_channel_pk=user_channel_pk, name=name)
 
     @classmethod
     @logger.catch
