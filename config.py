@@ -10,6 +10,9 @@ from aiogram.contrib.fsm_storage.memory import MemoryStorage
 from peewee import SqliteDatabase, PostgresqlDatabase
 import psycopg2
 
+# flag for saving files
+SAVING: bool = False
+
 
 # Загружаем переменные из файла .env
 load_dotenv()

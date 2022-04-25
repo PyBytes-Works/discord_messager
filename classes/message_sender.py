@@ -33,7 +33,6 @@ class MessageSender(SendMessageToChannel):
         if not text:
             await ErrorsSender.send_message_check_token(
                 status=-2, telegram_id=self._datastore.telegram_id, admins=True)
-            # self.__answer = {"status_code": -2, "data": {"message": text}}
             return ''
         await RedisDB(redis_key=self._datastore.mate_id).save(data=[
             text], timeout_sec=self._datastore.delay + 300)
@@ -44,7 +43,8 @@ class MessageSender(SendMessageToChannel):
         mate_message: list = await RedisDB(redis_key=self._datastore.my_discord_id).load()
         if mate_message:
             self.__text: str = OpenAI().get_answer(mate_message[0].strip())
-            await RedisDB(redis_key=self._datastore.my_discord_id).delete(mate_id=self._datastore.mate_id)
+            await RedisDB(
+                redis_key=self._datastore.my_discord_id).delete(mate_id=self._datastore.mate_id)
         if not self.__text:
             self.__text: str = await self.__get_text_from_vocabulary()
 

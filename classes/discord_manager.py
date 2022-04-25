@@ -9,6 +9,8 @@ from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
 
 from classes.message_receiver import MessageReceiver
 from classes.message_sender import MessageSender
+from classes.open_ai import OpenAI
+from classes.redis_interface import RedisDB
 from classes.token_datastorage import TokenData
 
 from config import logger
@@ -105,6 +107,17 @@ class DiscordManager:
 
         await MessageReceiver(datastore=self._datastore).get_message()
         await DBI.update_token_last_message_time(token=self._datastore.token)
+        # await self.__update_token_last_message_time(token=self._datastore.token)
+    # TODO реализовать:
+    # @logger.catch
+    # async def __update_token_last_message_time(self, token: str) -> None:
+    #     """Отправляет сообщение в дискор и сохраняет данные об ошибках в
+    #     словарь атрибута класса"""
+    #
+    #     for elem in self.__related_tokens:
+    #         if elem.token == token:
+    #             elem._replace(last_message_time=int(datetime.datetime.now().timestamp()))
+    #             return
 
     @check_working
     @logger.catch
@@ -132,9 +145,10 @@ class DiscordManager:
 
     @logger.catch
     async def __make_related_tokens_list(self) -> None:
-        self.__related_tokens: List[namedtuple] = await DBI.get_all_related_user_tokens(
-            telegram_id=self._datastore.telegram_id
-        )
+        if not self.__related_tokens:
+            self.__related_tokens: List[namedtuple] = await DBI.get_all_related_user_tokens(
+                telegram_id=self._datastore.telegram_id
+            )
 
     @check_working
     @logger.catch
@@ -168,7 +182,7 @@ class DiscordManager:
         await self._get_delay()
         await self._send_delay_message()
         logger.info(f"SLEEP PAUSE: {self.delay}")
-        timer: int = self.delay
+        timer: int = self.delay + random.randint(3, 7)
         while timer > 0:
             timer -= 5
             if not self.is_working:
@@ -216,8 +230,14 @@ class DiscordManager:
         self._datastore.update(token=token, token_data=token_data)
 
     @logger.catch
+    async def __get_closest_token_time(self) -> namedtuple:
+        return await DBI.get_closest_token_time(self._datastore.telegram_id)
+        # TODO реализовать получение данных о токене из текущего экземпляра класса, а не из БД
+        # return min(self.__related_tokens, key=lambda x: x.last_message_time)
+
+    @logger.catch
     async def _get_delay(self) -> None:
-        token_data: namedtuple = await DBI.get_closest_token_time(self._datastore.telegram_id)
+        token_data: namedtuple = await self.__get_closest_token_time()
         min_token_time: int = int(token_data.last_message_time.timestamp())
         cooldown: int = token_data.cooldown
         self.delay = cooldown - abs(min_token_time - self.__get_current_timestamp())
@@ -247,134 +267,53 @@ class DiscordManager:
     async def _send_replies(self) -> None:
         """Отправляет реплаи из дискорда в телеграм с кнопкой Ответить"""
 
+        # TODO реализовать автоответчик
+        # result_replies: List[dict] = []
         for reply in self._datastore.replies:
-            if not reply.get("answered", False):
-                answer_keyboard: 'InlineKeyboardMarkup' = InlineKeyboardMarkup(row_width=1)
-                author: str = reply.get("author")
-                reply_id: str = reply.get("message_id")
-                reply_text: str = reply.get("text")
-                reply_to_author: str = reply.get("to_user")
-                reply_to_message: str = reply.get("to_message")
-                answer_keyboard.add(InlineKeyboardButton(
-                    text="Ответить",
-                    callback_data=f'reply_{reply_id}'
-                ))
-                await self.message.answer(
-                    f"Вам пришло сообщение из ДИСКОРДА:"
-                    f"\nКому: {reply_to_author}"
-                    f"\nНа сообщение: {reply_to_message}"
-                    f"\nОт: {author}"
-                    f"\nText: {reply_text}",
-                    reply_markup=answer_keyboard
-                )
+            if not reply.get("answered"):
+                # if self.autoanswer:
+                #     result_replies.append(await self._auto_reply_with_davinchi(reply))
+                # else:
+                await self.__reply_to_telegram(reply)
+                # result_replies.append(reply)
+        # if self.autoanswer:
+        #     await RedisDB(redis_key=self._datastore.telegram_id).save(data=result_replies)
 
-    #
-    # @check_working
-    # @logger.catch
-    # async def _get_error_text(self) -> None:
-    #     """Обработка ошибок от сервера"""
-    #
-    #     if not self._discord_data:
-    #         return
-    #     self._error_text: str = self._discord_data.get("message", "")
-    #     token: str = self._discord_data.get("token")
-    #     answer: dict = self._discord_data.get("answer", {})
-    #     status_code: int = answer.get("status", 0)
-    #     sender_text: str = answer.get("message", "SEND_ERROR")
-    #     data = answer.get("data")
-    #     if isinstance(data, str):
-    #         data: dict = json.loads(answer.get("data", {}))
-    #     discord_code_error: int = data.get("code", 0)
-    #
-    #     if status_code == -1:
-    #         error_text = sender_text
-    #         await self.message.answer("Ошибка десериализации отправки ответа.")
-    #         await ErrorsSender.send_report_to_admins(error_text)
-    #         self.working = False
-    #     elif status_code == -2:
-    #         await self.message.answer("Ошибка словаря.", reply_markup=user_menu_keyboard())
-    #         await ErrorsSender.send_report_to_admins("Ошибка словаря.")
-    #         self.working = False
-    #     elif status_code == 400:
-    #         if discord_code_error == 50035:
-    #             sender_text = 'Сообщение для ответа удалено из дискорд канала.'
-    #         else:
-    #             self.working = False
-    #         await ErrorsSender.send_report_to_admins(sender_text)
-    #     elif status_code == 401:
-    #         if discord_code_error == 0:
-    #             await DBI.delete_token(token=token)
-    #             await self.message.answer("Токен сменился и будет удален."
-    #                                       f"\nToken: {token}")
-    #         else:
-    #             await self.message.answer(
-    #                 "Произошла ошибка данных. "
-    #                 "Убедитесь, что вы ввели верные данные. Код ошибки - 401.",
-    #                 reply_markup=user_menu_keyboard()
-    #             )
-    #         self.working = False
-    #     elif status_code == 403:
-    #         if discord_code_error == 50013:
-    #             await self.message.answer(
-    #                 "Не могу отправить сообщение для токена. (Ошибка 403 - 50013)"
-    #                 "Токен в муте."
-    #                 f"\nToken: {token}"
-    #                 f"\nGuild: {self._datastore.guild}"
-    #                 f"\nChannel: {self._datastore.channel}"
-    #             )
-    #         elif discord_code_error == 50001:
-    #             await DBI.delete_token(token=token)
-    #             await self.message.answer(
-    #                 "Не могу отправить сообщение для токена. (Ошибка 403 - 50001)"
-    #                 "Токен забанили."
-    #                 f"\nТокен: {token} удален."
-    #                 f"\nФормирую новые пары.",
-    #                 reply_markup=user_menu_keyboard()
-    #             )
-    #             await self.form_token_pairs(unpair=False)
-    #         else:
-    #             await self.message.answer(f"Ошибка {status_code}: {data}")
-    #     elif status_code == 404:
-    #         if discord_code_error == 10003:
-    #             await self.message.answer(
-    #                 "Ошибка отправки сообщения. Неверный канал. (Ошибка 404 - 10003)"
-    #                 f"\nToken: {token}"
-    #             )
-    #         else:
-    #             await self.message.answer(f"Ошибка {status_code}: {data}")
-    #     elif status_code == 407:
-    #         await self.message.answer(
-    #             "Ошибка прокси. Обратитесь к администратору. Код ошибки 407.",
-    #             reply_markup=ReplyKeyboardRemove()
-    #         )
-    #         await ErrorsSender.send_report_to_admins(f"Ошибка прокси. Время действия proxy истекло.")
-    #         self.working = False
-    #     elif status_code == 429:
-    #         if discord_code_error == 20016:
-    #             cooldown: int = int(data.get("retry_after", None))
-    #             if cooldown:
-    #                 cooldown += self._datastore.cooldown
-    #                 await DBI.update_user_channel_cooldown(
-    #                     user_channel_pk=self._datastore.user_channel_pk, cooldown=cooldown)
-    #                 self._datastore.delay = cooldown
-    #             await self.message.answer(
-    #                 "Для данного токена сообщения отправляются чаще, чем разрешено в канале."
-    #                 f"\nToken: {token}"
-    #                 f"\nГильдия/Канал: {self._datastore.guild}/{self._datastore.channel}"
-    #                 f"\nВремя скорректировано. Кулдаун установлен: {cooldown} секунд"
-    #             )
-    #         else:
-    #             await self.message.answer(f"Ошибка: "
-    #                                       f"{status_code}:{discord_code_error}:{sender_text}")
-    #     elif status_code == 500:
-    #         error_text = (
-    #             f"Внутренняя ошибка сервера Дискорда. "
-    #             f"\nГильдия:Канал: {self._datastore.guild}:{self._datastore.channel} "
-    #             f"\nПауза 10 секунд. Код ошибки - 500."
-    #         )
-    #         await self.message.answer(error_text)
-    #         await ErrorsSender.send_report_to_admins(error_text)
-    #         self._datastore.delay = 10
+    @logger.catch
+    async def __reply_to_telegram(self, data: dict) -> None:
+        """Отправляет сообщение о реплае в телеграм"""
+
+        answer_keyboard: 'InlineKeyboardMarkup' = InlineKeyboardMarkup(row_width=1)
+        author: str = data.get("author")
+        reply_id: str = data.get("message_id")
+        reply_text: str = data.get("text")
+        reply_to_author: str = data.get("to_user")
+        reply_to_message: str = data.get("to_message")
+        answer_keyboard.add(InlineKeyboardButton(
+            text="Ответить",
+            callback_data=f'reply_{reply_id}'
+        ))
+        await self.message.answer(
+            f"Вам пришло сообщение из ДИСКОРДА:"
+            f"\nКому: {reply_to_author}"
+            f"\nНа сообщение: {reply_to_message}"
+            f"\nОт: {author}"
+            f"\nText: {reply_text}",
+            reply_markup=answer_keyboard
+        )
+
+    @logger.catch
+    async def _auto_reply_with_davinchi(self, data: dict) -> dict:
+
+        logger.debug("Start autoreply:")
+        reply_text: str = data.get("text")
+        ai_reply_text: str = OpenAI(davinchi=True).get_answer(message=reply_text)
+        logger.debug(f"Davinci text: {ai_reply_text}")
+        if not ai_reply_text:
+            logger.error(f"Davinci NOT ANSWERED")
+            return data
+        data.update({"answer_text": ai_reply_text})
+        return data
 
     @check_working
     @logger.catch
