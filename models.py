@@ -673,9 +673,10 @@ class UserChannel(BaseModel):
 
     @classmethod
     @logger.catch
-    def set_user_channel_name(cls: 'UserChannel', user_channel_pk: int, name: str) -> None:
+    def set_user_channel_name(cls: 'UserChannel', user_channel_pk: int, name: str) -> int:
         """
         Update name for one users_channel by user_channel_id
+        returns the number of updated records
         """
         return cls.update(name=name).where(cls.id == user_channel_pk).execute()
 
@@ -704,6 +705,7 @@ class Token(BaseModel):
           get_all_free_tokens
           get_all_discord_id
           get_all_discord_id_by_channel
+          set_token_name
           check_token_by_discord_id
           update_token_time
     """
@@ -1032,12 +1034,17 @@ class Token(BaseModel):
              'token_discord_id']
         )(user_channel_pk=None, proxy=None, guild_id=None, channel_id=None, mate_discord_id=None)
 
-
     @classmethod
     @logger.catch
     def delete_token_by_id(cls, token_pk: int) -> int:
         """Deleting token by id"""
         return cls.delete().where(cls.id == token_pk).execute()
+
+    @classmethod
+    @logger.catch
+    def set_token_name(cls: 'Token', token: str, name: str) -> int:
+        """Set new name for token"""
+        return cls.update(name=name).where(cls.token == token).execute()
 
     @classmethod
     @logger.catch
@@ -1050,6 +1057,7 @@ class Token(BaseModel):
     def get_number_of_free_slots_for_tokens(cls, telegram_id: str) -> int:
         """
         Вернуть количество свободных мест для размещения токенов
+        TODO admin super admin
         """
         return (
             User.select(
