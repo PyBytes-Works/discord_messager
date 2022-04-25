@@ -8,7 +8,7 @@ from aiogram.dispatcher import FSMContext
 
 import utils
 from classes.manager_storage import InstancesStorage
-from config import logger, Dispatcher, DEBUG, VERSION, bot
+from config import logger, Dispatcher, DEBUG, VERSION, bot, SAVING
 from keyboards import cancel_keyboard, user_menu_keyboard
 from classes.discord_manager import DiscordManager
 from classes.redis_interface import RedisDB
@@ -41,7 +41,9 @@ async def send_cancel_message(telegram_id: str, state: FSMContext) -> None:
     text: str = ''
     keyboard = user_menu_keyboard
     if await DBI.is_user_work(telegram_id=telegram_id):
-        text: str = "\nДождитесь завершения работы бота. Это займет несколько секунд..."
+        text: str = ("\nДождитесь завершения работы бота. Это займет около 5 секунд..."
+                     "\nЕсли бот не завершил работу - введите 'Отмена' или любую команду для вызова "
+                     "клавиатуры")
         keyboard = ReplyKeyboardRemove
     await bot.send_message(
         chat_id=telegram_id,
@@ -94,6 +96,7 @@ async def answer_to_reply_handler(callback: CallbackQuery, state: FSMContext):
     """Запрашивает текст ответа на реплай для отправки в дискорд"""
 
     message_id: str = callback.data.rsplit("_", maxsplit=1)[-1]
+    await bot.delete_message(callback.message.chat.id, callback.message.message_id)
     await callback.message.answer('Введите текст ответа:', reply_markup=cancel_keyboard())
     await state.update_data(message_id=message_id)
     await callback.answer()
@@ -112,10 +115,10 @@ async def send_message_to_reply_handler(message: Message, state: FSMContext):
             elem.update({"answer_text": message.text})
             break
     else:
-        logger.warning("f: send_message_to_reply_handler: elem in Redis data not found.")
+        logger.warning("f: send_message_to_reply_handler: elem in Redis data not found or timeout error")
         await message.answer('Время хранения данных истекло.', reply_markup=cancel_keyboard())
         return
-    if DEBUG:
+    if DEBUG and SAVING:
         utils.save_data_to_json(data=redis_data, file_name="redis_answer_from_user.json")
     await message.answer('Добавляю сообщение в очередь. Это займет несколько секунд.', reply_markup=ReplyKeyboardRemove())
     await RedisDB(redis_key=user_telegram_id).save(data=redis_data)
@@ -139,9 +142,9 @@ async def activate_valid_user_handler(message: Message):
 
     user_telegram_id: str = str(message.from_user.id)
     is_user_exists: bool = await DBI.get_user_by_telegram_id(telegram_id=user_telegram_id)
-    is_user_expired: bool = await DBI.is_user_expired(telegram_id=user_telegram_id)
+    is_subscribe_active: bool = await DBI.is_subscribe_active(telegram_id=user_telegram_id)
     is_user_active: bool = await DBI.user_is_active(telegram_id=user_telegram_id)
-    if is_user_exists and not is_user_expired and not is_user_active:
+    if is_user_exists and is_subscribe_active and not is_user_active:
         await DBI.activate_user(telegram_id=user_telegram_id)
         await message.answer("Аккаунт активирован.")
 
@@ -153,9 +156,12 @@ def register_handlers(dp: Dispatcher) -> None:
     """
 
     dp.register_message_handler(message_cancel_handler, commands=['отмена', 'cancel'], state="*")
-    dp.register_message_handler(message_cancel_handler, Text(startswith=["отмена", "cancel"], ignore_case=True), state="*")
+    dp.register_message_handler(message_cancel_handler, Text(startswith=["отмена",
+                                                                         "cancel"], ignore_case=True), state="*")
     dp.register_message_handler(activate_valid_user_handler, commands=["start"])
-    dp.register_message_handler(start_parsing_command_handler, Text(equals=["Старт", "Старт & Mute"]))
-    dp.register_callback_query_handler(answer_to_reply_handler, Text(startswith=["reply_"]), state=UserStates.in_work)
+    dp.register_message_handler(start_parsing_command_handler, Text(equals=["Старт",
+                                                                            "Старт & Mute"]))
+    dp.register_callback_query_handler(answer_to_reply_handler, Text(startswith=[
+        "reply_"]), state=UserStates.in_work)
     dp.register_message_handler(send_message_to_reply_handler, state=UserStates.in_work)
     dp.register_message_handler(default_message)

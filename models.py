@@ -225,7 +225,8 @@ class User(BaseModel):
         user = cls.select().where(cls.telegram_id == telegram_id).count()
         if not user:
             new_expiration: int = 10 * 365 * 24 if expiration == -1 else expiration
-            expiration_time_stamp: float = datetime.datetime.now().timestamp() + new_expiration * 60 * 60
+            expiration_time_stamp: float = (
+                    datetime.datetime.now().timestamp() + new_expiration * 60 * 60)
             expiration: 'datetime' = datetime.datetime.fromtimestamp(expiration_time_stamp)
             result, answer = cls.get_or_create(
                 nick_name=f'{nick_name}_{telegram_id}',
@@ -255,7 +256,7 @@ class User(BaseModel):
         return UserChannel.delete().where(
             UserChannel.user.in_(
                 cls.select(User.id).where(cls.telegram_id == telegram_id)
-                )
+            )
         ).execute()
 
     @classmethod
@@ -264,19 +265,19 @@ class User(BaseModel):
         """
         remove all associations of user token pairs and User channels
         """
-        # TODO упростить
+        # TODO упростить ????
         return TokenPair.delete().where(
             (TokenPair.first_id.in_(
                 Token.select(Token.id)
-                .join(UserChannel, JOIN.LEFT_OUTER, on=(Token.user_channel == UserChannel.id))
-                .join(User, JOIN.LEFT_OUTER, on=(UserChannel.user == User.id))
-                .where(User.telegram_id == telegram_id)))
+                    .join(UserChannel, JOIN.LEFT_OUTER, on=(Token.user_channel == UserChannel.id))
+                    .join(User, JOIN.LEFT_OUTER, on=(UserChannel.user == User.id))
+                    .where(User.telegram_id == telegram_id)))
             |
             (TokenPair.second_id.in_(
                 Token.select(Token.id)
-                .join(UserChannel, JOIN.LEFT_OUTER, on=(Token.user_channel == UserChannel.id))
-                .join(User, JOIN.LEFT_OUTER, on=(UserChannel.user == User.id))
-                .where(User.telegram_id == telegram_id)))
+                    .join(UserChannel, JOIN.LEFT_OUTER, on=(Token.user_channel == UserChannel.id))
+                    .join(User, JOIN.LEFT_OUTER, on=(UserChannel.user == User.id))
+                    .where(User.telegram_id == telegram_id)))
         )
 
     @classmethod
@@ -298,7 +299,7 @@ class User(BaseModel):
         return: list
         """
         return [user.id for user in cls.select(cls.id)
-                .where(cls.active == False).execute()]
+            .where(cls.active == False).execute()]
 
     @classmethod
     @logger.catch
@@ -495,19 +496,19 @@ class User(BaseModel):
 
     @classmethod
     @logger.catch
-    def is_user_expired(cls: 'User', telegram_id: str) -> bool:
+    def is_subscribe_active(cls: 'User', telegram_id: str) -> bool:
         """
         Возвращает статус подписки пользователя,
 
-        False если подписка ещё действует
+        False если срок подписки истёк
 
-        True если срок подписки истёк
+        True если подписка действует
         """
 
         user: User = cls.get_or_none(cls.telegram_id == telegram_id)
         expiration = user.expiration if user else datetime.datetime.now()
 
-        return expiration >= datetime.datetime.now() if expiration else False
+        return expiration > datetime.datetime.now() if expiration else False
 
     @classmethod
     @logger.catch
@@ -596,6 +597,7 @@ class UserChannel(BaseModel):
         add_user_channel
         get_user_channels
         get_all_user_channel_by_telegram_id
+        set_user_channel_name
         update_cooldown_by_channel_id
     """
 
@@ -658,17 +660,52 @@ class UserChannel(BaseModel):
             guild_id: int
         """
         return list(
-                    cls.select(
-                        cls.id.alias('user_channel_pk'),
-                        cls.name.alias('channel_name'),
-                        cls.name.alias('cooldown'),
-                        Channel.channel_id.alias('channel_id'),
-                        Channel.guild_id.alias('guild_id')
-                    )
-                    .join(Channel, JOIN.LEFT_OUTER, on=(Channel.id == cls.channel))
-                    .join(User, JOIN.LEFT_OUTER, on=(User.id == cls.user))
-                    .where(User.telegram_id == telegram_id).namedtuples().execute()
-                )
+            cls.select(
+                cls.id.alias('user_channel_pk'),
+                cls.name.alias('channel_name'),
+                cls.name.alias('cooldown'),
+                Channel.channel_id.alias('channel_id'),
+                Channel.guild_id.alias('guild_id')
+            )
+                .join(Channel, JOIN.LEFT_OUTER, on=(Channel.id == cls.channel))
+                .join(User, JOIN.LEFT_OUTER, on=(User.id == cls.user))
+                .where(User.telegram_id == telegram_id).namedtuples().execute()
+        )
+
+
+    @classmethod
+    @logger.catch
+    def get_user_channel(
+            cls: 'UserChannel', user_channel_pk: int) -> namedtuple:
+        """
+        Function returns a list of named tuples
+        list of namedtuple fields:
+            user_channel_pk: int
+            channel_name: str
+            cooldown: int
+            channel_id: int
+            guild_id: int
+        """
+        return (
+            cls.select(
+                cls.id.alias('user_channel_pk'),
+                cls.name.alias('channel_name'),
+                cls.name.alias('cooldown'),
+                Channel.channel_id.alias('channel_id'),
+                Channel.guild_id.alias('guild_id')
+            )
+                .join(Channel, JOIN.LEFT_OUTER, on=(Channel.id == cls.channel))
+                .where(cls.id == user_channel_pk).namedtuples().first()
+        )
+
+    @classmethod
+    @logger.catch
+    def set_user_channel_name(cls: 'UserChannel', user_channel_pk: int, name: str) -> int:
+        """
+        Update name for one users_channel by user_channel_id
+        returns the number of updated records
+        """
+        return cls.update(name=name).where(cls.id == user_channel_pk).execute()
 
     @classmethod
     @logger.catch
@@ -688,11 +725,13 @@ class Token(BaseModel):
           get_all_user_tokens
           get_all_info_tokens
           get_number_of_free_slots_for_tokens
+          get_min_last_time_token_data
           get_time_by_token
-          get_info_by_token
+          get_token_info
           get_all_free_tokens
           get_all_discord_id
           get_all_discord_id_by_channel
+          set_token_name
           check_token_by_discord_id
           update_token_time
     """
@@ -720,9 +759,9 @@ class Token(BaseModel):
         """Returns TOTAL token user amount"""
         return (
             cls.select()
-            .join(UserChannel, JOIN.LEFT_OUTER, on=(UserChannel.id == cls.user_channel))
-            .join(User, JOIN.LEFT_OUTER, on=(UserChannel.user == User.id))
-            .where(User.telegram_id == telegram_id).count()
+                .join(UserChannel, JOIN.LEFT_OUTER, on=(UserChannel.id == cls.user_channel))
+                .join(User, JOIN.LEFT_OUTER, on=(UserChannel.user == User.id))
+                .where(User.telegram_id == telegram_id).count()
         )
 
     @classmethod
@@ -882,7 +921,7 @@ class Token(BaseModel):
             cls.discord_id.alias('discord_id'),
         )
                   .join_from(cls, UserChannel, JOIN.LEFT_OUTER,
-                             on=(cls.user_channel == UserChannel.id))
+            on=(cls.user_channel == UserChannel.id))
                   .join_from(cls, Channel, JOIN.LEFT_OUTER, on=(UserChannel.channel == Channel.id))
                   .join_from(cls, User, JOIN.LEFT_OUTER, on=(UserChannel.user == User.id))
                   .where(User.telegram_id == telegram_id).namedtuples().execute())
@@ -896,7 +935,7 @@ class Token(BaseModel):
 
         """
         return list(cls.select(cls.discord_id.alias('discord_id'))
-                    .where(cls.user_channel == user_channel_pk).namedtuples().execute())
+            .where(cls.user_channel == user_channel_pk).namedtuples().execute())
 
     @classmethod
     @logger.catch
@@ -911,7 +950,7 @@ class Token(BaseModel):
                 Channel.channel_id.alias('channel_id'),
             )
                 .join_from(cls, UserChannel, JOIN.LEFT_OUTER, on=(
-                        cls.user_channel == UserChannel.id))
+                    cls.user_channel == UserChannel.id))
                 .join_from(cls, Channel, JOIN.LEFT_OUTER, on=(UserChannel.channel == Channel.id))
                 .join_from(cls, User, JOIN.LEFT_OUTER, on=(UserChannel.user == User.id))
                 .join_from(cls, TokenPair, JOIN.LEFT_OUTER, on=(TokenPair.first_id == cls.id))
@@ -957,7 +996,10 @@ class Token(BaseModel):
             'cooldown': cooldown(int, seconds)}
             'mate_discord_id' str (discord_id)
             'token_discord_id' str
+            'token_name' str
         """
+        # TODO Добавить в возвращаеммые значения еще имя токена: 'token_name' str
+
         data = (
             cls.select(
                 cls.user_channel.alias('user_channel_pk'),
@@ -967,6 +1009,7 @@ class Token(BaseModel):
                 UserChannel.cooldown.alias('cooldown'),
                 cls.alias('pair').discord_id.alias('mate_discord_id'),
                 cls.discord_id.alias('token_discord_id'),
+                cls.name.alias('token_name'),
             )
                 .join(UserChannel, JOIN.LEFT_OUTER, on=(cls.user_channel == UserChannel.id))
                 .join(Channel, JOIN.LEFT_OUTER, on=(UserChannel.channel == Channel.id))
@@ -982,9 +1025,85 @@ class Token(BaseModel):
 
     @classmethod
     @logger.catch
+    def get_token_info_by_token_pk(cls: 'Token', token_pk: int) -> namedtuple:
+        """
+        Вернуть info по токен
+        возвращает namedtuple
+        list of namedtuple fields:
+            token str
+            token_pk int
+            token_discord_id str
+            proxy str
+            user_channel_pk int
+            channel_id int
+            guild_id int
+            cooldown  int
+            mate_discord_id str (discord_id)
+
+        """
+        data = (cls.select(
+            cls.token.alias('token'),
+            cls.id.alias('token_pk'),
+            cls.discord_id.alias('token_discord_id'),
+            Proxy.proxy.alias('proxy'),
+            cls.name.alias('token_name'),
+            UserChannel.id.alias('user_channel_pk'),
+            Channel.channel_id.alias('channel_id'),
+            Channel.guild_id.alias('guild_id'),
+            UserChannel.cooldown.alias('cooldown'),
+            cls.alias('pair').discord_id.alias('mate_discord_id')
+        )
+                .join(UserChannel, JOIN.LEFT_OUTER, on=(cls.user_channel == UserChannel.id))
+                .join(Channel, JOIN.LEFT_OUTER, on=(UserChannel.channel == Channel.id))
+                .join(User, JOIN.LEFT_OUTER, on=(UserChannel.user == User.id))
+                .join(TokenPair, JOIN.LEFT_OUTER, on=(TokenPair.first_id == cls.id))
+                .join(Proxy, JOIN.LEFT_OUTER, on=(Proxy.id == User.proxy))
+                .join(cls.alias('pair'), JOIN.LEFT_OUTER,
+            on=(cls.alias('pair').id == TokenPair.second_id))
+                .where(cls.id == token_pk).namedtuples().first()
+                )
+
+        return data
+
+    @classmethod
+    @logger.catch
+    def get_closest_token_time(cls: 'Token', telegram_id: str) -> namedtuple:
+        """
+        Вернуть info по токен
+        возвращает объект токен
+            'cooldown': cooldown(int, seconds)}
+            'last_message_time' int
+        """
+        data = (
+            cls.select(
+                UserChannel.cooldown.alias('cooldown'),
+                cls.last_message_time.alias('last_message_time'),
+            )
+                .join(UserChannel, JOIN.LEFT_OUTER, on=(cls.user_channel == UserChannel.id))
+                .join(Channel, JOIN.LEFT_OUTER, on=(UserChannel.channel == Channel.id))
+                .join(User, JOIN.LEFT_OUTER, on=(UserChannel.user == User.id))
+                .join(TokenPair, JOIN.LEFT_OUTER, on=(TokenPair.first_id == cls.id))
+                .join(Proxy, JOIN.LEFT_OUTER, on=(Proxy.id == User.proxy))
+                .join(cls.alias('pair'), JOIN.LEFT_OUTER,
+                on=(cls.alias('pair').id == TokenPair.second_id))
+                .where(User.telegram_id == telegram_id)
+                .order_by(cls.last_message_time).namedtuples().first()
+        )
+
+        return data if data else namedtuple(
+            'Row', ['cooldown', 'last_message_time'])(cooldown=None, last_message_time=None)
+
+    @classmethod
+    @logger.catch
     def delete_token_by_id(cls, token_pk: int) -> int:
         """Deleting token by id"""
         return cls.delete().where(cls.id == token_pk).execute()
+
+    @classmethod
+    @logger.catch
+    def set_token_name(cls: 'Token', token_pk: int, name: str) -> int:
+        """Set new name for token"""
+        return cls.update(name=name).where(cls.id == token_pk).execute()
 
     @classmethod
     @logger.catch
@@ -997,6 +1116,7 @@ class Token(BaseModel):
     def get_number_of_free_slots_for_tokens(cls, telegram_id: str) -> int:
         """
         Вернуть количество свободных мест для размещения токенов
+        TODO admin super admin
         """
         return (
             User.select(
@@ -1004,18 +1124,18 @@ class Token(BaseModel):
                     None,
                     [
                         ((fn.MAX(User.max_tokens).is_null(False)),
-                            fn.MAX(User.max_tokens) - fn.COUNT(Token.id),)
+                         fn.MAX(User.max_tokens) - fn.COUNT(Token.id),)
                     ],
                     0
                 )
-                .alias('limit')
+                    .alias('limit')
             )
-            .join(UserChannel, JOIN.LEFT_OUTER, on=(UserChannel.user == User.id))
-            .join(cls, JOIN.LEFT_OUTER, on=(cls.user_channel == UserChannel.id))
-            .where(User.telegram_id == telegram_id)
-            .namedtuples()
-            .first()
-            .limit
+                .join(UserChannel, JOIN.LEFT_OUTER, on=(UserChannel.user == User.id))
+                .join(cls, JOIN.LEFT_OUTER, on=(cls.user_channel == UserChannel.id))
+                .where(User.telegram_id == telegram_id)
+                .namedtuples()
+                .first()
+                .limit
         )
 
 

@@ -1,3 +1,4 @@
+import random
 from typing import List, Tuple, Dict
 from collections import namedtuple
 
@@ -5,11 +6,11 @@ from aiogram.types import ReplyKeyboardRemove, Message
 
 from models import User, Token, Proxy, UserChannel
 from config import logger, admins_list
-from classes.errors_sender import ErrorsSender
+# from classes.errors_sender import ErrorsSender
+from checks import check_users
 
 
 class DBI:
-
     """Database interface class"""
 
     @classmethod
@@ -19,10 +20,10 @@ class DBI:
         Возвращает True если деактивирован."""
 
         telegram_id: str = str(message.from_user.id)
-        user_expired: bool = await cls.is_user_expired(telegram_id)
+        subscribe_active: bool = await cls.is_subscribe_active(telegram_id)
         user_is_admin: bool = await cls.is_admin(telegram_id)
         user_is_superadmin: bool = telegram_id in admins_list
-        if user_expired and not user_is_admin and not user_is_superadmin:
+        if not subscribe_active and not user_is_admin and not user_is_superadmin:
             await message.answer(
                 "Время подписки истекло. Ваш аккаунт деактивирован, токены удалены.",
                 reply_markup=ReplyKeyboardRemove()
@@ -33,10 +34,23 @@ class DBI:
                 f"пользователь декативирован, его токены удалены"
             )
             logger.info(text)
-            await ErrorsSender.send_report_to_admins(text)
             return True
 
         return False
+
+    @classmethod
+    @logger.catch
+    async def form_new_tokens_pairs(cls, telegram_id: str) -> None:
+        """ВОзвращает количество сформированных пар токенов"""
+        free_tokens: Tuple[
+            List[int], ...] = await DBI.get_all_free_tokens(telegram_id)
+        formed_pairs: int = 0
+        for tokens in free_tokens:
+            while len(tokens) > 1:
+                random.shuffle(tokens)
+                first_token = tokens.pop()
+                second_token = tokens.pop()
+                formed_pairs += await DBI.make_tokens_pair(first_token, second_token)
 
     @classmethod
     @logger.catch
@@ -113,15 +127,15 @@ class DBI:
 
     @classmethod
     @logger.catch
-    async def is_user_expired(cls, telegram_id: str) -> bool:
+    async def is_subscribe_active(cls, telegram_id: str) -> bool:
         """
         Возвращает статус подписки пользователя,
 
-        False если подписка ещё действует
+        False если срок подписки истек
 
-        True если срок подписки истёк
+        True если подписка действует
         """
-        return User.is_user_expired(telegram_id=telegram_id)
+        return User.is_subscribe_active(telegram_id=telegram_id)
 
     @classmethod
     @logger.catch
@@ -230,12 +244,26 @@ class DBI:
 
     @classmethod
     @logger.catch
+    async def get_info_by_token_pk(cls, token_pk: int) -> 'namedtuple':
+        return Token.get_token_info_by_token_pk(token_pk=token_pk)
+
+    @classmethod
+    @logger.catch
+    async def set_token_name(cls, token_pk: int, name: str) -> int:
+        return Token.set_token_name(token_pk=token_pk, name=name)
+
+    @classmethod
+    @logger.catch
     async def make_tokens_pair(cls, first_token, second_token) -> bool:
         return Token.make_tokens_pair(first_token, second_token)
 
     @classmethod
     @logger.catch
     async def get_number_of_free_slots_for_tokens(cls, telegram_id: str) -> int:
+        """Todo вот убрать проверку и что возвращать?"""
+        if (check_users.is_super_admin(telegram_id=telegram_id) or
+                check_users.is_super_admin(telegram_id=telegram_id)):
+            return 100
         return Token.get_number_of_free_slots_for_tokens(telegram_id)
 
     @classmethod
@@ -254,18 +282,16 @@ class DBI:
 
     @classmethod
     @logger.catch
-    async def get_min_last_time_token_data(cls, telegram_id: str) -> namedtuple:
-        # TODO Возвращает данные о токене У КОТОРОГО ЕСТЬ НАПАРНИК (get_related_token), у которого минимальное last_message_time. Формат
-        #  данных как в методе get_info_by_token(token)
-
-        return Token.get_min_last_time_token_data(telegram_id=telegram_id)
+    async def get_closest_token_time(cls, telegram_id: str) -> namedtuple:
+        return Token.get_closest_token_time(telegram_id=telegram_id)
 
     @classmethod
     @logger.catch
     async def add_user_channel(cls, telegram_id: str, channel_id: int, guild_id: int,
                                name: str = '', cooldown: int = 60
                                ) -> int:
-        return UserChannel.add_user_channel(telegram_id=telegram_id, channel_id=channel_id,
+        return UserChannel.add_user_channel(
+            telegram_id=telegram_id, channel_id=channel_id,
             guild_id=guild_id, name=name, cooldown=cooldown)
 
     @classmethod
@@ -305,5 +331,20 @@ class DBI:
 
     @classmethod
     @logger.catch
+    async def set_user_channel_name(cls, user_channel_pk: int, name: str) -> int:
+        return UserChannel.set_user_channel_name(user_channel_pk=user_channel_pk, name=name)
+
+    @classmethod
+    @logger.catch
     async def get_user_channels(cls, telegram_id: str) -> List[namedtuple]:
         return UserChannel.get_user_channels_by_telegram_id(telegram_id=telegram_id)
+
+    @classmethod
+    @logger.catch
+    async def get_channel(cls, user_channel_pk: int) -> namedtuple:
+        # TODO вернуть данные о канале по его user_channel_pk
+        return UserChannel.get_user_channel(user_channel_pk=user_channel_pk)
+
+        # заглушка, удалить
+        # user_channel = UserChannel.get_or_none(UserChannel.id == user_channel_pk)
+        # return user_channel.channel.channel_id
