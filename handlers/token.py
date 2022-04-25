@@ -18,6 +18,8 @@ from keyboards import (
 )
 
 
+# TODO Удалять реплай сообщения после ответа.
+
 @logger.catch
 async def select_channel_handler(message: Message) -> None:
     """
@@ -144,7 +146,7 @@ async def check_and_add_token_handler(message: Message, state: FSMContext) -> No
     if await DBI.is_token_exists(token):
         await message.answer(
             "Такой токен токен уже есть в база данных."
-            "\n Повторите ввод токена.",
+            "\nПовторите ввод токена.",
             reply_markup=cancel_keyboard()
         )
         return
@@ -153,6 +155,8 @@ async def check_and_add_token_handler(message: Message, state: FSMContext) -> No
     channel: int = data.get('channel')
     guild: int = data.get('guild')
     user_channel_pk: int = int(data.get("user_channel_pk", 0))
+    if user_channel_pk:
+        channel: int = await DBI.get_channel(user_channel_pk=user_channel_pk)
 
     proxy: str = await ProxyChecker().get_checked_proxy(telegram_id=telegram_id)
     if proxy == 'no proxies':
@@ -161,6 +165,7 @@ async def check_and_add_token_handler(message: Message, state: FSMContext) -> No
         return
 
     discord_id: str = await GetMe().get_discord_id(token=token, proxy=proxy)
+    await message.answer("Получаю дискорд id.")
     if not discord_id:
         error_text: str = (f"Не смог определить discord_id для токена:"
                            f"\nToken: [{token}]"
@@ -168,13 +173,22 @@ async def check_and_add_token_handler(message: Message, state: FSMContext) -> No
         await ErrorsSender.errors_report(telegram_id=telegram_id, text=error_text)
         await state.finish()
         return
-
-    if not await TokenChecker().check_token(token=token, proxy=proxy, channel=channel):
+    if await DBI.check_token_by_discord_id(discord_id=discord_id):
+        error_text: str = 'Токен с таким дискорд id уже сущестует в базе'
+        await ErrorsSender.errors_report(telegram_id=telegram_id, text=error_text)
         await state.finish()
         return
+    await message.answer(f"Дискорд id получен: {discord_id}"
+                         f"\nПроверяю токен.")
 
+    if not await TokenChecker().check_token(
+            token=token, proxy=proxy, channel=channel, telegram_id=telegram_id):
+        await state.finish()
+        return
+    await message.answer("Токен прошел проверку.")
     if user_channel_pk == 0:
         user_channel_pk: int = await DBI.add_user_channel(telegram_id=telegram_id, channel_id=channel, guild_id=guild)
+        await message.answer(f"Создаю канал {channel}")
         if not user_channel_pk:
             await ErrorsSender.errors_report(
                 telegram_id=telegram_id,
@@ -182,6 +196,8 @@ async def check_and_add_token_handler(message: Message, state: FSMContext) -> No
             )
             await state.finish()
             return
+    await message.answer(f"Канал {channel} создан."
+                         f"Добавляю токен в канал...\n")
 
     if not await DBI.add_token_by_telegram_id(
             telegram_id=telegram_id, token=token, discord_id=discord_id, user_channel_pk=user_channel_pk
@@ -303,6 +319,14 @@ async def delete_token_handler(callback: CallbackQuery, state: FSMContext) -> No
 
 
 @logger.catch
+async def no_cooldown_enter_handler(callback: CallbackQuery) -> None:
+    """Хэндлер для нажатия на кнопку "Нет" при выборе "Установить кулдаун или нет """
+
+    await callback.message.answer("Установлен кулдаун по умолчанию: 1 минута.", reply_markup=user_menu_keyboard())
+    await callback.answer()
+
+
+@logger.catch
 async def rename_token_handler(callback: CallbackQuery, state: FSMContext) -> None:
     """Хэндлер для нажатия на кнопку "Переименовать токен" """
     token_pk: int = int(callback.data.rsplit('_', maxsplit=1)[-1])
@@ -361,6 +385,7 @@ def token_register_handlers(dp: Dispatcher) -> None:
     dp.register_message_handler(check_and_add_token_handler, state=TokenStates.check_token)
     dp.register_callback_query_handler(ask_channel_cooldown_handler, Text(startswith=[
         "set_cooldown_"]))
+    dp.register_callback_query_handler(no_cooldown_enter_handler, Text(startswith=["endof"]))
     dp.register_callback_query_handler(ask_channel_cooldown_handler, state=TokenStates.add_channel_cooldown)
     dp.register_message_handler(add_channel_cooldown_handler, state=TokenStates.add_channel_cooldown)
     dp.register_callback_query_handler(delete_token_handler, Text(startswith=["del_token_"]))

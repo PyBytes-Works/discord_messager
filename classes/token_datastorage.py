@@ -29,6 +29,7 @@ class TokenData:
         self.__all_tokens_ids: List[str] = []
         self.user_channel_pk: int = 0
         self.replies: List[dict] = []
+        self.token_name: str = ''
 
     @logger.catch
     def update(self, token: str, token_data: namedtuple):
@@ -40,6 +41,7 @@ class TokenData:
         self.mate_id: str = token_data.mate_discord_id
         self.my_discord_id: str = token_data.token_discord_id
         self.user_channel_pk: int = token_data.user_channel_pk
+        self.token_name: str = token  # TODO поправить после реализации на token_data.token_name
 
     @property
     def all_tokens_ids(self) -> List[str]:

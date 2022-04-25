@@ -1,20 +1,18 @@
 import datetime
-import json
 import random
-from typing import List, Tuple, Optional
+from typing import List, Optional
 from collections import namedtuple
 
 import asyncio
 
-from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeyboardRemove
+from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
 
 from classes.message_receiver import MessageReceiver
 from classes.message_sender import MessageSender
 from classes.token_datastorage import TokenData
 
 from config import logger
-from classes.errors_sender import ErrorsSender
-from keyboards import cancel_keyboard, user_menu_keyboard
+from keyboards import user_menu_keyboard
 from classes.db_interface import DBI
 
 
@@ -22,12 +20,13 @@ def check_working(func):
     async def wrapper(*args, **kwargs):
         name: str = func.__name__
         if args and hasattr(args[0].__class__, name):
-            working: bool = getattr(args[0], "working")
-            if working:
-                logger.debug(f"DiscordManager.@check_working: {name} end working")
+            is_working: bool = getattr(args[0], "is_working")
+            if is_working:
+                logger.debug(f"\t{name}: OK")
                 return await func(*args, **kwargs)
-        print(f"{name} end of working")
+        logger.debug(f"\t{name}: FAIL")
         return
+
     return wrapper
 
 
@@ -44,56 +43,68 @@ class DiscordManager:
         self.__username: str = message.from_user.username
         self.user_telegram_id: str = str(self.message.from_user.id)
         self.__silence: bool = mute
-        self.__current_tokens_list: List[namedtuple] = []
+        self.__related_tokens: List[namedtuple] = []
         self.__workers: List[str] = []
         self._datastore: Optional['TokenData'] = None
-        self.working: bool = True
-        self._error_text: str = ''
+        self.is_working: bool = False
         self._discord_data: dict = {}
+        self.delay: int = 0
+        self.autoanswer: bool = False
+
+    @logger.catch
+    async def _lets_play(self) -> None:
+
+        if await DBI.is_expired_user_deactivated(self.message):
+            self.is_working = False
+            return
+        await self._get_worker()
+        await self._getting_messages()
+        await self._send_replies()
+        await self._sending_messages()
+        await self._sleep()
+
+    @logger.catch
+    async def __make_datastore(self) -> None:
+        self._datastore: 'TokenData' = TokenData(self.user_telegram_id)
+
+    @logger.catch
+    async def __make_all_token_ids(self) -> None:
+        self._datastore.all_tokens_ids = await DBI.get_all_discord_id(self.user_telegram_id)
+        if not self._datastore.all_tokens_ids:
+            logger.debug(f"No all_tokens_ids.")
+            return
+        self.is_working = True
 
     @logger.catch
     async def lets_play(self) -> None:
         """Show must go on
         Запускает рабочий цикл бота, проверяет ошибки."""
 
-        self._datastore: 'TokenData' = TokenData(self.user_telegram_id)
-        self._datastore.all_tokens_ids = await DBI.get_all_discord_id(telegram_id=self.user_telegram_id)
-        logger.debug(f"\tUSER: {self.__username}: {self.user_telegram_id} - Game begin.")
+        # TODO Сделать флаг автоответа (если флаг стоит - то отвечает бот Давинчи, иначе -
+        #  отправлять в телеграм юзеру
+        # TODO выделить реплаи и работу с ними в отдельный класс
 
-        while self.working:
-            await self._prepare_data()
+        await self.__make_datastore()
+        await self.__make_all_token_ids()
+        logger.debug(f"\n\tUSER: {self.__username}: {self.user_telegram_id} - Game begin.")
 
-            await self._getting_messages()
+        while self.is_working:
+            t0 = datetime.datetime.now()
+            logger.info(f"\n\t\tCircle start at: {t0}")
+            await self._lets_play()
 
-            timer: float = 7 + random.randint(0, 6)
-            logger.info(f"Пауза между отправкой сообщений: {timer}")
-            await asyncio.sleep(timer)
+            logger.info(f"\n\t\tCircle finish. Total time: {datetime.datetime.now() - t0}")
 
-            await self._sending_messages()
-
-            await self._send_replies()
-
-            await self._get_error_text()
-            if not self.__silence and self._error_text:
-                await self.message.answer(self._error_text, reply_markup=cancel_keyboard())
-        logger.debug("Game over.")
-
-    @check_working
-    @logger.catch
-    async def _prepare_data(self) -> None:
-        if await DBI.is_expired_user_deactivated(self.message):
-            self.working = False
-            return
-        await self._is_datastore_ready()
+        logger.debug("\n\tGame over.")
 
     @check_working
     @logger.catch
     async def _getting_messages(self) -> None:
-        message_manager: 'MessageReceiver' = MessageReceiver(datastore=self._datastore)
+        """Получает сообщения из чата и обрабатывает их
+        Если удачно - перезаписывает кулдаун текущего токена"""
+
+        await MessageReceiver(datastore=self._datastore).get_message()
         await DBI.update_token_last_message_time(token=self._datastore.token)
-        datastore: Optional['TokenData'] = await message_manager.get_message()
-        if not datastore:
-            self.working = False
 
     @check_working
     @logger.catch
@@ -101,18 +112,11 @@ class DiscordManager:
         """Отправляет сообщение в дискор и сохраняет данные об ошибках в
         словарь атрибута класса"""
 
-        self.working = False
-        answer: dict = await MessageSender(datastore=self._datastore).send_message()
-        if answer.get("status") == 200:
-            self._discord_data = {}
-            self._datastore.current_message_id = 0
-            self.working = True
+        if not await MessageSender(datastore=self._datastore).send_message():
+            self.is_working = False
             return
-        elif not answer:
-            logger.error("F: Manager.__message_send ERROR: NO ANSWER ERROR")
-            self._discord_data = {"message": "ERROR"}
-        elif answer.get("status") != 200:
-            self._discord_data = {"answer": answer, "token": self._datastore.token}
+        self._discord_data = {}
+        self._datastore.current_message_id = 0
 
     @logger.catch
     async def __send_text(self, text: str, keyboard=None, check_silence: bool = False) -> None:
@@ -126,40 +130,50 @@ class DiscordManager:
             return
         await self.message.answer(text, reply_markup=keyboard)
 
+    @logger.catch
+    async def __make_related_tokens_list(self) -> None:
+        self.__related_tokens: List[namedtuple] = await DBI.get_all_related_user_tokens(
+            telegram_id=self._datastore.telegram_id
+        )
+
     @check_working
     @logger.catch
-    async def _is_datastore_ready(self) -> None:
-        if not self.working:
-            return
+    async def _make_related_tokens(self) -> None:
+
+        await self.__make_related_tokens_list()
+        if not self.__related_tokens:
+            await self.__send_text(
+                text="Не смог сформировать пары токенов.",
+                keyboard=user_menu_keyboard())
+            self.is_working = False
+
+    @check_working
+    @logger.catch
+    async def _get_worker(self) -> None:
+
         if not self.__workers:
-            await self.form_token_pairs(unpair=True)
-            self.__current_tokens_list: List[namedtuple] = await DBI.get_all_related_user_tokens(
-                telegram_id=self._datastore.telegram_id
-            )
-            logger.debug(f"Current token list: {self.__current_tokens_list}")
-            if not self.__current_tokens_list:
-                await self.__send_text(
-                    text="Не смог сформировать пары токенов.", keyboard=user_menu_keyboard())
-                self.working = False
-            await self.__get_workers()
-        is_workers: bool = await self.__get_worker_from_list()
-        if not is_workers:
-            await self._get_all_tokens_busy_message()
-
-        self.working = await self._sleep()
+            await self.make_token_pairs(unpair=True)
+            await self._make_related_tokens()
+            await self._make_workers_list()
+        await self._get_worker_from_list()
 
     @check_working
     @logger.catch
-    async def _sleep(self) -> bool:
-        logger.info(f"PAUSE: {self._datastore.delay + 1}")
-        timer: int = self._datastore.delay + 1
+    async def _sleep(self) -> None:
+        """Спит на время ближайшего токена."""
+
+        logger.debug(f"WORKERS: {self.__workers}")
+        if self.__workers:
+            return
+        await self._get_delay()
+        await self._send_delay_message()
+        logger.info(f"SLEEP PAUSE: {self.delay}")
+        timer: int = self.delay
         while timer > 0:
             timer -= 5
-            if not self.working:
-                return False
+            if not self.is_working:
+                return
             await asyncio.sleep(5)
-        self._datastore.delay = 0
-        return True
 
     @logger.catch
     def __get_max_message_time(self, elem: namedtuple) -> int:
@@ -168,29 +182,30 @@ class DiscordManager:
 
         return int(elem.last_message_time.timestamp()) + elem.cooldown
 
+    @check_working
     @logger.catch
-    async def __get_workers(self) -> None:
+    async def _make_workers_list(self) -> None:
         """Возвращает список токенов, которые не на КД"""
 
         self.__workers = [
             elem.token
-            for elem in self.__current_tokens_list
-            if self.__get_current_time() > self.__get_max_message_time(elem)
+            for elem in self.__related_tokens
+            if self.__get_current_timestamp() > self.__get_max_message_time(elem)
         ]
 
+    @check_working
     @logger.catch
-    async def __get_worker_from_list(self) -> bool:
+    async def _get_worker_from_list(self) -> None:
         """Возвращает токен для работы"""
 
         if not self.__workers:
-            return False
+            return
         random.shuffle(self.__workers)
         random_token: str = self.__workers.pop()
         await self._update_datastore(random_token)
-        return True
 
     @logger.catch
-    def __get_current_time(self) -> int:
+    def __get_current_timestamp(self) -> int:
         """Возвращает текущее время (timestamp) целое."""
 
         return int(datetime.datetime.now().timestamp())
@@ -201,24 +216,18 @@ class DiscordManager:
         self._datastore.update(token=token, token_data=token_data)
 
     @logger.catch
-    async def _get_all_tokens_busy_message(self) -> None:
-        min_token_data: namedtuple = min(self.__current_tokens_list, key=lambda x: x.last_message_time)
-        token: str = min_token_data.token
-        await self._update_datastore(token)
-        logger.debug(f"\tlast_message_time {min_token_data.last_message_time}")
+    async def _get_delay(self) -> None:
+        token_data: namedtuple = await DBI.get_closest_token_time(self._datastore.telegram_id)
+        min_token_time: int = int(token_data.last_message_time.timestamp())
+        cooldown: int = token_data.cooldown
+        self.delay = cooldown - abs(min_token_time - self.__get_current_timestamp())
 
-        min_token_time: int = int(min_token_data.last_message_time.timestamp())
+    @check_working
+    @logger.catch
+    async def _send_delay_message(self) -> None:
+        """Отправляет сообщение что все токены заняты"""
 
-        logger.debug(f"\tself._datastore.cooldown {self._datastore.cooldown}")
-        logger.debug(f"\tmin_token_time {min_token_time}")
-        logger.debug(f"\tself.__get_current_time() {self.__get_current_time()}")
-        logger.debug(f"\tRAZNICA {min_token_time - self.__get_current_time()}")
-
-        delay: int = self._datastore.cooldown - abs(min_token_time - self.__get_current_time())
-
-        logger.debug(f"\tdelay = {delay}")
-
-        self._datastore.delay = delay
+        delay: int = self.delay
         text = "секунд"
         if delay > 60:
             minutes: int = delay // 60
@@ -229,18 +238,17 @@ class DiscordManager:
                 seconds: str = f'0{seconds}'
             delay: str = f"{minutes}:{seconds}"
             text = "минут"
-        message: str =  f"Все токены отработали. Следующий старт через {delay} {text}."
-        await self.__send_text(text=message, check_silence=True)
+        text: str = f"Все токены отработали. Следующий старт через {delay} {text}."
+        if not self.silence:
+            await self.__send_text(text=text, check_silence=True)
 
     @check_working
     @logger.catch
     async def _send_replies(self) -> None:
         """Отправляет реплаи из дискорда в телеграм с кнопкой Ответить"""
 
-        logger.debug(f"Replies: {self._datastore.replies}")
         for reply in self._datastore.replies:
-            answered: bool = reply.get("answered", False)
-            if not answered:
+            if not reply.get("answered", False):
                 answer_keyboard: 'InlineKeyboardMarkup' = InlineKeyboardMarkup(row_width=1)
                 author: str = reply.get("author")
                 reply_id: str = reply.get("message_id")
@@ -260,132 +268,122 @@ class DiscordManager:
                     reply_markup=answer_keyboard
                 )
 
+    #
+    # @check_working
+    # @logger.catch
+    # async def _get_error_text(self) -> None:
+    #     """Обработка ошибок от сервера"""
+    #
+    #     if not self._discord_data:
+    #         return
+    #     self._error_text: str = self._discord_data.get("message", "")
+    #     token: str = self._discord_data.get("token")
+    #     answer: dict = self._discord_data.get("answer", {})
+    #     status_code: int = answer.get("status", 0)
+    #     sender_text: str = answer.get("message", "SEND_ERROR")
+    #     data = answer.get("data")
+    #     if isinstance(data, str):
+    #         data: dict = json.loads(answer.get("data", {}))
+    #     discord_code_error: int = data.get("code", 0)
+    #
+    #     if status_code == -1:
+    #         error_text = sender_text
+    #         await self.message.answer("Ошибка десериализации отправки ответа.")
+    #         await ErrorsSender.send_report_to_admins(error_text)
+    #         self.working = False
+    #     elif status_code == -2:
+    #         await self.message.answer("Ошибка словаря.", reply_markup=user_menu_keyboard())
+    #         await ErrorsSender.send_report_to_admins("Ошибка словаря.")
+    #         self.working = False
+    #     elif status_code == 400:
+    #         if discord_code_error == 50035:
+    #             sender_text = 'Сообщение для ответа удалено из дискорд канала.'
+    #         else:
+    #             self.working = False
+    #         await ErrorsSender.send_report_to_admins(sender_text)
+    #     elif status_code == 401:
+    #         if discord_code_error == 0:
+    #             await DBI.delete_token(token=token)
+    #             await self.message.answer("Токен сменился и будет удален."
+    #                                       f"\nToken: {token}")
+    #         else:
+    #             await self.message.answer(
+    #                 "Произошла ошибка данных. "
+    #                 "Убедитесь, что вы ввели верные данные. Код ошибки - 401.",
+    #                 reply_markup=user_menu_keyboard()
+    #             )
+    #         self.working = False
+    #     elif status_code == 403:
+    #         if discord_code_error == 50013:
+    #             await self.message.answer(
+    #                 "Не могу отправить сообщение для токена. (Ошибка 403 - 50013)"
+    #                 "Токен в муте."
+    #                 f"\nToken: {token}"
+    #                 f"\nGuild: {self._datastore.guild}"
+    #                 f"\nChannel: {self._datastore.channel}"
+    #             )
+    #         elif discord_code_error == 50001:
+    #             await DBI.delete_token(token=token)
+    #             await self.message.answer(
+    #                 "Не могу отправить сообщение для токена. (Ошибка 403 - 50001)"
+    #                 "Токен забанили."
+    #                 f"\nТокен: {token} удален."
+    #                 f"\nФормирую новые пары.",
+    #                 reply_markup=user_menu_keyboard()
+    #             )
+    #             await self.form_token_pairs(unpair=False)
+    #         else:
+    #             await self.message.answer(f"Ошибка {status_code}: {data}")
+    #     elif status_code == 404:
+    #         if discord_code_error == 10003:
+    #             await self.message.answer(
+    #                 "Ошибка отправки сообщения. Неверный канал. (Ошибка 404 - 10003)"
+    #                 f"\nToken: {token}"
+    #             )
+    #         else:
+    #             await self.message.answer(f"Ошибка {status_code}: {data}")
+    #     elif status_code == 407:
+    #         await self.message.answer(
+    #             "Ошибка прокси. Обратитесь к администратору. Код ошибки 407.",
+    #             reply_markup=ReplyKeyboardRemove()
+    #         )
+    #         await ErrorsSender.send_report_to_admins(f"Ошибка прокси. Время действия proxy истекло.")
+    #         self.working = False
+    #     elif status_code == 429:
+    #         if discord_code_error == 20016:
+    #             cooldown: int = int(data.get("retry_after", None))
+    #             if cooldown:
+    #                 cooldown += self._datastore.cooldown
+    #                 await DBI.update_user_channel_cooldown(
+    #                     user_channel_pk=self._datastore.user_channel_pk, cooldown=cooldown)
+    #                 self._datastore.delay = cooldown
+    #             await self.message.answer(
+    #                 "Для данного токена сообщения отправляются чаще, чем разрешено в канале."
+    #                 f"\nToken: {token}"
+    #                 f"\nГильдия/Канал: {self._datastore.guild}/{self._datastore.channel}"
+    #                 f"\nВремя скорректировано. Кулдаун установлен: {cooldown} секунд"
+    #             )
+    #         else:
+    #             await self.message.answer(f"Ошибка: "
+    #                                       f"{status_code}:{discord_code_error}:{sender_text}")
+    #     elif status_code == 500:
+    #         error_text = (
+    #             f"Внутренняя ошибка сервера Дискорда. "
+    #             f"\nГильдия:Канал: {self._datastore.guild}:{self._datastore.channel} "
+    #             f"\nПауза 10 секунд. Код ошибки - 500."
+    #         )
+    #         await self.message.answer(error_text)
+    #         await ErrorsSender.send_report_to_admins(error_text)
+    #         self._datastore.delay = 10
+
     @check_working
     @logger.catch
-    async def _get_error_text(self) -> None:
-        """Обработка ошибок от сервера"""
-
-        if not self._discord_data:
-            return
-        self._error_text: str = self._discord_data.get("message", "")
-        token: str = self._discord_data.get("token")
-        answer: dict = self._discord_data.get("answer", {})
-        status_code: int = answer.get("status", 0)
-        sender_text: str = answer.get("message", "SEND_ERROR")
-        data = answer.get("data")
-        if isinstance(data, str):
-            data: dict = json.loads(answer.get("data", {}))
-        discord_code_error: int = data.get("code", 0)
-
-        if status_code == -1:
-            error_text = sender_text
-            await self.message.answer("Ошибка десериализации отправки ответа.")
-            await ErrorsSender.send_report_to_admins(error_text)
-            self.working = False
-        elif status_code == -2:
-            await self.message.answer("Ошибка словаря.", reply_markup=user_menu_keyboard())
-            await ErrorsSender.send_report_to_admins("Ошибка словаря.")
-            self.working = False
-        elif status_code == 400:
-            if discord_code_error == 50035:
-                sender_text = 'Сообщение для ответа удалено из дискорд канала.'
-            else:
-                self.working = False
-            await ErrorsSender.send_report_to_admins(sender_text)
-        elif status_code == 401:
-            if discord_code_error == 0:
-                await DBI.delete_token(token=token)
-                await self.message.answer("Токен сменился и будет удален."
-                                          f"\nToken: {token}")
-            else:
-                await self.message.answer(
-                    "Произошла ошибка данных. "
-                    "Убедитесь, что вы ввели верные данные. Код ошибки - 401.",
-                    reply_markup=user_menu_keyboard()
-                )
-            self.working = False
-        elif status_code == 403:
-            if discord_code_error == 50013:
-                await self.message.answer(
-                    "Не могу отправить сообщение для токена. (Ошибка 403 - 50013)"
-                    "Токен в муте."
-                    f"\nToken: {token}"
-                    f"\nGuild: {self._datastore.guild}"
-                    f"\nChannel: {self._datastore.channel}"
-                )
-            elif discord_code_error == 50001:
-                await DBI.delete_token(token=token)
-                await self.message.answer(
-                    "Не могу отправить сообщение для токена. (Ошибка 403 - 50001)"
-                    "Токен забанили."
-                    f"\nТокен: {token} удален."
-                    f"\nФормирую новые пары.",
-                    reply_markup=user_menu_keyboard()
-                )
-                await self.form_token_pairs(unpair=False)
-            else:
-                await self.message.answer(f"Ошибка {status_code}: {data}")
-        elif status_code == 404:
-            if discord_code_error == 10003:
-                await self.message.answer(
-                    "Ошибка отправки сообщения. Неверный канал. (Ошибка 404 - 10003)"
-                    f"\nToken: {token}"
-                )
-            else:
-                await self.message.answer(f"Ошибка {status_code}: {data}")
-        elif status_code == 407:
-            await self.message.answer(
-                "Ошибка прокси. Обратитесь к администратору. Код ошибки 407.",
-                reply_markup=ReplyKeyboardRemove()
-            )
-            await ErrorsSender.send_report_to_admins(f"Ошибка прокси. Время действия proxy истекло.")
-            self.working = False
-        elif status_code == 429:
-            if discord_code_error == 20016:
-                cooldown: int = int(data.get("retry_after", None))
-                if cooldown:
-                    cooldown += self._datastore.cooldown
-                    await DBI.update_user_channel_cooldown(
-                        user_channel_pk=self._datastore.user_channel_pk, cooldown=cooldown)
-                    self._datastore.delay = cooldown
-                await self.message.answer(
-                    "Для данного токена сообщения отправляются чаще, чем разрешено в канале."
-                    f"\nToken: {token}"
-                    f"\nГильдия/Канал: {self._datastore.guild}/{self._datastore.channel}"
-                    f"\nВремя скорректировано. Кулдаун установлен: {cooldown} секунд"
-                )
-            else:
-                await self.message.answer(f"Ошибка: "
-                                          f"{status_code}:{discord_code_error}:{sender_text}")
-        elif status_code == 500:
-            error_text = (
-                f"Внутренняя ошибка сервера Дискорда. "
-                f"\nГильдия:Канал: {self._datastore.guild}:{self._datastore.channel} "
-                f"\nПауза 10 секунд. Код ошибки - 500."
-            )
-            await self.message.answer(error_text)
-            await ErrorsSender.send_report_to_admins(error_text)
-            self._datastore.delay = 10
-
-    @logger.catch
-    async def form_token_pairs(self, unpair: bool = False) -> int:
+    async def make_token_pairs(self, unpair: bool = False) -> None:
         """Формирует пары из свободных токенов если они в одном канале"""
 
         if unpair:
             await DBI.delete_all_pairs(telegram_id=self.user_telegram_id)
-        free_tokens: Tuple[
-            List[int], ...] = await DBI.get_all_free_tokens(telegram_id=self.user_telegram_id)
-        formed_pairs: int = 0
-        for tokens in free_tokens:
-            while len(tokens) > 1:
-                random.shuffle(tokens)
-                first_token = tokens.pop()
-                second_token = tokens.pop()
-                formed_pairs += await DBI.make_tokens_pair(first_token, second_token)
-
-        logger.info(f"Pairs formed: {formed_pairs}")
-
-        return formed_pairs
+        await DBI.form_new_tokens_pairs(telegram_id=self.user_telegram_id)
 
     @property
     def silence(self) -> bool:
