@@ -507,7 +507,7 @@ class User(BaseModel):
         user: User = cls.get_or_none(cls.telegram_id == telegram_id)
         expiration = user.expiration if user else datetime.datetime.now()
 
-        return expiration >= datetime.datetime.now() if expiration else False
+        return expiration < datetime.datetime.now() if expiration else False
 
     @classmethod
     @logger.catch
