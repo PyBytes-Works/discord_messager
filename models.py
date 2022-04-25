@@ -225,7 +225,8 @@ class User(BaseModel):
         user = cls.select().where(cls.telegram_id == telegram_id).count()
         if not user:
             new_expiration: int = 10 * 365 * 24 if expiration == -1 else expiration
-            expiration_time_stamp: float = datetime.datetime.now().timestamp() + new_expiration * 60 * 60
+            expiration_time_stamp: float = (
+                    datetime.datetime.now().timestamp() + new_expiration * 60 * 60)
             expiration: 'datetime' = datetime.datetime.fromtimestamp(expiration_time_stamp)
             result, answer = cls.get_or_create(
                 nick_name=f'{nick_name}_{telegram_id}',
@@ -680,7 +681,6 @@ class UserChannel(BaseModel):
         """
         return cls.update(name=name).where(cls.id == user_channel_pk).execute()
 
-
     @classmethod
     @logger.catch
     def update_cooldown(cls: 'UserChannel', user_channel_pk: int, cooldown: int) -> int:
@@ -1032,7 +1032,8 @@ class Token(BaseModel):
             'Row',
             ['user_channel_pk', 'proxy', 'guild_id', 'channel_id', 'cooldown', 'mate_discord_id',
              'token_discord_id']
-        )(user_channel_pk=None, proxy=None, guild_id=None, channel_id=None, mate_discord_id=None)
+        )(user_channel_pk=None, proxy=None, guild_id=None, channel_id=None, cooldown=None,
+            mate_discord_id=None, token_discord_id=None)
 
     @classmethod
     @logger.catch
