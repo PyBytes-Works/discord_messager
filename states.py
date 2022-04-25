@@ -35,3 +35,9 @@ class TokenStates(StatesGroup):
     add_channel_cooldown = State()
     delete_token = State()
     select_token = State()
+    set_name_for_token = State()
+
+
+class UserChannelStates(StatesGroup):
+    call_name_for_user_channel = State()
+    set_name_for_user_channel = State()
