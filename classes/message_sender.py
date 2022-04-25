@@ -92,4 +92,3 @@ class MessageSender(SendMessageToChannel):
                     }
             }
             self._datastore.data_for_send.update(**params)
-            print(f"Data for send", self._datastore.data_for_send)

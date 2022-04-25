@@ -216,7 +216,6 @@ class DiscordManager:
             return
         random.shuffle(self.__workers)
         random_token: str = self.__workers.pop()
-        print(f"Random token: {random_token}")
         await self._update_datastore(random_token)
 
     @logger.catch
@@ -233,6 +232,7 @@ class DiscordManager:
     @logger.catch
     async def __get_closest_token_time(self) -> namedtuple:
         return await DBI.get_closest_token_time(self._datastore.telegram_id)
+        # TODO реализовать получение данных о токене из текущего экземпляра класса, а не из БД
         # return min(self.__related_tokens, key=lambda x: x.last_message_time)
 
     @logger.catch
@@ -267,6 +267,7 @@ class DiscordManager:
     async def _send_replies(self) -> None:
         """Отправляет реплаи из дискорда в телеграм с кнопкой Ответить"""
 
+        # TODO реализовать автоответчик
         # result_replies: List[dict] = []
         for reply in self._datastore.replies:
             if not reply.get("answered"):
