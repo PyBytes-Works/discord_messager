@@ -337,9 +337,69 @@ async def rename_token_handler(callback: CallbackQuery, state: FSMContext) -> No
 
 
 @logger.catch
+async def list_channel_handler(message: Message, state: FSMContext) -> None:
+    """
+    вывести список каналов:
+    Commands: '/channels'
+    :param message:
+    :return:
+    """
+    if await DBI.is_expired_user_deactivated(message):
+        return
+    telegram_id: str = str(message.from_user.id)
+    channels: List[namedtuple] = await DBI.get_user_channels(telegram_id=telegram_id)
+    keyboard = InlineKeyboardMarkup(row_width=1)
+    if not channels:
+        await message.answer(
+            "У вас нет ни одного канала. Сначала нужно создать новый канал и добавить в него токен.",
+            reply_markup=cancel_keyboard()
+        )
+
+    for elem in channels:
+        keyboard.add(InlineKeyboardButton(
+            text="Переименовать канал",
+            callback_data=f"{elem.user_channel_pk}")
+        )
+        text: str = f"Имя канала: {elem.channel_name}\nСервер/канал: {elem.guild_id}/{elem.channel_id}"
+        await message.answer(text, reply_markup=keyboard)
+    state: FSMContext = await UserChannelStates.call_name_for_user_channel.set()
+
+
+@logger.catch
+async def rename_channel_handler(callback: CallbackQuery, state: FSMContext) -> None:
+    """Хэндлер для нажатия на кнопку "Переименовать канал" """
+    user_channel_pk: int = int(callback.data)
+    await state.set_state(UserChannelStates.set_name_for_user_channel)
+    await state.update_data({'user_channel_pk': user_channel_pk})
+    await callback.message.answer("Введите новое имя.", reply_markup=cancel_keyboard())
+    await callback.message.delete()
+    await UserChannelStates.set_name_for_user_channel.set()
+
+
+@logger.catch
+async def set_user_channel_name(message: Message, state: FSMContext) -> None:
+    """Хэндлер для переименования канала """
+    name = message.text
+    data: dict = await state.get_data()
+    user_channel_pk: int = data.get('user_channel_pk')
+    await DBI.set_user_channel_name(user_channel_pk=user_channel_pk, name=name)
+    await message.answer("Канал переименован.", reply_markup=user_menu_keyboard())
+    keyboard = InlineKeyboardMarkup(row_width=1)
+    user_channel: namedtuple = await DBI.get_channel(user_channel_pk=user_channel_pk)
+    keyboard.add(InlineKeyboardButton(
+        text="Переименовать канал",
+        callback_data=f"{user_channel.user_channel_pk}")
+    )
+    mess: str = (f"Имя канала: {user_channel.channel_name}\nСервер/канал:"
+                 f" {user_channel.guild_id}/{user_channel.channel_id}")
+
+    await message.answer(mess, reply_markup=keyboard)
+    await state.finish()
+
+
+@logger.catch
 async def set_token_name(message: Message, state: FSMContext) -> None:
     """Хэндлер для переименования токена """
-    telegram_id: str = str(message.from_user.id)
     name = message.text
     data: dict = await state.get_data()
     token_pk = data.get('token_pk')
@@ -364,12 +424,6 @@ async def set_token_name(message: Message, state: FSMContext) -> None:
 
 
 @logger.catch
-async def set_user_channel_name(callback: CallbackQuery, state: FSMContext) -> None:
-    """Хэндлер для нажатия на кнопку "переименовать канал" """
-    pass
-
-
-@logger.catch
 def token_register_handlers(dp: Dispatcher) -> None:
     """
     Регистратор для функций данного модуля
@@ -390,8 +444,10 @@ def token_register_handlers(dp: Dispatcher) -> None:
     dp.register_message_handler(add_channel_cooldown_handler, state=TokenStates.add_channel_cooldown)
     dp.register_callback_query_handler(delete_token_handler, Text(startswith=["del_token_"]))
     dp.register_callback_query_handler(rename_token_handler, Text(startswith=["rename_token_"]))
+    dp.register_message_handler(list_channel_handler, commands=["channel"])
+    dp.register_callback_query_handler(rename_channel_handler, state=UserChannelStates.call_name_for_user_channel)
+    dp.register_message_handler(set_token_name, state=TokenStates.set_name_for_token)
+    dp.register_message_handler(set_user_channel_name, state=UserChannelStates.set_name_for_user_channel)
     dp.register_message_handler(info_tokens_handler, Text(equals=["Информация"]))
     dp.register_message_handler(select_channel_handler, Text(equals=["Установить кулдаун"]))
     dp.register_message_handler(select_channel_handler, Text(equals=['Добавить токен']))
-    dp.register_message_handler(set_token_name, state=TokenStates.set_name_for_token)
-    dp.register_callback_query_handler(set_user_channel_name, state=UserChannelStates.set_name_for_user_channel)
