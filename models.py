@@ -672,6 +672,32 @@ class UserChannel(BaseModel):
                 .where(User.telegram_id == telegram_id).namedtuples().execute()
         )
 
+
+    @classmethod
+    @logger.catch
+    def get_user_channel(
+            cls: 'UserChannel', user_channel_pk: int) -> namedtuple:
+        """
+        Function returns a list of named tuples
+        list of namedtuple fields:
+            user_channel_pk: int
+            channel_name: str
+            cooldown: int
+            channel_id: int
+            guild_id: int
+        """
+        return (
+            cls.select(
+                cls.id.alias('user_channel_pk'),
+                cls.name.alias('channel_name'),
+                cls.name.alias('cooldown'),
+                Channel.channel_id.alias('channel_id'),
+                Channel.guild_id.alias('guild_id')
+            )
+                .join(Channel, JOIN.LEFT_OUTER, on=(Channel.id == cls.channel))
+                .where(cls.id == user_channel_pk).namedtuples().first()
+        )
+
     @classmethod
     @logger.catch
     def set_user_channel_name(cls: 'UserChannel', user_channel_pk: int, name: str) -> int:
