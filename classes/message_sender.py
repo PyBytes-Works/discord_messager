@@ -47,7 +47,7 @@ class MessageSender(PostRequest):
 
         self.token = self._datastore.token
         self.proxy = self._datastore.proxy
-        self.channel = self._datastore.channel.channel_id
+        self.channel = self._datastore.channel
         self._data_for_send = self._datastore.data_for_send
 
         await self.typing()
@@ -59,7 +59,11 @@ class MessageSender(PostRequest):
             return True
         self._update_err_params(answer=answer, telegram_id=self._datastore.telegram_id)
         logger.debug("MessageSender.__send_data call error handling:"
-                     f"\nParams: {self._error_params}")
+                     f"\nParams: "
+                     f"\nToken: {self.token}"
+                     f"\nProxy:{self.proxy}"
+                     f"\nChannel: {self.channel}"
+                     f"\nData for send: {self._data_for_send}")
         result: dict = await ErrorsSender(**self._error_params).handle_errors()
         data: dict = result.get('answer_data', {})
         code: int = data.get("code")
