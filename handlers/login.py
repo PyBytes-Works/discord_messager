@@ -33,13 +33,13 @@ async def check_new_user_is_exists_handler(message: Message, state: FSMContext) 
     """Получает сообщение от админа и добавляет пользователя в БД
 
     """
+    logger.debug(f"Add user message: {message}")
     if not message.forward_from:
         await message.answer(
             "Нужно переслать (forward) любое сообщение из телеграма от пользователя, "
             "которого вы хотите добавить.",
             reply_markup=cancel_keyboard()
         )
-        logger.debug(f"Add user message: {message}")
         return
 
     new_user_telegram_id: str = str(message.forward_from.id)

@@ -35,6 +35,8 @@ class MessageReceiver(ChannelData):
 
         answer: dict = await self._send_request()
         self._error_params.update(answer=answer, telegram_id=self._datastore.telegram_id)
+        logger.debug("MessageReceiver.__get_discord_messages call error handling:"
+                     f"\nParams: {self._error_params}")
         result: dict = await ErrorsSender(**self._error_params).handle_errors()
         if result.get("status") == 200:
             return result.get("answer_data")

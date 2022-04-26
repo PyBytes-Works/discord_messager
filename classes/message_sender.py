@@ -57,6 +57,8 @@ class MessageSender(PostRequest):
         if status == 200:
             return True
         self._error_params.update(answer=answer, telegram_id=self._datastore.telegram_id)
+        logger.debug("MessageSender.__send_data call error handling:"
+                     f"\nParams: {self._error_params}")
         result: dict = await ErrorsSender(**self._error_params).handle_errors()
         data: dict = result.get('answer_data', {})
         code: int = data.get("code")

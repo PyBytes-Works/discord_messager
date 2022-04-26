@@ -118,7 +118,6 @@ class ErrorsSender:
             text = 'Unrecognised error!'
             users = False
             admins = True
-
         if text:
             if users and self._telegram_id:
                 await self.errors_report(text=text)
