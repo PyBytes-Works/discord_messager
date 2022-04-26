@@ -61,8 +61,9 @@ class DiscordManager:
                 f"\n\tProxy: {self._datastore.proxy}"
                 f"\n\tDiscord ID: {self._datastore.my_discord_id}"
                 f"\n\tMate discord id: {self._datastore.mate_id}"
-                f"\n\tRelated tokens: {len(self.__related_tokens)}"
                 f"\n\tSilence: {self.__silence}"
+                f"\n\tRelated tokens: {len(self.__related_tokens)}"
+                f"\n\tRelated tokens: {self.__related_tokens}"
         )
 
     async def _check_user_active(self):
@@ -195,9 +196,12 @@ class DiscordManager:
         if self.__workers:
             return
         await self._get_delay()
-        await self._send_delay_message()
+        self.delay += random.randint(3, 7)
+        if self.delay <= 0:
+            self.delay: int = self._datastore.cooldown
         logger.info(f"SLEEP PAUSE: {self.delay}")
-        timer: int = self.delay + random.randint(3, 7)
+        await self._send_delay_message()
+        timer: int = self.delay
         while timer > 0:
             timer -= 5
             if not self.is_working:
@@ -242,7 +246,7 @@ class DiscordManager:
     @logger.catch
     async def _update_datastore(self, token: str) -> None:
         token_data: namedtuple = await DBI.get_info_by_token(token)
-        self._datastore.update(token=token, token_data=token_data)
+        self._datastore.update_data(token=token, token_data=token_data)
 
     @logger.catch
     async def __get_closest_token_time(self) -> namedtuple:
@@ -253,9 +257,9 @@ class DiscordManager:
     @logger.catch
     async def _get_delay(self) -> None:
         token_data: namedtuple = await self.__get_closest_token_time()
-        min_token_time: int = int(token_data.last_message_time.timestamp())
+        message_time: int = int(token_data.last_message_time.timestamp())
         cooldown: int = token_data.cooldown
-        self.delay = cooldown - abs(min_token_time - self.__get_current_timestamp())
+        self.delay = cooldown - abs(message_time - self.__get_current_timestamp())
 
     @check_working
     @logger.catch
