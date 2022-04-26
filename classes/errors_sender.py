@@ -34,11 +34,10 @@ class ErrorsSender:
                     f"ErrorsSender: answer_handling: JSON ERROR: {err}"
                     f"\nAnswer data: {self._answer_data}"
                 )
-        if self._status == 200:
+        if data:
             self._answer.update(answer_data=data)
-        else:
+        if self._status != 200:
             await self.send_message_check_token()
-            return {}
         return self._answer
 
     @logger.catch
