@@ -1,21 +1,24 @@
+import asyncio
 import random
 
+from classes.db_interface import DBI
 from classes.errors_sender import ErrorsSender
 from classes.open_ai import OpenAI
 from classes.redis_interface import RedisDB
-from classes.request_classes import SendMessageToChannel
+from classes.request_classes import PostRequest
 from classes.vocabulary import Vocabulary
-from config import logger
+from config import logger, DISCORD_BASE_URL
 from classes.token_datastorage import TokenData
 
 
-class MessageSender(SendMessageToChannel):
+class MessageSender(PostRequest):
     """Отправляет сообщение в дискорд-канал в ответ на сообщение
     связанного токена
     Возвращает сообщение об ошибке или об успехе"""
 
     def __init__(self, datastore: 'TokenData'):
-        super().__init__(datastore)
+        super().__init__()
+        self._datastore: 'TokenData' = datastore
         self.__text: str = ''
 
     @logger.catch
@@ -25,14 +28,61 @@ class MessageSender(SendMessageToChannel):
         self.__text = self._datastore.text_to_send
         await self.__prepare_data()
         if self._datastore.data_for_send:
-            return await self.send_data()
+            return await self.__send_data()
+
+    async def typing(self) -> None:
+        """Имитирует "Пользователь печатает" в чате дискорда."""
+
+        self.url = f'https://discord.com/api/v9/channels/{self._datastore.channel}/typing'
+        answer: dict = await self._send_request()
+        if answer.get("status") not in range(200, 205):
+            logger.warning(f"Typing: {answer}")
+        await asyncio.sleep(2)
+
+    async def __send_data(self) -> bool:
+        """
+        Sends data to discord channel
+        :return:
+        """
+
+        self.token = self._datastore.token
+        self.proxy = self._datastore.proxy
+        self._data_for_send = self._datastore.data_for_send
+
+        await self.typing()
+        await self.typing()
+        self.url = DISCORD_BASE_URL + f'{self._datastore.channel}/messages?'
+        answer: dict = await self._send_request()
+        status: int = answer.get("status")
+        if status == 200:
+            return True
+        self._error_params.update(answer=answer, telegram_id=self._datastore.telegram_id)
+        result: dict = await ErrorsSender(**self._error_params).handle_errors()
+        data: dict = result['answer_data']
+        code: int = data["code"]
+        if status == 429:
+            if code == 20016:
+                logger.debug(f"SendMessageToChannel.send_data: {answer}")
+                cooldown: int = int(data["retry_after"])
+                if cooldown:
+                    cooldown += self._datastore.cooldown
+                    await DBI.update_user_channel_cooldown(
+                        user_channel_pk=self._datastore.user_channel_pk, cooldown=cooldown)
+                    self._datastore.delay = cooldown
+                await ErrorsSender(telegram_id=self._datastore.telegram_id).errors_report(
+                    text=(
+                        "Для данного токена сообщения отправляются чаще, чем разрешено в канале."
+                        f"\nToken: {self._datastore.token}"
+                        f"\nГильдия/Канал: {self._datastore.guild}/{self._datastore.channel}"
+                        f"\nВремя скорректировано. Кулдаун установлен: {cooldown} секунд"
+                    )
+                )
 
     @logger.catch
     async def __get_text_from_vocabulary(self) -> str:
         text: str = Vocabulary.get_message()
         if not text:
-            await ErrorsSender.send_message_check_token(
-                status=-2, telegram_id=self._datastore.telegram_id, admins=True)
+            await ErrorsSender.send_report_to_admins(text="Ошибка словаря фраз.")
             return ''
         await RedisDB(redis_key=self._datastore.mate_id).save(data=[
             text], timeout_sec=self._datastore.delay + 300)

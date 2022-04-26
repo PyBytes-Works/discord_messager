@@ -14,7 +14,7 @@ from classes.db_interface import DBI
 from classes.errors_sender import ErrorsSender
 from config import logger, Dispatcher
 from keyboards import (
-    user_menu_keyboard, cancel_keyboard, new_channel_key, yes_no_buttons,
+    user_menu_keyboard, cancel_keyboard, new_channel_key, yes_no_buttons, channel_menu_keyboard
 )
 
 
@@ -160,22 +160,22 @@ async def check_and_add_token_handler(message: Message, state: FSMContext) -> No
 
     proxy: str = await ProxyChecker().get_checked_proxy(telegram_id=telegram_id)
     if proxy == 'no proxies':
-        await ErrorsSender.errors_report(telegram_id=telegram_id, text="Ошибка прокси. Нет доступных прокси.")
+        await ErrorsSender(telegram_id=telegram_id).errors_report(
+            text="Ошибка прокси. Нет доступных прокси.")
         await state.finish()
         return
-
     discord_id: str = await GetMe().get_discord_id(token=token, proxy=proxy)
     await message.answer("Получаю дискорд id.")
     if not discord_id:
         error_text: str = (f"Не смог определить discord_id для токена:"
                            f"\nToken: [{token}]"
                            f"\nGuild/channel: [{guild}: {channel}]")
-        await ErrorsSender.errors_report(telegram_id=telegram_id, text=error_text)
+        await ErrorsSender(telegram_id=telegram_id).errors_report(error_text)
         await state.finish()
         return
     if await DBI.check_token_by_discord_id(discord_id=discord_id):
         error_text: str = 'Токен с таким дискорд id уже сущестует в базе'
-        await ErrorsSender.errors_report(telegram_id=telegram_id, text=error_text)
+        await ErrorsSender(telegram_id=telegram_id).errors_report(error_text)
         await state.finish()
         return
     await message.answer(f"Дискорд id получен: {discord_id}"
@@ -190,8 +190,7 @@ async def check_and_add_token_handler(message: Message, state: FSMContext) -> No
         user_channel_pk: int = await DBI.add_user_channel(telegram_id=telegram_id, channel_id=channel, guild_id=guild)
         await message.answer(f"Создаю канал {channel}")
         if not user_channel_pk:
-            await ErrorsSender.errors_report(
-                telegram_id=telegram_id,
+            await ErrorsSender(telegram_id=telegram_id).errors_report(
                 text=f"Не смог добавить канал:\n{telegram_id}:{channel}:{guild}"
             )
             await state.finish()
@@ -205,7 +204,7 @@ async def check_and_add_token_handler(message: Message, state: FSMContext) -> No
         error_text: str = (f"Не добавить токен:"
                            f"\nToken: [{token}]"
                            f"\nGuild/channel: [{guild}: {channel}]")
-        await ErrorsSender.errors_report(telegram_id=telegram_id, text=error_text)
+        await ErrorsSender(telegram_id=telegram_id).errors_report(error_text)
         await state.finish()
         return
     await message.answer(
@@ -252,7 +251,7 @@ async def add_channel_cooldown_handler(message: Message, state: FSMContext) -> N
     if not await DBI.update_user_channel_cooldown(user_channel_pk=user_channel_pk, cooldown=cooldown):
         error_text: str = (f"Не смог установить кулдаун для канала:"
                            f"\nuser_channel_pk: [{user_channel_pk}: cooldown: {cooldown}]")
-        await ErrorsSender.errors_report(telegram_id=str(message.from_user.id), text=error_text)
+        await ErrorsSender(telegram_id=str(message.from_user.id)).errors_report(error_text)
         await state.finish()
         return
     await message.answer("Кулдаун установлен.", reply_markup=user_menu_keyboard())
@@ -334,6 +333,16 @@ async def rename_token_handler(callback: CallbackQuery, state: FSMContext) -> No
     await state.update_data({'token_pk': token_pk})
     await callback.message.answer("Введите новое имя.", reply_markup=cancel_keyboard())
     await callback.message.delete()
+
+
+@logger.catch
+async def menu_channel_handler(message: Message) -> None:
+    """
+    вывести меню каналов:
+    text: 'Каналы'
+    :param message:
+    :return:"""
+    await message.answer('Выберете действия', reply_markup=channel_menu_keyboard())
 
 
 @logger.catch
@@ -440,14 +449,18 @@ def token_register_handlers(dp: Dispatcher) -> None:
     dp.register_callback_query_handler(ask_channel_cooldown_handler, Text(startswith=[
         "set_cooldown_"]))
     dp.register_callback_query_handler(no_cooldown_enter_handler, Text(startswith=["endof"]))
-    dp.register_callback_query_handler(ask_channel_cooldown_handler, state=TokenStates.add_channel_cooldown)
-    dp.register_message_handler(add_channel_cooldown_handler, state=TokenStates.add_channel_cooldown)
     dp.register_callback_query_handler(delete_token_handler, Text(startswith=["del_token_"]))
     dp.register_callback_query_handler(rename_token_handler, Text(startswith=["rename_token_"]))
-    dp.register_message_handler(list_channel_handler, commands=["channel"])
+    # ---------channels--------------
+    dp.register_message_handler(menu_channel_handler, Text(equals=["Каналы"]))
+    dp.register_message_handler(list_channel_handler, Text(equals=["Переименовать канал"]))
     dp.register_callback_query_handler(rename_channel_handler, state=UserChannelStates.call_name_for_user_channel)
-    dp.register_message_handler(set_token_name, state=TokenStates.set_name_for_token)
     dp.register_message_handler(set_user_channel_name, state=UserChannelStates.set_name_for_user_channel)
-    dp.register_message_handler(info_tokens_handler, Text(equals=["Информация"]))
     dp.register_message_handler(select_channel_handler, Text(equals=["Установить кулдаун"]))
+    dp.register_callback_query_handler(ask_channel_cooldown_handler, state=TokenStates.add_channel_cooldown)
+    dp.register_message_handler(add_channel_cooldown_handler, state=TokenStates.add_channel_cooldown)
+    # ---------end channels----------
+
+    dp.register_message_handler(set_token_name, state=TokenStates.set_name_for_token)
+    dp.register_message_handler(info_tokens_handler, Text(equals=["Информация"]))
     dp.register_message_handler(select_channel_handler, Text(equals=['Добавить токен']))

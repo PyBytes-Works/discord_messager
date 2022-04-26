@@ -6,7 +6,6 @@ from aiogram.types import ReplyKeyboardRemove, Message
 
 from models import User, Token, Proxy, UserChannel
 from config import logger, admins_list
-# from classes.errors_sender import ErrorsSender
 from checks import check_users
 
 
@@ -322,7 +321,9 @@ class DBI:
     @classmethod
     @logger.catch
     async def update_proxies_for_owners(cls, proxy) -> int:
-        return Proxy.update_proxies_for_owners(proxy=proxy)
+        logger.debug(f"DBI: update_proxies_for_owners for {proxy}")
+        Proxy.delete_proxy(proxy=proxy)
+        return Proxy.set_proxy_if_not_exists()
 
     @classmethod
     @logger.catch
@@ -342,9 +343,4 @@ class DBI:
     @classmethod
     @logger.catch
     async def get_channel(cls, user_channel_pk: int) -> namedtuple:
-        # TODO вернуть данные о канале по его user_channel_pk
         return UserChannel.get_user_channel(user_channel_pk=user_channel_pk)
-
-        # заглушка, удалить
-        # user_channel = UserChannel.get_or_none(UserChannel.id == user_channel_pk)
-        # return user_channel.channel.channel_id
