@@ -131,10 +131,7 @@ class ChannelData(GetRequest):
         super().__init__()
         self._datastore: 'TokenData' = datastore
         self.limit: int = 100
-
-    async def _send(self) -> dict:
         self.url: str = DISCORD_BASE_URL + f'{self._datastore.channel}/messages?limit={self.limit}'
-        return await super()._send()
 
 
 class ProxyChecker(GetRequest):
@@ -172,7 +169,6 @@ class TokenChecker(GetRequest):
 
     def __init__(self):
         super().__init__()
-        self.limit: int = 1
         self.channel: Union[str, int] = 0
 
     @logger.catch
@@ -182,7 +178,7 @@ class TokenChecker(GetRequest):
         self.proxy: str = proxy
         self.token: str = token
         self.channel: int = channel
-        self.url: str = DISCORD_BASE_URL + f'{self.channel}/messages?limit={self.limit}'
+        self.url: str = DISCORD_BASE_URL + f'{self.channel}/messages?limit=1'
 
         answer: dict = await self._send_request()
         status: int = answer.get("status")

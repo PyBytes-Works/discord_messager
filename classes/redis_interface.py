@@ -49,7 +49,7 @@ class RedisDB:
         except Exception as err:
             logger.error(f"RedisInterface.__get_or_set_from_db(): {err}")
             error = err
-        # await ErrorsSender().send_report_to_admins(str(error))
+        # await ErrorsSender.send_report_to_admins(str(error))
         return result
 
     @logger.catch

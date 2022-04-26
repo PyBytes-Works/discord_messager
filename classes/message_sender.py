@@ -82,7 +82,7 @@ class MessageSender(PostRequest):
     async def __get_text_from_vocabulary(self) -> str:
         text: str = Vocabulary.get_message()
         if not text:
-            await ErrorsSender().send_report_to_admins(text="Ошибка словаря фраз.")
+            await ErrorsSender.send_report_to_admins(text="Ошибка словаря фраз.")
             return ''
         await RedisDB(redis_key=self._datastore.mate_id).save(data=[
             text], timeout_sec=self._datastore.delay + 300)

@@ -21,14 +21,14 @@ class MessageReceiver(ChannelData):
 
         user_message, message_id = await self.__get_user_message_from_redis()
 
-        discord_messages: List[dict] = await self.__get_all_messages()
+        discord_messages: List[dict] = await self.__get_discord_messages()
         await self.__get_replies_and_message_id(discord_messages)
         if message_id:
             self._datastore.current_message_id = message_id
         self._datastore.text_to_send = user_message if user_message else ''
 
     @logger.catch
-    async def __get_all_messages(self) -> List[dict]:
+    async def __get_discord_messages(self) -> List[dict]:
 
         self.proxy: str = self._datastore.proxy
         self.token: str = self._datastore.token

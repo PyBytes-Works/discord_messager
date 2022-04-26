@@ -26,7 +26,8 @@ class ErrorsSender:
         if self._answer_data:
             try:
                 data: dict = json.loads(self._answer_data)
-                self._code = data.get("code", 0)
+                if isinstance(data, dict):
+                    self._code = data.get("code", 0)
             except JSONDecodeError as err:
                 logger.error(
                     f"ErrorsSender: answer_handling: JSON ERROR: {err}"
@@ -125,8 +126,9 @@ class ErrorsSender:
         logger.error(f"Errors report: {text}")
         await bot.send_message(chat_id=self._telegram_id, text=text, reply_markup=user_menu_keyboard())
 
+    @classmethod
     @logger.catch
-    async def send_report_to_admins(self, text: str) -> None:
+    async def send_report_to_admins(cls, text: str) -> None:
         """Отправляет сообщение в телеграме всем администраторам из списка"""
 
         text = f'[Рассылка][Superusers]: {text}'
@@ -136,7 +138,8 @@ class ErrorsSender:
             except aiogram.utils.exceptions.ChatNotFound as err:
                 logger.error(f"Не смог отправить сообщение пользователю {admin_id}.", err)
 
+    @classmethod
     @logger.catch
-    async def proxy_not_found_error(self):
+    async def proxy_not_found_error(cls):
         text: str = "Нет доступных прокси."
-        await self.send_report_to_admins(text)
+        await cls.send_report_to_admins(text)
