@@ -1,6 +1,4 @@
 import asyncio
-import json
-import ssl
 from abc import abstractmethod, ABC
 from typing import Union
 
@@ -24,7 +22,6 @@ class RequestSender(ABC):
             asyncio.exceptions.TimeoutError,
             aiohttp.client_exceptions.ServerDisconnectedError,
             aiohttp.client_exceptions.ClientProxyConnectionError,
-            aiohttp.client_exceptions.ClientHttpProxyError,
             aiohttp.client_exceptions.ClientOSError,
             aiohttp.client_exceptions.TooManyRedirects,
         )
@@ -52,11 +49,16 @@ class RequestSender(ABC):
         }
         try:
             answer: dict = await self._send()
-        except aiohttp.client_exceptions.ClientHttpProxyError as err:
-            logger.error(f"aiohttp.client_exceptions.ClientHttpProxyError: 407 {err}")
+        except (
+                aiohttp.client_exceptions.ClientHttpProxyError,
+                aiohttp.client_exceptions.ClientConnectorError,
+                aiohttp.http_exceptions.BadHttpMessage
+        ) as err:
+            logger.error(f"PROXY ERROR: 407 {err}")
             answer.update(status=407)
-        # except Exception as err:
-        #     logger.error(f"Exception raised {err}")
+        except self._EXCEPTIONS as err:
+            logger.error(f"GetRequest: _EXCEPTIONS: {err}")
+            answer.update(status=-100)
 
         return answer
 
@@ -158,8 +160,8 @@ class ProxyChecker(GetRequest):
             return result
         proxy: str = str(await DBI.get_user_proxy(telegram_id=telegram_id))
         if await self._check_proxy(proxy=proxy) == 200:
-            logger.error(f"Proxy {proxy} doesn`t work. Will be delete.")
             return proxy
+        logger.error(f"Proxy {proxy} doesn`t work. Will be delete.")
         if not await DBI.update_proxies_for_owners(proxy=proxy):
             return result
         return await self.get_checked_proxy(telegram_id=telegram_id)
