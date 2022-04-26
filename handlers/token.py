@@ -160,10 +160,10 @@ async def check_and_add_token_handler(message: Message, state: FSMContext) -> No
 
     proxy: str = await ProxyChecker().get_checked_proxy(telegram_id=telegram_id)
     if proxy == 'no proxies':
-        await ErrorsSender.errors_report(telegram_id=telegram_id, text="Ошибка прокси. Нет доступных прокси.")
+        await ErrorsSender.errors_report(
+            telegram_id=telegram_id, text="Ошибка прокси. Нет доступных прокси.")
         await state.finish()
         return
-
     discord_id: str = await GetMe().get_discord_id(token=token, proxy=proxy)
     await message.answer("Получаю дискорд id.")
     if not discord_id:
