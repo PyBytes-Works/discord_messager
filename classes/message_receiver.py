@@ -1,11 +1,8 @@
 import datetime
-import json
 from datetime import timedelta
-from json import JSONDecodeError
 from typing import List, Tuple
 
 import utils
-from classes.db_interface import DBI
 from classes.errors_sender import ErrorsSender
 from classes.redis_interface import RedisDB
 from classes.request_classes import ChannelData
@@ -36,20 +33,11 @@ class MessageReceiver(ChannelData):
         self.proxy: str = self._datastore.proxy
         self.token: str = self._datastore.token
 
-        answer: dict = await self._send()
-        status: int = answer.get("status")
-        if not status:
-            logger.error(f"get_data_from_channel error: ")
-        elif status == 200:
-            try:
-                return json.loads(answer.get("data"))
-            except JSONDecodeError as err:
-                logger.error("F: get_data_from_channel: JSON ERROR:", err)
-        elif status == 401:
-            await ErrorsSender.send_message_check_token(
-                status=status, telegram_id=self._datastore.telegram_id, admins=False,
-                token=self._datastore.token)
-            await DBI.delete_token(token=self.token)
+        answer: dict = await self._send_request()
+        self._error_params.update(answer=answer, telegram_id=self._datastore.telegram_id)
+        result: dict = await ErrorsSender(**self._error_params).handle_errors()
+        if result.get("status") == 200:
+            return result.get("answer_data")
         return []
 
     @staticmethod

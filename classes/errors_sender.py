@@ -12,13 +12,13 @@ from keyboards import user_menu_keyboard
 class ErrorsSender:
     """Отправляет сообщения об ошибках"""
 
-    def __init__(self, answer: dict, proxy: str, token: str, telegram_id: str = ''):
-        self._answer: dict = answer
+    def __init__(self, answer: dict = None, proxy: str = '', token: str = '', telegram_id: str = ''):
+        self._answer: dict = answer if answer else {}
         self._status: int = answer.get("status", 0)
         self._answer_data: str = answer.get("answer_data", {})
-        self._proxy: str = proxy
-        self._token: str = token
-        self._telegram_id: str = telegram_id
+        self._proxy: str = proxy if proxy else 'no proxy'
+        self._token: str = token if token else 'no token'
+        self._telegram_id: str = telegram_id if telegram_id else 'no telegram_id'
         self._code: Optional[int] = None
 
     async def handle_errors(self) -> dict:
@@ -54,10 +54,7 @@ class ErrorsSender:
         )
         logger.error(error_message)
         text: str = ''
-        if self._status == -2:
-            text: str = "Ошибка словаря."
-            admins = True
-        elif self._status == 400:
+        if self._status == 400:
             if self._code == 50035:
                 text: str = (
                     f'Ошибка токена.'
@@ -117,16 +114,16 @@ class ErrorsSender:
             admins = True
         if text:
             if users and self._telegram_id:
-                await self.errors_report(telegram_id=self._telegram_id, text=text)
+                await self.errors_report(text=text)
             if admins:
                 await self.send_report_to_admins(text)
 
     @logger.catch
-    async def errors_report(self, telegram_id: str, text: str) -> None:
+    async def errors_report(self, text: str) -> None:
         """Errors report"""
 
         logger.error(f"Errors report: {text}")
-        await bot.send_message(chat_id=telegram_id, text=text, reply_markup=user_menu_keyboard())
+        await bot.send_message(chat_id=self._telegram_id, text=text, reply_markup=user_menu_keyboard())
 
     @logger.catch
     async def send_report_to_admins(self, text: str) -> None:
