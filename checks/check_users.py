@@ -1,4 +1,3 @@
-from aiogram.types import Message
 from models import User
 from config import admins_list
 
