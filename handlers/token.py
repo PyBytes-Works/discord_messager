@@ -154,7 +154,9 @@ async def check_and_add_token_handler(message: Message, state: FSMContext) -> No
     guild: int = data.get('guild')
     user_channel_pk: int = int(data.get("user_channel_pk", 0))
     if user_channel_pk:
-        channel: int = await DBI.get_channel(user_channel_pk=user_channel_pk)
+        channel_data: namedtuple = await DBI.get_channel(user_channel_pk=user_channel_pk)
+        if channel_data:
+            channel: int = channel_data.channel_id
 
     proxy: str = await ProxyChecker().get_checked_proxy(telegram_id=telegram_id)
     if proxy == 'no proxies':
