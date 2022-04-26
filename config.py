@@ -8,6 +8,7 @@ from dotenv import load_dotenv
 from loguru import logger
 from aiogram.contrib.fsm_storage.memory import MemoryStorage
 from peewee import SqliteDatabase, PostgresqlDatabase
+from classes.data_struct import Menu
 import psycopg2
 
 # flag for saving files
@@ -126,3 +127,8 @@ elif DATABASE == 'lite':
     db: Union[PostgresqlDatabase, SqliteDatabase] = sqlite()
 
 #  ********** END OF DATABASE CONFIG *************************
+
+# --------------- keyboard menu -------------------
+CHANEL_MENU = Menu(delete='Удалить', rename='Сменить имя', cooldown='Куллдаун')
+
+# --------------- end keyboard menu -------------------
