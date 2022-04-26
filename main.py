@@ -32,7 +32,7 @@ async def on_startup(_) -> None:
     """Функция выполняющаяся при старте бота."""
 
     try:
-        # Отправляет сообщение админам при запуске бота
+        # Отправляет сообщение админамv при запуске бота
         await send_report_to_admins(text="Discord_mailer started."
                                          f"\nVersion: {VERSION}")
     except Exception:
