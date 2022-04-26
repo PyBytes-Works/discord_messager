@@ -35,7 +35,7 @@ async def on_startup(_) -> None:
         "Discord_mailer started."
         f"\nVersion: {VERSION}")
     if DEBUG:
-        text += "DEBUG = TRUE"
+        text += "\nDEBUG = TRUE"
     try:
         await ErrorsSender.send_report_to_admins(text=text)
     except Exception:
