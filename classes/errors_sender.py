@@ -14,11 +14,11 @@ class ErrorsSender:
 
     def __init__(self, answer: dict = None, proxy: str = '', token: str = '', telegram_id: str = ''):
         self._answer: dict = answer if answer else {}
-        self._status: int = answer.get("status", 0)
-        self._answer_data: str = answer.get("answer_data", {})
+        self._status: int = answer.get("status", 0) if answer else 0
+        self._answer_data: str = answer.get("answer_data", {}) if answer else {}
         self._proxy: str = proxy if proxy else 'no proxy'
         self._token: str = token if token else ''
-        self._telegram_id: str = telegram_id if telegram_id else 'no telegram_id'
+        self._telegram_id: str = telegram_id if telegram_id else ''
         self._code: Optional[int] = None
 
     @logger.catch
