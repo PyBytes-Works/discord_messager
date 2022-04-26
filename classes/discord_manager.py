@@ -55,15 +55,15 @@ class DiscordManager:
 
     async def __get_full_info(self) -> str:
         return (
-                f"\n\tUsername: {self.__username}"
-                f"\n\tUser telegram id: {self.__telegram_id}"
-                f"\n\tToken: {self._datastore.token}"
-                f"\n\tProxy: {self._datastore.proxy}"
-                f"\n\tDiscord ID: {self._datastore.my_discord_id}"
-                f"\n\tMate discord id: {self._datastore.mate_id}"
-                f"\n\tSilence: {self.__silence}"
-                f"\n\tRelated tokens: {len(self.__related_tokens)}"
-                f"\n\tRelated tokens: {self.__related_tokens}"
+            f"\n\tUsername: {self.__username}"
+            f"\n\tUser telegram id: {self.__telegram_id}"
+            f"\n\tToken: {self._datastore.token}"
+            f"\n\tProxy: {self._datastore.proxy}"
+            f"\n\tDiscord ID: {self._datastore.my_discord_id}"
+            f"\n\tMate discord id: {self._datastore.mate_id}"
+            f"\n\tSilence: {self.__silence}"
+            f"\n\tRelated tokens: {len(self.__related_tokens)}"
+            f"\n\tRelated tokens: {self.__related_tokens}"
         )
 
     async def _check_user_active(self):
@@ -125,6 +125,7 @@ class DiscordManager:
         await MessageReceiver(datastore=self._datastore).get_message()
         await DBI.update_token_last_message_time(token=self._datastore.token)
         # await self.__update_token_last_message_time(token=self._datastore.token)
+
     # TODO реализовать:
     # @logger.catch
     # async def __update_token_last_message_time(self, token: str) -> None:
@@ -162,10 +163,9 @@ class DiscordManager:
 
     @logger.catch
     async def __make_related_tokens_list(self) -> None:
-        if not self.__related_tokens:
-            self.__related_tokens: List[namedtuple] = await DBI.get_all_related_user_tokens(
-                telegram_id=self._datastore.telegram_id
-            )
+        self.__related_tokens: List[namedtuple] = await DBI.get_all_related_user_tokens(
+            telegram_id=self._datastore.telegram_id
+        )
 
     @check_working
     @logger.catch
@@ -197,6 +197,7 @@ class DiscordManager:
             return
         await self._get_delay()
         self.delay += random.randint(3, 7)
+        # TODO убрать эту заглушку!!!
         if self.delay <= 0:
             self.delay: int = self._datastore.cooldown
         logger.info(f"SLEEP PAUSE: {self.delay}")

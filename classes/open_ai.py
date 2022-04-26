@@ -15,6 +15,7 @@ class OpenAI:
     def __init__(self, davinchi: bool = False):
         self.__message: str = ''
         self.__mode: str = "text-davinci-002" if davinchi else "text-curie-001"
+        self.__counter: int = 0
 
     @logger.catch
     def __send_message(self) -> dict:
@@ -42,11 +43,16 @@ class OpenAI:
     def get_answer(self, message: str = '') -> str:
         """Returns answer from bot or empty string if errors"""
 
+        self.__counter += 1
         plugs: Tuple[str, ...] = ('server here:', 'https://discord.gg/')
         defaults: Tuple[str, ...] = ('how are you', 'how are you doing')
 
+        if self.__counter > 5:
+            logger.warning(f"OpenAI counter: {self.__counter}")
+            return random.choice(defaults)
+
         if not message:
-            logger.debug("OpenAI: No message")
+            logger.warning("OpenAI: No message")
             return ''
         self.__message = message.strip()
         data: dict = self.__send_message()
@@ -60,6 +66,8 @@ class OpenAI:
         result: str = answers[0].get("text", '').strip().split("\n")[0]
         if any(filter(lambda x: x in result, plugs)):
             return random.choice(defaults)
+        if len(result) not in range(3, 101):
+            return self.get_answer(message)
         return result
 
 
@@ -69,7 +77,7 @@ if __name__ == '__main__':
             data = f.readlines()
         return random.choice(data)
 
+
     messages = get_message_from_file().strip()
     bot = OpenAI()
     bot.get_answer(messages)
-
