@@ -322,7 +322,8 @@ class DBI:
     @classmethod
     @logger.catch
     async def update_proxies_for_owners(cls, proxy) -> int:
-        return Proxy.update_proxies_for_owners(proxy=proxy)
+        Proxy.delete_proxy(proxy=proxy)
+        return Proxy.set_proxy_if_not_exists()
 
     @classmethod
     @logger.catch
