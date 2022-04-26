@@ -14,7 +14,7 @@ from classes.db_interface import DBI
 from classes.errors_sender import ErrorsSender
 from config import logger, Dispatcher
 from keyboards import (
-    user_menu_keyboard, cancel_keyboard, new_channel_key, yes_no_buttons,
+    user_menu_keyboard, cancel_keyboard, new_channel_key, yes_no_buttons, channel_menu_keyboard
 )
 
 
@@ -336,6 +336,16 @@ async def rename_token_handler(callback: CallbackQuery, state: FSMContext) -> No
 
 
 @logger.catch
+async def menu_channel_handler(message: Message) -> None:
+    """
+    вывести меню каналов:
+    text: 'Каналы'
+    :param message:
+    :return:"""
+    await message.answer('Выберете действия', reply_markup=channel_menu_keyboard())
+
+
+@logger.catch
 async def list_channel_handler(message: Message, state: FSMContext) -> None:
     """
     вывести список каналов:
@@ -439,14 +449,18 @@ def token_register_handlers(dp: Dispatcher) -> None:
     dp.register_callback_query_handler(ask_channel_cooldown_handler, Text(startswith=[
         "set_cooldown_"]))
     dp.register_callback_query_handler(no_cooldown_enter_handler, Text(startswith=["endof"]))
-    dp.register_callback_query_handler(ask_channel_cooldown_handler, state=TokenStates.add_channel_cooldown)
-    dp.register_message_handler(add_channel_cooldown_handler, state=TokenStates.add_channel_cooldown)
     dp.register_callback_query_handler(delete_token_handler, Text(startswith=["del_token_"]))
     dp.register_callback_query_handler(rename_token_handler, Text(startswith=["rename_token_"]))
-    dp.register_message_handler(list_channel_handler, commands=["channel"])
+    # ---------channels--------------
+    dp.register_message_handler(menu_channel_handler, Text(equals=["Каналы"]))
+    dp.register_message_handler(list_channel_handler, Text(equals=["Переименовать канал"]))
     dp.register_callback_query_handler(rename_channel_handler, state=UserChannelStates.call_name_for_user_channel)
-    dp.register_message_handler(set_token_name, state=TokenStates.set_name_for_token)
     dp.register_message_handler(set_user_channel_name, state=UserChannelStates.set_name_for_user_channel)
-    dp.register_message_handler(info_tokens_handler, Text(equals=["Информация"]))
     dp.register_message_handler(select_channel_handler, Text(equals=["Установить кулдаун"]))
+    dp.register_callback_query_handler(ask_channel_cooldown_handler, state=TokenStates.add_channel_cooldown)
+    dp.register_message_handler(add_channel_cooldown_handler, state=TokenStates.add_channel_cooldown)
+    # ---------end channels----------
+
+    dp.register_message_handler(set_token_name, state=TokenStates.set_name_for_token)
+    dp.register_message_handler(info_tokens_handler, Text(equals=["Информация"]))
     dp.register_message_handler(select_channel_handler, Text(equals=['Добавить токен']))

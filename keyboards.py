@@ -76,6 +76,24 @@ def user_menu_keyboard() -> 'ReplyKeyboardMarkup':
         KeyboardButton("Информация"),
         KeyboardButton("Отмена"),
         KeyboardButton("Добавить токен"),
+        KeyboardButton("Каналы")
+    )
+    return keyboard
+
+
+@logger.catch
+def channel_menu_keyboard() -> 'ReplyKeyboardMarkup':
+    """Возвращает кнопочки меню для канала из списка"""
+
+    keyboard = ReplyKeyboardMarkup(
+        resize_keyboard=True,
+        one_time_keyboard=True,
+        row_width=3
+    )
+
+    keyboard.add(
+        KeyboardButton("Отмена"),
+        KeyboardButton("Переименовать"),
         KeyboardButton("Установить кулдаун")
     )
     return keyboard
