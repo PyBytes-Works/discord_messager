@@ -44,22 +44,24 @@ class MessageSender(PostRequest):
         Sends data to discord channel
         :return:
         """
-
         self.token = self._datastore.token
         self.proxy = self._datastore.proxy
-        self.channel = self._datastore.channel.channel_id
         self._data_for_send = self._datastore.data_for_send
 
         await self.typing()
         await self.typing()
-        self.url = DISCORD_BASE_URL + f'{self.channel}/messages?'
+        self.url = DISCORD_BASE_URL + f'{self._datastore.channel}/messages?'
         answer: dict = await self._send_request()
         status: int = answer.get("status")
         if status == 200:
             return True
         self._update_err_params(answer=answer, telegram_id=self._datastore.telegram_id)
         logger.debug("MessageSender.__send_data call error handling:"
-                     f"\nParams: {self._error_params}")
+                     f"\nParams: "
+                     f"\nToken: {self.token}"
+                     f"\nProxy:{self.proxy}"
+                     f"\nChannel: {self._datastore.channel}"
+                     f"\nData for send: {self._data_for_send}")
         result: dict = await ErrorsSender(**self._error_params).handle_errors()
         data: dict = result.get('answer_data', {})
         code: int = data.get("code")
