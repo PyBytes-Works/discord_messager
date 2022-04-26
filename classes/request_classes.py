@@ -75,45 +75,6 @@ class GetRequest(RequestSender):
                     "answer_data": await response.text()
                 }
 
-        # answer: dict = await super()._send()
-
-        # async with aiohttp.ClientSession() as session:
-        #
-        #     params: dict = {
-        #         'url': self.url,
-        #         "proxy": self.proxy_data,
-        #         "ssl": False,
-        #         "timeout": 10
-        #     }
-        #     # TODO разделить на пост и гет запросы
-        #     if self.token:
-        #         session.headers['authorization']: str = self.token
-        #     try:
-        #         async with session.get(**params) as response:
-        #             answer.update(
-        #                 status=response.status,
-        #                 data=await response.text()
-        #             )
-        #     except aiohttp.client_exceptions.ClientConnectorError as err:
-        #         logger.error(f"GetRequest: Proxy check Error: {err}"
-        #                      f"\nProxy: {self.proxy}")
-        #         await ErrorsSender.proxy_not_found_error()
-        #         answer.update(status=407)
-        #     except aiohttp.http_exceptions.BadHttpMessage as err:
-        #         logger.error(f"GetRequest: МУДАК ПРОВЕРЬ ПОРТ ПРОКСИ!!! {err}"
-        #                      f"\nProxy: {self.proxy}")
-        #         if "Proxy Authentication Required" in err:
-        #             answer.update(status=407)
-        #     except (ssl.SSLError, OSError) as err:
-        #         logger.error(f"GetRequest: Ошибка авторизации прокси: {err}"
-        #                      f"\nProxy: {self.proxy}")
-        #         if "Proxy Authentication Required" in err:
-        #             answer.update(status=407)
-        #     except self._EXCEPTIONS as err:
-        #         logger.error(f"GetRequest: _EXCEPTIONS: {err}")
-        #
-        # return answer
-
 
 class GetMe(GetRequest):
 
@@ -123,6 +84,7 @@ class GetMe(GetRequest):
         self.url: str = f'https://discord.com/api/v9/users/@me'
         answer: dict = await self._send_request()
         self._error_params.update(answer=answer)
+        logger.debug("GetMe.get_discord_id call error handling:")
         answer: dict = await ErrorsSender(**self._error_params).handle_errors()
         return answer.get("answer_data", {}).get("id", '')
 
@@ -188,6 +150,7 @@ class TokenChecker(GetRequest):
             return True
 
         self._error_params.update(answer=answer, telegram_id=telegram_id)
+        logger.debug("TokenChecker.check_token call error handling:")
         await ErrorsSender(**self._error_params).handle_errors()
 
 
