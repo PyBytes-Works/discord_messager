@@ -39,6 +39,7 @@ async def check_new_user_is_exists_handler(message: Message, state: FSMContext) 
             "которого вы хотите добавить.",
             reply_markup=cancel_keyboard()
         )
+        logger.debug(f"Add user message: {message}")
         return
 
     new_user_telegram_id: str = str(message.forward_from.id)
