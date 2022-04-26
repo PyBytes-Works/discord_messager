@@ -135,8 +135,8 @@ class MessageReceiver(ChannelData):
         new_replies: List[dict] = await self.__get_filtered_replies(all_replies)
         self._datastore.replies = await self.__save_replies_to_redis(new_replies)
         self._datastore.current_message_id = await self.__get_last_message_id_from_last_messages(last_messages)
-        logger.error(f"NEW REPLIES: {self._datastore.replies}")
-        logger.error(f"MESSAGE ID: {self._datastore.current_message_id}")
+        # logger.error(f"NEW REPLIES: {self._datastore.replies}")
+        # logger.error(f"MESSAGE ID: {self._datastore.current_message_id}")
         utils.save_data_to_json(data=last_messages, file_name="last_messages.json", key='a')
 
         if DEBUG and SAVING:
