@@ -39,6 +39,7 @@ async def check_new_user_is_exists_handler(message: Message, state: FSMContext) 
             "которого вы хотите добавить.",
             reply_markup=user_menu_keyboard()
         )
+        await state.finish()
         return
 
     new_user_telegram_id: str = str(message.forward_from.id)
@@ -70,6 +71,7 @@ async def set_max_tokens_for_new_user_handler(message: Message, state: FSMContex
             'Число должно быть целым положительным. Введите еще раз: ',
             reply_markup=cancel_keyboard()
         )
+        await state.finish()
         return
     await state.update_data(max_tokens=max_tokens)
     await message.answer('Введите время подписки в ЧАСАХ:: ', reply_markup=cancel_keyboard())
@@ -90,6 +92,7 @@ async def check_expiration_and_add_new_user_handler(message: Message, state: FSM
             '\nВведите еще раз время подписки в ЧАСАХ: ',
             reply_markup=cancel_keyboard()
         )
+        await state.finish()
         return
     state_data: dict = await state.get_data()
     new_user_telegram_id: str = state_data["new_user_telegram_id"]

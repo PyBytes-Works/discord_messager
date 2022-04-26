@@ -14,7 +14,7 @@ from aiogram.types import Message, CallbackQuery, ReplyKeyboardRemove, InlineKey
 
 from classes.vocabulary import Vocabulary
 from config import logger, bot, admins_list
-from handlers.main_handlers import message_cancel_handler
+from handlers.cancel_handler import message_cancel_handler
 from keyboards import cancel_keyboard, user_menu_keyboard, inactive_users_keyboard, admin_keyboard, \
     superadmin_keyboard
 from states import AdminStates
