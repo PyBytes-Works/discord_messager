@@ -454,7 +454,7 @@ def token_register_handlers(dp: Dispatcher) -> None:
     dp.register_callback_query_handler(rename_token_handler, Text(startswith=["rename_token_"]))
     # ---------channels--------------
     dp.register_message_handler(menu_channel_handler, Text(equals=["Каналы"]))
-    dp.register_message_handler(list_channel_handler, Text(equals=["Переименовать канал"]))
+    dp.register_message_handler(list_channel_handler, Text(equals=["Переименовать"]))
     dp.register_callback_query_handler(rename_channel_handler, state=UserChannelStates.call_name_for_user_channel)
     dp.register_message_handler(set_user_channel_name, state=UserChannelStates.set_name_for_user_channel)
     dp.register_message_handler(select_channel_handler, Text(equals=["Установить кулдаун"]))
