@@ -7,7 +7,7 @@ from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, C
 from aiogram.dispatcher import FSMContext
 
 from classes.request_classes import GetMe, ProxyChecker, TokenChecker
-from handlers import main_handlers
+from handlers import cancel_handler
 from states import TokenStates, UserChannelStates
 from utils import check_is_int
 from classes.db_interface import DBI
@@ -17,8 +17,6 @@ from keyboards import (
     user_menu_keyboard, cancel_keyboard, new_channel_key, yes_no_buttons, channel_menu_keyboard
 )
 
-
-# TODO Удалять реплай сообщения после ответа.
 
 @logger.catch
 async def select_channel_handler(message: Message) -> None:
@@ -157,26 +155,28 @@ async def check_and_add_token_handler(message: Message, state: FSMContext) -> No
     guild: int = data.get('guild')
     user_channel_pk: int = int(data.get("user_channel_pk", 0))
     if user_channel_pk:
-        channel: int = await DBI.get_channel(user_channel_pk=user_channel_pk)
+        channel_data: namedtuple = await DBI.get_channel(user_channel_pk=user_channel_pk)
+        if channel_data:
+            channel: int = channel_data.channel_id
 
     proxy: str = await ProxyChecker().get_checked_proxy(telegram_id=telegram_id)
     if proxy == 'no proxies':
-        await ErrorsSender.errors_report(telegram_id=telegram_id, text="Ошибка прокси. Нет доступных прокси.")
+        await ErrorsSender(telegram_id=telegram_id).errors_report(
+            text="Ошибка прокси. Нет доступных прокси.")
         await state.finish()
         return
-
     discord_id: str = await GetMe().get_discord_id(token=token, proxy=proxy)
     await message.answer("Получаю дискорд id.")
     if not discord_id:
         error_text: str = (f"Не смог определить discord_id для токена:"
                            f"\nToken: [{token}]"
                            f"\nGuild/channel: [{guild}: {channel}]")
-        await ErrorsSender.errors_report(telegram_id=telegram_id, text=error_text)
+        await ErrorsSender(telegram_id=telegram_id).errors_report(error_text)
         await state.finish()
         return
     if await DBI.check_token_by_discord_id(discord_id=discord_id):
         error_text: str = 'Токен с таким дискорд id уже сущестует в базе'
-        await ErrorsSender.errors_report(telegram_id=telegram_id, text=error_text)
+        await ErrorsSender(telegram_id=telegram_id).errors_report(error_text)
         await state.finish()
         return
     await message.answer(f"Дискорд id получен: {discord_id}"
@@ -191,8 +191,7 @@ async def check_and_add_token_handler(message: Message, state: FSMContext) -> No
         user_channel_pk: int = await DBI.add_user_channel(telegram_id=telegram_id, channel_id=channel, guild_id=guild)
         await message.answer(f"Создаю канал {channel}")
         if not user_channel_pk:
-            await ErrorsSender.errors_report(
-                telegram_id=telegram_id,
+            await ErrorsSender(telegram_id=telegram_id).errors_report(
                 text=f"Не смог добавить канал:\n{telegram_id}:{channel}:{guild}"
             )
             await state.finish()
@@ -206,7 +205,7 @@ async def check_and_add_token_handler(message: Message, state: FSMContext) -> No
         error_text: str = (f"Не добавить токен:"
                            f"\nToken: [{token}]"
                            f"\nGuild/channel: [{guild}: {channel}]")
-        await ErrorsSender.errors_report(telegram_id=telegram_id, text=error_text)
+        await ErrorsSender(telegram_id=telegram_id).errors_report(error_text)
         await state.finish()
         return
     await message.answer(
@@ -253,7 +252,7 @@ async def add_channel_cooldown_handler(message: Message, state: FSMContext) -> N
     if not await DBI.update_user_channel_cooldown(user_channel_pk=user_channel_pk, cooldown=cooldown):
         error_text: str = (f"Не смог установить кулдаун для канала:"
                            f"\nuser_channel_pk: [{user_channel_pk}: cooldown: {cooldown}]")
-        await ErrorsSender.errors_report(telegram_id=str(message.from_user.id), text=error_text)
+        await ErrorsSender(telegram_id=str(message.from_user.id)).errors_report(error_text)
         await state.finish()
         return
     await message.answer("Кулдаун установлен.", reply_markup=user_menu_keyboard())
@@ -522,7 +521,7 @@ def token_register_handlers(dp: Dispatcher) -> None:
     """
     Регистратор для функций данного модуля
     """
-    dp.register_callback_query_handler(main_handlers.callback_cancel_handler, Text(startswith=[
+    dp.register_callback_query_handler(cancel_handler.callback_cancel_handler, Text(startswith=[
         "отмена", "cancel"], ignore_case=True), state="*")
     dp.register_callback_query_handler(start_create_channel_handler, Text(equals=[
         "new_channel"]), state=TokenStates.select_channel)

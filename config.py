@@ -31,8 +31,7 @@ vova = os.getenv("VOVA_TELEGRAM_ID")
 
 # set admins list
 admins_list = [deskent]
-DEBUG = os.getenv("DEBUG")
-DEBUG = True if (bool(DEBUG) or DEBUG.lower() == "true") else False
+DEBUG = bool(os.getenv("DEBUG"))
 if not DEBUG:
     admins_list = [deskent, artem, vova]
 

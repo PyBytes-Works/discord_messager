@@ -1,11 +1,8 @@
 import datetime
-import json
 from datetime import timedelta
-from json import JSONDecodeError
 from typing import List, Tuple
 
 import utils
-from classes.db_interface import DBI
 from classes.errors_sender import ErrorsSender
 from classes.redis_interface import RedisDB
 from classes.request_classes import ChannelData
@@ -24,32 +21,25 @@ class MessageReceiver(ChannelData):
 
         user_message, message_id = await self.__get_user_message_from_redis()
 
-        discord_messages: List[dict] = await self.__get_all_messages()
+        discord_messages: List[dict] = await self.__get_discord_messages()
         await self.__get_replies_and_message_id(discord_messages)
         if message_id:
             self._datastore.current_message_id = message_id
         self._datastore.text_to_send = user_message if user_message else ''
 
     @logger.catch
-    async def __get_all_messages(self) -> List[dict]:
+    async def __get_discord_messages(self) -> List[dict]:
 
         self.proxy: str = self._datastore.proxy
         self.token: str = self._datastore.token
 
-        answer: dict = await self._send()
-        status: int = answer.get("status")
-        if not status:
-            logger.error(f"get_data_from_channel error: ")
-        elif status == 200:
-            try:
-                return json.loads(answer.get("data"))
-            except JSONDecodeError as err:
-                logger.error("F: get_data_from_channel: JSON ERROR:", err)
-        elif status == 401:
-            await ErrorsSender.send_message_check_token(
-                status=status, telegram_id=self._datastore.telegram_id, admins=False,
-                token=self._datastore.token)
-            await DBI.delete_token(token=self.token)
+        answer: dict = await self._send_request()
+        self._error_params.update(answer=answer, telegram_id=self._datastore.telegram_id)
+        logger.debug("MessageReceiver.__get_discord_messages call error handling:"
+                     f"\nParams: {self._error_params}")
+        result: dict = await ErrorsSender(**self._error_params).handle_errors()
+        if result.get("status") == 200:
+            return result.get("answer_data")
         return []
 
     @staticmethod
@@ -147,8 +137,8 @@ class MessageReceiver(ChannelData):
         new_replies: List[dict] = await self.__get_filtered_replies(all_replies)
         self._datastore.replies = await self.__save_replies_to_redis(new_replies)
         self._datastore.current_message_id = await self.__get_last_message_id_from_last_messages(last_messages)
-        logger.error(f"NEW REPLIES: {self._datastore.replies}")
-        logger.error(f"MESSAGE ID: {self._datastore.current_message_id}")
+        # logger.error(f"NEW REPLIES: {self._datastore.replies}")
+        # logger.error(f"MESSAGE ID: {self._datastore.current_message_id}")
         utils.save_data_to_json(data=last_messages, file_name="last_messages.json", key='a')
 
         if DEBUG and SAVING:

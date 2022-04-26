@@ -70,7 +70,6 @@ if __name__ == '__main__':
         return random.choice(data)
 
     messages = get_message_from_file().strip()
-    logger.debug(f"MESSAGES: {messages}")
     bot = OpenAI()
     bot.get_answer(messages)
 

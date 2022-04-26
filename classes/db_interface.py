@@ -6,7 +6,6 @@ from aiogram.types import ReplyKeyboardRemove, Message
 
 from models import User, Token, Proxy, UserChannel
 from config import logger, admins_list
-# from classes.errors_sender import ErrorsSender
 from checks import check_users
 
 

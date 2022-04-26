@@ -36,6 +36,7 @@ class TokenData:
         self.token: str = token
         self.proxy: str = token_data.proxy
         self.channel: int = token_data.channel_id
+        logger.debug(f"\n\t\tCHANNEL: {self.channel}")
         self.guild: int = token_data.guild_id
         self.cooldown: int = token_data.cooldown
         self.mate_id: str = token_data.mate_discord_id

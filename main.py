@@ -11,14 +11,16 @@ import datetime
 
 from aiogram import executor
 
-from classes.errors_sender import ErrorsSender
 from handlers.admin import register_admin_handlers
-from config import dp, logger, DB_FILE_NAME, VERSION
+from config import dp, logger, DB_FILE_NAME, VERSION, DEBUG
 from handlers.main_handlers import register_handlers
 from handlers.login import login_register_handlers
 from handlers.token import token_register_handlers
+from handlers.cancel_handler import cancel_register_handlers
 from models import recreate_db
+from classes.errors_sender import ErrorsSender
 
+cancel_register_handlers(dp=dp)
 login_register_handlers(dp=dp)
 register_admin_handlers(dp=dp)
 token_register_handlers(dp=dp)
@@ -29,11 +31,13 @@ register_handlers(dp=dp)
 async def on_startup(_) -> None:
     """Функция выполняющаяся при старте бота."""
 
+    text: str = (
+        "Discord_mailer started."
+        f"\nVersion: {VERSION}")
+    if DEBUG:
+        text += "DEBUG = TRUE"
     try:
-        # Отправляет сообщение админам при запуске бота
-        await ErrorsSender.send_report_to_admins(
-            text="Discord_mailer started."
-            f"\nVersion: {VERSION}")
+        await ErrorsSender.send_report_to_admins(text=text)
     except Exception:
         pass
     if not os.path.exists('./db'):

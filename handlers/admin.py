@@ -14,7 +14,7 @@ from aiogram.types import Message, CallbackQuery, ReplyKeyboardRemove, InlineKey
 
 from classes.vocabulary import Vocabulary
 from config import logger, bot, admins_list
-from handlers.main_handlers import message_cancel_handler
+from handlers.cancel_handler import message_cancel_handler
 from keyboards import cancel_keyboard, user_menu_keyboard, inactive_users_keyboard, admin_keyboard, \
     superadmin_keyboard
 from states import AdminStates
@@ -300,88 +300,6 @@ async def activate_user_handler(message: Message, state: FSMContext) -> None:
         return
 
 
-# @logger.catch
-# async def max_tokens_request_handler(message: Message) -> None:
-#     """Обработчик для создания нового пользователя. Команда /add_user"""
-#
-#     if await DBI.is_admin(telegram_id=str(message.from_user.id)):
-#         if not await DBI.get_proxy_count():
-#             await message.answer("Нет ни одной прокси. Добавьте хотя бы одну.", reply_markup=user_menu_keyboard())
-#             return
-#         await message.answer('Введите количество токенов для пользователя?', reply_markup=cancel_keyboard())
-#         await AdminStates.max_tokens_req.set()
-#     else:
-#         logger.info(f'{message.from_user.id}:{message.from_user.username}: NOT AUTORIZATED')
-
-
-# @logger.catch
-# async def user_name_request_handler(message: Message, state: FSMContext) -> None:
-#     """Проверка максимального количества токенов и запрос на введение имени нового пользователя"""
-#
-#     max_tokens: int = check_is_int(message.text)
-#     if not max_tokens:
-#         await message.answer(
-#             'Число должно быть целым положительным. Введите еще раз.: ',
-#             reply_markup=cancel_keyboard()
-#         )
-#         return
-#     await state.update_data(max_tokens=max_tokens)
-#     await message.answer('Введите имя для нового пользователя: ', reply_markup=cancel_keyboard())
-#     await AdminStates.subscribe_time.set()
-
-
-# @logger.catch
-# async def subscribe_time_request_handler(message: Message, state: FSMContext) -> None:
-#     """Проверка введеного имени и запрос времени подписки для нового пользователя"""
-#
-#     name: str = message.text
-#     if await DBI.get_user_by_name(name=name):
-#         await message.answer('Такой пользователь уже существует. '
-#                              '\nВведите другое имя:')
-#         return
-#     if len(name) > 20:
-#         await message.answer('Имя пользователя не должно превышать 20 символов. Введите заново.')
-#         return
-#     await state.update_data(name=name)
-#     await message.answer('Введите время подписки в ЧАСАХ: ', reply_markup=cancel_keyboard())
-#     await AdminStates.name_for_cr.set()
-
-
-# @logger.catch
-# async def add_new_user_handler(message: Message, state: FSMContext) -> None:
-#     """Проверка введенного времени подписки и создание токена для нового пользователя"""
-#
-#     subscribe_time: int = check_is_int(message.text)
-#     if message.text == "-1":
-#         subscribe_time: int = -1
-#     hours_in_year: int = 8760
-#     if not subscribe_time or subscribe_time > hours_in_year * 2:
-#         await message.answer(
-#             'Время в часах должно быть целым положительным. '
-#             '\nВведите еще раз время подписки в ЧАСАХ: ',
-#             reply_markup=cancel_keyboard()
-#         )
-#         return
-#     state_data: dict = await state.get_data()
-#     name: str = state_data.get("name")
-#     max_tokens: int = state_data.get("max_tokens", 0)
-#     new_token: str = get_token(key="user")
-#     tokens: dict = {
-#         new_token: {
-#             "name": name,
-#             "max_tokens": max_tokens,
-#             "subscribe_time": subscribe_time
-#             }
-#         }
-#     add_new_token(tokens)
-#     await message.answer(
-#         f"Токен для нового пользователя {name}: {new_token}"
-#         f"\nМаксимум токенов: {max_tokens}",
-#         reply_markup=user_menu_keyboard()
-#     )
-#     await state.finish()
-
-
 @logger.catch
 async def show_all_users_handler(message: Message) -> None:
     """Обработчик команды /show_users. Показывает список всех пользователей"""
@@ -391,7 +309,6 @@ async def show_all_users_handler(message: Message) -> None:
     user_is_superadmin: bool = user_telegram_id in admins_list
     if user_is_admin or user_is_superadmin:
         users: Tuple[namedtuple] = await DBI.get_all_users()
-
         lenght: int = len(users)
         for shift in range(0, lenght, 10):
             users_slice: tuple = users[shift:shift + 10]
@@ -401,7 +318,7 @@ async def show_all_users_handler(message: Message) -> None:
                     f'{"Admin" if user.admin else "Not admin"} | '
                     f'Proxy: {user.proxy if user.proxy else "ЧТО ТО СЛОМАЛОСЬ"} | '
                     f'\nID: {user.telegram_id if user.telegram_id else "ЧТО ТО СЛОМАЛОСЬ"} | '
-                    f'№: {user.max_tokens if user.max_tokens else "ЧТО ТО СЛОМАЛОСЬ"} | '
+                    f'Tokens: {user.max_tokens if user.max_tokens else "ЧТО ТО СЛОМАЛОСЬ"} | '
                     f'{user.expiration if user.expiration else "ЧТО ТО СЛОМАЛОСЬ"}'
                     for user in users_slice
                 )
@@ -522,13 +439,13 @@ async def reboot_handler(message: Message) -> None:
     user_telegram_id: str = str(message.from_user.id)
     user_is_superadmin: bool = user_telegram_id in admins_list
     if user_is_superadmin:
-        text: str = "Перезагрузка через 1 минуту. Работа бота будет остановлена автоматически."
+        text: str = "Перезагрузка через 3 минуты."
         for user_telegram_id in await DBI.get_working_users():
             try:
                 await bot.send_message(user_telegram_id, text=text)
+                await DBI.set_user_is_not_work(str(user_telegram_id))
             except aiogram.utils.exceptions.ChatNotFound:
                 logger.warning(f"Chat {user_telegram_id} not found.")
-            await DBI.set_user_is_not_work(str(user_telegram_id))
 
 
 @logger.catch
