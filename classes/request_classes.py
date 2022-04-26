@@ -149,10 +149,8 @@ class ProxyChecker(GetRequest):
 
         self.proxy: str = proxy
 
-        # answer: dict = await self._send_request()
-        # return answer.get("status")
-        # TODO раскоментить код выше, убрать ретурн 0
-        return 0
+        answer: dict = await self._send_request()
+        return answer.get("status")
 
     @logger.catch
     async def get_checked_proxy(self, telegram_id: str) -> str:
@@ -167,8 +165,7 @@ class ProxyChecker(GetRequest):
             return proxy
         if not await DBI.update_proxies_for_owners(proxy=proxy):
             return result
-        # TODO Вернуть после фикса бесконечной рекурсии
-        # return await self.get_checked_proxy(telegram_id=telegram_id)
+        return await self.get_checked_proxy(telegram_id=telegram_id)
 
 
 class TokenChecker(GetRequest):

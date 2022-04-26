@@ -6,9 +6,9 @@ from fake_data import *
 async def tests():
     # print("Discord id:", await GetMe().get_discord_id(token=token, proxy=proxy))
     # print("Discord id:", await GetMe().get_discord_id(token=token, proxy=bad_proxy))
-    # print("Proxy:", await ProxyChecker().get_checked_proxy(telegram_id=telegram_id))
+    print("Proxy:", await ProxyChecker().get_checked_proxy(telegram_id=telegram_id))
     # print(await TokenChecker().check_token(token=token, proxy=proxy, channel=channel, telegram_id=telegram_id))
-    print(await MessageSender(datastore).send_message())
+    # print(await MessageSender(datastore).send_message())
 
 
 if __name__ == '__main__':
