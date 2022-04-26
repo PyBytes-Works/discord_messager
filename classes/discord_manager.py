@@ -43,7 +43,7 @@ class DiscordManager:
     def __init__(self, message: Message, mute: bool = False) -> None:
         self.message: 'Message' = message
         self.__username: str = message.from_user.username
-        self.user_telegram_id: str = str(self.message.from_user.id)
+        self.__telegram_id: str = str(self.message.from_user.id)
         self.__silence: bool = mute
         self.__related_tokens: List[namedtuple] = []
         self.__workers: List[str] = []
@@ -53,6 +53,16 @@ class DiscordManager:
         self.delay: int = 0
         self.autoanswer: bool = False
 
+    async def __get_full_info(self) -> str:
+        return (
+                f"\n\t\tUsername: {self.__username}"
+                f"\n\t\tUser telegram id: {self.__telegram_id}"
+                f"\n\t\tToken: {self._datastore.token}"
+                f"\n\t\tProxy: {self._datastore.proxy}"
+                f"\n\t\tDiscord ID: {self._datastore.my_discord_id}"
+                f"\n\t\tMate discord id: {self._datastore.mate_id}"
+        )
+
     @logger.catch
     async def _lets_play(self) -> None:
 
@@ -60,6 +70,7 @@ class DiscordManager:
             self.is_working = False
             return
         await self._get_worker()
+        logger.info(await self.__get_full_info())
         await self._getting_messages()
         await self._send_replies()
         await self._sending_messages()
@@ -67,11 +78,11 @@ class DiscordManager:
 
     @logger.catch
     async def __make_datastore(self) -> None:
-        self._datastore: 'TokenData' = TokenData(self.user_telegram_id)
+        self._datastore: 'TokenData' = TokenData(self.__telegram_id)
 
     @logger.catch
     async def __make_all_token_ids(self) -> None:
-        self._datastore.all_tokens_ids = await DBI.get_all_discord_id(self.user_telegram_id)
+        self._datastore.all_tokens_ids = await DBI.get_all_discord_id(self.__telegram_id)
         if not self._datastore.all_tokens_ids:
             logger.debug(f"No all_tokens_ids.")
             return
@@ -84,20 +95,19 @@ class DiscordManager:
 
         # TODO Сделать флаг автоответа (если флаг стоит - то отвечает бот Давинчи, иначе -
         #  отправлять в телеграм юзеру
-        # TODO выделить реплаи и работу с ними в отдельный класс
 
         await self.__make_datastore()
         await self.__make_all_token_ids()
-        logger.debug(f"\n\tUSER: {self.__username}: {self.user_telegram_id} - Game begin.")
+        logger.info(f"\n\tUSER: {self.__username}: {self.__telegram_id} - Game begin.")
 
         while self.is_working:
             t0 = datetime.datetime.now()
-            logger.info(f"\n\t\tCircle start at: {t0}")
+            logger.debug(f"\n\t\tCircle start at: {t0}")
             await self._lets_play()
 
-            logger.info(f"\n\t\tCircle finish. Total time: {datetime.datetime.now() - t0}")
+            logger.debug(f"\n\t\tCircle finish. Total time: {datetime.datetime.now() - t0}")
 
-        logger.debug("\n\tGame over.")
+        logger.info("\n\tGame over.")
 
     @check_working
     @logger.catch
@@ -176,7 +186,6 @@ class DiscordManager:
     async def _sleep(self) -> None:
         """Спит на время ближайшего токена."""
 
-        logger.debug(f"WORKERS: {self.__workers}")
         if self.__workers:
             return
         await self._get_delay()
@@ -321,8 +330,8 @@ class DiscordManager:
         """Формирует пары из свободных токенов если они в одном канале"""
 
         if unpair:
-            await DBI.delete_all_pairs(telegram_id=self.user_telegram_id)
-        await DBI.form_new_tokens_pairs(telegram_id=self.user_telegram_id)
+            await DBI.delete_all_pairs(telegram_id=self.__telegram_id)
+        await DBI.form_new_tokens_pairs(telegram_id=self.__telegram_id)
 
     @property
     def silence(self) -> bool:

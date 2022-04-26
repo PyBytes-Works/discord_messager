@@ -522,13 +522,13 @@ async def reboot_handler(message: Message) -> None:
     user_telegram_id: str = str(message.from_user.id)
     user_is_superadmin: bool = user_telegram_id in admins_list
     if user_is_superadmin:
-        text: str = "Перезагрузка через 1 минуту. Работа бота будет остановлена автоматически."
+        text: str = "Перезагрузка через 1 минуту."
         for user_telegram_id in await DBI.get_working_users():
             try:
                 await bot.send_message(user_telegram_id, text=text)
+                await DBI.set_user_is_not_work(str(user_telegram_id))
             except aiogram.utils.exceptions.ChatNotFound:
                 logger.warning(f"Chat {user_telegram_id} not found.")
-            await DBI.set_user_is_not_work(str(user_telegram_id))
 
 
 @logger.catch

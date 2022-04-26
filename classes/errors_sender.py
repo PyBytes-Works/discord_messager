@@ -17,10 +17,11 @@ class ErrorsSender:
         self._status: int = answer.get("status", 0)
         self._answer_data: str = answer.get("answer_data", {})
         self._proxy: str = proxy if proxy else 'no proxy'
-        self._token: str = token if token else 'no token'
+        self._token: str = token if token else ''
         self._telegram_id: str = telegram_id if telegram_id else 'no telegram_id'
         self._code: Optional[int] = None
 
+    @logger.catch
     async def handle_errors(self) -> dict:
         data = {}
         if self._answer_data:
@@ -40,6 +41,7 @@ class ErrorsSender:
             return {}
         return self._answer
 
+    @logger.catch
     async def send_message_check_token(
             self,
             admins: bool = False,
@@ -54,12 +56,16 @@ class ErrorsSender:
             f"\n\tError data: {self._answer_data}"
         )
         logger.error(error_message)
-        text: str = ''
-        if self._status == 400:
+        if self._status == -100:
+            text: str = f'Произошла ошибка запроса. RequestSender._EXCEPTIONS: read the logs.'
+            admins = True
+            users = False
+        elif self._status == 400:
             if self._code == 50035:
-                text: str = (
-                    f'Ошибка токена.'
-                    f'Token: {self._token}')
+                text: str = f'Сообщение для ответа удалено из дискорд канала.'
+                admins = False
+            else:
+                text: str = f'Ошибка 400.'
                 admins = False
         elif self._status == 401:
             if self._code == 0:
@@ -67,7 +73,7 @@ class ErrorsSender:
                     f"Токен не рабочий."
                     f"\nToken: {self._token}")
                 if await DBI.delete_token(token=self._token):
-                    text += 'Токен удален.'
+                    text += f"\nТокен: {self._token} удален."
             else:
                 text: str = (
                     "Произошла ошибка данных."
@@ -79,40 +85,41 @@ class ErrorsSender:
                 text: str = (
                     "Не могу отправить сообщение для токена. (Ошибка 403 - 50013)"
                     "Токен в муте."
-                    f"\nToken: {self._token}"
                 )
+                if self._token:
+                    text += f"\nToken: {self._token}"
             elif self._code == 50001:
-                await DBI.delete_token(token=self._token)
                 text: str = (
                     "Не могу отправить сообщение для токена. (Ошибка 403 - 50001)"
                     "Токен забанили."
-                    f"\nТокен: {self._token} удален."
                     f"\nФормирую новые пары."
                 )
+                if await DBI.delete_token(token=self._token):
+                    text += f"\nТокен: {self._token} удален."
                 await DBI.form_new_tokens_pairs(telegram_id=self._telegram_id)
             else:
-                text: str = (f"Ошибка {self._status}")
+                text: str = f"Ошибка {self._status} Code: {self._code}"
         elif self._status == 404:
             if self._code == 10003:
-                text: str = (
-                    "Ошибка отправки сообщения. Неверный канал. (Ошибка 404 - 10003)"
-                    f"\nToken: {self._token}"
-                )
+                text: str = "Ошибка отправки сообщения. Неверный канал. (Ошибка 404 - 10003)"
+                if self._token:
+                    text += f"\nToken: {self._token}"
             else:
-                text: str = (f"Ошибка {self._status}")
+                text: str = f"Ошибка {self._status}"
         elif self._status == 407:
-            text = f'Ошибка прокси: {self._proxy}. Обратитесь к администратору. Код ошибки 407'
+            text = (
+                f'Ошибка прокси: {self._proxy}. '
+                f'\nОбратитесь к администратору. Код ошибки 407')
             users = True
             admins = True
         elif self._status == 500:
-            text = (
-                f"Внутренняя ошибка сервера Дискорда. "
-                f"\nПауза 10 секунд. Код ошибки - 500."
-            )
+            text = f"Внутренняя ошибка сервера Дискорда. Код ошибки - 500."
+            admins = True
         else:
             text = 'Unrecognised error!'
             users = False
             admins = True
+
         if text:
             if users and self._telegram_id:
                 await self.errors_report(text=text)
@@ -124,7 +131,10 @@ class ErrorsSender:
         """Errors report"""
 
         logger.error(f"Errors report: {text}")
-        await bot.send_message(chat_id=self._telegram_id, text=text, reply_markup=user_menu_keyboard())
+        try:
+            await bot.send_message(chat_id=self._telegram_id, text=text, reply_markup=user_menu_keyboard())
+        except aiogram.utils.exceptions.ChatNotFound:
+            logger.error(f"Chat {self._telegram_id} not found")
 
     @classmethod
     @logger.catch
