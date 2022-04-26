@@ -55,12 +55,14 @@ class DiscordManager:
 
     async def __get_full_info(self) -> str:
         return (
-                f"\n\t\tUsername: {self.__username}"
-                f"\n\t\tUser telegram id: {self.__telegram_id}"
-                f"\n\t\tToken: {self._datastore.token}"
-                f"\n\t\tProxy: {self._datastore.proxy}"
-                f"\n\t\tDiscord ID: {self._datastore.my_discord_id}"
-                f"\n\t\tMate discord id: {self._datastore.mate_id}"
+                f"\n\tUsername: {self.__username}"
+                f"\n\tUser telegram id: {self.__telegram_id}"
+                f"\n\tToken: {self._datastore.token}"
+                f"\n\tProxy: {self._datastore.proxy}"
+                f"\n\tDiscord ID: {self._datastore.my_discord_id}"
+                f"\n\tMate discord id: {self._datastore.mate_id}"
+                f"\n\tRelated tokens: {len(self.__related_tokens)}"
+                f"\n\tSilence: {self.__silence}"
         )
 
     async def _check_user_active(self):
@@ -74,10 +76,10 @@ class DiscordManager:
 
         await self._check_user_active()
         await self._get_worker()
-        logger.info(await self.__get_full_info())
         await self._getting_messages()
         await self._send_replies()
         await self._sending_messages()
+        logger.info(await self.__get_full_info())
         await self._sleep()
 
     @logger.catch
