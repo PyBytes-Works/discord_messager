@@ -346,7 +346,8 @@ class User(BaseModel):
             User.telegram_id.alias('telegram_id'),
             User.max_tokens.alias('max_tokens'),
             User.expiration.alias('expiration'),
-        ).join(Proxy, JOIN.LEFT_OUTER, on=(User.proxy == Proxy.id)).namedtuples().execute())
+        ).join(Proxy, JOIN.LEFT_OUTER, on=(
+                    User.proxy == Proxy.id)).order_by(User.created_at).namedtuples().execute())
 
     @classmethod
     @logger.catch
