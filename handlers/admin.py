@@ -48,7 +48,7 @@ async def send_message_to_all_users_handler(message: Message) -> None:
                 logger.error(f"Пользователь {user} заблокировал бота", err)
                 result: bool = await DBI.deactivate_user(telegram_id=user)
                 if result:
-                    await ErrorsSender.send_report_to_admins(
+                    await ErrorsSender().send_report_to_admins(
                         f"Пользователь {user} заблокировал бота. "
                         f"\nЕго аккаунт деактивирован.")
 
@@ -138,7 +138,7 @@ async def delete_all_proxies(message: Message, state: FSMContext) -> None:
 
     if message.text.lower() == "yes":
         await DBI.delete_all_proxy()
-        await ErrorsSender.send_report_to_admins(
+        await ErrorsSender().send_report_to_admins(
             f"Пользователь {message.from_user.id} удалил ВСЕ прокси.")
         await state.finish()
         return

@@ -31,7 +31,7 @@ async def on_startup(_) -> None:
 
     try:
         # Отправляет сообщение админам при запуске бота
-        await ErrorsSender.send_report_to_admins(
+        await ErrorsSender().send_report_to_admins(
             text="Discord_mailer started."
             f"\nVersion: {VERSION}")
     except Exception:
@@ -50,7 +50,7 @@ async def on_startup(_) -> None:
 async def on_shutdown(dp) -> None:
     """Действия при отключении бота."""
     try:
-        await ErrorsSender.send_report_to_admins(text="Discord_mailer stopping.")
+        await ErrorsSender().send_report_to_admins(text="Discord_mailer stopping.")
     except Exception:
         pass
     logger.warning("BOT shutting down.")
