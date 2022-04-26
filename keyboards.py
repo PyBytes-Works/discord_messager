@@ -4,7 +4,7 @@ from collections import namedtuple
 from aiogram.types import (
     ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton
 )
-from config import logger
+from config import logger, CHANEL_MENU
 
 
 @logger.catch
@@ -92,9 +92,10 @@ def channel_menu_keyboard() -> 'ReplyKeyboardMarkup':
     )
 
     keyboard.add(
+        KeyboardButton(CHANEL_MENU.rename),
+        KeyboardButton(CHANEL_MENU.cooldown),
+        KeyboardButton(CHANEL_MENU.delete),
         KeyboardButton("Отмена"),
-        KeyboardButton("Переименовать"),
-        KeyboardButton("Установить кулдаун")
     )
     return keyboard
 
