@@ -245,7 +245,7 @@ class User(BaseModel):
 
     @classmethod
     @logger.catch
-    def delete_channels(cls, telegram_id: str) -> int:
+    def delete_channels(cls: 'User', telegram_id: str) -> int:
         """
         Function removes  user channels and tokens
         """
@@ -595,6 +595,7 @@ class UserChannel(BaseModel):
         get_all_user_channel_by_telegram_id
         set_user_channel_name
         update_cooldown_by_channel_id
+        delete_user_channel
     """
 
     user = ForeignKeyField(
@@ -668,6 +669,11 @@ class UserChannel(BaseModel):
                 .where(User.telegram_id == telegram_id).namedtuples().execute()
         )
 
+    @classmethod
+    @logger.catch
+    def delete_user_channel(cls: 'UserChannel', user_channel_pk: int) -> int:
+        """Удаляет пользовательский канал связанные токены удаляются автоматически"""
+        return cls.delete().where(cls.id == user_channel_pk).execute()
 
     @classmethod
     @logger.catch
@@ -727,6 +733,7 @@ class Token(BaseModel):
           get_all_free_tokens
           get_all_discord_id
           get_all_discord_id_by_channel
+          get_count_bu_user_channel
           set_token_name
           check_token_by_discord_id
           update_token_time
@@ -1088,6 +1095,12 @@ class Token(BaseModel):
 
         return data if data else namedtuple(
             'Row', ['cooldown', 'last_message_time'])(cooldown=None, last_message_time=None)
+
+    @classmethod
+    @logger.catch
+    def get_count_bu_user_channel(cls, user_channel_pk: int) -> int:
+        """Get numbers token by channel id"""
+        return cls.select().where(cls.user_channel == user_channel_pk).count()
 
     @classmethod
     @logger.catch
