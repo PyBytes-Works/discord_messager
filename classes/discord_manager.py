@@ -88,16 +88,16 @@ class DiscordManager:
 
         await self.__make_datastore()
         await self.__make_all_token_ids()
-        logger.debug(f"\n\tUSER: {self.__username}: {self.user_telegram_id} - Game begin.")
+        logger.info(f"\n\tUSER: {self.__username}: {self.user_telegram_id} - Game begin.")
 
         while self.is_working:
             t0 = datetime.datetime.now()
-            logger.info(f"\n\t\tCircle start at: {t0}")
+            logger.debug(f"\n\t\tCircle start at: {t0}")
             await self._lets_play()
 
-            logger.info(f"\n\t\tCircle finish. Total time: {datetime.datetime.now() - t0}")
+            logger.debug(f"\n\t\tCircle finish. Total time: {datetime.datetime.now() - t0}")
 
-        logger.debug("\n\tGame over.")
+        logger.info("\n\tGame over.")
 
     @check_working
     @logger.catch

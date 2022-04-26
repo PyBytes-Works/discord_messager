@@ -124,7 +124,10 @@ class ErrorsSender:
         """Errors report"""
 
         logger.error(f"Errors report: {text}")
-        await bot.send_message(chat_id=self._telegram_id, text=text, reply_markup=user_menu_keyboard())
+        try:
+            await bot.send_message(chat_id=self._telegram_id, text=text, reply_markup=user_menu_keyboard())
+        except aiogram.utils.exceptions.ChatNotFound:
+            logger.error(f"Chat {self._telegram_id} not found")
 
     @classmethod
     @logger.catch
