@@ -29,7 +29,7 @@ class Proxy(BaseModel):
             get_list_proxies
             get_low_used_proxy
             get_proxy_count
-            update_proxies_for_owners
+            set_proxy_if_not_exists
         fields:
             proxy: str
             using: int ????
@@ -53,7 +53,7 @@ class Proxy(BaseModel):
     @logger.catch
     def delete_proxy(cls, proxy: str) -> bool:
         """Proxy removal"""
-        return bool(cls.delete().where(cls.proxy == proxy))
+        return bool(cls.delete().where(cls.proxy == proxy).execute())
 
     @classmethod
     @logger.catch
@@ -92,16 +92,12 @@ class Proxy(BaseModel):
 
     @classmethod
     @logger.catch
-    def update_proxies_for_owners(cls: 'Proxy', proxy: str) -> int:
+    def set_proxy_if_not_exists(cls: 'Proxy') -> int:
         """
-        Метод получает не рабочую прокси, удаляет ее и
-        перезаписывает прокси для всех кто ей пользовался
+        Метод устанавливает прокси для всех пользователей без прокси
         """
-        removed_proxy = cls.select().where(cls.proxy == proxy).first()
-        if not cls.get_proxy_count() and not removed_proxy:
-            return 0
+        users = User.select().where(User.proxy.is_null(True)).execute()
         count = 0
-        users = User.select().where(User.proxy == removed_proxy.id).execute()
         for user in users:
             new_proxy = cls.get_low_used_proxy()
             count += 1
