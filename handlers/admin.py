@@ -522,7 +522,7 @@ async def reboot_handler(message: Message) -> None:
     user_telegram_id: str = str(message.from_user.id)
     user_is_superadmin: bool = user_telegram_id in admins_list
     if user_is_superadmin:
-        text: str = "Перезагрузка через 1 минуту."
+        text: str = "Перезагрузка через 3 минуты."
         for user_telegram_id in await DBI.get_working_users():
             try:
                 await bot.send_message(user_telegram_id, text=text)
