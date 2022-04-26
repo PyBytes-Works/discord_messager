@@ -176,7 +176,6 @@ class DiscordManager:
     async def _sleep(self) -> None:
         """Спит на время ближайшего токена."""
 
-        logger.debug(f"WORKERS: {self.__workers}")
         if self.__workers:
             return
         await self._get_delay()

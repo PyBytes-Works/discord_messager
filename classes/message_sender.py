@@ -62,7 +62,6 @@ class MessageSender(PostRequest):
         code: int = data["code"]
         if status == 429:
             if code == 20016:
-                logger.debug(f"SendMessageToChannel.send_data: {answer}")
                 cooldown: int = int(data["retry_after"])
                 if cooldown:
                     cooldown += self._datastore.cooldown

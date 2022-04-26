@@ -158,8 +158,8 @@ class ProxyChecker(GetRequest):
             return result
         proxy: str = str(await DBI.get_user_proxy(telegram_id=telegram_id))
         if await self._check_proxy(proxy=proxy) == 200:
-            logger.error(f"Proxy {proxy} doesn`t work. Will be delete.")
             return proxy
+        logger.error(f"Proxy {proxy} doesn`t work. Will be delete.")
         if not await DBI.update_proxies_for_owners(proxy=proxy):
             return result
         return await self.get_checked_proxy(telegram_id=telegram_id)
