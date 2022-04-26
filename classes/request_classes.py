@@ -26,14 +26,19 @@ class RequestSender(ABC):
             aiohttp.client_exceptions.TooManyRedirects,
         )
         self._params: dict = {}
-        self._error_params: dict = {
-            "proxy": self.proxy if self.proxy else 'no proxy',
-            "token": self.token if self.token else 'no token',
-        }
+        self._error_params: dict = {}
 
     @abstractmethod
     async def _send(self, *args, **kwargs) -> dict:
         pass
+
+    def _update_err_params(self, answer: dict, telegram_id: str = ''):
+        self._error_params: dict = {
+            "proxy": self.proxy if self.proxy else '',
+            "token": self.token if self.token else '',
+            "answer": answer,
+            "telegram_id": telegram_id if telegram_id else ''
+        }
 
     async def _send_request(self) -> dict:
         self.proxy_data: str = f"http://{PROXY_USER}:{PROXY_PASSWORD}@{self.proxy}/"
@@ -48,6 +53,7 @@ class RequestSender(ABC):
             "timeout": 10
         }
         try:
+            logger.debug(self._params)
             answer: dict = await self._send()
         except (
                 aiohttp.client_exceptions.ClientHttpProxyError,
@@ -83,7 +89,7 @@ class GetMe(GetRequest):
         self.token = token
         self.url: str = f'https://discord.com/api/v9/users/@me'
         answer: dict = await self._send_request()
-        self._error_params.update(answer=answer)
+        self._update_err_params(answer=answer)
         logger.debug("GetMe.get_discord_id call error handling:"
                      f"\nParams: {self._error_params}")
         answer: dict = await ErrorsSender(**self._error_params).handle_errors()
@@ -110,7 +116,6 @@ class ProxyChecker(GetRequest):
         """Отправляет запрос через прокси, возвращает статус код ответа"""
 
         self.proxy: str = proxy
-
         answer: dict = await self._send_request()
         return answer.get("status")
 
@@ -149,8 +154,7 @@ class TokenChecker(GetRequest):
         status: int = answer.get("status")
         if status == 200:
             return True
-
-        self._error_params.update(answer=answer, telegram_id=telegram_id)
+        self._update_err_params(answer=answer, telegram_id=telegram_id)
         logger.debug("TokenChecker.check_token call error handling:"
                      f"\nParams: {self._error_params}")
         await ErrorsSender(**self._error_params).handle_errors()
@@ -173,38 +177,3 @@ class PostRequest(RequestSender):
                     "status": response.status,
                     "answer_data": await response.text()
             }
-
-        #
-        # answer: dict = await super()._send()
-        # async with aiohttp.ClientSession() as session:
-        #     params: dict = {
-        #         'url': self.url,
-        #         "proxy": self.proxy_data,
-        #         "ssl": False,
-        #         "timeout": 10,
-        #         "json": self._data_for_send
-        #     }
-        #     if self.token:
-        #         session.headers['authorization']: str = self.token
-        #     try:
-        #         async with session.post(**params) as response:
-        #             answer.update(
-        #                 status=response.status,
-        #                 data=await response.text()
-        #             )
-        #     except aiohttp.client_exceptions.ClientConnectorError as err:
-        #         logger.error(f"GetRequest: Proxy check Error: {err}")
-        #         await ErrorsSender.proxy_not_found_error()
-        #         answer.update(status=407)
-        #     except aiohttp.http_exceptions.BadHttpMessage as err:
-        #         logger.error("GetRequest: МУДАК ПРОВЕРЬ ПОРТ ПРОКСИ!!!", err)
-        #         if "Proxy Authentication Required" in err:
-        #             answer.update(status=407)
-        #     except (ssl.SSLError, OSError) as err:
-        #         logger.error("GetRequest: Ошибка авторизации прокси:", err)
-        #         if "Proxy Authentication Required" in err:
-        #             answer.update(status=407)
-        #     except self._EXCEPTIONS as err:
-        #         logger.error("GetRequest: _EXCEPTIONS: ", err)
-        #
-        # return answer
