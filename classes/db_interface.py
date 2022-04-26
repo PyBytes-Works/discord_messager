@@ -44,17 +44,20 @@ class DBI:
         free_tokens: Tuple[
             List[int], ...] = await DBI.get_all_free_tokens(telegram_id)
         formed_pairs: int = 0
+        logger.debug(f"\n\tAll free tokens: {free_tokens}")
         for tokens in free_tokens:
             while len(tokens) > 1:
                 random.shuffle(tokens)
                 first_token = tokens.pop()
                 second_token = tokens.pop()
+                logger.debug(f"\n\tPaired tokens: {first_token} + {second_token}")
                 formed_pairs += await DBI.make_tokens_pair(first_token, second_token)
 
     @classmethod
     @logger.catch
     async def add_new_user(
-            cls, nick_name: str, telegram_id: str, proxy_pk: int, expiration: int, max_tokens: int) -> bool:
+            cls, nick_name: str, telegram_id: str, proxy_pk: int, expiration: int, max_tokens: int
+    ) -> bool:
         return User.add_new_user(
             nick_name=nick_name, telegram_id=telegram_id, proxy_pk=proxy_pk, expiration=expiration,
             max_tokens=max_tokens)
