@@ -343,7 +343,7 @@ class DBI:
     @classmethod
     @logger.catch
     async def get_channel(cls, user_channel_pk: int) -> namedtuple:
-        # TODO вернуть данные о канале по его user_channel_pk
+        """Вернет данные о канале по его user_channel_pk"""
         return UserChannel.get_user_channel(user_channel_pk=user_channel_pk)
 
         # заглушка, удалить
