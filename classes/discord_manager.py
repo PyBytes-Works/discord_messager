@@ -63,12 +63,16 @@ class DiscordManager:
                 f"\n\t\tMate discord id: {self._datastore.mate_id}"
         )
 
+    async def _check_user_active(self):
+        user_deactivated: bool = await DBI.is_expired_user_deactivated(self.message)
+        user_is_work: bool = await DBI.is_user_work(telegram_id=self.__telegram_id)
+        if user_deactivated or not user_is_work:
+            self.is_working = False
+
     @logger.catch
     async def _lets_play(self) -> None:
 
-        if await DBI.is_expired_user_deactivated(self.message):
-            self.is_working = False
-            return
+        await self._check_user_active()
         await self._get_worker()
         logger.info(await self.__get_full_info())
         await self._getting_messages()

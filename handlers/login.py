@@ -16,15 +16,16 @@ async def start_add_new_user_handler(message: Message) -> None:
     """Получает сообщение от админа и добавляет пользователя в БД"""
 
     telegram_id: str = str(message.from_user.id)
-    user_is_admin: bool = telegram_id in admins_list
-    user_is_superadmin: bool = await DBI.is_admin(telegram_id)
+    user_is_superadmin: bool = telegram_id in admins_list
+    user_is_admin: bool = await DBI.is_admin(telegram_id)
     if user_is_admin or user_is_superadmin:
-        # await message.answer("Функция временно недоступна.", reply_markup=user_menu_keyboard())
         await message.answer(
             "Перешлите (forward) мне любое сообщение от пользователя, которого вы хотите добавить.",
             reply_markup=cancel_keyboard()
         )
         await LogiStates.add_new_user.set()
+    else:
+        logger.info(f"User {telegram_id} try to add user.")
 
 
 @logger.catch
@@ -38,13 +39,14 @@ async def check_new_user_is_exists_handler(message: Message, state: FSMContext) 
             "которого вы хотите добавить.",
             reply_markup=user_menu_keyboard()
         )
+        await state.finish()
         return
 
     new_user_telegram_id: str = str(message.forward_from.id)
     new_user_nickname: str = message.forward_from.username
     await message.answer(
         f"В базу будет добавлен пользователь {new_user_telegram_id}: {new_user_nickname}",
-        reply_markup=user_menu_keyboard()
+        reply_markup=cancel_keyboard()
     )
     if await DBI.get_user_by_telegram_id(telegram_id=new_user_telegram_id):
         text: str = f"Пользователь {new_user_telegram_id}: {new_user_nickname} уже существует."
@@ -55,7 +57,7 @@ async def check_new_user_is_exists_handler(message: Message, state: FSMContext) 
         new_user_telegram_id=new_user_telegram_id, new_user_nickname=new_user_nickname
     )
     text: str = f"Введите количество токенов для пользователя {new_user_nickname}:"
-    await message.answer(text, reply_markup=user_menu_keyboard())
+    await message.answer(text, reply_markup=cancel_keyboard())
     await LogiStates.add_new_user_max_tokens.set()
 
 
@@ -69,6 +71,7 @@ async def set_max_tokens_for_new_user_handler(message: Message, state: FSMContex
             'Число должно быть целым положительным. Введите еще раз: ',
             reply_markup=cancel_keyboard()
         )
+        await state.finish()
         return
     await state.update_data(max_tokens=max_tokens)
     await message.answer('Введите время подписки в ЧАСАХ:: ', reply_markup=cancel_keyboard())
@@ -89,6 +92,7 @@ async def check_expiration_and_add_new_user_handler(message: Message, state: FSM
             '\nВведите еще раз время подписки в ЧАСАХ: ',
             reply_markup=cancel_keyboard()
         )
+        await state.finish()
         return
     state_data: dict = await state.get_data()
     new_user_telegram_id: str = state_data["new_user_telegram_id"]

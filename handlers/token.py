@@ -7,7 +7,7 @@ from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, C
 from aiogram.dispatcher import FSMContext
 
 from classes.request_classes import GetMe, ProxyChecker, TokenChecker
-from handlers import main_handlers
+from handlers import cancel_handler
 from states import TokenStates, UserChannelStates
 from utils import check_is_int
 from classes.db_interface import DBI
@@ -17,8 +17,6 @@ from keyboards import (
     user_menu_keyboard, cancel_keyboard, new_channel_key, yes_no_buttons, channel_menu_keyboard
 )
 
-
-# TODO Удалять реплай сообщения после ответа.
 
 @logger.catch
 async def select_channel_handler(message: Message) -> None:
@@ -437,7 +435,7 @@ def token_register_handlers(dp: Dispatcher) -> None:
     """
     Регистратор для функций данного модуля
     """
-    dp.register_callback_query_handler(main_handlers.callback_cancel_handler, Text(startswith=[
+    dp.register_callback_query_handler(cancel_handler.callback_cancel_handler, Text(startswith=[
         "отмена", "cancel"], ignore_case=True), state="*")
     dp.register_callback_query_handler(start_create_channel_handler, Text(equals=[
         "new_channel"]), state=TokenStates.select_channel)

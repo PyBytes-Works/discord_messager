@@ -26,7 +26,7 @@ class CheckAccess:
             message: Message = args[0]
             if is_user_subscribe_active(telegram_id=message.from_user.id):
                 return await func(*args, **kwargs)
-
+            logger.warning(f"User {message.from_user.id} expired.")
         return wrapper
 
     @classmethod
@@ -40,6 +40,7 @@ class CheckAccess:
             telegram_id = message.from_user.id
             if is_admin(telegram_id=str(telegram_id)) or is_super_admin(telegram_id=str(telegram_id)):
                 return await func(*args, **kwargs)
+            logger.warning(f"User {message.from_user.id} is not admin.")
 
         return wrapper
 
@@ -54,5 +55,6 @@ class CheckAccess:
             telegram_id = message.from_user.id
             if is_admin(args[0]) or is_super_admin(telegram_id=str(telegram_id)):
                 return await func(*args, **kwargs)
+            logger.warning(f"User {message.from_user.id} is not superadmin.")
 
         return wrapper
