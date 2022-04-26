@@ -41,3 +41,5 @@ class TokenStates(StatesGroup):
 class UserChannelStates(StatesGroup):
     call_name_for_user_channel = State()
     set_name_for_user_channel = State()
+    delete_for_user_channel = State()
+    checks_tokens_for_user_channel = State()
