@@ -346,6 +346,12 @@ class DBI:
         """Вернет данные о канале по его user_channel_pk"""
         return UserChannel.get_user_channel(user_channel_pk=user_channel_pk)
 
-        # заглушка, удалить
-        # user_channel = UserChannel.get_or_none(UserChannel.id == user_channel_pk)
-        # return user_channel.channel.channel_id
+    @classmethod
+    @logger.catch
+    async def delete_user_channel(cls, user_channel_pk: int) -> bool:
+        return bool(UserChannel.delete_user_channel(user_channel_pk=user_channel_pk))
+
+    @classmethod
+    @logger.catch
+    async def get_count_tokens_by_user_channel(cls, user_channel_pk: int) -> int:
+        return Token.get_count_bu_user_channel(user_channel_pk=user_channel_pk)
