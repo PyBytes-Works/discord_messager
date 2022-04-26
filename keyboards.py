@@ -93,7 +93,7 @@ def channel_menu_keyboard() -> 'ReplyKeyboardMarkup':
 
     keyboard.add(
         KeyboardButton("Отмена"),
-        KeyboardButton("Переименовать"),
+        # KeyboardButton("Переименовать"),
         KeyboardButton("Установить кулдаун")
     )
     return keyboard
