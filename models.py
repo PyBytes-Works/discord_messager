@@ -668,7 +668,6 @@ class UserChannel(BaseModel):
                 .where(User.telegram_id == telegram_id).namedtuples().execute()
         )
 
-
     @classmethod
     @logger.catch
     def get_user_channel(

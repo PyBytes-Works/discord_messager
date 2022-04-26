@@ -53,6 +53,7 @@ class RequestSender(ABC):
             "timeout": 10
         }
         try:
+            logger.debug(self._params)
             answer: dict = await self._send()
         except (
                 aiohttp.client_exceptions.ClientHttpProxyError,

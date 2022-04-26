@@ -47,11 +47,12 @@ class MessageSender(PostRequest):
 
         self.token = self._datastore.token
         self.proxy = self._datastore.proxy
+        self.channel = self._datastore.channel.channel_id
         self._data_for_send = self._datastore.data_for_send
 
         await self.typing()
         await self.typing()
-        self.url = DISCORD_BASE_URL + f'{self._datastore.channel}/messages?'
+        self.url = DISCORD_BASE_URL + f'{self.channel}/messages?'
         answer: dict = await self._send_request()
         status: int = answer.get("status")
         if status == 200:
