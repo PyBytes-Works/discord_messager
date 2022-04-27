@@ -1,6 +1,7 @@
 from collections import namedtuple
 from typing import List
 
+import aiogram
 from aiogram.dispatcher.filters import Text
 from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
 
@@ -345,7 +346,7 @@ async def menu_channel_handler(message: Message) -> None:
     :return:"""
     if await DBI.is_expired_user_deactivated(message):
         return
-    await message.answer('Выберете действия', reply_markup=channel_menu_keyboard())
+    await message.answer('Выберите действия', reply_markup=channel_menu_keyboard())
     await message.delete()
 
 
@@ -378,7 +379,8 @@ async def list_channel_handler(message: Message, state: FSMContext) -> None:
         text: str = f"Имя канала: {elem.channel_name}\nСервер/канал: {elem.guild_id}/{elem.channel_id}"
         mess = await message.answer(text, reply_markup=keyboard)
         list_messages.append(mess.message_id)
-    mess = await message.answer('Отмена', reply_markup=cancel_keyboard())
+    await message.delete()
+    mess = await message.answer('Выберите действие', reply_markup=cancel_keyboard())
     list_messages.append(mess.message_id)
     await state.update_data({'messages': list_messages})
 
@@ -387,10 +389,14 @@ async def list_channel_handler(message: Message, state: FSMContext) -> None:
 async def rename_channel_handler(callback: CallbackQuery, state: FSMContext) -> None:
     """Хэндлер для нажатия на кнопку "Переименовать канал" """
     user_channel_pk: int = int(callback.data)
+
     await state.set_state(UserChannelStates.enter_name_for_user_channel)
     await state.update_data({'user_channel_pk': user_channel_pk})
     mess = await callback.message.answer("Введите новое имя.", reply_markup=cancel_keyboard())
-
+    data: dict = await state.get_data()
+    old_messages = data.get('messages', [])
+    old_messages.append(mess.message_id)
+    await state.update_data({'messages': old_messages})
 
 @logger.catch
 async def set_user_channel_name(message: Message, state: FSMContext) -> None:
@@ -405,11 +411,14 @@ async def set_user_channel_name(message: Message, state: FSMContext) -> None:
     await message.delete()
 
     for message_id in old_messages:
-        await bot.delete_message(message.chat.id, message_id=message_id)
+        try:
+            await bot.delete_message(message.chat.id, message_id=message_id)
+        except aiogram.utils.exceptions.MessageToDeleteNotFound as err:
+            pass
 
     await DBI.set_user_channel_name(user_channel_pk=user_channel_pk, name=name)
-    await bot.send_message(chat_id, "Канал переименован.", reply_markup=user_menu_keyboard())
     await state.finish()
+    await bot.send_message(chat_id, "Канал переименован.", reply_markup=user_menu_keyboard())
 
 
 # TODO переписать дублирование кода
@@ -431,9 +440,8 @@ async def list_channel_handler_for_delete(message: Message, state: FSMContext) -
         )
         return
 
-    # state: FSMContext = await UserChannelStates.checks_tokens_for_user_channel
     await state.set_state(UserChannelStates.checks_tokens_for_user_channel)
-    # await state.set()
+
     list_messages = []
 
     for elem in channels:
@@ -445,6 +453,8 @@ async def list_channel_handler_for_delete(message: Message, state: FSMContext) -
         text: str = f"Имя канала: {elem.channel_name}\nСервер/канал: {elem.guild_id}/{elem.channel_id}"
         mess = await message.answer(text, reply_markup=keyboard)
         list_messages.append(mess.message_id)
+    mess = await message.answer('Выберите действие', reply_markup=cancel_keyboard())
+    list_messages.append(mess.message_id)
     await state.update_data({'messages': list_messages})
 
 
@@ -456,7 +466,9 @@ async def check_tokens_for_user_channel_handler(callback: CallbackQuery, state: 
     user_channel_pk: int = int(callback.data)
 
     await state.update_data({'user_channel_pk': user_channel_pk})
-
+    data: dict = await state.get_data()
+    old_messages = data.get('messages', [])
+    old_messages.append(callback.message.message_id)
     if await DBI.get_count_tokens_by_user_channel(user_channel_pk=user_channel_pk):
         keyboard = InlineKeyboardMarkup(row_width=3)
         keyboard.add(InlineKeyboardButton(
@@ -465,12 +477,18 @@ async def check_tokens_for_user_channel_handler(callback: CallbackQuery, state: 
         keyboard.add(InlineKeyboardButton(
             text="Отмена",
             callback_data=f"{'False'}"))
-        await callback.message.answer(
+        mess = await callback.message.answer(
             'В этом канале есть токены, если продолжить они будут удалены',
             reply_markup=keyboard
         )
+        old_messages.append(mess.message_id)
+        mess = await callback.message.answer('Выберите действие', reply_markup=cancel_keyboard())
+
+        old_messages.append(mess.message_id)
         await state.update_data({'user_channel_pk': user_channel_pk})
+        await state.update_data({'messages': old_messages})
         return
+    await state.update_data({'messages': old_messages})
     callback.data = 'True'
     await delete_user_channel_handler(callback, state)
 
@@ -488,8 +506,10 @@ async def delete_user_channel_handler(callback: CallbackQuery, state: FSMContext
         await callback.message.delete()
     old_messages = data.get('messages', [])
     for message_id in old_messages:
-        await bot.delete_message(callback.message.chat.id, message_id=message_id)
-    # await list_channel_handler_for_delete(callback.message, state)
+        try:
+            await bot.delete_message(callback.message.chat.id, message_id=message_id)
+        except aiogram.utils.exceptions.MessageToDeleteNotFound as err:
+            pass
     await state.finish()
 
 
