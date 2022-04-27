@@ -1,11 +1,12 @@
 from collections import namedtuple
 
+import aiogram.utils.exceptions
 from aiogram.types import Message
 from aiogram.dispatcher import FSMContext
 
 from classes.db_interface import DBI
 from classes.errors_sender import ErrorsSender
-from config import logger, Dispatcher, admins_list
+from config import logger, Dispatcher, admins_list, bot
 from keyboards import user_menu_keyboard, cancel_keyboard
 from states import LogiStates
 from utils import check_is_int
@@ -97,6 +98,8 @@ async def check_expiration_and_add_new_user_handler(message: Message, state: FSM
     new_user_nickname: str = state_data["new_user_nickname"]
     max_tokens: int = state_data["max_tokens"]
     proxy: namedtuple = await DBI.get_low_used_proxy()
+    if not proxy.proxy_pk:
+        await ErrorsSender.send_report_to_admins(text="Нет проксей.")
     user_data: dict = {
         "telegram_id": new_user_telegram_id,
         "nick_name": new_user_nickname,
@@ -109,13 +112,27 @@ async def check_expiration_and_add_new_user_handler(message: Message, state: FSM
         f"\nИмя: {new_user_nickname}  ID:{new_user_telegram_id}"
         f"\nМаксимум токенов: {max_tokens}"
         f"\nДобавлен на срок (в часах): {subscribe_time}"
+        f"\nПрокси: {proxy.proxy}"
     )
     if not await DBI.add_new_user(**user_data):
         text: str = (f"ОШИБКА ДОБАВЛЕНИЯ ПОЛЬЗОВАТЕЛЯ В БД: "
                      f"\nИмя: {new_user_nickname}  ID:{new_user_telegram_id}")
         await ErrorsSender.send_report_to_admins(text)
+        logger.error(text)
+        await state.finish()
+        return
     await DBI.activate_user(telegram_id=new_user_telegram_id)
     await message.answer(text, reply_markup=user_menu_keyboard())
+    try:
+        await bot.send_message(
+            chat_id=new_user_telegram_id, text="Вы добавлены в базу данных.",
+            reply_markup=user_menu_keyboard())
+    except aiogram.utils.exceptions.ChatNotFound as err:
+        logger.error(f"Не смог отправить сообщение пользователю {new_user_telegram_id}.", err)
+    except aiogram.utils.exceptions.BotBlocked as err:
+        logger.error(f"Пользователь {new_user_telegram_id} заблокировал бота", err)
+    except aiogram.utils.exceptions.CantInitiateConversation as err:
+        logger.error(f"Не смог отправить сообщение пользователю {new_user_telegram_id}.", err)
     await state.finish()
 
 
