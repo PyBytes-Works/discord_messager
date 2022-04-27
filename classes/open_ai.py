@@ -8,6 +8,8 @@ import openai
 from config import logger
 
 openai.api_key = os.getenv("OPEN_AI_KEY")
+MIN_MESSAGE_LENGTH: int = 3
+MAX_MESSAGE_LENGTH: int = 100
 
 
 class OpenAI:
@@ -66,7 +68,7 @@ class OpenAI:
         result: str = answers[0].get("text", '').strip().split("\n")[0]
         if any(filter(lambda x: x in result, plugs)):
             return random.choice(defaults)
-        if len(result) not in range(3, 101):
+        if len(result) not in range(MIN_MESSAGE_LENGTH, MAX_MESSAGE_LENGTH):
             return self.get_answer(message)
         return result
 
