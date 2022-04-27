@@ -21,7 +21,7 @@ load_dotenv()
 VERSION = os.getenv("VERSION")
 
 # DEBUG setting
-DEBUG = bool(os.getenv("DEBUG"))
+DEBUG = bool(os.getenv("DEBUG", 0))
 
 # # redis init
 REDIS_DB = os.environ.get("REDIS_DB", "redis://127.0.0.1:6379/0")
