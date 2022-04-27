@@ -1077,30 +1077,30 @@ class Token(BaseModel):
 
         return data
 
-    @classmethod
-    @logger.catch
-    def get_closest_token_time(cls: 'Token', telegram_id: str) -> namedtuple:
-        """
-        Вернуть info по токен
-        возвращает объект токен
-            'cooldown': cooldown(int, seconds)}
-            'last_message_time' int
-        """
-        data = (
-            cls.select(
-                UserChannel.cooldown.alias('cooldown'),
-                cls.last_message_time.alias('last_message_time'),
-            )
-                .join(UserChannel, JOIN.LEFT_OUTER, on=(cls.user_channel == UserChannel.id))
-                .join(Channel, JOIN.LEFT_OUTER, on=(UserChannel.channel == Channel.id))
-                .join(User, JOIN.LEFT_OUTER, on=(UserChannel.user == User.id))
-                .join(TokenPair, JOIN.LEFT_OUTER, on=(TokenPair.first_id == cls.id))
-                .join(Proxy, JOIN.LEFT_OUTER, on=(Proxy.id == User.proxy))
-                .join(cls.alias('pair'), JOIN.LEFT_OUTER,
-                on=(cls.alias('pair').id == TokenPair.second_id))
-                .where(User.telegram_id == telegram_id)
-                .order_by(cls.last_message_time).namedtuples().first()
-        )
+    # @classmethod
+    # @logger.catch
+    # def get_closest_token_time(cls: 'Token', telegram_id: str) -> namedtuple:
+    #     """
+    #     Вернуть info по токен
+    #     возвращает объект токен
+    #         'cooldown': cooldown(int, seconds)}
+    #         'last_message_time' int
+    #     """
+    #     data = (
+    #         cls.select(
+    #             UserChannel.cooldown.alias('cooldown'),
+    #             cls.last_message_time.alias('last_message_time'),
+    #         )
+    #             .join(UserChannel, JOIN.LEFT_OUTER, on=(cls.user_channel == UserChannel.id))
+    #             .join(Channel, JOIN.LEFT_OUTER, on=(UserChannel.channel == Channel.id))
+    #             .join(User, JOIN.LEFT_OUTER, on=(UserChannel.user == User.id))
+    #             .join(TokenPair, JOIN.LEFT_OUTER, on=(TokenPair.first_id == cls.id))
+    #             .join(Proxy, JOIN.LEFT_OUTER, on=(Proxy.id == User.proxy))
+    #             .join(cls.alias('pair'), JOIN.LEFT_OUTER,
+    #             on=(cls.alias('pair').id == TokenPair.second_id))
+    #             .where(User.telegram_id == telegram_id)
+    #             .order_by(cls.last_message_time).namedtuples().first()
+    #     )
 
         return data if data else namedtuple(
             'Row', ['cooldown', 'last_message_time'])(cooldown=None, last_message_time=None)

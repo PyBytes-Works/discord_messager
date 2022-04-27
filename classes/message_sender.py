@@ -105,6 +105,12 @@ class MessageSender(PostRequest):
     def __roll_the_dice(self) -> bool:
         return random.randint(1, 100) <= 10
 
+    @logger.catch
+    def __fifty_fifty(self) -> bool:
+        return random.randint(1, 100) <= 50
+
+    # TODO 50/50 chance to AI answer without reply
+    @logger.catch
     async def __get_text(self) -> None:
         if self.__text:
             return
