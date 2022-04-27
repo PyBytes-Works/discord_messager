@@ -40,6 +40,7 @@ class Replies(RedisDB):
                 elem.update(
                     {
                         "answer_text": text,
+                        "showed": True,
                         "answered": True
                     }
                 )

@@ -268,21 +268,32 @@ class DiscordManager:
     async def _send_replies(self) -> None:
         """Отправляет реплаи из дискорда в телеграм с кнопкой Ответить"""
 
-        # TODO реализовать автоответчик
-        # result_replies: List[dict] = []
+        replyer: 'Replies' = Replies(self.__telegram_id)
         for elem in self._datastore.for_reply:
-            if not elem.get("showed"):
-                # if self.autoanswer:
-                #     result_replies.append(await self._auto_reply_with_davinchi(reply))
-                # else:
-                await self.__reply_to_telegram(elem)
-                await Replies(self.__telegram_id).update_showed(str(elem.get("message_id")))
-                # result_replies.append(reply)
-        # if self.autoanswer:
-        #     await RedisDB(redis_key=self._datastore.telegram_id).save(data=result_replies)
+            if not elem.get("showed") and not elem.get("answered"):
+                if self.autoanswer:
+                    await self._auto_reply_with_davinchi(elem, replyer)
+                else:
+                    await self.__reply_to_telegram(elem, replyer)
 
     @logger.catch
-    async def __reply_to_telegram(self, data: dict) -> None:
+    async def _auto_reply_with_davinchi(self, data: dict, replyer: 'Replies') -> None:
+
+        logger.debug("Start autoreply:")
+        reply_text: str = data.get("text")
+        ai_reply_text: str = OpenAI(davinchi=True).get_answer(message=reply_text)
+        logger.debug(f"Davinci text: {ai_reply_text}")
+        if ai_reply_text:
+            await replyer.update_answered(
+                message_id=str(data.get("message_id")), text=ai_reply_text)
+            return
+
+        logger.error(f"Davinci NOT ANSWERED")
+        await self.message.answer("ИИ не ответил на реплай:")
+        await self.__reply_to_telegram(data)
+
+    @logger.catch
+    async def __reply_to_telegram(self, data: dict, replyer: 'Replies') -> None:
         """Отправляет сообщение о реплае в телеграм"""
 
         answer_keyboard: 'InlineKeyboardMarkup' = InlineKeyboardMarkup(row_width=1)
@@ -303,19 +314,8 @@ class DiscordManager:
             f"\nText: {reply_text}",
             reply_markup=answer_keyboard
         )
+        await replyer.update_showed(str(data.get("message_id")))
 
-    @logger.catch
-    async def _auto_reply_with_davinchi(self, data: dict) -> dict:
-
-        logger.debug("Start autoreply:")
-        reply_text: str = data.get("text")
-        ai_reply_text: str = OpenAI(davinchi=True).get_answer(message=reply_text)
-        logger.debug(f"Davinci text: {ai_reply_text}")
-        if not ai_reply_text:
-            logger.error(f"Davinci NOT ANSWERED")
-            return data
-        data.update({"answer_text": ai_reply_text})
-        return data
 
     @check_working
     @logger.catch
