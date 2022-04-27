@@ -94,7 +94,6 @@ class ErrorsSender:
                 )
                 if await DBI.delete_token(token=self._token):
                     text += f"\nТокен: {self._token} удален."
-                await DBI.form_new_tokens_pairs(telegram_id=self._telegram_id)
             else:
                 text: str = f"Ошибка {self._status} Code: {self._code}"
         elif self._status == 404:

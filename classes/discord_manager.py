@@ -1,6 +1,6 @@
 import datetime
 import random
-from typing import List, Optional
+from typing import List, Optional, Tuple
 from collections import namedtuple
 
 import asyncio
@@ -124,19 +124,19 @@ class DiscordManager:
 
         await MessageReceiver(datastore=self._datastore).get_message()
         await DBI.update_token_last_message_time(token=self._datastore.token)
-        # await self.__update_token_last_message_time(token=self._datastore.token)
+        await self.__update_token_last_message_time(token=self._datastore.token)
 
-    # @logger.catch
-    # async def __update_token_last_message_time(self, token: str) -> None:
-    #     """Отправляет сообщение в дискор и сохраняет данные об ошибках в
-    #     словарь атрибута класса"""
-    #
-    #     for elem in self.__related_tokens:
-    #         if elem.token == token:
-    #             logger.debug(f"Related tokens before replace: {self.__related_tokens}")
-    #             elem._replace(last_message_time=int(datetime.datetime.now().timestamp()))
-    #             logger.debug(f"Related tokens after replace: {self.__related_tokens}")
-    #             return
+    @logger.catch
+    def __get_replaced_namedtuple(self, elem) -> namedtuple:
+        return elem._replace(last_message_time=datetime.datetime.now())
+
+    @logger.catch
+    async def __update_token_last_message_time(self, token: str) -> None:
+        """"""
+
+        self.__related_tokens = [self.__get_replaced_namedtuple(elem)
+                                 if elem.token == token else elem
+                                 for elem in self.__related_tokens]
 
     @check_working
     @logger.catch
@@ -164,25 +164,10 @@ class DiscordManager:
 
     @check_working
     @logger.catch
-    async def _make_related_tokens(self) -> None:
-        related_tokens: List[namedtuple] = await DBI.get_all_related_user_tokens(
-            telegram_id=self._datastore.telegram_id
-        )
-        if not related_tokens:
-            await self.__send_text(
-                text="Не смог сформировать пары токенов.",
-                keyboard=user_menu_keyboard())
-            self.is_working = False
-            return
-        self.__related_tokens: List[namedtuple] = related_tokens
-
-    @check_working
-    @logger.catch
     async def _get_worker(self) -> None:
 
         if not self.__workers:
             await self.make_token_pairs(unpair=True)
-            await self._make_related_tokens()
             await self._make_workers_list()
         await self._get_worker_from_list()
 
@@ -195,7 +180,6 @@ class DiscordManager:
             return
         await self._get_delay()
         self.delay += random.randint(3, 7)
-        # TODO убрать эту заглушку!!!
         # if self.delay <= 0:
         #     self.delay: int = self._datastore.cooldown
         logger.info(f"SLEEP PAUSE: {self.delay}")
@@ -249,9 +233,9 @@ class DiscordManager:
 
     @logger.catch
     async def __get_closest_token_time(self) -> namedtuple:
-        return await DBI.get_closest_token_time(self._datastore.telegram_id)
+        # return await DBI.get_closest_token_time(self._datastore.telegram_id)
         # TODO реализовать получение данных о токене из текущего экземпляра класса, а не из БД
-        # return min(self.__related_tokens, key=lambda x: x.last_message_time)
+        return min(self.__related_tokens, key=lambda x: x.last_message_time)
 
     @logger.catch
     async def _get_delay(self) -> None:
@@ -340,7 +324,35 @@ class DiscordManager:
 
         if unpair:
             await DBI.delete_all_pairs(telegram_id=self.__telegram_id)
-        await DBI.form_new_tokens_pairs(telegram_id=self.__telegram_id)
+        await self.form_new_tokens_pairs(telegram_id=self.__telegram_id)
+
+    @logger.catch
+    async def form_new_tokens_pairs(self) -> None:
+        """Формирует пары токенов из свободных"""
+
+        free_tokens: Tuple[List[namedtuple], ...] = await DBI.get_all_free_tokens(self.__telegram_id)
+        formed_pairs: int = 0
+        sorted_tokens: Tuple[List[namedtuple], ...] = tuple(
+            sorted(
+                array, key=lambda x: x.last_message_time, reverse=True
+            )
+            for array in free_tokens
+        )
+        self.__related_tokens = []
+        for tokens in sorted_tokens:
+            while len(tokens) > 1:
+                random.shuffle(tokens)
+                first_token = tokens.pop()
+                second_token = tokens.pop()
+                logger.debug(f"\n\tPaired tokens: {first_token} + {second_token}")
+                formed_pairs += await DBI.make_tokens_pair(first_token.token_pk, second_token.token_pk)
+                self.__related_tokens.append(first_token.token)
+                self.__related_tokens.append(second_token.token)
+        if not self.__related_tokens:
+            await self.__send_text(
+                text="Не смог сформировать пары токенов.",
+                keyboard=user_menu_keyboard())
+            self.is_working = False
 
     @property
     def silence(self) -> bool:
