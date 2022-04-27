@@ -62,7 +62,7 @@ class DiscordManager:
             f"\n\tDiscord ID: {self._datastore.my_discord_id}"
             f"\n\tMate discord id: {self._datastore.mate_id}"
             f"\n\tSilence: {self.__silence}"
-            f"\n\tWorkers: {self.__workers}/{len(self.__related_tokens)}"
+            f"\n\tWorkers: {len(self.__workers)}/{len(self.__related_tokens)}"
             # f"\n\tRelated tokens: {self.__related_tokens}"
         )
 
