@@ -948,13 +948,18 @@ class Token(BaseModel):
         List[namedtuple], ...]:
         """
         Возвращает список всех свободных токенов по каналам
-          discord id
+            token_pk int
+            token str
+            last_message_time datetime
+            cooldown  int
+            channel_id int
         """
         data = (
             cls.select(
                 cls.id.alias('token_pk'),
                 cls.token.alias('token'),
                 cls.last_message_time.alias('last_message_time'),
+                UserChannel.cooldown.alias('cooldown'),
                 Channel.channel_id.alias('channel_id'),
             )
                 .join_from(cls, UserChannel, JOIN.LEFT_OUTER, on=(
