@@ -103,6 +103,8 @@ class DiscordManager:
         # TODO Сделать флаг автоответа (если флаг стоит - то отвечает бот Давинчи, иначе -
         #  отправлять в телеграм юзеру
 
+        # TODO разобраться с реплаями
+
         await self.__create_datastore()
         await self.__make_all_token_ids()
         logger.info(f"\n\tUSER: {self.__username}: {self.__telegram_id} - Game begin.")
