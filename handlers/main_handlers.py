@@ -108,7 +108,7 @@ async def autoanswer_enabled_handler(message: Message):
     telegram_id: str = str(message.from_user.id)
     manager: 'DiscordManager' = await InstancesStorage.get_instance(telegram_id=telegram_id)
     manager.autoanswer = True
-    await message.answer("Автоответчик включен.")
+    await message.answer("Автоответчик включен.", reply_markup=in_work_keyboard())
 
 
 @logger.catch
@@ -118,7 +118,7 @@ async def autoanswer_disabled_handler(message: Message):
     telegram_id: str = str(message.from_user.id)
     manager: 'DiscordManager' = await InstancesStorage.get_instance(telegram_id=telegram_id)
     manager.autoanswer = False
-    await message.answer("Автоответчик вЫключен.")
+    await message.answer("Автоответчик вЫключен.", reply_markup=in_work_keyboard())
 
 
 @logger.catch
@@ -128,7 +128,7 @@ async def silence_mode_handler(message: Message):
     telegram_id: str = str(message.from_user.id)
     manager: 'DiscordManager' = await InstancesStorage.get_instance(telegram_id=telegram_id)
     manager.silence = True
-    await message.answer("Тихий режим включен.")
+    await message.answer("Тихий режим включен.", reply_markup=in_work_keyboard())
 
 
 @logger.catch
