@@ -274,7 +274,7 @@ class User(BaseModel):
                     .join(UserChannel, JOIN.LEFT_OUTER, on=(Token.user_channel == UserChannel.id))
                     .join(User, JOIN.LEFT_OUTER, on=(UserChannel.user == User.id))
                     .where(User.telegram_id == telegram_id)))
-        )
+        ).execute()
 
     @classmethod
     @logger.catch
