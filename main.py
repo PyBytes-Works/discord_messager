@@ -11,47 +11,50 @@ import datetime
 
 from aiogram import executor
 
-from admin_handlers import register_admin_handlers
-from config import dp, logger, admins_list, bot, db_file_name, VERSION
-from handlers import register_handlers
+from handlers.admin import register_admin_handlers
+from config import dp, logger, DB_FILE_NAME, VERSION, DEBUG
+from handlers.main_handlers import register_handlers
+from handlers.login import login_register_handlers
+from handlers.token import token_register_handlers
+from handlers.cancel_handler import cancel_register_handlers
 from models import recreate_db
+from classes.errors_sender import ErrorsSender
 
+cancel_register_handlers(dp=dp)
+login_register_handlers(dp=dp)
 register_admin_handlers(dp=dp)
+token_register_handlers(dp=dp)
 register_handlers(dp=dp)
-
-
-async def send_report_to_admins(text: str) -> None:
-    """Отправляет сообщение в телеграме всем администраторам из списка"""
-
-    for admin_id in admins_list:
-        await bot.send_message(chat_id=admin_id, text=text)
 
 
 @logger.catch
 async def on_startup(_) -> None:
     """Функция выполняющаяся при старте бота."""
 
+    text: str = (
+        "Discord_mailer started."
+        f"\nVersion: {VERSION}")
+    if DEBUG:
+        text += "\nDEBUG = TRUE"
     try:
-        # Отправляет сообщение админамv при запуске бота
-        await send_report_to_admins(text="Discord_mailer started."
-                                         f"\nVersion: {VERSION}")
+        await ErrorsSender.send_report_to_admins(text=text)
     except Exception:
         pass
     if not os.path.exists('./db'):
         os.mkdir("./db")
-    if not os.path.exists(db_file_name):
-        logger.warning(f"Database not found with file name: {db_file_name}")
-        recreate_db(db_file_name)
+    if not os.path.exists(DB_FILE_NAME):
+        logger.warning(f"Database not found with file name: {DB_FILE_NAME}")
+        recreate_db(DB_FILE_NAME)
 
-    print('Bot started at:', datetime.datetime.now())
-    logger.info("BOT POLLING ONLINE")
+    logger.info(f'Bot started at: {datetime.datetime.now()}'
+                f'\nBOT POLLING ONLINE')
 
 
 @logger.catch
 async def on_shutdown(dp) -> None:
     """Действия при отключении бота."""
     try:
-        await send_report_to_admins(text="Discord_mailer stopping.")
+        await ErrorsSender.send_report_to_admins(text="Discord_mailer stopping.")
     except Exception:
         pass
     logger.warning("BOT shutting down.")
