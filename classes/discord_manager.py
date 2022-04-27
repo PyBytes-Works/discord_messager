@@ -341,7 +341,7 @@ class DiscordManager:
                 random.shuffle(tokens)
                 first_token = tokens.pop()
                 second_token = tokens.pop()
-                logger.debug(f"\n\tPaired tokens: {first_token} + {second_token}")
+                logger.debug(f"\n\tPaired tokens: {first_token.token_pk} + {second_token.token_pk}")
                 formed_pairs += await DBI.make_tokens_pair(first_token.token_pk, second_token.token_pk)
                 self.__related_tokens.append(first_token)
                 self.__related_tokens.append(second_token)
