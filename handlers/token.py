@@ -13,9 +13,10 @@ from states import TokenStates, UserChannelStates
 from utils import check_is_int
 from classes.db_interface import DBI
 from classes.errors_sender import ErrorsSender
-from config import logger, Dispatcher, CHANNEL_MENU, bot
+from config import logger, Dispatcher, bot
 from keyboards import (
-    user_menu_keyboard, cancel_keyboard, new_channel_key, yes_no_buttons, channel_menu_keyboard
+    user_menu_keyboard, cancel_keyboard, new_channel_key, yes_no_buttons, channel_menu_keyboard,
+    CHANNEL_MENU
 )
 
 

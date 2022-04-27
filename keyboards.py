@@ -4,7 +4,14 @@ from collections import namedtuple
 from aiogram.types import (
     ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton
 )
-from config import logger, CHANNEL_MENU
+
+from config import logger
+from classes.menu_classes import Menu
+
+
+# --------------- keyboard menu -------------------
+CHANNEL_MENU: 'Menu' = Menu(delete='Удалить', rename='Сменить имя', cooldown='Кулдаун')
+# --------------- end keyboard menu -------------------
 
 
 @logger.catch
