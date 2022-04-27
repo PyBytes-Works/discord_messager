@@ -10,7 +10,6 @@ from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
 from classes.message_receiver import MessageReceiver
 from classes.message_sender import MessageSender
 from classes.open_ai import OpenAI
-from classes.redis_interface import RedisDB
 from classes.replies import Replies
 from classes.token_datastorage import TokenData
 
