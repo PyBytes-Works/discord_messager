@@ -50,7 +50,8 @@ class RequestSender(ABC):
             'url': self.url,
             "proxy": self.proxy_data,
             "ssl": False,
-            "timeout": 10
+            "timeout": 10,
+            "trust_env": True
         }
         try:
             # logger.debug(self._params)
@@ -177,4 +178,4 @@ class PostRequest(RequestSender):
                 return {
                     "status": response.status,
                     "answer_data": await response.text()
-            }
+                }
