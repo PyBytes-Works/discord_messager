@@ -41,11 +41,16 @@ class DBI:
     @logger.catch
     async def form_new_tokens_pairs(cls, telegram_id: str) -> None:
         """ВОзвращает количество сформированных пар токенов"""
-        free_tokens: Tuple[
-            List[int], ...] = await DBI.get_all_free_tokens(telegram_id)
+        free_tokens: Tuple[List[int], ...] = await DBI.get_all_free_tokens(telegram_id)
         formed_pairs: int = 0
+        sorted_tokens: Tuple[List[int], ...] = tuple(
+            sorted(
+                array, key=lambda x: x.last_message_time, reverse=True
+            )
+            for array in free_tokens
+        )
         logger.debug(f"\n\tAll free tokens: {free_tokens}")
-        for tokens in free_tokens:
+        for tokens in sorted_tokens:
             while len(tokens) > 1:
                 random.shuffle(tokens)
                 first_token = tokens.pop()

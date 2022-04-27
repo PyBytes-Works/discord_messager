@@ -84,7 +84,7 @@ class DiscordManager:
         await self._sleep()
 
     @logger.catch
-    async def __make_datastore(self) -> None:
+    async def __create_datastore(self) -> None:
         self._datastore: 'TokenData' = TokenData(self.__telegram_id)
 
     @logger.catch
@@ -103,7 +103,7 @@ class DiscordManager:
         # TODO Сделать флаг автоответа (если флаг стоит - то отвечает бот Давинчи, иначе -
         #  отправлять в телеграм юзеру
 
-        await self.__make_datastore()
+        await self.__create_datastore()
         await self.__make_all_token_ids()
         logger.info(f"\n\tUSER: {self.__username}: {self.__telegram_id} - Game begin.")
 
@@ -126,7 +126,6 @@ class DiscordManager:
         await DBI.update_token_last_message_time(token=self._datastore.token)
         # await self.__update_token_last_message_time(token=self._datastore.token)
 
-    # TODO реализовать:
     # @logger.catch
     # async def __update_token_last_message_time(self, token: str) -> None:
     #     """Отправляет сообщение в дискор и сохраняет данные об ошибках в
@@ -134,7 +133,9 @@ class DiscordManager:
     #
     #     for elem in self.__related_tokens:
     #         if elem.token == token:
+    #             logger.debug(f"Related tokens before replace: {self.__related_tokens}")
     #             elem._replace(last_message_time=int(datetime.datetime.now().timestamp()))
+    #             logger.debug(f"Related tokens after replace: {self.__related_tokens}")
     #             return
 
     @check_working
@@ -161,22 +162,19 @@ class DiscordManager:
             return
         await self.message.answer(text, reply_markup=keyboard)
 
-    @logger.catch
-    async def __make_related_tokens_list(self) -> None:
-        self.__related_tokens: List[namedtuple] = await DBI.get_all_related_user_tokens(
-            telegram_id=self._datastore.telegram_id
-        )
-
     @check_working
     @logger.catch
     async def _make_related_tokens(self) -> None:
-
-        await self.__make_related_tokens_list()
-        if not self.__related_tokens:
+        related_tokens: List[namedtuple] = await DBI.get_all_related_user_tokens(
+            telegram_id=self._datastore.telegram_id
+        )
+        if not related_tokens:
             await self.__send_text(
                 text="Не смог сформировать пары токенов.",
                 keyboard=user_menu_keyboard())
             self.is_working = False
+            return
+        self.__related_tokens: List[namedtuple] = related_tokens
 
     @check_working
     @logger.catch
@@ -198,8 +196,8 @@ class DiscordManager:
         await self._get_delay()
         self.delay += random.randint(3, 7)
         # TODO убрать эту заглушку!!!
-        if self.delay <= 0:
-            self.delay: int = self._datastore.cooldown
+        # if self.delay <= 0:
+        #     self.delay: int = self._datastore.cooldown
         logger.info(f"SLEEP PAUSE: {self.delay}")
         await self._send_delay_message()
         timer: int = self.delay
