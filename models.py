@@ -731,6 +731,7 @@ class Token(BaseModel):
           get_min_last_time_token_data
           get_time_by_token
           get_token_info
+          get_token_info_by_token_pk
           get_all_free_tokens
           get_all_discord_id
           get_all_discord_id_by_channel
@@ -1002,7 +1003,6 @@ class Token(BaseModel):
             'token_discord_id' str
             'token_name' str
         """
-        # TODO Добавить в возвращаеммые значения еще имя токена: 'token_name' str
 
         data = (
             cls.select(
