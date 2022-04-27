@@ -324,7 +324,7 @@ class DiscordManager:
 
         if unpair:
             await DBI.delete_all_pairs(telegram_id=self.__telegram_id)
-        await self.form_new_tokens_pairs(telegram_id=self.__telegram_id)
+        await self.form_new_tokens_pairs()
 
     @logger.catch
     async def form_new_tokens_pairs(self) -> None:
@@ -346,8 +346,8 @@ class DiscordManager:
                 second_token = tokens.pop()
                 logger.debug(f"\n\tPaired tokens: {first_token} + {second_token}")
                 formed_pairs += await DBI.make_tokens_pair(first_token.token_pk, second_token.token_pk)
-                self.__related_tokens.append(first_token.token)
-                self.__related_tokens.append(second_token.token)
+                self.__related_tokens.append(first_token)
+                self.__related_tokens.append(second_token)
         if not self.__related_tokens:
             await self.__send_text(
                 text="Не смог сформировать пары токенов.",
