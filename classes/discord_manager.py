@@ -7,6 +7,7 @@ import asyncio
 
 from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
 
+from classes.errors_sender import ErrorsSender
 from classes.message_receiver import MessageReceiver
 from classes.message_sender import MessageSender
 from classes.open_ai import OpenAI
@@ -277,17 +278,18 @@ class DiscordManager:
     @logger.catch
     async def _auto_reply_with_davinchi(self, data: dict, replyer: 'Replies') -> None:
 
-        logger.debug("Start autoreply:")
         reply_text: str = data.get("text")
         ai_reply_text: str = OpenAI(davinchi=True).get_answer(message=reply_text)
-        logger.debug(f"Davinci text: {ai_reply_text}")
+        logger.info(f"Davinci get text: {reply_text}")
+        logger.info(f"\nDavinci answered: {ai_reply_text}")
         if ai_reply_text:
             await replyer.update_answered(
                 message_id=str(data.get("message_id")), text=ai_reply_text)
             return
-
         logger.error(f"Davinci NOT ANSWERED")
-        await self.message.answer("ИИ не ответил на реплай:")
+        text: str = "ИИ не ответил на реплай:"
+        await self.message.answer(text)
+        await ErrorsSender.send_report_to_admins(text)
         await self.__reply_to_telegram(data)
 
     @logger.catch
