@@ -176,6 +176,7 @@ class DiscordManager:
     async def _sleep(self) -> None:
         """Спит на время ближайшего токена."""
 
+        logger.debug(f"TOTAL WORKERS: {self.__workers}")
         if self.__workers:
             return
         await self._get_delay()
@@ -232,7 +233,7 @@ class DiscordManager:
     @logger.catch
     async def __get_closest_token_time(self) -> namedtuple:
         # return await DBI.get_closest_token_time(self._datastore.telegram_id)
-        return min(self.__related_tokens, key=lambda x: x.last_message_time)
+        return sorted(self.__related_tokens, key=lambda x: x.last_message_time)[1]
 
     @logger.catch
     async def _get_delay(self) -> None:
@@ -338,7 +339,6 @@ class DiscordManager:
         self.__related_tokens = []
         for tokens in sorted_tokens:
             while len(tokens) > 1:
-                random.shuffle(tokens)
                 first_token = tokens.pop()
                 second_token = tokens.pop()
                 logger.debug(f"\n\tPaired tokens: {first_token.token_pk} + {second_token.token_pk}")
