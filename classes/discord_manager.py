@@ -80,7 +80,6 @@ class DiscordManager:
         await self._getting_messages()
         await self._send_replies()
         await self._sending_messages()
-        logger.info(await self.__get_full_info())
         await self._sleep()
 
     @logger.catch
@@ -171,6 +170,7 @@ class DiscordManager:
         if not self.__workers:
             await self.make_token_pairs(unpair=True)
             await self._make_workers_list()
+        logger.info(await self.__get_full_info())
         await self._get_worker_from_list()
 
     @check_working

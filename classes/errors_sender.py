@@ -109,6 +109,9 @@ class ErrorsSender:
                 f'\nОбратитесь к администратору. Код ошибки 407')
             users = True
             admins = True
+        elif self._status == 429 and self._code == 20016:
+            # превышен кулдаун канала
+            return
         elif self._status == 500:
             text = f"Внутренняя ошибка сервера Дискорда. Код ошибки - 500."
             admins = True
