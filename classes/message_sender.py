@@ -30,7 +30,7 @@ class MessageSender(PostRequest):
         if self._datastore.data_for_send:
             return await self.__send_data()
 
-    async def typing(self) -> None:
+    async def _typing(self) -> None:
         """Имитирует "Пользователь печатает" в чате дискорда."""
 
         self.url = f'https://discord.com/api/v9/channels/{self._datastore.channel}/typing'
@@ -48,8 +48,8 @@ class MessageSender(PostRequest):
         self.proxy = self._datastore.proxy
         self._data_for_send = self._datastore.data_for_send
 
-        await self.typing()
-        await self.typing()
+        await self._typing()
+        await self._typing()
         self.url = DISCORD_BASE_URL + f'{self._datastore.channel}/messages?'
         answer: dict = await self._send_request()
         status: int = answer.get("status")
@@ -96,28 +96,19 @@ class MessageSender(PostRequest):
         mate_message: list = await RedisDB(redis_key=self._datastore.my_discord_id).load()
         if mate_message:
             self.__text: str = OpenAI().get_answer(mate_message[0].strip())
+            if self._fifty_fifty():
+                self._datastore.current_message_id = 0
             await RedisDB(
                 redis_key=self._datastore.my_discord_id).delete(mate_id=self._datastore.mate_id)
-        if not self.__text:
-            self.__text: str = await self.__get_text_from_vocabulary()
+            return
+        if self._ten_from_hundred():
+            logger.debug("Random message! You are lucky!!!")
+            self._datastore.current_message_id = 0
+        self.__text: str = await self.__get_text_from_vocabulary()
 
-    @logger.catch
-    def __roll_the_dice(self) -> bool:
-        return random.randint(1, 100) <= 10
-
-    @logger.catch
-    def __fifty_fifty(self) -> bool:
-        return random.randint(1, 100) <= 50
-
-    # TODO 50/50 chance to AI answer without reply
     @logger.catch
     async def __get_text(self) -> None:
         if self.__text:
-            return
-        if self.__roll_the_dice():
-            logger.debug("Random message! You are lucky!!!")
-            self._datastore.current_message_id = 0
-            self.__text = await self.__get_text_from_vocabulary()
             return
         await self.__prepare_message_text()
 
@@ -127,6 +118,7 @@ class MessageSender(PostRequest):
 
         await self.__get_text()
         if not self.__text:
+            logger.warning("Message sender.__prepare_data: no text for sending.")
             return
         self._datastore.data_for_send = {
             "content": self.__text,
@@ -151,3 +143,13 @@ class MessageSender(PostRequest):
                     }
             }
             self._datastore.data_for_send.update(**params)
+
+    @staticmethod
+    @logger.catch
+    def _ten_from_hundred() -> bool:
+        return random.randint(1, 100) <= 10
+
+    @staticmethod
+    @logger.catch
+    def _fifty_fifty() -> bool:
+        return random.randint(1, 100) <= 50
