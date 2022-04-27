@@ -69,7 +69,7 @@ async def send_message_to_reply_handler(message: Message, state: FSMContext):
     state_data: dict = await state.get_data()
     message_id: str = state_data.get("message_id")
     user_telegram_id: str = str(message.from_user.id)
-    if not await Replies(user_telegram_id).update_answered(
+    if not await Replies(user_telegram_id).update_answered_or_showed(
             message_id=message_id, text=message.text):
         logger.warning("f: send_message_to_reply_handler: elem in Redis data not found or timeout error")
         await message.answer('Время хранения данных истекло.', reply_markup=cancel_keyboard())

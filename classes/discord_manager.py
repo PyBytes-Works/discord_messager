@@ -283,7 +283,7 @@ class DiscordManager:
         logger.info(f"Davinci get text: {reply_text}")
         logger.info(f"\nDavinci answered: {ai_reply_text}")
         if ai_reply_text:
-            await replyer.update_answered(
+            await replyer.update_answered_or_showed(
                 message_id=str(data.get("message_id")), text=ai_reply_text)
             return
         logger.error(f"Davinci NOT ANSWERED")
@@ -314,8 +314,7 @@ class DiscordManager:
             f"\nText: {reply_text}",
             reply_markup=answer_keyboard
         )
-        await replyer.update_answered(str(data.get("message_id")))
-
+        await replyer.update_answered_or_showed(str(data.get("message_id")))
 
     @check_working
     @logger.catch
