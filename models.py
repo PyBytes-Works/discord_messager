@@ -953,6 +953,7 @@ class Token(BaseModel):
         data = (
             cls.select(
                 cls.id.alias('token_pk'),
+                cls.token.alias('token'),
                 cls.last_message_time.alias('last_message_time'),
                 Channel.channel_id.alias('channel_id'),
             )
