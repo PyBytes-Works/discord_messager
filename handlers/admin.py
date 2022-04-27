@@ -33,9 +33,10 @@ async def send_message_to_all_users_handler(message: Message) -> None:
         index = 9
     elif text.startswith("/sa"):
         index = 4
-    data: str = f'[Рассылка][Всем]: {text[index:]}'
+    text_data: str = text[index:]
+    data: str = f'[Рассылка][Всем]: {text_data}'
     user_id: str = str(message.from_user.id)
-    if not data:
+    if not text_data:
         await message.answer("Нет данных для отправки.")
         return
     if user_id in admins_list:
