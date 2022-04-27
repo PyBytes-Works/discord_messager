@@ -10,7 +10,7 @@ from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
 from classes.message_receiver import MessageReceiver
 from classes.message_sender import MessageSender
 from classes.open_ai import OpenAI
-from classes.redis_interface import RedisDB
+from classes.replies import Replies
 from classes.token_datastorage import TokenData
 
 from config import logger
@@ -24,9 +24,9 @@ def check_working(func):
         if args and hasattr(args[0].__class__, name):
             is_working: bool = getattr(args[0], "is_working")
             if is_working:
-                logger.debug(f"\t{name}: OK")
+                # logger.debug(f"\t{name}: OK")
                 return await func(*args, **kwargs)
-        logger.debug(f"\t{name}: FAIL")
+        # logger.debug(f"\t{name}: FAIL")
         return
 
     return wrapper
@@ -63,7 +63,7 @@ class DiscordManager:
             f"\n\tMate discord id: {self._datastore.mate_id}"
             f"\n\tSilence: {self.__silence}"
             f"\n\tRelated tokens: {len(self.__related_tokens)}"
-            f"\n\tRelated tokens: {self.__related_tokens}"
+            # f"\n\tRelated tokens: {self.__related_tokens}"
         )
 
     async def _check_user_active(self):
@@ -103,16 +103,18 @@ class DiscordManager:
         # TODO Сделать флаг автоответа (если флаг стоит - то отвечает бот Давинчи, иначе -
         #  отправлять в телеграм юзеру
 
+        # TODO разобраться с реплаями
+
         await self.__create_datastore()
         await self.__make_all_token_ids()
         logger.info(f"\n\tUSER: {self.__username}: {self.__telegram_id} - Game begin.")
 
         while self.is_working:
             t0 = datetime.datetime.now()
-            logger.debug(f"\n\t\tCircle start at: {t0}")
+            # logger.debug(f"\n\t\tCircle start at: {t0}")
             await self._lets_play()
 
-            logger.debug(f"\n\t\tCircle finish. Total time: {datetime.datetime.now() - t0}")
+            # logger.debug(f"\n\t\tCircle finish. Total time: {datetime.datetime.now() - t0}")
 
         logger.info("\n\tGame over.")
 
@@ -232,7 +234,7 @@ class DiscordManager:
     @logger.catch
     async def __get_closest_token_time(self) -> namedtuple:
         # return await DBI.get_closest_token_time(self._datastore.telegram_id)
-        return min(self.__related_tokens, key=lambda x: x.last_message_time)
+        return sorted(self.__related_tokens, key=lambda x: x.last_message_time)[1]
 
     @logger.catch
     async def _get_delay(self) -> None:
@@ -268,12 +270,13 @@ class DiscordManager:
 
         # TODO реализовать автоответчик
         # result_replies: List[dict] = []
-        for reply in self._datastore.replies:
-            if not reply.get("answered"):
+        for elem in self._datastore.for_reply:
+            if not elem.get("showed"):
                 # if self.autoanswer:
                 #     result_replies.append(await self._auto_reply_with_davinchi(reply))
                 # else:
-                await self.__reply_to_telegram(reply)
+                await self.__reply_to_telegram(elem)
+                await Replies(self.__telegram_id).update_showed(str(elem.get("message_id")))
                 # result_replies.append(reply)
         # if self.autoanswer:
         #     await RedisDB(redis_key=self._datastore.telegram_id).save(data=result_replies)
@@ -338,10 +341,9 @@ class DiscordManager:
         self.__related_tokens = []
         for tokens in sorted_tokens:
             while len(tokens) > 1:
-                random.shuffle(tokens)
                 first_token = tokens.pop()
                 second_token = tokens.pop()
-                logger.debug(f"\n\tPaired tokens: {first_token} + {second_token}")
+                logger.debug(f"\n\tPaired tokens: {first_token.token_pk} + {second_token.token_pk}")
                 formed_pairs += await DBI.make_tokens_pair(first_token.token_pk, second_token.token_pk)
                 self.__related_tokens.append(first_token)
                 self.__related_tokens.append(second_token)

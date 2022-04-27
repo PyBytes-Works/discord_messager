@@ -128,6 +128,6 @@ elif DATABASE == 'lite':
 #  ********** END OF DATABASE CONFIG *************************
 
 # --------------- keyboard menu -------------------
-CHANEL_MENU = Menu(delete='Удалить', rename='Сменить имя', cooldown='Куллдаун')
+CHANNEL_MENU = Menu(delete='Удалить', rename='Сменить имя', cooldown='Куллдаун')
 
 # --------------- end keyboard menu -------------------

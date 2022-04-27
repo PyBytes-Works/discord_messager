@@ -1102,8 +1102,8 @@ class Token(BaseModel):
     #             .order_by(cls.last_message_time).namedtuples().first()
     #     )
 
-        return data if data else namedtuple(
-            'Row', ['cooldown', 'last_message_time'])(cooldown=None, last_message_time=None)
+        # return data if data else namedtuple(
+        #     'Row', ['cooldown', 'last_message_time'])(cooldown=None, last_message_time=None)
 
     @classmethod
     @logger.catch
