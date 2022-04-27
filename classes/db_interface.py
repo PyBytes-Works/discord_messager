@@ -39,22 +39,9 @@ class DBI:
 
     @classmethod
     @logger.catch
-    async def form_new_tokens_pairs(cls, telegram_id: str) -> None:
-        """ВОзвращает количество сформированных пар токенов"""
-        free_tokens: Tuple[
-            List[int], ...] = await DBI.get_all_free_tokens(telegram_id)
-        formed_pairs: int = 0
-        for tokens in free_tokens:
-            while len(tokens) > 1:
-                random.shuffle(tokens)
-                first_token = tokens.pop()
-                second_token = tokens.pop()
-                formed_pairs += await DBI.make_tokens_pair(first_token, second_token)
-
-    @classmethod
-    @logger.catch
     async def add_new_user(
-            cls, nick_name: str, telegram_id: str, proxy_pk: int, expiration: int, max_tokens: int) -> bool:
+            cls, nick_name: str, telegram_id: str, proxy_pk: int, expiration: int, max_tokens: int
+    ) -> bool:
         return User.add_new_user(
             nick_name=nick_name, telegram_id=telegram_id, proxy_pk=proxy_pk, expiration=expiration,
             max_tokens=max_tokens)
@@ -228,7 +215,7 @@ class DBI:
 
     @classmethod
     @logger.catch
-    async def get_all_free_tokens(cls, telegram_id: str) -> Tuple[List[int], ...]:
+    async def get_all_free_tokens(cls, telegram_id: str) -> Tuple[List[namedtuple], ...]:
         return Token.get_all_free_tokens(telegram_id=telegram_id)
 
     @classmethod
@@ -279,10 +266,10 @@ class DBI:
             user_channel_pk=user_channel_pk
         )
 
-    @classmethod
-    @logger.catch
-    async def get_closest_token_time(cls, telegram_id: str) -> namedtuple:
-        return Token.get_closest_token_time(telegram_id=telegram_id)
+    # @classmethod
+    # @logger.catch
+    # async def get_closest_token_time(cls, telegram_id: str) -> namedtuple:
+    #     return Token.get_closest_token_time(telegram_id=telegram_id)
 
     @classmethod
     @logger.catch
@@ -342,4 +329,15 @@ class DBI:
     @classmethod
     @logger.catch
     async def get_channel(cls, user_channel_pk: int) -> namedtuple:
+        """Вернет данные о канале по его user_channel_pk"""
         return UserChannel.get_user_channel(user_channel_pk=user_channel_pk)
+
+    @classmethod
+    @logger.catch
+    async def delete_user_channel(cls, user_channel_pk: int) -> bool:
+        return bool(UserChannel.delete_user_channel(user_channel_pk=user_channel_pk))
+
+    @classmethod
+    @logger.catch
+    async def get_count_tokens_by_user_channel(cls, user_channel_pk: int) -> int:
+        return Token.get_count_bu_user_channel(user_channel_pk=user_channel_pk)
