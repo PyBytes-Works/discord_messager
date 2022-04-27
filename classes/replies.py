@@ -33,28 +33,20 @@ class Replies(RedisDB):
                 and str(elem.get("target_id")) == target_id]
 
     @logger.catch
-    async def update_answered(self, message_id: str, text: str) -> bool:
+    async def update_answered_or_showed(self, message_id: str, text: str = '') -> bool:
         redis_data: List[dict] = await self.load()
         for elem in redis_data:
             if str(elem.get("message_id")) == str(message_id):
-                elem.update(
-                    {
-                        "answer_text": text,
-                        "answered": True
-                    }
-                )
+                if text:
+                    elem.update(
+                        {
+                            "answer_text": text,
+                            "showed": True,
+                            "answered": True
+                        }
+                    )
+                else:
+                    elem.update(showed=True)
                 await self.save(data=redis_data)
                 return True
 
-    @logger.catch
-    async def update_showed(self, message_id: str) -> bool:
-        redis_data: List[dict] = await self.load()
-        for elem in redis_data:
-            if str(elem.get("message_id")) == str(message_id):
-                elem.update(
-                    {
-                        "showed": True
-                    }
-                )
-                await self.save(data=redis_data)
-                return True

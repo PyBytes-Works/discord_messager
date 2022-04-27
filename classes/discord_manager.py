@@ -7,6 +7,7 @@ import asyncio
 
 from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
 
+from classes.errors_sender import ErrorsSender
 from classes.message_receiver import MessageReceiver
 from classes.message_sender import MessageSender
 from classes.open_ai import OpenAI
@@ -62,6 +63,7 @@ class DiscordManager:
             f"\n\tDiscord ID: {self._datastore.my_discord_id}"
             f"\n\tMate discord id: {self._datastore.mate_id}"
             f"\n\tSilence: {self.__silence}"
+            f"\n\tAutoanswer: {self.autoanswer}"
             f"\n\tWorkers: {len(self.__workers)}/{len(self.__related_tokens)}"
             # f"\n\tRelated tokens: {self.__related_tokens}"
         )
@@ -80,7 +82,6 @@ class DiscordManager:
         await self._getting_messages()
         await self._send_replies()
         await self._sending_messages()
-        logger.info(await self.__get_full_info())
         await self._sleep()
 
     @logger.catch
@@ -146,23 +147,20 @@ class DiscordManager:
         """Отправляет сообщение в дискор и сохраняет данные об ошибках в
         словарь атрибута класса"""
 
-        if not await MessageSender(datastore=self._datastore).send_message():
+        if not await MessageSender(datastore=self._datastore).send_message_to_discord():
             self.is_working = False
             return
         self._discord_data = {}
         self._datastore.current_message_id = 0
 
     @logger.catch
-    async def __send_text(self, text: str, keyboard=None, check_silence: bool = False) -> None:
+    async def __send_text(self, text: str, check_silence: bool = False) -> None:
         """Отправляет текст и клавиатуру пользователю если он не в
         тихом режиме."""
 
         if check_silence and self.__silence:
             return
-        if not keyboard:
-            await self.message.answer(text)
-            return
-        await self.message.answer(text, reply_markup=keyboard)
+        await self.message.answer(text)
 
     @check_working
     @logger.catch
@@ -171,6 +169,7 @@ class DiscordManager:
         if not self.__workers:
             await self.make_token_pairs(unpair=True)
             await self._make_workers_list()
+        logger.info(await self.__get_full_info())
         await self._get_worker_from_list()
 
     @check_working
@@ -268,21 +267,33 @@ class DiscordManager:
     async def _send_replies(self) -> None:
         """Отправляет реплаи из дискорда в телеграм с кнопкой Ответить"""
 
-        # TODO реализовать автоответчик
-        # result_replies: List[dict] = []
+        replyer: 'Replies' = Replies(self.__telegram_id)
         for elem in self._datastore.for_reply:
-            if not elem.get("showed"):
-                # if self.autoanswer:
-                #     result_replies.append(await self._auto_reply_with_davinchi(reply))
-                # else:
-                await self.__reply_to_telegram(elem)
-                await Replies(self.__telegram_id).update_showed(str(elem.get("message_id")))
-                # result_replies.append(reply)
-        # if self.autoanswer:
-        #     await RedisDB(redis_key=self._datastore.telegram_id).save(data=result_replies)
+            if not elem.get("showed") and not elem.get("answered"):
+                if self.autoanswer:
+                    await self._auto_reply_with_davinchi(elem, replyer)
+                else:
+                    await self.__reply_to_telegram(elem, replyer)
 
     @logger.catch
-    async def __reply_to_telegram(self, data: dict) -> None:
+    async def _auto_reply_with_davinchi(self, data: dict, replyer: 'Replies') -> None:
+
+        reply_text: str = data.get("text")
+        ai_reply_text: str = OpenAI(davinchi=True).get_answer(message=reply_text)
+        logger.info(f"Davinci get text: {reply_text}")
+        logger.info(f"\nDavinci answered: {ai_reply_text}")
+        if ai_reply_text:
+            await replyer.update_answered_or_showed(
+                message_id=str(data.get("message_id")), text=ai_reply_text)
+            return
+        logger.error(f"Davinci NOT ANSWERED")
+        text: str = "ИИ не ответил на реплай:"
+        await self.message.answer(text)
+        await ErrorsSender.send_report_to_admins(text)
+        await self.__reply_to_telegram(data)
+
+    @logger.catch
+    async def __reply_to_telegram(self, data: dict, replyer: 'Replies') -> None:
         """Отправляет сообщение о реплае в телеграм"""
 
         answer_keyboard: 'InlineKeyboardMarkup' = InlineKeyboardMarkup(row_width=1)
@@ -303,19 +314,7 @@ class DiscordManager:
             f"\nText: {reply_text}",
             reply_markup=answer_keyboard
         )
-
-    @logger.catch
-    async def _auto_reply_with_davinchi(self, data: dict) -> dict:
-
-        logger.debug("Start autoreply:")
-        reply_text: str = data.get("text")
-        ai_reply_text: str = OpenAI(davinchi=True).get_answer(message=reply_text)
-        logger.debug(f"Davinci text: {ai_reply_text}")
-        if not ai_reply_text:
-            logger.error(f"Davinci NOT ANSWERED")
-            return data
-        data.update({"answer_text": ai_reply_text})
-        return data
+        await replyer.update_answered_or_showed(str(data.get("message_id")))
 
     @check_working
     @logger.catch
@@ -348,9 +347,7 @@ class DiscordManager:
                 self.__related_tokens.append(first_token)
                 self.__related_tokens.append(second_token)
         if not self.__related_tokens:
-            await self.__send_text(
-                text="Не смог сформировать пары токенов.",
-                keyboard=user_menu_keyboard())
+            await self.__send_text(text="Не смог сформировать пары токенов.")
             self.is_working = False
 
     @property

@@ -68,6 +68,25 @@ def superadmin_keyboard() -> 'ReplyKeyboardMarkup':
 
 
 @logger.catch
+def in_work_keyboard() -> 'ReplyKeyboardMarkup':
+    """Возвращает кнопочки из списка"""
+
+    keyboard = ReplyKeyboardMarkup(
+        resize_keyboard=True,
+        one_time_keyboard=True,
+        row_width=3
+    )
+
+    keyboard.add(
+        KeyboardButton("Автоответчик ВКЛ"),
+        KeyboardButton("Автоответчик ВЫКЛ"),
+        KeyboardButton("Тихий режим (mute)"),
+        KeyboardButton("Отмена"),
+    )
+    return keyboard
+
+
+@logger.catch
 def user_menu_keyboard() -> 'ReplyKeyboardMarkup':
     """Возвращает кнопочки из списка"""
 
@@ -78,12 +97,11 @@ def user_menu_keyboard() -> 'ReplyKeyboardMarkup':
     )
 
     keyboard.add(
-        KeyboardButton("Старт"),
-        KeyboardButton("Старт & Mute"),
         KeyboardButton("Информация"),
-        KeyboardButton("Отмена"),
         KeyboardButton("Добавить токен"),
-        KeyboardButton("Каналы")
+        KeyboardButton("Каналы"),
+        KeyboardButton("Старт"),
+        KeyboardButton("Отмена"),
     )
     return keyboard
 
