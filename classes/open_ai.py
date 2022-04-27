@@ -54,7 +54,7 @@ class OpenAI:
             return random.choice(defaults)
 
         if not message:
-            logger.warning("OpenAI: No message")
+            logger.warning("OpenAI: No message sent to OpenAI")
             return ''
         self.__message = message.strip()
         data: dict = self.__send_message()

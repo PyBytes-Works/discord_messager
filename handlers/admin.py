@@ -51,6 +51,8 @@ async def send_message_to_all_users_handler(message: Message) -> None:
                     await ErrorsSender.send_report_to_admins(
                         f"Пользователь {user} заблокировал бота. "
                         f"\nЕго аккаунт деактивирован.")
+            except aiogram.utils.exceptions.CantInitiateConversation as err:
+                logger.error(f"Не смог отправить сообщение пользователю {user}.", err)
 
 
 @logger.catch

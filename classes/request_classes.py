@@ -53,7 +53,7 @@ class RequestSender(ABC):
             "timeout": 10
         }
         try:
-            logger.debug(self._params)
+            # logger.debug(self._params)
             answer: dict = await self._send()
         except (
                 aiohttp.client_exceptions.ClientHttpProxyError,
@@ -90,8 +90,8 @@ class GetMe(GetRequest):
         self.url: str = f'https://discord.com/api/v9/users/@me'
         answer: dict = await self._send_request()
         self._update_err_params(answer=answer)
-        logger.debug("GetMe.get_discord_id call error handling:"
-                     f"\nParams: {self._error_params}")
+        # logger.debug("GetMe.get_discord_id call error handling:"
+        #              f"\nParams: {self._error_params}")
         answer: dict = await ErrorsSender(**self._error_params).handle_errors()
         return answer.get("answer_data", {}).get("id", '')
 
@@ -155,8 +155,8 @@ class TokenChecker(GetRequest):
         if status == 200:
             return True
         self._update_err_params(answer=answer, telegram_id=telegram_id)
-        logger.debug("TokenChecker.check_token call error handling:"
-                     f"\nParams: {self._error_params}")
+        # logger.debug("TokenChecker.check_token call error handling:"
+        #              f"\nParams: {self._error_params}")
         await ErrorsSender(**self._error_params).handle_errors()
 
 
