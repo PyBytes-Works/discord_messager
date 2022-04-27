@@ -312,7 +312,7 @@ class DiscordManager:
             f"\nText: {reply_text}",
             reply_markup=answer_keyboard
         )
-        await replyer.update_showed(str(data.get("message_id")))
+        await replyer.update_answered(str(data.get("message_id")))
 
 
     @check_working

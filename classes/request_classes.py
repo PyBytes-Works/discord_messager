@@ -51,7 +51,6 @@ class RequestSender(ABC):
             "proxy": self.proxy_data,
             "ssl": False,
             "timeout": 10,
-            "trust_env": True
         }
         try:
             # logger.debug(self._params)
@@ -73,7 +72,7 @@ class RequestSender(ABC):
 class GetRequest(RequestSender):
 
     async def _send(self) -> dict:
-        async with aiohttp.ClientSession() as session:
+        async with aiohttp.ClientSession(trust_env=True) as session:
             if self.token:
                 session.headers['authorization']: str = self.token
             async with session.get(**self._params) as response:
@@ -170,7 +169,7 @@ class PostRequest(RequestSender):
     async def _send(self) -> dict:
         """Отправляет данные в дискорд канал"""
 
-        async with aiohttp.ClientSession() as session:
+        async with aiohttp.ClientSession(trust_env=True) as session:
             if self.token:
                 session.headers['authorization']: str = self.token
             self._params.update(json=self._data_for_send)
