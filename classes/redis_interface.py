@@ -15,21 +15,21 @@ class RedisDB:
         self.data: list = []
         self.timeout_sec: int = 1000
 
-    @logger.catch
-    async def _send_request_do_redis_db(self, key: str, mate_id: str = '') -> Optional[list]:
+    async def _send_request_do_redis_db(self, key: str, mate_id: str = '', data: list = None) -> list:
         """Запрашивает или записывает данные в редис, возвращает список если запрашивали"""
-
-        result: List[dict] = []
+        result: list = []
+        name: str = mate_id if mate_id else self.redis_key
+        data: list = data if data else self.data
         try:
             async with self.redis_db.client() as conn:
                 if key == "set":
                     await conn.set(
-                        name=self.redis_key, value=json.dumps(self.data), ex=self.timeout_sec)
+                        name=name, value=json.dumps(data), ex=self.timeout_sec)
                 elif key == "get":
-                    data: str = await conn.get(self.redis_key)
+                    data: str = await conn.get(name)
                     if data:
                         try:
-                            result: List[dict] = json.loads(data)
+                            result: list = json.loads(data)
                         except TypeError as err:
                             logger.error(f"F: load_from_redis: {err}", err)
                         except Exception as err:
@@ -47,12 +47,13 @@ class RedisDB:
         return result
 
     @logger.catch
-    async def save(self, data: list, timeout_sec: int = 1000) -> None:
+    async def save(self, data: list, timeout_sec: int = 0) -> None:
         """Сериализует данные и сохраняет в Редис. Устанавливает время хранения в секундах.
         Возвращает кол-во записей."""
 
         self.data: list = data
-        self.timeout_sec: int = timeout_sec
+        if timeout_sec:
+            self.timeout_sec: int = timeout_sec
 
         await self._send_request_do_redis_db(key="set")
 

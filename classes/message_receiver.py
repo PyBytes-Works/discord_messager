@@ -31,10 +31,10 @@ class MessageReceiver(ChannelData):
 
         answer: dict = await self._send_request()
         self._error_params.update(answer=answer, telegram_id=self._datastore.telegram_id)
-        logger.debug("MessageReceiver.__get_discord_messages call error handling:"
-                     f"\nParams: "
-                     f"\nProxy{self.proxy} "
-                     f"\nToken: {self.token}")
+        # logger.debug("MessageReceiver.__get_discord_messages call error handling:"
+        #              f"\nParams: "
+        #              f"\nProxy{self.proxy} "
+        #              f"\nToken: {self.token}")
         result: dict = await ErrorsSender(**self._error_params).handle_errors()
         if result.get("status") == 200:
             return result.get("answer_data")
@@ -112,7 +112,7 @@ class MessageReceiver(ChannelData):
         ]
 
     @logger.catch
-    async def __get_last_message_id_from_messages(self, data: List[dict]) -> int:
+    async def __get_last_message_id(self, data: List[dict]) -> int:
         """"""
 
         messages: List[dict] = [
@@ -120,7 +120,7 @@ class MessageReceiver(ChannelData):
             for elem in data
             if self._datastore.mate_id == str(elem["author"]["id"])
         ]
-        return await self.__get_last_message_id(messages)
+        return await self.__get_last_message_id_from_messages(messages)
 
     @logger.catch
     async def __get_replies_and_message_id(self, data: List[dict]) -> None:
@@ -128,15 +128,15 @@ class MessageReceiver(ChannelData):
 
         await self.__make_message_id_and_text()
         if not data:
-            self._datastore.replies = []
+            self._datastore.for_reply = []
             self._datastore.current_message_id = 0
             return
         last_messages: List[dict] = await self.__get_last_messages(data)
         all_replies: List[dict] = await self.__get_my_replies(last_messages)
         new_replies: List[dict] = await self.__get_filtered_replies(all_replies)
-        self._datastore.replies = await self.__save_replies_to_redis(new_replies)
+        self._datastore.for_reply = await self.__get_replies_for_answer(new_replies)
         if not self._datastore.current_message_id:
-            self._datastore.current_message_id = await self.__get_last_message_id_from_messages(last_messages)
+            self._datastore.current_message_id = await self.__get_last_message_id(last_messages)
 
         # logger.error(f"NEW REPLIES: {self._datastore.replies}")
         # logger.error(f"MESSAGE ID: {self._datastore.current_message_id}")
@@ -150,15 +150,15 @@ class MessageReceiver(ChannelData):
                 self._datastore.current_message_id], file_name="last_message_id.json")
 
     @logger.catch
-    async def __get_last_message_id(self, data: list) -> int:
+    async def __get_last_message_id_from_messages(self, data: list) -> int:
         return int(max(data, key=lambda x: x.get("timestamp"))["id"]) if data else 0
 
     @logger.catch
-    async def __save_replies_to_redis(self, new_replies: List[dict]) -> List[dict]:
+    async def __get_replies_for_answer(self, new_replies: List[dict]) -> List[dict]:
         """Возвращает разницу между старыми и новыми данными в редисе,
         записывает полные данные в редис"""
 
-        return await Replies(redis_key=self._datastore.telegram_id).update_replies(new_replies)
+        return await Replies(redis_key=self._datastore.telegram_id).get_difference_and_update(new_replies)
         # if not new_replies:
         #     return []
         # total_replies: List[dict] = await RedisDB(redis_key=self._datastore.telegram_id).load()
@@ -198,11 +198,10 @@ class MessageReceiver(ChannelData):
         self._datastore.current_message_id = 0
         self._datastore.text_to_send = ''
         replies: 'Replies' = Replies(redis_key=self._datastore.telegram_id)
-        my_unanswered: List[dict] = await replies.get_unanswered(self._datastore.my_discord_id)
-        if not my_unanswered:
+        my_answered: List[dict] = await replies.get_answered(self._datastore.my_discord_id)
+        if not my_answered:
             return
-        data: dict = random.choice(my_unanswered)
+        data: dict = random.choice(my_answered)
         self._datastore.text_to_send = data.get("answer_text")
         message_id: int = data.get("message_id")
         self._datastore.current_message_id = message_id
-        await replies.delete_answered(message_id)

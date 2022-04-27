@@ -8,6 +8,7 @@ from aiogram.dispatcher import FSMContext
 
 import utils
 from classes.manager_storage import InstancesStorage
+from classes.replies import Replies
 from config import logger, Dispatcher, DEBUG, VERSION, bot, SAVING
 from keyboards import cancel_keyboard, user_menu_keyboard
 from classes.discord_manager import DiscordManager
@@ -69,19 +70,11 @@ async def send_message_to_reply_handler(message: Message, state: FSMContext):
     state_data: dict = await state.get_data()
     message_id: str = state_data.get("message_id")
     user_telegram_id: str = str(message.from_user.id)
-    redis_data: List[dict] = await RedisDB(redis_key=user_telegram_id).load()
-    for elem in redis_data:
-        if str(elem.get("message_id")) == str(message_id):
-            elem.update({"answer_text": message.text})
-            break
-    else:
+    if not await Replies(redis_key=user_telegram_id).update_answered(message_id=message_id, text=message.text):
         logger.warning("f: send_message_to_reply_handler: elem in Redis data not found or timeout error")
         await message.answer('Время хранения данных истекло.', reply_markup=cancel_keyboard())
         return
-    if DEBUG and SAVING:
-        utils.save_data_to_json(data=redis_data, file_name="redis_answer_from_user.json")
     await message.answer('Добавляю сообщение в очередь. Это займет несколько секунд.', reply_markup=ReplyKeyboardRemove())
-    await RedisDB(redis_key=user_telegram_id).save(data=redis_data)
     await message.answer('Сообщение добавлено в очередь сообщений.', reply_markup=cancel_keyboard())
 
 

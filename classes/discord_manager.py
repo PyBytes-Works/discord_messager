@@ -11,6 +11,7 @@ from classes.message_receiver import MessageReceiver
 from classes.message_sender import MessageSender
 from classes.open_ai import OpenAI
 from classes.redis_interface import RedisDB
+from classes.replies import Replies
 from classes.token_datastorage import TokenData
 
 from config import logger
@@ -271,12 +272,13 @@ class DiscordManager:
 
         # TODO реализовать автоответчик
         # result_replies: List[dict] = []
-        for reply in self._datastore.replies:
-            if not reply.get("answered"):
+        for elem in self._datastore.for_reply:
+            if not elem.get("showed"):
                 # if self.autoanswer:
                 #     result_replies.append(await self._auto_reply_with_davinchi(reply))
                 # else:
-                await self.__reply_to_telegram(reply)
+                await self.__reply_to_telegram(elem)
+                await Replies(self.__telegram_id).update_showed(str(elem.get("message_id")))
                 # result_replies.append(reply)
         # if self.autoanswer:
         #     await RedisDB(redis_key=self._datastore.telegram_id).save(data=result_replies)
