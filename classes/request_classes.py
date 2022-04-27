@@ -168,6 +168,7 @@ class PostRequest(RequestSender):
 
     async def _send(self) -> dict:
         """Отправляет данные в дискорд канал"""
+
         async with aiohttp.ClientSession() as session:
             if self.token:
                 session.headers['authorization']: str = self.token

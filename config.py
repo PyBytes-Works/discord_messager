@@ -20,6 +20,9 @@ load_dotenv()
 # Версия приложения
 VERSION = os.getenv("VERSION")
 
+# DEBUG setting
+DEBUG = bool(os.getenv("DEBUG"))
+
 # # redis init
 REDIS_DB = os.environ.get("REDIS_DB", "redis://127.0.0.1:6379/0")
 
@@ -30,9 +33,10 @@ vova = os.getenv("VOVA_TELEGRAM_ID")
 
 # set admins list
 admins_list = [deskent]
-DEBUG = bool(os.getenv("DEBUG"))
-if not DEBUG:
-    admins_list = [deskent, artem, vova]
+if artem:
+    admins_list.append(artem)
+if vova:
+    admins_list.append(vova)
 
 # Proxy config
 PROXY_USER = os.getenv("PROXY_USER")
@@ -48,7 +52,7 @@ bot = Bot(token=tgToken)
 storage = MemoryStorage()
 dp = Dispatcher(bot, storage=storage)
 
-# Constants
+# Constants # TODO переместить в request sender
 DISCORD_BASE_URL: str = f'https://discord.com/api/v9/channels/'
 
 #  ********** LOGGER CONFIG ********************************
