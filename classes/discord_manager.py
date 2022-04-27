@@ -180,8 +180,6 @@ class DiscordManager:
             return
         await self._get_delay()
         self.delay += random.randint(3, 7)
-        # if self.delay <= 0:
-        #     self.delay: int = self._datastore.cooldown
         logger.info(f"SLEEP PAUSE: {self.delay}")
         await self._send_delay_message()
         timer: int = self.delay
@@ -234,7 +232,6 @@ class DiscordManager:
     @logger.catch
     async def __get_closest_token_time(self) -> namedtuple:
         # return await DBI.get_closest_token_time(self._datastore.telegram_id)
-        # TODO реализовать получение данных о токене из текущего экземпляра класса, а не из БД
         return min(self.__related_tokens, key=lambda x: x.last_message_time)
 
     @logger.catch

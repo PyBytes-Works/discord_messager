@@ -266,10 +266,10 @@ class DBI:
             user_channel_pk=user_channel_pk
         )
 
-    @classmethod
-    @logger.catch
-    async def get_closest_token_time(cls, telegram_id: str) -> namedtuple:
-        return Token.get_closest_token_time(telegram_id=telegram_id)
+    # @classmethod
+    # @logger.catch
+    # async def get_closest_token_time(cls, telegram_id: str) -> namedtuple:
+    #     return Token.get_closest_token_time(telegram_id=telegram_id)
 
     @classmethod
     @logger.catch
