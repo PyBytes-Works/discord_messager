@@ -40,10 +40,11 @@ class DBI:
     @classmethod
     @logger.catch
     async def form_new_tokens_pairs(cls, telegram_id: str) -> None:
-        """ВОзвращает количество сформированных пар токенов"""
-        free_tokens: Tuple[List[int], ...] = await DBI.get_all_free_tokens(telegram_id)
+        """Формирует пары токенов из свободных"""
+
+        free_tokens: Tuple[List[namedtuple], ...] = await DBI.get_all_free_tokens(telegram_id)
         formed_pairs: int = 0
-        sorted_tokens: Tuple[List[int], ...] = tuple(
+        sorted_tokens: Tuple[List[namedtuple], ...] = tuple(
             sorted(
                 array, key=lambda x: x.last_message_time, reverse=True
             )
@@ -56,7 +57,7 @@ class DBI:
                 first_token = tokens.pop()
                 second_token = tokens.pop()
                 logger.debug(f"\n\tPaired tokens: {first_token} + {second_token}")
-                formed_pairs += await DBI.make_tokens_pair(first_token, second_token)
+                formed_pairs += await DBI.make_tokens_pair(first_token.token_pk, second_token.token_pk)
 
     @classmethod
     @logger.catch
@@ -236,7 +237,7 @@ class DBI:
 
     @classmethod
     @logger.catch
-    async def get_all_free_tokens(cls, telegram_id: str) -> Tuple[List[int], ...]:
+    async def get_all_free_tokens(cls, telegram_id: str) -> Tuple[List[namedtuple], ...]:
         return Token.get_all_free_tokens(telegram_id=telegram_id)
 
     @classmethod
