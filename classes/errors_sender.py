@@ -109,6 +109,9 @@ class ErrorsSender:
                 f'\nОбратитесь к администратору. Код ошибки 407')
             users = True
             admins = True
+        elif self._status == 429 and self._code == 20016:
+            # превышен кулдаун канала
+            return
         elif self._status == 500:
             text = f"Внутренняя ошибка сервера Дискорда. Код ошибки - 500."
             admins = True
@@ -129,7 +132,7 @@ class ErrorsSender:
         logger.error(f"Errors report: {text}")
         try:
             await bot.send_message(
-                chat_id=self._telegram_id, text=text, reply_markup=user_menu_keyboard())
+                chat_id=self._telegram_id, text=text)
         except aiogram.utils.exceptions.ChatNotFound:
             logger.error(f"Chat {self._telegram_id} not found")
 
@@ -142,7 +145,7 @@ class ErrorsSender:
         for admin_id in admins_list:
             try:
                 await bot.send_message(
-                    chat_id=admin_id, text=text, reply_markup=user_menu_keyboard())
+                    chat_id=admin_id, text=text)
             except aiogram.utils.exceptions.ChatNotFound as err:
                 logger.error(f"Не смог отправить сообщение пользователю {admin_id}.", err)
 
