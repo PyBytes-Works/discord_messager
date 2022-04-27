@@ -3,7 +3,7 @@ from aiogram.types import Message, CallbackQuery, ReplyKeyboardRemove
 from aiogram.dispatcher import FSMContext
 
 from classes.db_interface import DBI
-from classes.manager_storage import InstancesStorage
+from classes.instances_storage import InstancesStorage
 from config import logger, Dispatcher, bot
 from keyboards import user_menu_keyboard
 

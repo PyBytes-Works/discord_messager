@@ -22,7 +22,7 @@ class MessageSender(PostRequest):
         self.__text: str = ''
 
     @logger.catch
-    async def send_message(self) -> bool:
+    async def send_message_to_discord(self) -> bool:
         """Отправляет данные в канал дискорда, возвращает результат отправки."""
 
         self.__text = self._datastore.text_to_send
@@ -80,6 +80,7 @@ class MessageSender(PostRequest):
                     f"\nВремя скорректировано. Кулдаун установлен: {cooldown} секунд"
                 )
             )
+            return True
 
     @logger.catch
     async def __get_text_from_vocabulary(self) -> str:

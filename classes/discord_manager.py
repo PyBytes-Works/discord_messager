@@ -62,6 +62,7 @@ class DiscordManager:
             f"\n\tDiscord ID: {self._datastore.my_discord_id}"
             f"\n\tMate discord id: {self._datastore.mate_id}"
             f"\n\tSilence: {self.__silence}"
+            f"\n\tAutoanswer: {self.autoanswer}"
             f"\n\tWorkers: {len(self.__workers)}/{len(self.__related_tokens)}"
             # f"\n\tRelated tokens: {self.__related_tokens}"
         )
@@ -145,23 +146,20 @@ class DiscordManager:
         """Отправляет сообщение в дискор и сохраняет данные об ошибках в
         словарь атрибута класса"""
 
-        if not await MessageSender(datastore=self._datastore).send_message():
+        if not await MessageSender(datastore=self._datastore).send_message_to_discord():
             self.is_working = False
             return
         self._discord_data = {}
         self._datastore.current_message_id = 0
 
     @logger.catch
-    async def __send_text(self, text: str, keyboard=None, check_silence: bool = False) -> None:
+    async def __send_text(self, text: str, check_silence: bool = False) -> None:
         """Отправляет текст и клавиатуру пользователю если он не в
         тихом режиме."""
 
         if check_silence and self.__silence:
             return
-        if not keyboard:
-            await self.message.answer(text)
-            return
-        await self.message.answer(text, reply_markup=keyboard)
+        await self.message.answer(text)
 
     @check_working
     @logger.catch
@@ -348,9 +346,7 @@ class DiscordManager:
                 self.__related_tokens.append(first_token)
                 self.__related_tokens.append(second_token)
         if not self.__related_tokens:
-            await self.__send_text(
-                text="Не смог сформировать пары токенов.",
-                keyboard=user_menu_keyboard())
+            await self.__send_text(text="Не смог сформировать пары токенов.")
             self.is_working = False
 
     @property
