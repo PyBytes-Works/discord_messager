@@ -204,7 +204,7 @@ async def check_and_add_token_handler(message: Message, state: FSMContext) -> No
     ):
         error_text: str = (f"Не добавить токен:"
                            f"\nToken: [{token}]"
-                           f"\nGuild/channel: [{guild}: {channel}]")
+                           f"\nChannel: {channel}]")
         await ErrorsSender(telegram_id=telegram_id).errors_report(error_text)
         await state.finish()
         return
