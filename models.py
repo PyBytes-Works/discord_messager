@@ -245,7 +245,7 @@ class User(BaseModel):
 
     @classmethod
     @logger.catch
-    def delete_channels(cls, telegram_id: str) -> int:
+    def delete_channels(cls: 'User', telegram_id: str) -> int:
         """
         Function removes  user channels and tokens
         """
@@ -274,7 +274,7 @@ class User(BaseModel):
                     .join(UserChannel, JOIN.LEFT_OUTER, on=(Token.user_channel == UserChannel.id))
                     .join(User, JOIN.LEFT_OUTER, on=(UserChannel.user == User.id))
                     .where(User.telegram_id == telegram_id)))
-        )
+        ).execute()
 
     @classmethod
     @logger.catch
@@ -346,7 +346,8 @@ class User(BaseModel):
             User.telegram_id.alias('telegram_id'),
             User.max_tokens.alias('max_tokens'),
             User.expiration.alias('expiration'),
-        ).join(Proxy, JOIN.LEFT_OUTER, on=(User.proxy == Proxy.id)).namedtuples().execute())
+        ).join(Proxy, JOIN.LEFT_OUTER, on=(
+                    User.proxy == Proxy.id)).order_by(User.created_at).namedtuples().execute())
 
     @classmethod
     @logger.catch
@@ -595,6 +596,7 @@ class UserChannel(BaseModel):
         get_all_user_channel_by_telegram_id
         set_user_channel_name
         update_cooldown_by_channel_id
+        delete_user_channel
     """
 
     user = ForeignKeyField(
@@ -670,6 +672,12 @@ class UserChannel(BaseModel):
 
     @classmethod
     @logger.catch
+    def delete_user_channel(cls: 'UserChannel', user_channel_pk: int) -> int:
+        """Удаляет пользовательский канал связанные токены удаляются автоматически"""
+        return cls.delete().where(cls.id == user_channel_pk).execute()
+
+    @classmethod
+    @logger.catch
     def get_user_channel(
             cls: 'UserChannel', user_channel_pk: int) -> namedtuple:
         """
@@ -723,9 +731,11 @@ class Token(BaseModel):
           get_min_last_time_token_data
           get_time_by_token
           get_token_info
+          get_token_info_by_token_pk
           get_all_free_tokens
           get_all_discord_id
           get_all_discord_id_by_channel
+          get_count_bu_user_channel
           set_token_name
           check_token_by_discord_id
           update_token_time
@@ -934,7 +944,8 @@ class Token(BaseModel):
 
     @classmethod
     @logger.catch
-    def get_all_free_tokens(cls, telegram_id: Union[str, int] = None) -> Tuple[List[int], ...]:
+    def get_all_free_tokens(cls, telegram_id: Union[str, int] = None) -> Tuple[
+        List[namedtuple], ...]:
         """
         Возвращает список всех свободных токенов по каналам
           discord id
@@ -942,6 +953,7 @@ class Token(BaseModel):
         data = (
             cls.select(
                 cls.id.alias('token_pk'),
+                cls.last_message_time.alias('last_message_time'),
                 Channel.channel_id.alias('channel_id'),
             )
                 .join_from(cls, UserChannel, JOIN.LEFT_OUTER, on=(
@@ -953,7 +965,7 @@ class Token(BaseModel):
                 .where(TokenPair.first_id.is_null(True)).namedtuples().execute()
         )
         result: Tuple[List[int], ...] = tuple(
-            [token.token_pk for token in tokens]
+            [token for token in tokens]
             for channel, tokens in
             groupby(data, lambda x: x.channel_id)
         )
@@ -993,7 +1005,6 @@ class Token(BaseModel):
             'token_discord_id' str
             'token_name' str
         """
-        # TODO Добавить в возвращаеммые значения еще имя токена: 'token_name' str
 
         data = (
             cls.select(
@@ -1087,6 +1098,12 @@ class Token(BaseModel):
 
         return data if data else namedtuple(
             'Row', ['cooldown', 'last_message_time'])(cooldown=None, last_message_time=None)
+
+    @classmethod
+    @logger.catch
+    def get_count_bu_user_channel(cls, user_channel_pk: int) -> int:
+        """Get numbers token by channel id"""
+        return cls.select().where(cls.user_channel == user_channel_pk).count()
 
     @classmethod
     @logger.catch

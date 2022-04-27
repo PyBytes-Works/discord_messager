@@ -12,7 +12,7 @@ from states import TokenStates, UserChannelStates
 from utils import check_is_int
 from classes.db_interface import DBI
 from classes.errors_sender import ErrorsSender
-from config import logger, Dispatcher
+from config import logger, Dispatcher, CHANEL_MENU, bot
 from keyboards import (
     user_menu_keyboard, cancel_keyboard, new_channel_key, yes_no_buttons, channel_menu_keyboard
 )
@@ -31,16 +31,16 @@ async def select_channel_handler(message: Message) -> None:
         return
     telegram_id: str = str(message.from_user.id)
     channels: List[namedtuple] = await DBI.get_user_channels(telegram_id=telegram_id)
-    keyboard = InlineKeyboardMarkup(row_width=1)
     if not channels:
         await message.answer(
-            "У вас нет ни одного канала. Сначала нужно создать новый канал и добавить в него токен.",
+            "У вас нет ни одного канала. Сначала нужно создать новый канал и добавить в него токен",
             reply_markup=cancel_keyboard()
         )
         # await TokenStates.create_channel.set()
         # return
-    if message.text == 'Установить кулдаун':
+    if message.text == CHANEL_MENU.cooldown:
         for elem in channels:
+            keyboard = InlineKeyboardMarkup(row_width=1)
             keyboard.add(InlineKeyboardButton(
                 text="Добавить сюда",
                 callback_data=f"{elem.user_channel_pk}")
@@ -51,6 +51,7 @@ async def select_channel_handler(message: Message) -> None:
             await TokenStates.add_channel_cooldown.set()
     elif message.text == "Добавить токен":
         for elem in channels:
+            keyboard = InlineKeyboardMarkup(row_width=1)
             keyboard.add(InlineKeyboardButton(
                 text="Добавить сюда",
                 callback_data=f"{elem.user_channel_pk}")
@@ -342,14 +343,80 @@ async def menu_channel_handler(message: Message) -> None:
     text: 'Каналы'
     :param message:
     :return:"""
+    if await DBI.is_expired_user_deactivated(message):
+        return
     await message.answer('Выберете действия', reply_markup=channel_menu_keyboard())
+    await message.delete()
 
 
 @logger.catch
 async def list_channel_handler(message: Message, state: FSMContext) -> None:
     """
-    вывести список каналов:
-    Commands: '/channels'
+    Вывести список каналов для переименования:
+    """
+    if await DBI.is_expired_user_deactivated(message):
+        return
+    telegram_id: str = str(message.from_user.id)
+    channels: List[namedtuple] = await DBI.get_user_channels(telegram_id=telegram_id)
+    if not channels:
+        await message.answer(
+            "У вас нет ни одного канала. Сначала нужно создать новый канал и добавить в него токен",
+            reply_markup=user_menu_keyboard()
+        )
+        await message.delete()
+        await state.finish()
+        return
+    await state.set_state(UserChannelStates.select_user_channel_to_rename)
+    # await state.update_data({'start_message': message.message_id})
+    list_messages = [message.message_id]
+    for elem in channels:
+        keyboard = InlineKeyboardMarkup(row_width=1)
+        keyboard.add(InlineKeyboardButton(
+            text="Переименовать канал",
+            callback_data=f"{elem.user_channel_pk}")
+        )
+        text: str = f"Имя канала: {elem.channel_name}\nСервер/канал: {elem.guild_id}/{elem.channel_id}"
+        mess = await message.answer(text, reply_markup=keyboard)
+        list_messages.append(mess.message_id)
+    mess = await message.answer('Отмена', reply_markup=cancel_keyboard())
+    list_messages.append(mess.message_id)
+    await state.update_data({'messages': list_messages})
+
+
+@logger.catch
+async def rename_channel_handler(callback: CallbackQuery, state: FSMContext) -> None:
+    """Хэндлер для нажатия на кнопку "Переименовать канал" """
+    user_channel_pk: int = int(callback.data)
+    await state.set_state(UserChannelStates.enter_name_for_user_channel)
+    await state.update_data({'user_channel_pk': user_channel_pk})
+    mess = await callback.message.answer("Введите новое имя.", reply_markup=cancel_keyboard())
+
+
+@logger.catch
+async def set_user_channel_name(message: Message, state: FSMContext) -> None:
+    """Хэндлер для переименования канала """
+    if await DBI.is_expired_user_deactivated(message):
+        return
+    name = message.text
+    data: dict = await state.get_data()
+    user_channel_pk: int = data.get('user_channel_pk')
+    old_messages = data.get('messages', [])
+    chat_id = message.chat.id
+    await message.delete()
+
+    for message_id in old_messages:
+        await bot.delete_message(message.chat.id, message_id=message_id)
+
+    await DBI.set_user_channel_name(user_channel_pk=user_channel_pk, name=name)
+    await bot.send_message(chat_id, "Канал переименован.", reply_markup=user_menu_keyboard())
+    await state.finish()
+
+
+# TODO переписать дублирование кода
+@logger.catch
+async def list_channel_handler_for_delete(message: Message, state: FSMContext) -> None:
+    """
+    вывести список каналов для удаления:
     :param message:
     :return:
     """
@@ -357,52 +424,72 @@ async def list_channel_handler(message: Message, state: FSMContext) -> None:
         return
     telegram_id: str = str(message.from_user.id)
     channels: List[namedtuple] = await DBI.get_user_channels(telegram_id=telegram_id)
-    keyboard = InlineKeyboardMarkup(row_width=1)
     if not channels:
         await message.answer(
             "У вас нет ни одного канала. Сначала нужно создать новый канал и добавить в него токен.",
             reply_markup=cancel_keyboard()
         )
+        return
+
+    # state: FSMContext = await UserChannelStates.checks_tokens_for_user_channel
+    await state.set_state(UserChannelStates.checks_tokens_for_user_channel)
+    # await state.set()
+    list_messages = []
 
     for elem in channels:
+        keyboard = InlineKeyboardMarkup(row_width=1)
         keyboard.add(InlineKeyboardButton(
-            text="Переименовать канал",
+            text="Удалить канал",
             callback_data=f"{elem.user_channel_pk}")
         )
         text: str = f"Имя канала: {elem.channel_name}\nСервер/канал: {elem.guild_id}/{elem.channel_id}"
-        await message.answer(text, reply_markup=keyboard)
-    state: FSMContext = await UserChannelStates.call_name_for_user_channel.set()
+        mess = await message.answer(text, reply_markup=keyboard)
+        list_messages.append(mess.message_id)
+    await state.update_data({'messages': list_messages})
 
 
 @logger.catch
-async def rename_channel_handler(callback: CallbackQuery, state: FSMContext) -> None:
-    """Хэндлер для нажатия на кнопку "Переименовать канал" """
+async def check_tokens_for_user_channel_handler(callback: CallbackQuery, state: FSMContext) -> None:
+    """Хэндлер для нажатия на кнопку "Удалить канал" """
+
+    await state.set_state(UserChannelStates.delete_for_user_channel)
     user_channel_pk: int = int(callback.data)
-    await state.set_state(UserChannelStates.set_name_for_user_channel)
+
     await state.update_data({'user_channel_pk': user_channel_pk})
-    await callback.message.answer("Введите новое имя.", reply_markup=cancel_keyboard())
-    await callback.message.delete()
-    await UserChannelStates.set_name_for_user_channel.set()
+
+    if await DBI.get_count_tokens_by_user_channel(user_channel_pk=user_channel_pk):
+        keyboard = InlineKeyboardMarkup(row_width=3)
+        keyboard.add(InlineKeyboardButton(
+            text="Удалить канал",
+            callback_data=f"{'True'}"))
+        keyboard.add(InlineKeyboardButton(
+            text="Отмена",
+            callback_data=f"{'False'}"))
+        await callback.message.answer(
+            'В этом канале есть токены, если продолжить они будут удалены',
+            reply_markup=keyboard
+        )
+        await state.update_data({'user_channel_pk': user_channel_pk})
+        return
+    callback.data = 'True'
+    await delete_user_channel_handler(callback, state)
 
 
 @logger.catch
-async def set_user_channel_name(message: Message, state: FSMContext) -> None:
-    """Хэндлер для переименования канала """
-    name = message.text
+async def delete_user_channel_handler(callback: CallbackQuery, state: FSMContext, **kwargs) -> None:
+    """последний этап удаления канала """
     data: dict = await state.get_data()
-    user_channel_pk: int = data.get('user_channel_pk')
-    await DBI.set_user_channel_name(user_channel_pk=user_channel_pk, name=name)
-    await message.answer("Канал переименован.", reply_markup=user_menu_keyboard())
-    keyboard = InlineKeyboardMarkup(row_width=1)
-    user_channel: namedtuple = await DBI.get_channel(user_channel_pk=user_channel_pk)
-    keyboard.add(InlineKeyboardButton(
-        text="Переименовать канал",
-        callback_data=f"{user_channel.user_channel_pk}")
-    )
-    mess: str = (f"Имя канала: {user_channel.channel_name}\nСервер/канал:"
-                 f" {user_channel.guild_id}/{user_channel.channel_id}")
-
-    await message.answer(mess, reply_markup=keyboard)
+    if callback.data == 'True':
+        user_channel_pk: int = data.get('user_channel_pk')
+        await DBI.delete_user_channel(user_channel_pk=user_channel_pk)
+        await callback.message.answer("Канал удален.", reply_markup=user_menu_keyboard())
+    else:
+        await callback.message.answer('Удаление отменено', reply_markup=user_menu_keyboard())
+        await callback.message.delete()
+    old_messages = data.get('messages', [])
+    for message_id in old_messages:
+        await bot.delete_message(callback.message.chat.id, message_id=message_id)
+    # await list_channel_handler_for_delete(callback.message, state)
     await state.finish()
 
 
@@ -453,12 +540,23 @@ def token_register_handlers(dp: Dispatcher) -> None:
     dp.register_callback_query_handler(rename_token_handler, Text(startswith=["rename_token_"]))
     # ---------channels--------------
     dp.register_message_handler(menu_channel_handler, Text(equals=["Каналы"]))
-    dp.register_message_handler(list_channel_handler, Text(equals=["Переименовать канал"]))
-    dp.register_callback_query_handler(rename_channel_handler, state=UserChannelStates.call_name_for_user_channel)
-    dp.register_message_handler(set_user_channel_name, state=UserChannelStates.set_name_for_user_channel)
-    dp.register_message_handler(select_channel_handler, Text(equals=["Установить кулдаун"]))
-    dp.register_callback_query_handler(ask_channel_cooldown_handler, state=TokenStates.add_channel_cooldown)
-    dp.register_message_handler(add_channel_cooldown_handler, state=TokenStates.add_channel_cooldown)
+    dp.register_message_handler(list_channel_handler, Text(equals=[CHANEL_MENU.rename]))
+    dp.register_callback_query_handler(
+        rename_channel_handler, state=UserChannelStates.select_user_channel_to_rename)
+    dp.register_message_handler(
+        set_user_channel_name, state=UserChannelStates.enter_name_for_user_channel)
+
+    dp.register_message_handler(list_channel_handler_for_delete, Text(equals=[CHANEL_MENU.delete]))
+    dp.register_callback_query_handler(
+        check_tokens_for_user_channel_handler, state=UserChannelStates.checks_tokens_for_user_channel)
+    dp.register_callback_query_handler(
+        delete_user_channel_handler, state=UserChannelStates.delete_for_user_channel)
+
+    dp.register_message_handler(select_channel_handler, Text(equals=[CHANEL_MENU.cooldown]))
+    dp.register_callback_query_handler(
+        ask_channel_cooldown_handler, state=TokenStates.add_channel_cooldown)
+    dp.register_message_handler(
+        add_channel_cooldown_handler, state=TokenStates.add_channel_cooldown)
     # ---------end channels----------
 
     dp.register_message_handler(set_token_name, state=TokenStates.set_name_for_token)
