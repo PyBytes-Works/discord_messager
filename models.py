@@ -944,7 +944,8 @@ class Token(BaseModel):
 
     @classmethod
     @logger.catch
-    def get_all_free_tokens(cls, telegram_id: Union[str, int] = None) -> Tuple[List[int], ...]:
+    def get_all_free_tokens(cls, telegram_id: Union[str, int] = None) -> Tuple[
+        List[namedtuple], ...]:
         """
         Возвращает список всех свободных токенов по каналам
           discord id
@@ -952,6 +953,7 @@ class Token(BaseModel):
         data = (
             cls.select(
                 cls.id.alias('token_pk'),
+                cls.last_message_time.alias('last_message_time'),
                 Channel.channel_id.alias('channel_id'),
             )
                 .join_from(cls, UserChannel, JOIN.LEFT_OUTER, on=(
@@ -963,7 +965,7 @@ class Token(BaseModel):
                 .where(TokenPair.first_id.is_null(True)).namedtuples().execute()
         )
         result: Tuple[List[int], ...] = tuple(
-            [token.token_pk for token in tokens]
+            [token for token in tokens]
             for channel, tokens in
             groupby(data, lambda x: x.channel_id)
         )
