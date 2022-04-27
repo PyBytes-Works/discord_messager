@@ -1,18 +1,14 @@
 """Модуль с основными обработчиками команд, сообщений и коллбэков"""
 
-from typing import List
-
 from aiogram.dispatcher.filters import Text
 from aiogram.types import Message, CallbackQuery, ReplyKeyboardRemove
 from aiogram.dispatcher import FSMContext
 
-import utils
 from classes.manager_storage import InstancesStorage
 from classes.replies import Replies
-from config import logger, Dispatcher, DEBUG, VERSION, bot, SAVING
+from config import logger, Dispatcher, VERSION, bot
 from keyboards import cancel_keyboard, user_menu_keyboard
 from classes.discord_manager import DiscordManager
-from classes.redis_interface import RedisDB
 from classes.db_interface import DBI
 from states import UserStates
 

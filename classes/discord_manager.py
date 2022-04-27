@@ -25,9 +25,9 @@ def check_working(func):
         if args and hasattr(args[0].__class__, name):
             is_working: bool = getattr(args[0], "is_working")
             if is_working:
-                logger.debug(f"\t{name}: OK")
+                # logger.debug(f"\t{name}: OK")
                 return await func(*args, **kwargs)
-        logger.debug(f"\t{name}: FAIL")
+        # logger.debug(f"\t{name}: FAIL")
         return
 
     return wrapper
@@ -64,7 +64,7 @@ class DiscordManager:
             f"\n\tMate discord id: {self._datastore.mate_id}"
             f"\n\tSilence: {self.__silence}"
             f"\n\tRelated tokens: {len(self.__related_tokens)}"
-            f"\n\tRelated tokens: {self.__related_tokens}"
+            # f"\n\tRelated tokens: {self.__related_tokens}"
         )
 
     async def _check_user_active(self):
@@ -112,10 +112,10 @@ class DiscordManager:
 
         while self.is_working:
             t0 = datetime.datetime.now()
-            logger.debug(f"\n\t\tCircle start at: {t0}")
+            # logger.debug(f"\n\t\tCircle start at: {t0}")
             await self._lets_play()
 
-            logger.debug(f"\n\t\tCircle finish. Total time: {datetime.datetime.now() - t0}")
+            # logger.debug(f"\n\t\tCircle finish. Total time: {datetime.datetime.now() - t0}")
 
         logger.info("\n\tGame over.")
 
@@ -179,7 +179,6 @@ class DiscordManager:
     async def _sleep(self) -> None:
         """Спит на время ближайшего токена."""
 
-        logger.debug(f"TOTAL WORKERS: {self.__workers}")
         if self.__workers:
             return
         await self._get_delay()
