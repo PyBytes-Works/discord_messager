@@ -16,12 +16,12 @@ async def test_all_proxies():
 
 
 async def tests():
-    # print("Discord id:", await GetMe().get_discord_id(token=token, proxy=proxy))
-    # print("Discord id:", await GetMe().get_discord_id(token=token, proxy=bad_proxy))
-    # print("Proxy:", await ProxyChecker().get_checked_proxy(telegram_id=telegram_id))
+    print("Discord id:", await GetMe().get_discord_id(token=token, proxy=ban))
+    print("Discord id:", await GetMe().get_discord_id(token=token, proxy=bad_proxy))
+    print("Proxy:", await ProxyChecker().get_checked_proxy(telegram_id=telegram_id))
     print(await TokenChecker().check_token(token="ksdf", proxy=proxy, channel=channel, telegram_id=telegram_id))
-    # print(await MessageSender(datastore).send_message())
-    # await test_all_proxies()
+    print(await MessageSender(datastore).send_message_to_discord())
+    await test_all_proxies()
 
 if __name__ == '__main__':
 

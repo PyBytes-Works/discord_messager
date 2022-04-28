@@ -4,7 +4,13 @@ from classes.redis_interface import RedisDB
 from config import logger
 
 
-class Replies(RedisDB):
+class ReplyData:
+    pass
+
+
+class RepliesManager(RedisDB):
+
+    # TODO Сделать дата-класс реплаев
 
     def __init__(self, redis_key: str):
         super().__init__(redis_key)
