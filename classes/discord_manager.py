@@ -283,7 +283,8 @@ class DiscordManager:
                 if self.auto_answer:
                     await self._auto_reply_with_davinchi(elem, replyer)
                 else:
-                    await self.__reply_to_telegram(elem, replyer)
+                    await self.__send_reply_to_telegram(elem)
+                    await replyer.update_answered_or_showed(str(elem.get("message_id")))
 
     @logger.catch
     async def _auto_reply_with_davinchi(self, data: dict, replyer: 'RepliesManager') -> None:
@@ -295,37 +296,50 @@ class DiscordManager:
         if ai_reply_text:
             await replyer.update_answered_or_showed(
                 message_id=str(data.get("message_id")), text=ai_reply_text)
+            text: str = await self.__get_message_text_from_dict(data)
+            result: str = text + f"\nОтвет от ИИ: {ai_reply_text}"
+            await self.message.answer(result)
             return
         logger.error(f"Davinci NOT ANSWERED to:"
                      f"\n{data}")
         text: str = "ИИ не ответил на реплай:"
         await self.message.answer(text)
         await ErrorsSender.send_report_to_admins(text)
-        await self.__reply_to_telegram(data)
+        await self.__send_reply_to_telegram(data)
 
     @logger.catch
-    async def __reply_to_telegram(self, data: dict, replyer: 'RepliesManager') -> None:
-        """Отправляет сообщение о реплае в телеграм"""
+    async def __send_reply_to_telegram(self, data: dict) -> None:
+        text: str = await self.__get_message_text_from_dict(data)
+        message_id: str = data.get("message_id")
+        await self.__reply_to_telegram(text=text, message_id=message_id)
 
-        answer_keyboard: 'InlineKeyboardMarkup' = InlineKeyboardMarkup(row_width=1)
+    @logger.catch
+    async def __get_message_text_from_dict(self, data) -> str:
         author: str = data.get("author")
-        reply_id: str = data.get("message_id")
         reply_text: str = data.get("text")
         reply_to_author: str = data.get("to_user")
         reply_to_message: str = data.get("to_message")
-        answer_keyboard.add(InlineKeyboardButton(
-            text="Ответить",
-            callback_data=f'reply_{reply_id}'
-        ))
-        await self.message.answer(
+        return (
             f"Вам пришло сообщение из ДИСКОРДА:"
             f"\nКому: {reply_to_author}"
             f"\nНа сообщение: {reply_to_message}"
             f"\nОт: {author}"
-            f"\nText: {reply_text}",
-            reply_markup=answer_keyboard
+            f"\nText: {reply_text}"
         )
-        await replyer.update_answered_or_showed(str(data.get("message_id")))
+
+    @logger.catch
+    async def __reply_to_telegram(self, text: str, message_id: str) -> None:
+        """Отправляет сообщение о реплае в телеграм"""
+
+        answer_keyboard: 'InlineKeyboardMarkup' = InlineKeyboardMarkup(row_width=1)
+
+        answer_keyboard.add(InlineKeyboardButton(
+            text="Ответить",
+            callback_data=f'reply_{message_id}'
+        ))
+        await self.message.answer(text, reply_markup=answer_keyboard
+        )
+
 
     @check_working
     @logger.catch
