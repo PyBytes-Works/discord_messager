@@ -47,7 +47,6 @@ class OpenAI:
     def get_answer(self, message: str = '') -> str:
         """Returns answer from bot or empty string if errors"""
 
-        self._last_answer = message
         self.__counter += 1
         logger.debug(f"№ {self.__counter} - Message to OpenAI: {message}")
 
@@ -81,7 +80,8 @@ class OpenAI:
             return random.choice(defaults)
         if len(result) not in range(MIN_MESSAGE_LENGTH, MAX_MESSAGE_LENGTH):
             logger.warning(f"\t\tOpenAI answer no in range 3-100. Repeat.")
-            return self.get_answer(message)
+            result = self.get_answer(message)
+
         return result
 
     # TODO Если повторяется ответ от ИИ то взять случайное сообщение случайного пользователя из чата
