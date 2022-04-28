@@ -34,7 +34,7 @@ class MessageManager(ChannelData):
         all_messages: List[dict] = await self.__get_all_discord_messages()
         self._last_messages: List[dict] = await self.__get_last_messages(all_messages)
         if not await self.__get_message_id_and_text_for_send_answer():
-            self._datastore.current_message_id = await self.__get_last_message_id()
+            self._datastore.current_message_id = await self.__get_message_id_from_last_messages()
             self._datastore.text_to_send = await self._get_message_text()
         await self.__update_datastore_replies()
         await self.__get_data_for_send()
@@ -138,15 +138,20 @@ class MessageManager(ChannelData):
         ]
 
     @logger.catch
-    async def __get_last_message_id(self) -> int:
-        """"""
+    async def __get_message_id_from_last_messages(self) -> int:
+        """Returns message id from random message where author is mate"""
 
-        messages: List[dict] = [
+        mate_messages: List[dict] = [
             elem
             for elem in self._last_messages
             if self._datastore.mate_id == str(elem["author"]["id"])
         ]
-        return await self.__get_last_message_id_from_messages(messages)
+        return await self.__get_random_message_id(mate_messages)
+
+    @logger.catch
+    async def __get_random_message_id(self, data: list) -> int:
+        random_elem: dict = random.choice(data)
+        return random_elem.get("id", 0)
 
     @logger.catch
     async def __update_datastore_replies(self) -> None:
@@ -157,10 +162,6 @@ class MessageManager(ChannelData):
         all_replies: List[dict] = await self.__get_my_replies()
         new_replies: List[dict] = await self.__get_filtered_replies(all_replies)
         self._datastore.for_reply = await self.__get_replies_for_answer(new_replies)
-
-    @logger.catch
-    async def __get_last_message_id_from_messages(self, data: list) -> int:
-        return int(max(data, key=lambda x: x.get("timestamp"))["id"]) if data else 0
 
     @logger.catch
     async def __get_replies_for_answer(self, new_replies: List[dict]) -> List[dict]:
