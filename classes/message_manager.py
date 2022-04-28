@@ -35,7 +35,7 @@ class MessageManager(ChannelData):
         self._last_messages: List[dict] = await self.__get_last_messages(all_messages)
         if not await self.__update_datastore_message_id_and_answer_text_from_replies():
             self._datastore.current_message_id = await self.__get_last_message_id()
-            self._datastore.text_to_send = await self.__get_message_text()
+            self._datastore.text_to_send = await self._get_message_text()
         await self.__update_datastore_replies()
         await self.__get_data_for_send()
 
@@ -50,6 +50,21 @@ class MessageManager(ChannelData):
         if result.get("status") == 200:
             return result.get("answer_data")
         return []
+
+    @logger.catch
+    async def _get_message_text(self) -> str:
+        """Return text for sending to discord. If 'mate' message exists - send it to OpenAi
+        and returns result else return text from vocabulary"""
+
+        mate_message: str = await self.__get_mate_message()
+        if mate_message:
+            openai_text: str = await self.__get_text_from_openai()
+            if openai_text:
+                return openai_text
+        if self._ten_from_hundred():
+            logger.debug("Random message! You are lucky!!!")
+            self._datastore.current_message_id = 0
+        return await self.__get_text_from_vocabulary()
 
     @staticmethod
     @logger.catch
@@ -182,10 +197,8 @@ class MessageManager(ChannelData):
         return text
 
     @logger.catch
-    async def __get_text_from_openai(self) -> str:
-        mate_message: str = await self.__get_mate_message()
-        if not mate_message:
-            return ''
+    async def __get_text_from_openai(self, mate_message: str) -> str:
+
         openai_answer: str = await self.__get_openai_answer(mate_message)
         logger.warning(f"\n\t\tFirst OpenAI answer: {openai_answer}\n")
         if openai_answer:
@@ -198,15 +211,6 @@ class MessageManager(ChannelData):
 
         return random_message
 
-    @logger.catch
-    async def __get_message_text(self) -> str:
-        openai_text: str = await self.__get_text_from_openai()
-        if openai_text:
-            return openai_text
-        if self._ten_from_hundred():
-            logger.debug("Random message! You are lucky!!!")
-            self._datastore.current_message_id = 0
-        return await self.__get_text_from_vocabulary()
 
     @logger.catch
     async def __get_random_message_from_last_messages(self) -> str:
