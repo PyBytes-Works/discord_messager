@@ -178,11 +178,14 @@ class MessageManager(ChannelData):
 
         replies: 'RepliesManager' = RepliesManager(redis_key=self._datastore.telegram_id)
         my_answered: List[dict] = await replies.get_answered(self._datastore.my_discord_id)
+        logger.warning(f"\n\t\tMY ANSWERED before: {my_answered}")
         if my_answered:
-            current_reply: dict = random.choice(my_answered)
+            current_reply: dict = my_answered.pop()
             self._datastore.text_to_send = current_reply.get("answer_text")
             message_id: int = current_reply.get("message_id")
             self._datastore.current_message_id = message_id
+            logger.warning(f"\n\t\tMY ANSWERED after: {my_answered}")
+            await replies.delete_answered(message_id)
 
         return len(my_answered)
 

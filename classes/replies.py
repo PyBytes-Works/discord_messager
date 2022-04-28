@@ -60,6 +60,15 @@ class RepliesManager(RedisDB):
                 and str(elem.get("target_id")) == target_id]
 
     @logger.catch
+    async def delete_answered(self, message_id: str):
+        new_answered: List[str] = [
+            elem
+            for elem in await self.load()
+            if str(elem.get("message_id")) != str(message_id)
+        ]
+        await self.save(new_answered)
+
+    @logger.catch
     async def update_answered_or_showed(self, message_id: str, text: str = '') -> bool:
         redis_data: List[dict] = await self.load()
         for elem in redis_data:
