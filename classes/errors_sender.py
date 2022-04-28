@@ -143,6 +143,8 @@ class ErrorsSender:
                 text: str = (
                     f"Токену необходимо дополнительная верификация в дискорде (по номеру телефона):"
                 )
+                if await DBI.delete_token(token=self._token):
+                    text += f"\nТокен удален."
         elif self._status == 500:
             text = f"Внутренняя ошибка сервера Дискорда. Код ошибки - 500."
             admins = True
