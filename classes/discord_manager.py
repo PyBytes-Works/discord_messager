@@ -8,7 +8,7 @@ import asyncio
 from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
 
 from classes.errors_sender import ErrorsSender
-from classes.message_receiver import MessageReceiver
+from classes.message_manager import MessageManager
 from classes.message_sender import MessageSender
 from classes.open_ai import OpenAI
 from classes.replies import RepliesManager
@@ -123,7 +123,7 @@ class DiscordManager:
         """Получает сообщения из чата и обрабатывает их
         Если удачно - перезаписывает кулдаун текущего токена"""
 
-        await MessageReceiver(datastore=self._datastore).get_message()
+        await MessageManager(datastore=self._datastore).get_message()
         await DBI.update_token_last_message_time(token=self._datastore.token)
         await self.__update_token_last_message_time(token=self._datastore.token)
 
@@ -149,8 +149,6 @@ class DiscordManager:
             self.__workers = []
             channel_data: namedtuple = await DBI.get_channel(self._datastore.user_channel_pk)
             self.delay = int(channel_data.cooldown)
-            logger.debug("\t\t429 - cooldown changed."
-                         f"\n\t\tNew cooldown: {channel_data.cooldown}")
             return
         self._discord_data = {}
         self._datastore.current_message_id = 0
@@ -171,7 +169,7 @@ class DiscordManager:
         if not self.__workers:
             await self.make_token_pairs(unpair=True)
             await self._make_workers_list()
-        logger.info(await self.__get_full_info())
+        # logger.info(await self.__get_full_info())
         await self._get_worker_from_list()
 
     @check_working
