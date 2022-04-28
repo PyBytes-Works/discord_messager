@@ -80,6 +80,9 @@ class OpenAI:
             return self.get_answer(message)
         return result
 
+    # Если повторяется ответ от ИИ то взять случайное сообщение случайного пользователя из чата
+    # и скормить его ИИ и ответить ему же реплаем
+
     @staticmethod
     def get_message_from_file() -> str:
         with open('db/vocabulary_en.txt', 'r', encoding='utf-8') as f:
