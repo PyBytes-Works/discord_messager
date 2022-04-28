@@ -58,7 +58,7 @@ class MessageManager(ChannelData):
 
         mate_message: str = await self.__get_mate_message()
         if mate_message:
-            openai_text: str = await self.__get_text_from_openai()
+            openai_text: str = await self.__get_text_from_openai(mate_message)
             if openai_text:
                 return openai_text
         if self._ten_from_hundred():
