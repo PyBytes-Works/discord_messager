@@ -57,7 +57,7 @@ async def answer_to_reply_handler(callback: CallbackQuery, state: FSMContext):
 
     message_id: str = callback.data.rsplit("_", maxsplit=1)[-1]
     await bot.delete_message(callback.message.chat.id, callback.message.message_id)
-    await callback.message.answer('Введите текст ответа:', reply_markup=cancel_keyboard())
+    await callback.message.answer('Введите текст ответа:')
     await state.update_data(message_id=message_id)
     await callback.answer()
 
@@ -69,13 +69,13 @@ async def send_message_to_reply_handler(message: Message, state: FSMContext):
     state_data: dict = await state.get_data()
     message_id: str = state_data.get("message_id")
     user_telegram_id: str = str(message.from_user.id)
-    if not await RepliesManager(user_telegram_id).update_answered_or_showed(
+    if not await RepliesManager(user_telegram_id).update_text(
             message_id=message_id, text=message.text):
         logger.warning("f: send_message_to_reply_handler: elem in Redis data not found or timeout error")
-        await message.answer('Время хранения данных истекло.', reply_markup=cancel_keyboard())
+        await message.answer('Время хранения данных истекло.')
         return
-    await message.answer('Добавляю сообщение в очередь. Это займет несколько секунд.', reply_markup=ReplyKeyboardRemove())
-    await message.answer('Сообщение добавлено в очередь сообщений.', reply_markup=cancel_keyboard())
+    await message.answer('Добавляю сообщение в очередь. Это займет несколько секунд.')
+    await message.answer('Сообщение добавлено в очередь сообщений.')
 
 
 @logger.catch
