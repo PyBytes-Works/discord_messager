@@ -5,7 +5,28 @@ from config import logger
 
 
 class ReplyData:
-    pass
+
+    """Reply dataclass"""
+
+    def __init__(self, **kwargs):
+        self.token: bool = kwargs.get("token", False)
+        self.author: bool = kwargs.get("author", False)
+        self.text: bool = kwargs.get("text", False)
+        self.message_id: bool = kwargs.get("message_id", False)
+        self.to_message: bool = kwargs.get("to_message", False)
+        self.to_user: bool = kwargs.get("to_user", False)
+        self.target_id: bool = kwargs.get("target_id", False)
+        self.showed: bool = False
+        self.answered: bool = False
+
+    def set_answered(self):
+        self.answered = True
+
+    def set_showed(self):
+        self.showed = True
+
+    def get_dict(self) -> dict:
+        return self.__dict__
 
 
 class RepliesManager(RedisDB):
