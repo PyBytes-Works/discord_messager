@@ -66,7 +66,7 @@ class MessageSender(PostRequest):
         data: dict = result.get('answer_data', {})
         code: int = data.get("code")
         if status == 429 and code == 20016:
-            cooldown: int = int(data["retry_after"])
+            cooldown: int = int(data.get("retry_after"))
             if cooldown:
                 cooldown += self._datastore.cooldown
                 await DBI.update_user_channel_cooldown(

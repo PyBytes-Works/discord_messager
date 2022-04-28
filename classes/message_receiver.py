@@ -5,7 +5,7 @@ from typing import List
 
 import utils
 from classes.errors_sender import ErrorsSender
-from classes.replies import Replies
+from classes.replies import RepliesManager
 from classes.request_classes import ChannelData
 from config import logger, DEBUG, SAVING
 
@@ -158,7 +158,7 @@ class MessageReceiver(ChannelData):
         """Возвращает разницу между старыми и новыми данными в редисе,
         записывает полные данные в редис"""
 
-        return await Replies(redis_key=self._datastore.telegram_id).get_difference_and_update(new_replies)
+        return await RepliesManager(redis_key=self._datastore.telegram_id).get_difference_and_update(new_replies)
         # if not new_replies:
         #     return []
         # total_replies: List[dict] = await RedisDB(redis_key=self._datastore.telegram_id).load()
@@ -197,7 +197,7 @@ class MessageReceiver(ChannelData):
 
         self._datastore.current_message_id = 0
         self._datastore.text_to_send = ''
-        replies: 'Replies' = Replies(redis_key=self._datastore.telegram_id)
+        replies: 'RepliesManager' = RepliesManager(redis_key=self._datastore.telegram_id)
         my_answered: List[dict] = await replies.get_answered(self._datastore.my_discord_id)
         if not my_answered:
             return

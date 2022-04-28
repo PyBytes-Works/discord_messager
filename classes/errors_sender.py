@@ -54,6 +54,8 @@ class ErrorsSender:
             f"\n\tError data: {self._answer_data}"
         )
         logger.error(error_message)
+
+        text: str = ''
         if self._status == -100:
             text: str = f'Произошла ошибка запроса. RequestSender._EXCEPTIONS: read the logs.'
             admins = True
@@ -109,9 +111,18 @@ class ErrorsSender:
                 f'\nОбратитесь к администратору. Код ошибки 407')
             users = True
             admins = True
-        elif self._status == 429 and self._code == 20016:
-            # превышен кулдаун канала
-            return
+        elif self._status == 429:
+            if self._code == 20016:
+                # превышен кулдаун канала
+                return
+            elif self._code == 40062:
+                text: str = (
+                    f"User: {self._telegram_id}"
+                    f"\nError {self._status}"
+                    f"\nCode: {self._code}"
+                    f"\nError text: Service resource is being rate limited."
+                )
+                admins = True
         elif self._status == 500:
             text = f"Внутренняя ошибка сервера Дискорда. Код ошибки - 500."
             admins = True
