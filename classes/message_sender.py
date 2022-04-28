@@ -101,6 +101,7 @@ class MessageSender(PostRequest):
         if mate_message:
             self.__text: str = OpenAI().get_answer(mate_message[0].strip())
             if self._fifty_fifty():
+                logger.debug("50 / 50 You got it!!!")
                 self._datastore.current_message_id = 0
             await RedisDB(
                 redis_key=self._datastore.my_discord_id).delete(mate_id=self._datastore.mate_id)
