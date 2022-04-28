@@ -33,7 +33,7 @@ class MessageManager(ChannelData):
         self._datastore.text_to_send = ''
         all_messages: List[dict] = await self.__get_all_discord_messages()
         self._last_messages: List[dict] = await self.__get_last_messages(all_messages)
-        if not await self.__update_datastore_message_id_and_answer_text_from_replies():
+        if not await self.__get_message_id_and_text_for_send_answer():
             self._datastore.current_message_id = await self.__get_last_message_id()
             self._datastore.text_to_send = await self._get_message_text()
         await self.__update_datastore_replies()
@@ -170,7 +170,7 @@ class MessageManager(ChannelData):
         return await RepliesManager(self._datastore.telegram_id).get_difference_and_update(new_replies)
 
     @logger.catch
-    async def __update_datastore_message_id_and_answer_text_from_replies(self) -> int:
+    async def __get_message_id_and_text_for_send_answer(self) -> int:
 
         """Update datastore message id and answer text from answered replies from Redis
 
@@ -185,9 +185,9 @@ class MessageManager(ChannelData):
             message_id: int = current_reply.get("message_id")
             self._datastore.current_message_id = message_id
             logger.warning(f"\n\t\tMY ANSWERED after: {my_answered}")
-            await replies.delete_answered(message_id)
+            await replies.update_answered(str(message_id))
 
-        return len(my_answered)
+        return self._datastore.current_message_id
 
     @logger.catch
     async def __get_text_from_vocabulary(self) -> str:

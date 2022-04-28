@@ -44,45 +44,57 @@ class RepliesManager(RedisDB):
         if not new_replies:
             return []
         total_replies: List[dict] = await self.load()
-        old_messages: List[str] = list(map(lambda x: x.get("message_id"), total_replies))
-        result: List[
-            dict] = list(filter(lambda x: x.get("message_id") not in old_messages, new_replies))
+        unanswered: List[dict] = await self._get_unanswered(total_replies)
+        old_messages: List[str] = await self._get_old_replies(unanswered)
+        result: List[dict] = list(filter(
+            lambda x: x.get("message_id") not in old_messages, new_replies))
         total_replies.extend(result)
         await self.save(data=total_replies)
 
         return result
 
     @logger.catch
+    async def _get_unanswered(self, total_replies) -> List[dict]:
+        return [elem for elem in total_replies if not elem.get("answered")]
+
+    @logger.catch
+    async def _get_old_replies(self, unanswered) -> List[str]:
+        return list(map(
+            lambda x: x.get("message_id"),
+            unanswered
+        ))
+
+    @logger.catch
     async def get_answered(self, target_id: str) -> List[dict]:
         return [elem
                 for elem in await self.load()
-                if elem.get("answered")
+                if elem.get("answer_text")
+                and not elem.get("answered")
                 and str(elem.get("target_id")) == target_id]
 
     @logger.catch
-    async def delete_answered(self, message_id: str):
-        new_answered: List[str] = [
-            elem
-            for elem in await self.load()
-            if str(elem.get("message_id")) != str(message_id)
-        ]
-        await self.save(new_answered)
-
-    @logger.catch
-    async def update_answered_or_showed(self, message_id: str, text: str = '') -> bool:
+    async def update_text(self, message_id: str, text: str) -> bool:
         redis_data: List[dict] = await self.load()
         for elem in redis_data:
             if str(elem.get("message_id")) == str(message_id):
-                if text:
-                    elem.update(
-                        {
-                            "answer_text": text,
-                            "showed": True,
-                            "answered": True
-                        }
-                    )
-                else:
-                    elem.update(showed=True)
+                elem.update(answer_text=text)
                 await self.save(data=redis_data)
                 return True
 
+    @logger.catch
+    async def update_answered(self, message_id: str) -> bool:
+        redis_data: List[dict] = await self.load()
+        for elem in redis_data:
+            if str(elem.get("message_id")) == str(message_id):
+                elem.update(answered=True)
+                await self.save(data=redis_data)
+                return True
+
+    @logger.catch
+    async def update_showed(self, message_id: str) -> bool:
+        redis_data: List[dict] = await self.load()
+        for elem in redis_data:
+            if str(elem.get("message_id")) == str(message_id):
+                elem.update(showed=True)
+                await self.save(data=redis_data)
+                return True
