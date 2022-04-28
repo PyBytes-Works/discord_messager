@@ -18,10 +18,12 @@ class OpenAI:
         self.__message: str = ''
         self.__mode: str = "text-davinci-002" if davinchi else "text-curie-001"
         self.__counter: int = 0
+        self._last_answer: str = ''
 
     @logger.catch
     def __send_message(self) -> dict:
         time.sleep(0.5)
+        logger.debug(f"OpenAI mode: {self.__mode}")
         try:
             response: dict = openai.Completion.create(
                 engine=self.__mode,
@@ -45,9 +47,10 @@ class OpenAI:
     def get_answer(self, message: str = '') -> str:
         """Returns answer from bot or empty string if errors"""
 
-        logger.info(f"Message to OpenAI: {message}")
-
+        self._last_answer = message
         self.__counter += 1
+        logger.debug(f"№ {self.__counter} - Message to OpenAI: {message}")
+
         plugs: Tuple[str, ...] = ('server here:', 'https://discord.gg/')
         defaults: Tuple[str, ...] = ('how are you', 'how are you doing')
 
@@ -68,21 +71,24 @@ class OpenAI:
             logger.error("OpenAI: No answers")
             return ''
         result: str = answers[0].get("text", '').strip().split("\n")[0]
+        if self._last_answer == result:
+            message = self.get_message_from_file()
+            return self.get_answer(message)
+        self._last_answer = result
+        logger.debug(f"№ {self.__counter} - OpenAI answered: {result}")
         if any(filter(lambda x: x in result, plugs)):
+            logger.warning(f"\t\tOpenAI answer in plugs. Return default.")
             return random.choice(defaults)
         if len(result) not in range(MIN_MESSAGE_LENGTH, MAX_MESSAGE_LENGTH):
+            logger.warning(f"\t\tOpenAI answer no in range 3-100. Repeat.")
             return self.get_answer(message)
-        logger.info(f"OpenAI answered: {result}")
         return result
 
+    # TODO Если повторяется ответ от ИИ то взять случайное сообщение случайного пользователя из чата
+    # и скормить его ИИ и ответить ему же реплаем
 
-if __name__ == '__main__':
+    @staticmethod
     def get_message_from_file() -> str:
-        with open('../db/vocabulary_en.txt', 'r', encoding='utf-8') as f:
+        with open('db/vocabulary_en.txt', 'r', encoding='utf-8') as f:
             data = f.readlines()
         return random.choice(data)
-
-
-    messages = get_message_from_file().strip()
-    bot = OpenAI()
-    bot.get_answer(messages)

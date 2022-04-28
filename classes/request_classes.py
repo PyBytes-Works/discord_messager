@@ -18,13 +18,6 @@ class RequestSender(ABC):
         self.proxy: str = ''
         self.token: str = ''
         self.url: str = ''
-        self._EXCEPTIONS: tuple = (
-            asyncio.exceptions.TimeoutError,
-            aiohttp.client_exceptions.ServerDisconnectedError,
-            aiohttp.client_exceptions.ClientProxyConnectionError,
-            aiohttp.client_exceptions.ClientOSError,
-            aiohttp.client_exceptions.TooManyRedirects,
-        )
         self._params: dict = {}
         self._error_params: dict = {}
 
@@ -52,18 +45,32 @@ class RequestSender(ABC):
             "ssl": False,
             "timeout": 10,
         }
+        error_text: str = (f"\nUrl: {self.url}"
+                           f"\nProxy: {self.proxy}")
+        text: str = ''
         try:
-            # logger.debug(self._params)
             answer: dict = await self._send()
         except (
                 aiohttp.client_exceptions.ClientHttpProxyError,
                 aiohttp.client_exceptions.ClientConnectorError,
                 aiohttp.http_exceptions.BadHttpMessage
         ) as err:
-            logger.error(f"PROXY ERROR: 407 {err}")
+            logger.error(f"RequestSender: PROXY ERROR: 407 {err}")
             answer.update(status=407)
-        except self._EXCEPTIONS as err:
-            logger.error(f"GetRequest: _EXCEPTIONS: {err}")
+        except asyncio.exceptions.TimeoutError as err:
+            text = f"RequestSender._send_request: asyncio.exceptions.TimeoutError: {err}"
+        except aiohttp.client_exceptions.ServerDisconnectedError as err:
+            text = f"RequestSender._send_request: aiohttp.client_exceptions.ServerDisconnectedError: {err}"
+        except aiohttp.client_exceptions.ClientProxyConnectionError as err:
+            text = f"RequestSender._send_request: aiohttp.client_exceptions.ClientProxyConnectionError: {err}"
+        except aiohttp.client_exceptions.ClientOSError as err:
+            text = f"RequestSender._send_request: aiohttp.client_exceptions.ClientOSError: {err}"
+        except aiohttp.client_exceptions.TooManyRedirects as err:
+            text = f"RequestSender._send_request: aiohttp.client_exceptions.TooManyRedirects: {err}"
+        except Exception as err:
+            text = f"RequestSender._send_request: Exception: {err}"
+        if text:
+            logger.error(text + error_text)
             answer.update(status=-100)
 
         return answer

@@ -16,6 +16,7 @@ from classes.token_datastorage import TokenData
 
 from config import logger
 from classes.db_interface import DBI
+from keyboards import user_menu_keyboard
 
 
 def check_working(func):
@@ -52,6 +53,30 @@ class DiscordManager:
         self._discord_data: dict = {}
         self.delay: int = 0
         self.autoanswer: bool = False
+        self.reboot: bool = False
+
+    @logger.catch
+    async def lets_play(self) -> None:
+        """Show must go on
+        Запускает рабочий цикл бота, проверяет ошибки."""
+
+        if not await self.__check_reboot():
+            return
+        await self._create_datastore()
+        await self._make_all_token_ids()
+        logger.info(f"\n\tUSER: {self.__username}: {self.__telegram_id} - Game begin.")
+
+        while self.is_working:
+            await self._lets_play()
+        logger.info("\n\tGame over.")
+
+    async def __check_reboot(self) -> bool:
+        if self.reboot:
+            await self.message.answer(
+                "Ожидайте перезагрузки сервера.",
+                reply_markup=user_menu_keyboard())
+            return False
+        return True
 
     async def __get_full_info(self) -> str:
         return (
@@ -84,34 +109,16 @@ class DiscordManager:
         await self._sleep()
 
     @logger.catch
-    async def __create_datastore(self) -> None:
+    async def _create_datastore(self) -> None:
         self._datastore: 'TokenData' = TokenData(self.__telegram_id)
 
     @logger.catch
-    async def __make_all_token_ids(self) -> None:
+    async def _make_all_token_ids(self) -> None:
         self._datastore.all_tokens_ids = await DBI.get_all_discord_id(self.__telegram_id)
         if not self._datastore.all_tokens_ids:
             logger.debug(f"No all_tokens_ids.")
             return
         self.is_working = True
-
-    @logger.catch
-    async def lets_play(self) -> None:
-        """Show must go on
-        Запускает рабочий цикл бота, проверяет ошибки."""
-
-        await self.__create_datastore()
-        await self.__make_all_token_ids()
-        logger.info(f"\n\tUSER: {self.__username}: {self.__telegram_id} - Game begin.")
-
-        while self.is_working:
-            t0 = datetime.datetime.now()
-            # logger.debug(f"\n\t\tCircle start at: {t0}")
-            await self._lets_play()
-
-            # logger.debug(f"\n\t\tCircle finish. Total time: {datetime.datetime.now() - t0}")
-
-        logger.info("\n\tGame over.")
 
     @check_working
     @logger.catch
