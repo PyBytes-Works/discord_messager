@@ -68,7 +68,11 @@ class ErrorsSender:
         logger.error(error_message)
 
         text: str = ''
-        if self._status == -100:
+        if self._status == -99:
+            text: str = f'Ошибка таймаута'
+            admins = True
+            users = False
+        elif self._status == -100:
             text: str = f'Произошла ошибка запроса. RequestSender._EXCEPTIONS: read the logs.'
             admins = True
             users = False
@@ -127,7 +131,7 @@ class ErrorsSender:
             if self._code == 20016:
                 # превышен кулдаун канала. Обработано в MessageSender.
                 # return
-                # TODO Потестить
+                # TODO Потестить !!!
                 cooldown: int = int(self._answer_data_dict.get("retry_after"))
                 if cooldown:
                     cooldown += self._datastore.cooldown

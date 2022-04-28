@@ -55,7 +55,7 @@ class RequestSender(ABC):
             'url': self.url,
             "proxy": self.proxy_data,
             "ssl": False,
-            "timeout": 10,
+            "timeout": 15,
         }
         error_text: str = (f"\nUrl: {self.url}"
                            f"\nProxy: {self.proxy}")
@@ -70,7 +70,8 @@ class RequestSender(ABC):
             logger.error(f"RequestSender: PROXY ERROR: 407 {err}")
             answer.update(status=407)
         except asyncio.exceptions.TimeoutError as err:
-            text = f"RequestSender._send_request: asyncio.exceptions.TimeoutError: {err}"
+            logger.error(f"RequestSender._send_request: asyncio.exceptions.TimeoutError: {err}")
+            answer.update(status=-99)
         except aiohttp.client_exceptions.ServerDisconnectedError as err:
             text = f"RequestSender._send_request: aiohttp.client_exceptions.ServerDisconnectedError: {err}"
         except aiohttp.client_exceptions.ClientProxyConnectionError as err:
