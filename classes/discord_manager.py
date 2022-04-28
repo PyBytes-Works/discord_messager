@@ -285,12 +285,12 @@ class DiscordManager:
 
         replyer: 'RepliesManager' = RepliesManager(self.__telegram_id)
         for elem in self.datastore.for_reply:
-            if not elem.get("showed") and not elem.get("answered"):
+            if not elem.get("answered") and not elem.get("answer_text"):
                 if self.auto_answer:
                     await self._auto_reply_with_davinchi(elem, replyer)
                 else:
                     await self.__send_reply_to_telegram(elem)
-                    await replyer.update_answered_or_showed(str(elem.get("message_id")))
+                    await replyer.update_showed(str(elem.get("message_id")))
 
     @logger.catch
     async def _auto_reply_with_davinchi(self, data: dict, replyer: 'RepliesManager') -> None:
@@ -300,7 +300,7 @@ class DiscordManager:
         reply_text: str = data.get("text")
         ai_reply_text: str = OpenAI(davinchi=True).get_answer(message=reply_text)
         if ai_reply_text:
-            await replyer.update_answered_or_showed(
+            await replyer.update_text(
                 message_id=str(data.get("message_id")), text=ai_reply_text)
             text: str = await self.__get_message_text_from_dict(data)
             result: str = text + f"\nОтвет от ИИ: {ai_reply_text}"
