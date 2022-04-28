@@ -64,7 +64,8 @@ class MessageSender(PostRequest):
                      f"\nData for send: {self._data_for_send}")
         result: dict = await ErrorsSender(**self._error_params).handle_errors()
         data: dict = result.get('answer_data', {})
-        if status == 429:
+        code: int = data.get("code")
+        if status == 429 and code == 20016:
             cooldown: int = int(data.get("retry_after"))
             if cooldown:
                 cooldown += self._datastore.cooldown
