@@ -129,9 +129,6 @@ class ErrorsSender:
             admins = True
         elif self._status == 429:
             if self._code == 20016:
-                # превышен кулдаун канала. Обработано в MessageSender.
-                # return
-                # TODO Потестить !!!
                 cooldown: int = int(self._answer_data_dict.get("retry_after"))
                 if cooldown:
                     cooldown += self._datastore.cooldown

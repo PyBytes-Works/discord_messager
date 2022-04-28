@@ -52,7 +52,6 @@ class MessageSender(PostRequest):
         self.url = DISCORD_BASE_URL + f'{self._datastore.channel}/messages?'
 
         logger.debug("MessageSender.__send_data::"
-                     f"\nParams: "
                      f"\n\tToken: {self.token}"
                      f"\n\tProxy:{self.proxy}"
                      f"\n\tChannel: {self._datastore.channel}"
@@ -63,6 +62,7 @@ class MessageSender(PostRequest):
         if status == 200:
             return True
         self._update_err_params(answer=answer, datastore=self._datastore)
+        await ErrorsSender(**self._error_params).handle_errors()
 
     @logger.catch
     async def __get_text_from_vocabulary(self) -> str:
