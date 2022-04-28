@@ -51,17 +51,20 @@ class MessageSender(PostRequest):
         await self._typing()
         await self._typing()
         self.url = DISCORD_BASE_URL + f'{self._datastore.channel}/messages?'
+
+        logger.debug("MessageSender.__send_data::"
+                     f"\nParams: "
+                     f"\n\tToken: {self.token}"
+                     f"\n\tProxy:{self.proxy}"
+                     f"\n\tChannel: {self._datastore.channel}"
+                     f"\n\tData for send: {self._data_for_send}")
+
         answer: dict = await self._send_request()
         status: int = answer.get("status")
         if status == 200:
             return True
         self._update_err_params(answer=answer, telegram_id=self._datastore.telegram_id)
-        logger.debug("MessageSender.__send_data call error handling:"
-                     f"\nParams: "
-                     f"\nToken: {self.token}"
-                     f"\nProxy:{self.proxy}"
-                     f"\nChannel: {self._datastore.channel}"
-                     f"\nData for send: {self._data_for_send}")
+
         result: dict = await ErrorsSender(**self._error_params).handle_errors()
         data: dict = result.get('answer_data', {})
         code: int = data.get("code")

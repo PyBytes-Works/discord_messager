@@ -51,3 +51,4 @@ class InstancesStorage:
         user_class: 'DiscordManager' = await cls.get_instance(telegram_id=telegram_id)
         if user_class:
             user_class.is_working = False
+            user_class.reboot = True

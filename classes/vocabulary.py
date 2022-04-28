@@ -1,4 +1,5 @@
 import os
+import random
 
 from config import logger
 
@@ -15,6 +16,7 @@ class Vocabulary:
     def get_message(cls) -> str:
         vocabulary: list = cls.__get_vocabulary()
         try:
+            random.shuffle(vocabulary)
             message_text: str = vocabulary.pop(0)
             cls.__set_vocabulary(vocabulary)
         except (ValueError, TypeError, FileNotFoundError) as err:
