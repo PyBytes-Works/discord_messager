@@ -70,7 +70,7 @@ class OpenAI:
             logger.error("OpenAI: No answers")
             return ''
         result: str = answers[0].get("text", '').strip().split("\n")[0]
-        if self._last_answer == result:
+        if self._last_answer == result or message == result:
             message = self.get_message_from_file()
             return self.get_answer(message)
         self._last_answer = result
