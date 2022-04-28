@@ -150,6 +150,8 @@ class MessageManager(ChannelData):
 
     @logger.catch
     async def __get_random_message_id(self, data: list) -> int:
+        if not data:
+            return 0
         random_elem: dict = random.choice(data)
         return random_elem.get("id", 0)
 
