@@ -14,7 +14,7 @@ MAX_MESSAGE_LENGTH: int = 100
 
 class OpenAI:
 
-    def __init__(self, davinchi: bool = False):
+    def __init__(self, davinchi: bool = True):
         self.__message: str = ''
         self.__mode: str = "text-davinci-002" if davinchi else "text-curie-001"
         self.__counter: int = 0

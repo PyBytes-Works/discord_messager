@@ -62,17 +62,12 @@ class DiscordManager:
 
         if not await self.__check_reboot():
             return
-        await self.__create_datastore()
-        await self.__make_all_token_ids()
+        await self._create_datastore()
+        await self._make_all_token_ids()
         logger.info(f"\n\tUSER: {self.__username}: {self.__telegram_id} - Game begin.")
 
         while self.is_working:
-            t0 = datetime.datetime.now()
-            # logger.debug(f"\n\t\tCircle start at: {t0}")
             await self._lets_play()
-
-            # logger.debug(f"\n\t\tCircle finish. Total time: {datetime.datetime.now() - t0}")
-
         logger.info("\n\tGame over.")
 
     async def __check_reboot(self) -> bool:
@@ -114,11 +109,11 @@ class DiscordManager:
         await self._sleep()
 
     @logger.catch
-    async def __create_datastore(self) -> None:
+    async def _create_datastore(self) -> None:
         self._datastore: 'TokenData' = TokenData(self.__telegram_id)
 
     @logger.catch
-    async def __make_all_token_ids(self) -> None:
+    async def _make_all_token_ids(self) -> None:
         self._datastore.all_tokens_ids = await DBI.get_all_discord_id(self.__telegram_id)
         if not self._datastore.all_tokens_ids:
             logger.debug(f"No all_tokens_ids.")
