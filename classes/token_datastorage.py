@@ -101,7 +101,7 @@ class TokenData:
     def channel(self) -> str:
         channel = self.__CHANNEL
 
-        return channel if channel else 'no channel'
+        return channel if channel else ''
 
     @channel.setter
     def channel(self, channel: str):
@@ -111,7 +111,7 @@ class TokenData:
     def guild(self) -> str:
         guild = self.__GUILD
 
-        return guild if guild else 'no guild'
+        return guild if guild else ''
 
     @guild.setter
     def guild(self, guild: str):
@@ -121,7 +121,7 @@ class TokenData:
     def token(self) -> str:
         spam = self.__DISCORD_USER_TOKEN
 
-        return spam if spam else 'no token'
+        return spam if spam else ''
 
     @token.setter
     def token(self, token: str):
@@ -129,7 +129,7 @@ class TokenData:
 
     @property
     def proxy(self) -> str:
-        return self.__PROXY if self.__PROXY else 'no proxy'
+        return self.__PROXY if self.__PROXY else ''
 
     @proxy.setter
     def proxy(self, proxy: str) -> None:
