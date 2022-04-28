@@ -108,7 +108,7 @@ async def autoanswer_enabled_handler(message: Message):
 
     telegram_id: str = str(message.from_user.id)
     manager: 'DiscordManager' = await InstancesStorage.get_instance(telegram_id=telegram_id)
-    manager.autoanswer = True
+    manager.auto_answer = True
     await message.answer("Автоответчик включен.", reply_markup=in_work_keyboard())
 
 
@@ -118,7 +118,7 @@ async def autoanswer_disabled_handler(message: Message):
 
     telegram_id: str = str(message.from_user.id)
     manager: 'DiscordManager' = await InstancesStorage.get_instance(telegram_id=telegram_id)
-    manager.autoanswer = False
+    manager.auto_answer = False
     await message.answer("Автоответчик вЫключен.", reply_markup=in_work_keyboard())
 
 

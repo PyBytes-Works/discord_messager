@@ -34,35 +34,43 @@ def check_working(func):
 
 
 class DiscordManager:
-    """Класс управления токенами и таймингами.
+    """Bot work manager. Checking tokens data, getting and sending requests
+    to discord.
+
     Methods:
-        lets_play
-        form_token_pair
-        is_expired_user_deactivated
+        lets_play - start bot working
+
+    Attributes:
+        message: 'Message' - instance of aiogram Message class
+        silence: bool - flag for silence mode
+        is_working: bool - flag for check working mode
+        auto_answer: bool - flag for OpenAI autoansweri to replies from discord
+        reboot: bool - if True - dont start working than server will not rebooted yet
+        delay: int - time for sleep after all tokens worked
+        datastore: 'TokenData' - instance of TokenData class
     """
 
     def __init__(self, message: Message, mute: bool = False) -> None:
         self.message: 'Message' = message
+        self.datastore: Optional['TokenData'] = None
+        self.is_working: bool = False
+        self.delay: int = 0
+        self.auto_answer: bool = False
+        self.reboot: bool = False
         self.__username: str = message.from_user.username
         self.__telegram_id: str = str(self.message.from_user.id)
-        self.__silence: bool = mute
+        self.silence: bool = mute
         self.__related_tokens: List[namedtuple] = []
         self.__workers: List[str] = []
-        self._datastore: Optional['TokenData'] = None
-        self.is_working: bool = False
-        self._discord_data: dict = {}
-        self.delay: int = 0
-        self.autoanswer: bool = False
-        self.reboot: bool = False
 
     @logger.catch
     async def lets_play(self) -> None:
         """Show must go on
         Запускает рабочий цикл бота, проверяет ошибки."""
 
+        logger.info(f"\n\tUSER: {self.__username}: {self.__telegram_id} - Game begin.")
         await self._create_datastore()
         await self._make_all_token_ids()
-        logger.info(f"\n\tUSER: {self.__username}: {self.__telegram_id} - Game begin.")
 
         while self.is_working:
             await self._lets_play()
@@ -79,12 +87,12 @@ class DiscordManager:
         return (
             f"\n\tUsername: {self.__username}"
             f"\n\tUser telegram id: {self.__telegram_id}"
-            f"\n\tToken: {self._datastore.token}"
-            f"\n\tProxy: {self._datastore.proxy}"
-            f"\n\tDiscord ID: {self._datastore.my_discord_id}"
-            f"\n\tMate discord id: {self._datastore.mate_id}"
-            f"\n\tSilence: {self.__silence}"
-            f"\n\tAutoanswer: {self.autoanswer}"
+            f"\n\tToken: {self.datastore.token}"
+            f"\n\tProxy: {self.datastore.proxy}"
+            f"\n\tDiscord ID: {self.datastore.my_discord_id}"
+            f"\n\tMate discord id: {self.datastore.mate_id}"
+            f"\n\tSilence: {self.silence}"
+            f"\n\tAutoanswer: {self.auto_answer}"
             f"\n\tWorkers: {len(self.__workers)}/{len(self.__related_tokens)}"
             # f"\n\tRelated tokens: {self.__related_tokens}"
         )
@@ -99,7 +107,7 @@ class DiscordManager:
     async def _lets_play(self) -> None:
         await self.__check_reboot()
         await self._check_user_active()
-        await self._get_worker()
+        await self._get_working_data()
         await self._getting_messages()
         await self._send_replies()
         await self._sending_messages()
@@ -107,12 +115,12 @@ class DiscordManager:
 
     @logger.catch
     async def _create_datastore(self) -> None:
-        self._datastore: 'TokenData' = TokenData(self.__telegram_id)
+        self.datastore: 'TokenData' = TokenData(self.__telegram_id)
 
     @logger.catch
     async def _make_all_token_ids(self) -> None:
-        self._datastore.all_tokens_ids = await DBI.get_all_discord_id(self.__telegram_id)
-        if not self._datastore.all_tokens_ids:
+        self.datastore.all_tokens_ids = await DBI.get_all_discord_id(self.__telegram_id)
+        if not self.datastore.all_tokens_ids:
             logger.debug(f"No all_tokens_ids.")
             return
         self.is_working = True
@@ -123,9 +131,9 @@ class DiscordManager:
         """Получает сообщения из чата и обрабатывает их
         Если удачно - перезаписывает кулдаун текущего токена"""
 
-        await MessageManager(datastore=self._datastore).get_message()
-        await DBI.update_token_last_message_time(token=self._datastore.token)
-        await self.__update_token_last_message_time(token=self._datastore.token)
+        await MessageManager(datastore=self.datastore).get_message()
+        await DBI.update_token_last_message_time(token=self.datastore.token)
+        await self.__update_token_last_message_time(token=self.datastore.token)
 
     @logger.catch
     def __replace_time_to_now(self, elem) -> namedtuple:
@@ -145,33 +153,24 @@ class DiscordManager:
         """Отправляет сообщение в дискор и сохраняет данные об ошибках в
         словарь атрибута класса"""
 
-        if not await MessageSender(datastore=self._datastore).send_message_to_discord():
+        if not await MessageSender(datastore=self.datastore).send_message_to_discord():
             self.__workers = []
-            channel_data: namedtuple = await DBI.get_channel(self._datastore.user_channel_pk)
+            channel_data: namedtuple = await DBI.get_channel(self.datastore.user_channel_pk)
             self.delay = 60
             if channel_data:
                 self.delay = int(channel_data.cooldown)
             return
-        self._discord_data = {}
-        self._datastore.current_message_id = 0
-
-    @logger.catch
-    async def __send_text(self, text: str, check_silence: bool = False) -> None:
-        """Отправляет текст и клавиатуру пользователю если он не в
-        тихом режиме."""
-
-        if check_silence and self.__silence:
-            return
-        await self.message.answer(text)
+        self.datastore.current_message_id = 0
 
     @check_working
     @logger.catch
-    async def _get_worker(self) -> None:
+    async def _get_working_data(self) -> None:
+        """Создает пары токенов, список работников и следующий рабочий токен."""
 
         if not self.__workers:
             await self.make_token_pairs(unpair=True)
             await self._make_workers_list()
-        # logger.info(await self.__get_full_info())
+        logger.debug(await self.__get_full_info())
         await self._get_worker_from_list()
 
     @check_working
@@ -223,26 +222,31 @@ class DiscordManager:
         await self._update_datastore(random_token)
 
     @logger.catch
+    async def _update_datastore(self, token: str) -> None:
+        """Обновляет данные datastore информацией о токене, полученной из БД"""
+
+        token_data: namedtuple = await DBI.get_info_by_token(token)
+        self.datastore.update_data(token=token, token_data=token_data)
+
+    @logger.catch
     def __get_current_timestamp(self) -> int:
         """Возвращает текущее время (timestamp) целое."""
 
         return int(datetime.datetime.now().timestamp())
 
     @logger.catch
-    async def _update_datastore(self, token: str) -> None:
-        token_data: namedtuple = await DBI.get_info_by_token(token)
-        self._datastore.update_data(token=token, token_data=token_data)
+    async def __get_second_closest_token_time(self) -> namedtuple:
+        """Возвращает время второго ближайшего токена"""
 
-    @logger.catch
-    async def __get_closest_token_time(self) -> namedtuple:
-        # return await DBI.get_closest_token_time(self._datastore.telegram_id)
         return sorted(self.__related_tokens, key=lambda x: x.last_message_time)[1]
 
     @logger.catch
     async def _get_delay(self) -> None:
+        """Сохраняет время паузы взяв его из второго в очереди на работу токена"""
+
         if self.delay:
             return
-        token_data: namedtuple = await self.__get_closest_token_time()
+        token_data: namedtuple = await self.__get_second_closest_token_time()
         message_time: int = int(token_data.last_message_time.timestamp())
         cooldown: int = token_data.cooldown
         self.delay = cooldown - abs(message_time - self.__get_current_timestamp())
@@ -265,23 +269,26 @@ class DiscordManager:
             text = "минут"
         text: str = f"Все токены отработали. Следующий старт через {delay} {text}."
         if not self.silence:
-            await self.__send_text(text=text, check_silence=True)
+            await self.message.answer(text)
 
     @check_working
     @logger.catch
     async def _send_replies(self) -> None:
-        """Отправляет реплаи из дискорда в телеграм с кнопкой Ответить"""
+        """Отправляет реплаи из дискорда в телеграм с кнопкой Ответить
+        либо отправляет сообщение в нейросеть, чтоб она ответила"""
 
         replyer: 'RepliesManager' = RepliesManager(self.__telegram_id)
-        for elem in self._datastore.for_reply:
+        for elem in self.datastore.for_reply:
             if not elem.get("showed") and not elem.get("answered"):
-                if self.autoanswer:
+                if self.auto_answer:
                     await self._auto_reply_with_davinchi(elem, replyer)
                 else:
                     await self.__reply_to_telegram(elem, replyer)
 
     @logger.catch
     async def _auto_reply_with_davinchi(self, data: dict, replyer: 'RepliesManager') -> None:
+        """Отвечает с на реплай с помощью ИИ и сохраняет изменнные данные в Редис
+        Если ИИ не ответил - отправляет сообщение пользователю в обычном режиме"""
 
         reply_text: str = data.get("text")
         ai_reply_text: str = OpenAI(davinchi=True).get_answer(message=reply_text)
@@ -289,7 +296,8 @@ class DiscordManager:
             await replyer.update_answered_or_showed(
                 message_id=str(data.get("message_id")), text=ai_reply_text)
             return
-        logger.error(f"Davinci NOT ANSWERED")
+        logger.error(f"Davinci NOT ANSWERED to:"
+                     f"\n{data}")
         text: str = "ИИ не ответил на реплай:"
         await self.message.answer(text)
         await ErrorsSender.send_report_to_admins(text)
@@ -345,20 +353,9 @@ class DiscordManager:
             while len(tokens) > 1:
                 first_token = tokens.pop()
                 second_token = tokens.pop()
-                # logger.debug(f"\n\tPaired tokens: {first_token.token_pk} + {second_token.token_pk}")
                 formed_pairs += await DBI.make_tokens_pair(first_token.token_pk, second_token.token_pk)
                 self.__related_tokens.append(first_token)
                 self.__related_tokens.append(second_token)
         if not self.__related_tokens:
-            await self.__send_text(text="Не смог сформировать пары токенов.")
+            await self.message.answer("Не смог сформировать пары токенов.")
             self.is_working = False
-
-    @property
-    def silence(self) -> bool:
-        return self.__silence
-
-    @silence.setter
-    def silence(self, silence: bool):
-        if not isinstance(silence, bool):
-            raise TypeError("Silence must be boolean.")
-        self.__silence = silence
