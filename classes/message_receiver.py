@@ -5,8 +5,12 @@ from typing import List
 
 import utils
 from classes.errors_sender import ErrorsSender
+from classes.open_ai import OpenAI
+from classes.redis_interface import RedisDB
 from classes.replies import RepliesManager
 from classes.request_classes import ChannelData
+from classes.token_datastorage import TokenData
+from classes.vocabulary import Vocabulary
 from config import logger, DEBUG, SAVING
 
 
@@ -14,27 +18,35 @@ class MessageReceiver(ChannelData):
     """Получает сообщения из дискорда и формирует данные для ответа
     и реплаев"""
 
+    def __init__(self, datastore: 'TokenData'):
+        super().__init__(datastore)
+        self._last_messages: List[dict] = []
+
     @logger.catch
     async def get_message(self) -> None:
         """Получает данные из АПИ, выбирает случайное сообщение и
         возвращает ID сообщения
         и само сообщение"""
 
-        discord_messages: List[dict] = await self.__get_discord_messages()
-        await self.__get_replies_and_message_id(discord_messages)
+        self._datastore.for_reply = []
+        self._datastore.current_message_id = 0
+        self._datastore.text_to_send = ''
+        all_messages: List[dict] = await self.__get_all_discord_messages()
+        self._last_messages: List[dict] = await self.__get_last_messages(all_messages)
+        if not await self.__update_datastore_message_id_and_answer_text_from_replies():
+            self._datastore.current_message_id = await self.__get_last_message_id()
+            self._datastore.text_to_send = await self.__get_message_text()
+            logger.debug(f"\n\t\tTOTAL: self._datastore.text_to_send: {self._datastore.text_to_send}\n\n" )
+        await self.__update_datastore_replies()
+        await self.__get_data_for_send()
 
     @logger.catch
-    async def __get_discord_messages(self) -> List[dict]:
+    async def __get_all_discord_messages(self) -> List[dict]:
 
         self.proxy: str = self._datastore.proxy
         self.token: str = self._datastore.token
-
         answer: dict = await self._send_request()
         self._error_params.update(answer=answer, telegram_id=self._datastore.telegram_id)
-        # logger.debug("MessageReceiver.__get_discord_messages call error handling:"
-        #              f"\nParams: "
-        #              f"\nProxy{self.proxy} "
-        #              f"\nToken: {self.token}")
         result: dict = await ErrorsSender(**self._error_params).handle_errors()
         if result.get("status") == 200:
             return result.get("answer_data")
@@ -53,13 +65,13 @@ class MessageReceiver(ChannelData):
         return delta.seconds
 
     @logger.catch
-    async def __get_my_replies(self, data: List[dict]) -> List[dict]:
+    async def __get_my_replies(self) -> List[dict]:
         """Возвращает список всех упоминаний и реплаев наших токенов в
         сообщениях за последнее время"""
 
         return [
             elem
-            for elem in data
+            for elem in self._last_messages
             if (
                     elem.get("mentions")
                     and elem.get("mentions")[0].get("id", '') in self._datastore.all_tokens_ids
@@ -68,13 +80,13 @@ class MessageReceiver(ChannelData):
         ]
 
     @logger.catch
-    async def __get_last_messages(self, data: List[dict]) -> List[dict]:
+    async def __get_last_messages(self, all_messages: List[dict]) -> List[dict]:
         """Возвращает список всех сообщений за последнее время"""
 
         return list(
             filter(
                 lambda x: self.__get_delta_seconds(x) < self._datastore.last_message_time,
-                data
+                all_messages
             )
         )
 
@@ -112,42 +124,25 @@ class MessageReceiver(ChannelData):
         ]
 
     @logger.catch
-    async def __get_last_message_id(self, data: List[dict]) -> int:
+    async def __get_last_message_id(self) -> int:
         """"""
 
         messages: List[dict] = [
             elem
-            for elem in data
+            for elem in self._last_messages
             if self._datastore.mate_id == str(elem["author"]["id"])
         ]
         return await self.__get_last_message_id_from_messages(messages)
 
     @logger.catch
-    async def __get_replies_and_message_id(self, data: List[dict]) -> None:
+    async def __update_datastore_replies(self) -> None:
         """Сохраняет реплаи и последнее сообщение в datastore"""
 
-        await self.__make_message_id_and_text()
-        if not data:
-            self._datastore.for_reply = []
-            self._datastore.current_message_id = 0
+        if not self._last_messages:
             return
-        last_messages: List[dict] = await self.__get_last_messages(data)
-        all_replies: List[dict] = await self.__get_my_replies(last_messages)
+        all_replies: List[dict] = await self.__get_my_replies()
         new_replies: List[dict] = await self.__get_filtered_replies(all_replies)
         self._datastore.for_reply = await self.__get_replies_for_answer(new_replies)
-        if not self._datastore.current_message_id:
-            self._datastore.current_message_id = await self.__get_last_message_id(last_messages)
-
-        # logger.error(f"NEW REPLIES: {self._datastore.replies}")
-        # logger.error(f"MESSAGE ID: {self._datastore.current_message_id}")
-        utils.save_data_to_json(data=last_messages, file_name="last_messages.json", key='a')
-
-        if DEBUG and SAVING:
-            utils.save_data_to_json(data=last_messages, file_name="last_messages.json")
-            utils.save_data_to_json(data=all_replies, file_name="all_replies.json")
-            utils.save_data_to_json(data=new_replies, file_name="new_replies.json", key='a')
-            utils.save_data_to_json(data=[
-                self._datastore.current_message_id], file_name="last_message_id.json")
 
     @logger.catch
     async def __get_last_message_id_from_messages(self, data: list) -> int:
@@ -158,50 +153,106 @@ class MessageReceiver(ChannelData):
         """Возвращает разницу между старыми и новыми данными в редисе,
         записывает полные данные в редис"""
 
-        return await RepliesManager(redis_key=self._datastore.telegram_id).get_difference_and_update(new_replies)
-        # if not new_replies:
-        #     return []
-        # total_replies: List[dict] = await RedisDB(redis_key=self._datastore.telegram_id).load()
-        # old_messages: List[str] = list(map(lambda x: x.get("message_id"), total_replies))
-        # result: List[
-        #     dict] = list(filter(lambda x: x.get("message_id") not in old_messages, new_replies))
-        # total_replies.extend(result)
-        # await RedisDB(redis_key=self._datastore.telegram_id).save(data=total_replies)
-        #
-        # return result
-
-    # @logger.catch
-    # async def __get_user_message_from_redis(self) -> Tuple[str, int]:
-    #     """Возвращает данные из Редиса"""
-    #
-    #     answer: str = ''
-    #     message_id = 0
-    #     redis_data: List[dict] = await RedisDB(redis_key=self._datastore.telegram_id).load()
-    #     if not redis_data:
-    #         return answer, message_id
-    #
-    #     for elem in redis_data:
-    #         answered: bool = elem.get("answered", False)
-    #         for_me: bool = int(elem.get("target_id")) == int(self._datastore.my_discord_id)
-    #         if for_me and not answered:
-    #             answer: str = elem.get("answer_text", '')
-    #             message_id: int = elem.get("message_id", 0)
-    #             elem.update({"answered": True})
-    #             await RedisDB(redis_key=self._datastore.telegram_id).save(data=redis_data)
-    #             break
-    #
-    #     return answer, message_id
+        return await RepliesManager(self._datastore.telegram_id).get_difference_and_update(new_replies)
 
     @logger.catch
-    async def __make_message_id_and_text(self) -> None:
+    async def __update_datastore_message_id_and_answer_text_from_replies(self) -> int:
 
-        self._datastore.current_message_id = 0
-        self._datastore.text_to_send = ''
+        """Update datastore message id and answer text from answered replies from Redis
+
+        Returns length of replies list"""
+
         replies: 'RepliesManager' = RepliesManager(redis_key=self._datastore.telegram_id)
         my_answered: List[dict] = await replies.get_answered(self._datastore.my_discord_id)
-        if not my_answered:
+        if my_answered:
+            current_reply: dict = random.choice(my_answered)
+            self._datastore.text_to_send = current_reply.get("answer_text")
+            message_id: int = current_reply.get("message_id")
+            self._datastore.current_message_id = message_id
+
+        return len(my_answered)
+
+    @logger.catch
+    async def __get_text_from_vocabulary(self) -> str:
+        text: str = Vocabulary.get_message()
+        if not text:
+            await ErrorsSender.send_report_to_admins(text="Ошибка словаря фраз.")
+            return ''
+        await RedisDB(redis_key=self._datastore.mate_id).save(data=[
+            text], timeout_sec=self._datastore.delay + 300)
+        return text
+
+    @logger.catch
+    async def __get_text_from_openai(self) -> str:
+        result: str = ''
+        mate_message: list = await RedisDB(redis_key=self._datastore.my_discord_id).load()
+        logger.debug(f"Mate message: {mate_message}")
+        if mate_message:
+            await RedisDB(
+                redis_key=self._datastore.my_discord_id).delete(mate_id=self._datastore.mate_id)
+            text: str = OpenAI().get_answer(mate_message[0].strip())
+            if not text:
+                message_data: dict = random.choice(self._last_messages)
+                text: str = message_data.get("content", '')
+                logger.debug(f"Random message from last messages: {text}")
+                if text:
+                    result: str = OpenAI().get_answer(text.strip())
+                    self._datastore.current_message_id = int(message_data.get("id", 0))
+                    return result
+            if self._fifty_fifty():
+                logger.debug("50 / 50 You got it!!!")
+                self._datastore.current_message_id = 0
+        return result
+
+    @logger.catch
+    async def __get_message_text(self) -> str:
+        openai_text: str = await self.__get_text_from_openai()
+        if openai_text:
+            return openai_text
+        if self._ten_from_hundred():
+            logger.debug("Random message! You are lucky!!!")
+            self._datastore.current_message_id = 0
+        text: str = await self.__get_text_from_vocabulary()
+
+        return text
+
+    @logger.catch
+    async def __get_data_for_send(self) -> None:
+        """Возвращает сформированные данные для отправки в дискорд"""
+
+        if not self._datastore.text_to_send:
+            logger.warning("\n\t\tMessage_receiver.__prepare_data: no text for sending.\n")
             return
-        data: dict = random.choice(my_answered)
-        self._datastore.text_to_send = data.get("answer_text")
-        message_id: int = data.get("message_id")
-        self._datastore.current_message_id = message_id
+        self._datastore.data_for_send = {
+            "content": self._datastore.text_to_send,
+            "tts": "false"
+        }
+        if self._datastore.current_message_id:
+            params: dict = {
+                "message_reference":
+                    {
+                        "guild_id": self._datastore.guild,
+                        "channel_id": self._datastore.channel,
+                        "message_id": self._datastore.current_message_id
+                    },
+                "allowed_mentions":
+                    {
+                        "parse": [
+                            "users",
+                            "roles",
+                            "everyone"
+                        ],
+                        "replied_user": "false"
+                    }
+            }
+            self._datastore.data_for_send.update(**params)
+
+    @staticmethod
+    @logger.catch
+    def _ten_from_hundred() -> bool:
+        return random.randint(1, 100) <= 10
+
+    @staticmethod
+    @logger.catch
+    def _fifty_fifty() -> bool:
+        return random.randint(1, 100) <= 50

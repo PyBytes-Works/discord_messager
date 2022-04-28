@@ -25,7 +25,7 @@ class ErrorsSender:
         self._answer: dict = answer if answer else {}
         self._status: int = answer.get("status", 0) if answer else 0
         self._answer_data: str = answer.get("answer_data", {}) if answer else {}
-        self._proxy: str = proxy if proxy else 'no proxy'
+        self._proxy: str = proxy if proxy else ''
         self._token: str = token if token else ''
         self._telegram_id: str = telegram_id if telegram_id else ''
         self._code: Optional[int] = None
@@ -82,43 +82,36 @@ class ErrorsSender:
                 admins = False
             else:
                 text: str = f'Ошибка 400.'
-                admins = False
         elif self._status == 401:
             if self._code == 0:
-                text: str = (
-                    f"Токен не рабочий."
-                    f"\nToken: {self._token}")
+                text: str = f"Токен не рабочий."
                 if await DBI.delete_token(token=self._token):
-                    text += f"\nТокен: {self._token} удален."
+                    text += f"\nТокен удален."
             else:
                 text: str = (
                     "Произошла ошибка данных."
                     "\nУбедитесь, что вы ввели верные данные. Код ошибки - 401."
                 )
-            admins = False
         elif self._status == 403:
             if self._code == 50013:
                 text: str = (
                     "Не могу отправить сообщение для токена. (Ошибка 403 - 50013)"
-                    "Токен в муте."
+                    "\nТокен в муте."
                 )
-                if self._token:
-                    text += f"\nToken: {self._token}"
+                users = True
             elif self._code == 50001:
                 text: str = (
                     "Не могу отправить сообщение для токена. (Ошибка 403 - 50001)"
-                    "Токен забанили."
+                    "\nТокен забанили."
                     f"\nФормирую новые пары."
                 )
                 if await DBI.delete_token(token=self._token):
-                    text += f"\nТокен: {self._token} удален."
+                    text += f"\nТокен удален."
             else:
                 text: str = f"Ошибка {self._status} Code: {self._code}"
         elif self._status == 404:
             if self._code == 10003:
                 text: str = "Ошибка отправки сообщения. Неверный канал. (Ошибка 404 - 10003)"
-                if self._token:
-                    text += f"\nToken: {self._token}"
             else:
                 text: str = f"Ошибка {self._status}"
         elif self._status == 407:
@@ -146,7 +139,6 @@ class ErrorsSender:
             elif self._code == 40062:
                 text: str = (
                     f"Токену необходимо дополнительная верификация в дискорде (по номеру телефона):"
-                    f"\nToken: [{self._token}]"
                 )
                 users = True
                 admins = False
@@ -158,6 +150,8 @@ class ErrorsSender:
             users = False
             admins = True
         if text:
+            if self._token:
+                text += f"\nToken: {self._token}"
             if users and self._telegram_id:
                 await self.errors_report(text=text)
             if admins:

@@ -18,14 +18,14 @@ class MessageSender(PostRequest):
     def __init__(self, datastore: 'TokenData'):
         super().__init__()
         self._datastore: 'TokenData' = datastore
-        self.__text: str = ''
+        # self.__text: str = ''
 
     @logger.catch
     async def send_message_to_discord(self) -> bool:
         """Отправляет данные в канал дискорда, возвращает результат отправки."""
 
-        self.__text = self._datastore.text_to_send
-        await self.__prepare_data()
+        # self.__text = self._datastore.text_to_send
+        # await self.__prepare_data()
         if self._datastore.data_for_send:
             return await self.__send_data()
 
@@ -64,76 +64,4 @@ class MessageSender(PostRequest):
         self._update_err_params(answer=answer, datastore=self._datastore)
         await ErrorsSender(**self._error_params).handle_errors()
 
-    @logger.catch
-    async def __get_text_from_vocabulary(self) -> str:
-        text: str = Vocabulary.get_message()
-        if not text:
-            await ErrorsSender.send_report_to_admins(text="Ошибка словаря фраз.")
-            return ''
-        await RedisDB(redis_key=self._datastore.mate_id).save(data=[
-            text], timeout_sec=self._datastore.delay + 300)
-        return text
 
-    @logger.catch
-    async def __prepare_message_text(self) -> None:
-        mate_message: list = await RedisDB(redis_key=self._datastore.my_discord_id).load()
-        if mate_message:
-            self.__text: str = OpenAI().get_answer(mate_message[0].strip())
-            if self._fifty_fifty():
-                logger.debug("50 / 50 You got it!!!")
-                self._datastore.current_message_id = 0
-            await RedisDB(
-                redis_key=self._datastore.my_discord_id).delete(mate_id=self._datastore.mate_id)
-            return
-        if self._ten_from_hundred():
-            logger.debug("Random message! You are lucky!!!")
-            self._datastore.current_message_id = 0
-        self.__text: str = await self.__get_text_from_vocabulary()
-
-    @logger.catch
-    async def __get_text(self) -> None:
-        if self.__text:
-            return
-        await self.__prepare_message_text()
-
-    @logger.catch
-    async def __prepare_data(self) -> None:
-        """Возвращает сформированные данные для отправки в дискорд"""
-
-        await self.__get_text()
-        if not self.__text:
-            logger.warning("Message sender.__prepare_data: no text for sending.")
-            return
-        self._datastore.data_for_send = {
-            "content": self.__text,
-            "tts": "false"
-        }
-        if self._datastore.current_message_id:
-            params: dict = {
-                "message_reference":
-                    {
-                        "guild_id": self._datastore.guild,
-                        "channel_id": self._datastore.channel,
-                        "message_id": self._datastore.current_message_id
-                    },
-                "allowed_mentions":
-                    {
-                        "parse": [
-                            "users",
-                            "roles",
-                            "everyone"
-                        ],
-                        "replied_user": "false"
-                    }
-            }
-            self._datastore.data_for_send.update(**params)
-
-    @staticmethod
-    @logger.catch
-    def _ten_from_hundred() -> bool:
-        return random.randint(1, 100) <= 10
-
-    @staticmethod
-    @logger.catch
-    def _fifty_fifty() -> bool:
-        return random.randint(1, 100) <= 50

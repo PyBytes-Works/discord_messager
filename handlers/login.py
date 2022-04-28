@@ -22,7 +22,8 @@ async def start_add_new_user_handler(message: Message) -> None:
     user_is_admin: bool = await DBI.is_admin(telegram_id)
     if user_is_admin or user_is_superadmin:
         await message.answer(
-            "Перешлите (forward) мне любое сообщение от пользователя, которого вы хотите добавить.",
+            "Перешлите (forward) мне любое сообщение из ЛИЧНОЙ ПЕРЕПИСКИ с пользователем, "
+            "которого вы хотите добавить.",
             reply_markup=cancel_keyboard()
         )
         await LogiStates.add_new_user.set()
@@ -38,8 +39,9 @@ async def check_new_user_is_exists_handler(message: Message, state: FSMContext) 
     logger.debug(f"Add user message: {message}")
     if not message.forward_from:
         await message.answer(
-            "Нужно переслать (forward) любое сообщение из телеграма от пользователя, "
-            "которого вы хотите добавить.",
+            "Нужно переслать (forward) любое сообщение из ЛС телеграма от пользователя, "
+            "которого вы хотите добавить. Если не получается - скажите пользователю, "
+            "чтоб разрешил пересылку сообшений в своих настройках телеграма.",
             reply_markup=cancel_keyboard()
         )
         return

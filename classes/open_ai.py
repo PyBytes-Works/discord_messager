@@ -63,18 +63,17 @@ class OpenAI:
         self.__message = message.strip()
         data: dict = self.__send_message()
         if not data:
-            logger.error("OpenAI: No data")
+            logger.error("\n\tOpenAI: No data\n")
             return ''
         answers: list = data.get("choices", [])
 
         if not answers:
-            logger.error("OpenAI: No answers")
+            logger.error("\n\tOpenAI: No answers\n")
             return ''
         result: str = answers[0].get("text", '').strip().split("\n")[0]
 
         if result in (self._last_answer, message):
-            message = self.get_message_from_file()
-            return self.get_answer(message)
+            return ''
         self._last_answer = result
 
         logger.debug(f"№ {self.__counter} - OpenAI answered: {result}")
