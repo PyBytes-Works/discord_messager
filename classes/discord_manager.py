@@ -11,11 +11,10 @@ from classes.errors_sender import ErrorsSender
 from classes.message_receiver import MessageReceiver
 from classes.message_sender import MessageSender
 from classes.open_ai import OpenAI
-from classes.replies import Replies
+from classes.replies import RepliesManager
 from classes.token_datastorage import TokenData
 
 from config import logger
-from keyboards import user_menu_keyboard
 from classes.db_interface import DBI
 
 
@@ -101,11 +100,6 @@ class DiscordManager:
         """Show must go on
         Запускает рабочий цикл бота, проверяет ошибки."""
 
-        # TODO Сделать флаг автоответа (если флаг стоит - то отвечает бот Давинчи, иначе -
-        #  отправлять в телеграм юзеру
-
-        # TODO разобраться с реплаями
-
         await self.__create_datastore()
         await self.__make_all_token_ids()
         logger.info(f"\n\tUSER: {self.__username}: {self.__telegram_id} - Game begin.")
@@ -130,14 +124,14 @@ class DiscordManager:
         await self.__update_token_last_message_time(token=self._datastore.token)
 
     @logger.catch
-    def __get_replaced_namedtuple(self, elem) -> namedtuple:
+    def __replace_time_to_now(self, elem) -> namedtuple:
         return elem._replace(last_message_time=datetime.datetime.now())
 
     @logger.catch
     async def __update_token_last_message_time(self, token: str) -> None:
         """"""
 
-        self.__related_tokens = [self.__get_replaced_namedtuple(elem)
+        self.__related_tokens = [self.__replace_time_to_now(elem)
                                  if elem.token == token else elem
                                  for elem in self.__related_tokens]
 
@@ -267,7 +261,7 @@ class DiscordManager:
     async def _send_replies(self) -> None:
         """Отправляет реплаи из дискорда в телеграм с кнопкой Ответить"""
 
-        replyer: 'Replies' = Replies(self.__telegram_id)
+        replyer: 'RepliesManager' = RepliesManager(self.__telegram_id)
         for elem in self._datastore.for_reply:
             if not elem.get("showed") and not elem.get("answered"):
                 if self.autoanswer:
@@ -276,7 +270,7 @@ class DiscordManager:
                     await self.__reply_to_telegram(elem, replyer)
 
     @logger.catch
-    async def _auto_reply_with_davinchi(self, data: dict, replyer: 'Replies') -> None:
+    async def _auto_reply_with_davinchi(self, data: dict, replyer: 'RepliesManager') -> None:
 
         reply_text: str = data.get("text")
         ai_reply_text: str = OpenAI(davinchi=True).get_answer(message=reply_text)
@@ -293,7 +287,7 @@ class DiscordManager:
         await self.__reply_to_telegram(data)
 
     @logger.catch
-    async def __reply_to_telegram(self, data: dict, replyer: 'Replies') -> None:
+    async def __reply_to_telegram(self, data: dict, replyer: 'RepliesManager') -> None:
         """Отправляет сообщение о реплае в телеграм"""
 
         answer_keyboard: 'InlineKeyboardMarkup' = InlineKeyboardMarkup(row_width=1)
