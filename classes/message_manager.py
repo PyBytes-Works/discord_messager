@@ -211,7 +211,6 @@ class MessageManager(ChannelData):
 
         return random_message
 
-
     @logger.catch
     async def __get_random_message_from_last_messages(self) -> str:
         message_data: dict = random.choice(self._last_messages)
