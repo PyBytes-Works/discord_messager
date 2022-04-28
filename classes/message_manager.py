@@ -183,10 +183,7 @@ class MessageManager(ChannelData):
 
     @logger.catch
     async def __get_text_from_openai(self) -> str:
-        # mate_message: str = await self.__get_mate_message()
-        a = await self.__get_text_from_vocabulary()
-        self._last_messages.append({"content": a})
-        mate_message: str = "Привет, мир"
+        mate_message: str = await self.__get_mate_message()
         if not mate_message:
             return ''
         openai_answer: str = await self.__get_openai_answer(mate_message)
