@@ -148,7 +148,9 @@ class DiscordManager:
         if not await MessageSender(datastore=self._datastore).send_message_to_discord():
             self.__workers = []
             channel_data: namedtuple = await DBI.get_channel(self._datastore.user_channel_pk)
-            self.delay = int(channel_data.cooldown)
+            self.delay = 60
+            if channel_data:
+                self.delay = int(channel_data.cooldown)
             return
         self._discord_data = {}
         self._datastore.current_message_id = 0

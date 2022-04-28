@@ -46,7 +46,7 @@ class OpenAI:
     def get_answer(self, message: str) -> str:
         """Returns answer from bot or empty string if errors"""
 
-        logger.debug(f"\nOpenAI mode: {self.__mode}\n")
+        logger.debug(f"\n\t\tOpenAI mode: {self.__mode}")
 
         self.__counter += 1
         logger.debug(f"№ {self.__counter} - Message to OpenAI: {message}")
