@@ -274,8 +274,6 @@ class DiscordManager:
 
         reply_text: str = data.get("text")
         ai_reply_text: str = OpenAI(davinchi=True).get_answer(message=reply_text)
-        logger.info(f"Davinci get text: {reply_text}")
-        logger.info(f"\nDavinci answered: {ai_reply_text}")
         if ai_reply_text:
             await replyer.update_answered_or_showed(
                 message_id=str(data.get("message_id")), text=ai_reply_text)
