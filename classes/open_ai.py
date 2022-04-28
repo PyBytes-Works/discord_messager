@@ -14,10 +14,11 @@ MAX_MESSAGE_LENGTH: int = 100
 
 class OpenAI:
 
-    def __init__(self, davinchi: bool = True):
+    def __init__(self, davinchi: bool = False):
         self.__message: str = ''
         self.__mode: str = "text-davinci-002" if davinchi else "text-curie-001"
         self.__counter: int = 0
+        self._last_answer: str = ''
 
     @logger.catch
     def __send_message(self) -> dict:
@@ -68,6 +69,10 @@ class OpenAI:
             logger.error("OpenAI: No answers")
             return ''
         result: str = answers[0].get("text", '').strip().split("\n")[0]
+        if self._last_answer == result:
+            message = self.get_message_from_file()
+            return self.get_answer(message)
+        self._last_answer = result
         logger.debug(f"№ {self.__counter} - OpenAI answered: {result}")
         if any(filter(lambda x: x in result, plugs)):
             return random.choice(defaults)
@@ -75,14 +80,8 @@ class OpenAI:
             return self.get_answer(message)
         return result
 
-
-if __name__ == '__main__':
+    @staticmethod
     def get_message_from_file() -> str:
-        with open('../db/vocabulary_en.txt', 'r', encoding='utf-8') as f:
+        with open('db/vocabulary_en.txt', 'r', encoding='utf-8') as f:
             data = f.readlines()
         return random.choice(data)
-
-
-    messages = get_message_from_file().strip()
-    bot = OpenAI()
-    bot.get_answer(messages)
