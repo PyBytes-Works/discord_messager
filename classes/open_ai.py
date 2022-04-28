@@ -23,7 +23,6 @@ class OpenAI:
     @logger.catch
     def __send_message(self) -> dict:
         time.sleep(0.5)
-        logger.debug(f"OpenAI mode: {self.__mode}")
         try:
             response: dict = openai.Completion.create(
                 engine=self.__mode,
@@ -44,8 +43,10 @@ class OpenAI:
         return response
 
     @logger.catch
-    def get_answer(self, message: str = '') -> str:
+    def get_answer(self, message: str) -> str:
         """Returns answer from bot or empty string if errors"""
+
+        logger.debug(f"\nOpenAI mode: {self.__mode}\n")
 
         self.__counter += 1
         logger.debug(f"№ {self.__counter} - Message to OpenAI: {message}")
@@ -71,13 +72,10 @@ class OpenAI:
             logger.error("\n\tOpenAI: No answers\n")
             return ''
         result: str = answers[0].get("text", '').strip().split("\n")[0]
-
+        logger.debug(f"№ {self.__counter} - OpenAI answered: {result}")
         if result in (self._last_answer, message):
             return ''
         self._last_answer = result
-
-        logger.debug(f"№ {self.__counter} - OpenAI answered: {result}")
-
         if any(filter(lambda x: x in result, plugs)):
             logger.warning(f"\t\tOpenAI answer in plugs. Return default.")
             return random.choice(defaults)
@@ -86,9 +84,6 @@ class OpenAI:
             return self.get_answer(message)
 
         return result
-
-    # TODO Если повторяется ответ от ИИ то взять случайное сообщение случайного пользователя из чата
-    # и скормить его ИИ и ответить ему же реплаем
 
     @staticmethod
     def get_message_from_file() -> str:

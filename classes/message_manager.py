@@ -14,7 +14,7 @@ from classes.vocabulary import Vocabulary
 from config import logger, DEBUG, SAVING
 
 
-class MessageReceiver(ChannelData):
+class MessageManager(ChannelData):
     """Получает сообщения из дискорда и формирует данные для ответа
     и реплаев"""
 
@@ -36,7 +36,6 @@ class MessageReceiver(ChannelData):
         if not await self.__update_datastore_message_id_and_answer_text_from_replies():
             self._datastore.current_message_id = await self.__get_last_message_id()
             self._datastore.text_to_send = await self.__get_message_text()
-            logger.debug(f"\n\t\tTOTAL: self._datastore.text_to_send: {self._datastore.text_to_send}\n\n" )
         await self.__update_datastore_replies()
         await self.__get_data_for_send()
 
@@ -184,25 +183,23 @@ class MessageReceiver(ChannelData):
 
     @logger.catch
     async def __get_text_from_openai(self) -> str:
-        result: str = ''
-        mate_message: list = await RedisDB(redis_key=self._datastore.my_discord_id).load()
-        logger.debug(f"Mate message: {mate_message}")
-        if mate_message:
-            await RedisDB(
-                redis_key=self._datastore.my_discord_id).delete(mate_id=self._datastore.mate_id)
-            text: str = OpenAI().get_answer(mate_message[0].strip())
-            if not text:
-                message_data: dict = random.choice(self._last_messages)
-                text: str = message_data.get("content", '')
-                logger.debug(f"Random message from last messages: {text}")
-                if text:
-                    result: str = OpenAI().get_answer(text.strip())
-                    self._datastore.current_message_id = int(message_data.get("id", 0))
-                    return result
+        # mate_message: str = await self.__get_mate_message()
+        a = await self.__get_text_from_vocabulary()
+        self._last_messages.append({"content": a})
+        mate_message: str = "Привет, мир"
+        if not mate_message:
+            return ''
+        openai_answer: str = await self.__get_openai_answer(mate_message)
+        logger.warning(f"\n\t\tFirst OpenAI answer: {openai_answer}\n")
+        if openai_answer:
             if self._fifty_fifty():
                 logger.debug("50 / 50 You got it!!!")
                 self._datastore.current_message_id = 0
-        return result
+            return openai_answer
+        random_message: str = await self.__get_random_message_from_last_messages()
+        logger.warning(f"\n\t\tRandom OpenAI answer: {random_message}\n")
+
+        return random_message
 
     @logger.catch
     async def __get_message_text(self) -> str:
@@ -212,13 +209,38 @@ class MessageReceiver(ChannelData):
         if self._ten_from_hundred():
             logger.debug("Random message! You are lucky!!!")
             self._datastore.current_message_id = 0
-        text: str = await self.__get_text_from_vocabulary()
+        return await self.__get_text_from_vocabulary()
 
-        return text
+    @logger.catch
+    async def __get_random_message_from_last_messages(self) -> str:
+        message_data: dict = random.choice(self._last_messages)
+        text: str = message_data.get("content", '')
+        logger.debug(f"Random message from last messages: {text}")
+        result: str = await self.__get_openai_answer(text)
+        if result != text:
+            self._datastore.current_message_id = int(message_data.get("id", 0))
+            return result
+        return ''
+
+    @logger.catch
+    async def __get_mate_message(self) -> str:
+        mate_message: List[str] = await RedisDB(redis_key=self._datastore.my_discord_id).load()
+        if mate_message:
+            await RedisDB(
+                redis_key=self._datastore.my_discord_id).delete(mate_id=self._datastore.mate_id)
+            return mate_message[0]
+        return ''
+
+    @staticmethod
+    @logger.catch
+    async def __get_openai_answer(text: str) -> str:
+        if not text:
+            return ''
+        return OpenAI().get_answer(text.strip())
 
     @logger.catch
     async def __get_data_for_send(self) -> None:
-        """Возвращает сформированные данные для отправки в дискорд"""
+        """Сохраняет в datastore данные для отправки в дискорд"""
 
         if not self._datastore.text_to_send:
             logger.warning("\n\t\tMessage_receiver.__prepare_data: no text for sending.\n")

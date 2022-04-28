@@ -1,11 +1,7 @@
 import asyncio
-import random
 
 from classes.errors_sender import ErrorsSender
-from classes.open_ai import OpenAI
-from classes.redis_interface import RedisDB
 from classes.request_classes import PostRequest
-from classes.vocabulary import Vocabulary
 from config import logger, DISCORD_BASE_URL
 from classes.token_datastorage import TokenData
 
@@ -18,14 +14,11 @@ class MessageSender(PostRequest):
     def __init__(self, datastore: 'TokenData'):
         super().__init__()
         self._datastore: 'TokenData' = datastore
-        # self.__text: str = ''
 
     @logger.catch
     async def send_message_to_discord(self) -> bool:
         """Отправляет данные в канал дискорда, возвращает результат отправки."""
 
-        # self.__text = self._datastore.text_to_send
-        # await self.__prepare_data()
         if self._datastore.data_for_send:
             return await self.__send_data()
 
@@ -35,7 +28,7 @@ class MessageSender(PostRequest):
         self.url = f'https://discord.com/api/v9/channels/{self._datastore.channel}/typing'
         answer: dict = await self._send_request()
         if answer.get("status") not in range(200, 205):
-            logger.warning(f"Typing: {answer}")
+            logger.warning(f"Typing ERROR: {answer}")
         await asyncio.sleep(2)
 
     async def __send_data(self) -> bool:
@@ -51,15 +44,14 @@ class MessageSender(PostRequest):
         await self._typing()
         self.url = DISCORD_BASE_URL + f'{self._datastore.channel}/messages?'
 
-        logger.debug("MessageSender.__send_data::"
-                     f"\n\tToken: {self.token}"
-                     f"\n\tProxy:{self.proxy}"
-                     f"\n\tChannel: {self._datastore.channel}"
-                     f"\n\tData for send: {self._data_for_send}")
+        # logger.debug("MessageSender.__send_data::"
+        #              f"\n\tToken: {self.token}"
+        #              f"\n\tProxy:{self.proxy}"
+        #              f"\n\tChannel: {self._datastore.channel}"
+        #              f"\n\tData for send: {self._data_for_send}")
 
         answer: dict = await self._send_request()
-        status: int = answer.get("status")
-        if status == 200:
+        if answer.get("status") == 200:
             return True
         self._update_err_params(answer=answer, datastore=self._datastore)
         await ErrorsSender(**self._error_params).handle_errors()
