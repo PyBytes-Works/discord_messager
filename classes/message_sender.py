@@ -1,7 +1,6 @@
 import asyncio
 import random
 
-from classes.db_interface import DBI
 from classes.errors_sender import ErrorsSender
 from classes.open_ai import OpenAI
 from classes.redis_interface import RedisDB
@@ -53,7 +52,6 @@ class MessageSender(PostRequest):
         self.url = DISCORD_BASE_URL + f'{self._datastore.channel}/messages?'
 
         logger.debug("MessageSender.__send_data::"
-                     f"\nParams: "
                      f"\n\tToken: {self.token}"
                      f"\n\tProxy:{self.proxy}"
                      f"\n\tChannel: {self._datastore.channel}"
@@ -63,27 +61,8 @@ class MessageSender(PostRequest):
         status: int = answer.get("status")
         if status == 200:
             return True
-        self._update_err_params(answer=answer, telegram_id=self._datastore.telegram_id)
-
-        result: dict = await ErrorsSender(**self._error_params).handle_errors()
-        data: dict = result.get('answer_data', {})
-        code: int = data.get("code")
-        if status == 429 and code == 20016:
-            cooldown: int = int(data.get("retry_after"))
-            if cooldown:
-                cooldown += self._datastore.cooldown
-                await DBI.update_user_channel_cooldown(
-                    user_channel_pk=self._datastore.user_channel_pk, cooldown=cooldown)
-                self._datastore.delay = cooldown
-            await ErrorsSender(telegram_id=self._datastore.telegram_id).errors_report(
-                text=(
-                    "Для данного токена сообщения отправляются чаще, чем разрешено в канале."
-                    f"\nToken: {self._datastore.token}"
-                    f"\nГильдия/Канал: {self._datastore.guild}/{self._datastore.channel}"
-                    f"\nВремя скорректировано. Кулдаун установлен: {cooldown} секунд"
-                )
-            )
-            return True
+        self._update_err_params(answer=answer, datastore=self._datastore)
+        await ErrorsSender(**self._error_params).handle_errors()
 
     @logger.catch
     async def __get_text_from_vocabulary(self) -> str:

@@ -17,7 +17,7 @@ class Vocabulary:
         vocabulary: list = cls.__get_vocabulary()
         try:
             random.shuffle(vocabulary)
-            message_text: str = vocabulary.pop(0)
+            message_text: str = vocabulary.pop(0).strip()
             cls.__set_vocabulary(vocabulary)
         except (ValueError, TypeError, FileNotFoundError) as err:
             logger.error(f"ERROR: __get_random_message_from_vocabulary: {err}")
