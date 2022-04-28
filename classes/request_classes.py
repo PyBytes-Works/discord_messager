@@ -25,13 +25,25 @@ class RequestSender(ABC):
     async def _send(self, *args, **kwargs) -> dict:
         pass
 
-    def _update_err_params(self, answer: dict, telegram_id: str = ''):
-        self._error_params: dict = {
-            "proxy": self.proxy if self.proxy else '',
-            "token": self.token if self.token else '',
-            "answer": answer,
-            "telegram_id": telegram_id if telegram_id else ''
-        }
+    def _update_err_params(self, answer: dict, telegram_id: str = '', **kwargs):
+        self._error_params.update(
+            {
+                "answer": answer,
+                "proxy": self.proxy if self.proxy else '',
+                "token": self.token if self.token else '',
+                "telegram_id": telegram_id if telegram_id else '',
+            }
+        )
+        datastore = kwargs.get("datastore")
+        if datastore:
+            self._error_params.update(
+                {
+                    "datastore": datastore,
+                    "proxy": datastore.proxy,
+                    "token": datastore.token,
+                    "telegram_id": datastore.telegram_id,
+                }
+            )
 
     async def _send_request(self) -> dict:
         self.proxy_data: str = f"http://{PROXY_USER}:{PROXY_PASSWORD}@{self.proxy}/"

@@ -5,14 +5,23 @@ import aiogram.utils.exceptions
 from json import JSONDecodeError
 
 from classes.db_interface import DBI
+from classes.token_datastorage import TokenData
 from config import logger, admins_list, bot
-from keyboards import user_menu_keyboard
 
+
+# TODO Превратить в chain. Добавить обработку datastore
 
 class ErrorsSender:
     """Отправляет сообщения об ошибках"""
 
-    def __init__(self, answer: dict = None, proxy: str = '', token: str = '', telegram_id: str = ''):
+    def __init__(
+            self,
+            answer: dict = None,
+            proxy: str = '',
+            token: str = '',
+            telegram_id: str = '',
+            datastore=None
+    ) -> None:
         self._answer: dict = answer if answer else {}
         self._status: int = answer.get("status", 0) if answer else 0
         self._answer_data: str = answer.get("answer_data", {}) if answer else {}
@@ -20,6 +29,8 @@ class ErrorsSender:
         self._token: str = token if token else ''
         self._telegram_id: str = telegram_id if telegram_id else ''
         self._code: Optional[int] = None
+        self._datastore: Optional['TokenData'] = datastore
+        self._answer_data_dict: dict = {}
 
     @logger.catch
     async def handle_errors(self) -> dict:
@@ -29,6 +40,7 @@ class ErrorsSender:
                 data: dict = json.loads(self._answer_data)
                 if isinstance(data, dict):
                     self._code = data.get("code", 0)
+                    self._answer_data_dict = data
             except JSONDecodeError as err:
                 logger.error(
                     f"ErrorsSender: answer_handling: JSON ERROR: {err}"
@@ -113,16 +125,30 @@ class ErrorsSender:
             admins = True
         elif self._status == 429:
             if self._code == 20016:
-                # превышен кулдаун канала
-                return
+                # превышен кулдаун канала. Обработано в MessageSender.
+                # return
+                # TODO Потестить
+                cooldown: int = int(self._answer_data_dict.get("retry_after"))
+                if cooldown:
+                    cooldown += self._datastore.cooldown
+                    await DBI.update_user_channel_cooldown(
+                        user_channel_pk=self._datastore.user_channel_pk, cooldown=cooldown)
+                    self._datastore.delay = cooldown
+                await self.errors_report(
+                    text=(
+                        "Для данного токена сообщения отправляются чаще, чем разрешено в канале."
+                        f"\nToken: {self._datastore.token}"
+                        f"\nГильдия/Канал: {self._datastore.guild}/{self._datastore.channel}"
+                        f"\nВремя скорректировано. Кулдаун установлен: {cooldown} секунд"
+                    )
+                )
             elif self._code == 40062:
                 text: str = (
-                    f"User: {self._telegram_id}"
-                    f"\nError {self._status}"
-                    f"\nCode: {self._code}"
-                    f"\nError text: Service resource is being rate limited."
+                    f"Токену необходимо дополнительная верификация в дискорде (по номеру телефона):"
+                    f"\nToken: [{self._token}]"
                 )
-                admins = True
+                users = True
+                admins = False
         elif self._status == 500:
             text = f"Внутренняя ошибка сервера Дискорда. Код ошибки - 500."
             admins = True
