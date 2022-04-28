@@ -147,7 +147,7 @@ class ErrorsSender:
             text = f"Внутренняя ошибка сервера Дискорда. Код ошибки - 500."
             admins = True
         else:
-            text = 'Unrecognised error!'
+            text = f'Unrecognised error! {self._status} {self._code}'
             users = False
             admins = True
         if text:

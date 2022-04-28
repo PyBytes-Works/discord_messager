@@ -163,7 +163,7 @@ class DiscordManager:
             if channel_data:
                 self.delay = int(channel_data.cooldown)
             return
-        elif answer in (401, 403, 407):
+        elif answer == 407:
             self.is_working = False
 
     @check_working
