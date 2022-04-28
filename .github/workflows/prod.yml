@@ -5,10 +5,10 @@ env:
   PROJECT_NAME: "discord_mailer"
   STAGE: "prod"
   VERSION: "ver-${{ github.sha }}"
-  COUNT: "3.2-prod"
+  COUNT: "4.9.3-prod"
 on:
   push:
-    branches: [ main1 ]
+    branches: [ main ]
 jobs:
   create_docker_build:
     runs-on: ubuntu-latest

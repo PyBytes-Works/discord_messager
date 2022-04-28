@@ -4,7 +4,34 @@ from classes.redis_interface import RedisDB
 from config import logger
 
 
-class Replies(RedisDB):
+class ReplyData:
+
+    """Reply dataclass"""
+
+    def __init__(self, **kwargs):
+        self.token: bool = kwargs.get("token", False)
+        self.author: bool = kwargs.get("author", False)
+        self.text: bool = kwargs.get("text", False)
+        self.message_id: bool = kwargs.get("message_id", False)
+        self.to_message: bool = kwargs.get("to_message", False)
+        self.to_user: bool = kwargs.get("to_user", False)
+        self.target_id: bool = kwargs.get("target_id", False)
+        self.showed: bool = False
+        self.answered: bool = False
+
+    def set_answered(self):
+        self.answered = True
+
+    def set_showed(self):
+        self.showed = True
+
+    def get_dict(self) -> dict:
+        return self.__dict__
+
+
+class RepliesManager(RedisDB):
+
+    # TODO Сделать дата-класс реплаев
 
     def __init__(self, redis_key: str):
         super().__init__(redis_key)
@@ -33,28 +60,20 @@ class Replies(RedisDB):
                 and str(elem.get("target_id")) == target_id]
 
     @logger.catch
-    async def update_answered(self, message_id: str, text: str) -> bool:
+    async def update_answered_or_showed(self, message_id: str, text: str = '') -> bool:
         redis_data: List[dict] = await self.load()
         for elem in redis_data:
             if str(elem.get("message_id")) == str(message_id):
-                elem.update(
-                    {
-                        "answer_text": text,
-                        "answered": True
-                    }
-                )
+                if text:
+                    elem.update(
+                        {
+                            "answer_text": text,
+                            "showed": True,
+                            "answered": True
+                        }
+                    )
+                else:
+                    elem.update(showed=True)
                 await self.save(data=redis_data)
                 return True
 
-    @logger.catch
-    async def update_showed(self, message_id: str) -> bool:
-        redis_data: List[dict] = await self.load()
-        for elem in redis_data:
-            if str(elem.get("message_id")) == str(message_id):
-                elem.update(
-                    {
-                        "showed": True
-                    }
-                )
-                await self.save(data=redis_data)
-                return True

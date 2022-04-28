@@ -8,6 +8,7 @@ from classes.db_interface import DBI
 from classes.errors_sender import ErrorsSender
 from config import logger, Dispatcher, admins_list, bot
 from keyboards import user_menu_keyboard, cancel_keyboard
+from models import User
 from states import LogiStates
 from utils import check_is_int
 
@@ -21,7 +22,8 @@ async def start_add_new_user_handler(message: Message) -> None:
     user_is_admin: bool = await DBI.is_admin(telegram_id)
     if user_is_admin or user_is_superadmin:
         await message.answer(
-            "Перешлите (forward) мне любое сообщение от пользователя, которого вы хотите добавить.",
+            "Перешлите (forward) мне любое сообщение пользователя, "
+            "которого вы хотите добавить.",
             reply_markup=cancel_keyboard()
         )
         await LogiStates.add_new_user.set()
@@ -38,7 +40,8 @@ async def check_new_user_is_exists_handler(message: Message, state: FSMContext) 
     if not message.forward_from:
         await message.answer(
             "Нужно переслать (forward) любое сообщение из телеграма от пользователя, "
-            "которого вы хотите добавить.",
+            "которого вы хотите добавить. Если не получается - скажите пользователю, "
+            "чтоб разрешил пересылку сообшений в своих настройках телеграма.",
             reply_markup=cancel_keyboard()
         )
         return
@@ -46,14 +49,9 @@ async def check_new_user_is_exists_handler(message: Message, state: FSMContext) 
     new_user_telegram_id: str = str(message.forward_from.id)
     new_user_nickname: str = message.forward_from.username
     await message.answer(
-        f"В базу будет добавлен пользователь {new_user_telegram_id}: {new_user_nickname}",
+        f"Выбран пользователь {new_user_telegram_id}: {new_user_nickname}",
         reply_markup=cancel_keyboard()
     )
-    if await DBI.get_user_by_telegram_id(telegram_id=new_user_telegram_id):
-        text: str = f"Пользователь {new_user_telegram_id}: {new_user_nickname} уже существует."
-        await message.answer(text, reply_markup=user_menu_keyboard())
-        await state.finish()
-        return
     await state.update_data(
         new_user_telegram_id=new_user_telegram_id, new_user_nickname=new_user_nickname
     )
@@ -114,14 +112,20 @@ async def check_expiration_and_add_new_user_handler(message: Message, state: FSM
         f"\nДобавлен на срок (в часах): {subscribe_time}"
         f"\nПрокси: {proxy.proxy}"
     )
+    if await DBI.get_user_by_telegram_id(telegram_id=new_user_telegram_id):
+        await DBI.activate_user(**user_data)
+        await message.answer("Пользователь активирован.", reply_markup=user_menu_keyboard())
+        await state.finish()
+        return
+
     if not await DBI.add_new_user(**user_data):
         text: str = (f"ОШИБКА ДОБАВЛЕНИЯ ПОЛЬЗОВАТЕЛЯ В БД: "
                      f"\nИмя: {new_user_nickname}  ID:{new_user_telegram_id}")
         await ErrorsSender.send_report_to_admins(text)
+        await message.answer(text)
         logger.error(text)
         await state.finish()
         return
-    await DBI.activate_user(telegram_id=new_user_telegram_id)
     await message.answer(text, reply_markup=user_menu_keyboard())
     try:
         await bot.send_message(
@@ -141,7 +145,7 @@ def login_register_handlers(dp: Dispatcher) -> None:
     """
     Регистратор для функций данного модуля
     """
-    dp.register_message_handler(start_add_new_user_handler, commands=['add_user'])
+    dp.register_message_handler(start_add_new_user_handler, commands=['add_user', 'activate_user'])
     dp.register_message_handler(check_new_user_is_exists_handler, state=LogiStates.add_new_user)
     dp.register_message_handler(set_max_tokens_for_new_user_handler, state=LogiStates.add_new_user_max_tokens)
     dp.register_message_handler(check_expiration_and_add_new_user_handler, state=LogiStates.add_new_user_expiration)

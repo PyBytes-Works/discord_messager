@@ -250,7 +250,12 @@ async def add_channel_cooldown_handler(message: Message, state: FSMContext) -> N
         return
     cooldown *= 60
     data = await state.get_data()
-    user_channel_pk: int = int(data.get("user_channel_pk"))
+    channel_data: str = data.get("user_channel_pk")
+    if not channel_data:
+        await message.answer("Ошибка выбора канала.", reply_markup=user_menu_keyboard())
+        await state.finish()
+        return
+    user_channel_pk: int = int(channel_data)
     if not await DBI.update_user_channel_cooldown(user_channel_pk=user_channel_pk, cooldown=cooldown):
         error_text: str = (f"Не смог установить кулдаун для канала:"
                            f"\nuser_channel_pk: [{user_channel_pk}: cooldown: {cooldown}]")

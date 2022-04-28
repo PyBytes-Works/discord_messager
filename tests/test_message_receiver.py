@@ -1,11 +1,11 @@
 import asyncio
 
-from classes.message_receiver import MessageReceiver
+from classes.message_manager import MessageManager
 from fake_data import *
 
 
 async def tests():
-    print(await MessageReceiver(datastore=datastore).get_message())
+    print(await MessageManager(datastore=datastore).get_message())
 
 
 if __name__ == '__main__':

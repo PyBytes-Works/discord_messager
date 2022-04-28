@@ -693,7 +693,7 @@ class UserChannel(BaseModel):
             cls.select(
                 cls.id.alias('user_channel_pk'),
                 cls.name.alias('channel_name'),
-                cls.name.alias('cooldown'),
+                cls.cooldown.alias('cooldown'),
                 Channel.channel_id.alias('channel_id'),
                 Channel.guild_id.alias('guild_id')
             )

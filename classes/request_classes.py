@@ -18,13 +18,6 @@ class RequestSender(ABC):
         self.proxy: str = ''
         self.token: str = ''
         self.url: str = ''
-        self._EXCEPTIONS: tuple = (
-            asyncio.exceptions.TimeoutError,
-            aiohttp.client_exceptions.ServerDisconnectedError,
-            aiohttp.client_exceptions.ClientProxyConnectionError,
-            aiohttp.client_exceptions.ClientOSError,
-            aiohttp.client_exceptions.TooManyRedirects,
-        )
         self._params: dict = {}
         self._error_params: dict = {}
 
@@ -32,13 +25,25 @@ class RequestSender(ABC):
     async def _send(self, *args, **kwargs) -> dict:
         pass
 
-    def _update_err_params(self, answer: dict, telegram_id: str = ''):
-        self._error_params: dict = {
-            "proxy": self.proxy if self.proxy else '',
-            "token": self.token if self.token else '',
-            "answer": answer,
-            "telegram_id": telegram_id if telegram_id else ''
-        }
+    def _update_err_params(self, answer: dict, telegram_id: str = '', **kwargs):
+        self._error_params.update(
+            {
+                "answer": answer,
+                "proxy": self.proxy if self.proxy else '',
+                "token": self.token if self.token else '',
+                "telegram_id": telegram_id if telegram_id else '',
+            }
+        )
+        datastore = kwargs.get("datastore")
+        if datastore:
+            self._error_params.update(
+                {
+                    "datastore": datastore,
+                    "proxy": datastore.proxy,
+                    "token": datastore.token,
+                    "telegram_id": datastore.telegram_id,
+                }
+            )
 
     async def _send_request(self) -> dict:
         self.proxy_data: str = f"http://{PROXY_USER}:{PROXY_PASSWORD}@{self.proxy}/"
@@ -50,20 +55,35 @@ class RequestSender(ABC):
             'url': self.url,
             "proxy": self.proxy_data,
             "ssl": False,
-            "timeout": 10
+            "timeout": 20,
         }
+        error_text: str = (f"\nUrl: {self.url}"
+                           f"\nProxy: {self.proxy}")
+        text: str = ''
         try:
-            # logger.debug(self._params)
             answer: dict = await self._send()
         except (
                 aiohttp.client_exceptions.ClientHttpProxyError,
                 aiohttp.client_exceptions.ClientConnectorError,
                 aiohttp.http_exceptions.BadHttpMessage
         ) as err:
-            logger.error(f"PROXY ERROR: 407 {err}")
+            logger.error(f"RequestSender: PROXY ERROR: 407 {err}")
             answer.update(status=407)
-        except self._EXCEPTIONS as err:
-            logger.error(f"GetRequest: _EXCEPTIONS: {err}")
+        except asyncio.exceptions.TimeoutError as err:
+            logger.error(f"RequestSender._send_request: asyncio.exceptions.TimeoutError: {err}")
+            answer.update(status=-99)
+        except aiohttp.client_exceptions.ServerDisconnectedError as err:
+            text = f"RequestSender._send_request: aiohttp.client_exceptions.ServerDisconnectedError: {err}"
+        except aiohttp.client_exceptions.ClientProxyConnectionError as err:
+            text = f"RequestSender._send_request: aiohttp.client_exceptions.ClientProxyConnectionError: {err}"
+        except aiohttp.client_exceptions.ClientOSError as err:
+            text = f"RequestSender._send_request: aiohttp.client_exceptions.ClientOSError: {err}"
+        except aiohttp.client_exceptions.TooManyRedirects as err:
+            text = f"RequestSender._send_request: aiohttp.client_exceptions.TooManyRedirects: {err}"
+        # except Exception as err:
+        #     text = f"RequestSender._send_request: Exception: {err}"
+        if text:
+            logger.error(text + error_text)
             answer.update(status=-100)
 
         return answer
@@ -72,7 +92,7 @@ class RequestSender(ABC):
 class GetRequest(RequestSender):
 
     async def _send(self) -> dict:
-        async with aiohttp.ClientSession() as session:
+        async with aiohttp.ClientSession(trust_env=True) as session:
             if self.token:
                 session.headers['authorization']: str = self.token
             async with session.get(**self._params) as response:
@@ -168,7 +188,8 @@ class PostRequest(RequestSender):
 
     async def _send(self) -> dict:
         """Отправляет данные в дискорд канал"""
-        async with aiohttp.ClientSession() as session:
+
+        async with aiohttp.ClientSession(trust_env=True) as session:
             if self.token:
                 session.headers['authorization']: str = self.token
             self._params.update(json=self._data_for_send)
@@ -176,4 +197,4 @@ class PostRequest(RequestSender):
                 return {
                     "status": response.status,
                     "answer_data": await response.text()
-            }
+                }
