@@ -80,8 +80,8 @@ class RequestSender(ABC):
             text = f"RequestSender._send_request: aiohttp.client_exceptions.ClientOSError: {err}"
         except aiohttp.client_exceptions.TooManyRedirects as err:
             text = f"RequestSender._send_request: aiohttp.client_exceptions.TooManyRedirects: {err}"
-        except Exception as err:
-            text = f"RequestSender._send_request: Exception: {err}"
+        # except Exception as err:
+        #     text = f"RequestSender._send_request: Exception: {err}"
         if text:
             logger.error(text + error_text)
             answer.update(status=-100)
