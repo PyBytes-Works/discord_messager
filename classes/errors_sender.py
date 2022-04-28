@@ -34,6 +34,8 @@ class ErrorsSender:
 
     @logger.catch
     async def handle_errors(self) -> dict:
+        """Parse status and data from answer"""
+
         data = {}
         if self._answer_data:
             try:
@@ -57,6 +59,8 @@ class ErrorsSender:
             admins: bool = False,
             users: bool = True,
     ) -> None:
+        """Sending error messages"""
+
         error_message: str = (
             f"ErrorsSender get error:"
             f"\n\tTelegram_id: {self._telegram_id}"
