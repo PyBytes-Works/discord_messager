@@ -45,6 +45,8 @@ class OpenAI:
     def get_answer(self, message: str = '') -> str:
         """Returns answer from bot or empty string if errors"""
 
+        logger.info(f"Message to OpenAI: {message}")
+
         self.__counter += 1
         plugs: Tuple[str, ...] = ('server here:', 'https://discord.gg/')
         defaults: Tuple[str, ...] = ('how are you', 'how are you doing')
@@ -70,6 +72,7 @@ class OpenAI:
             return random.choice(defaults)
         if len(result) not in range(MIN_MESSAGE_LENGTH, MAX_MESSAGE_LENGTH):
             return self.get_answer(message)
+        logger.info(f"OpenAI answered: {result}")
         return result
 
 
