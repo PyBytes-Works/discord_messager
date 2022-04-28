@@ -101,6 +101,8 @@ class ErrorsSender:
                     "Не могу отправить сообщение для токена. (Ошибка 403 - 50013)"
                     "\nТокен в муте."
                 )
+                if await DBI.delete_token(token=self._token):
+                    text += f"\nТокен удален."
             elif self._code == 50001:
                 text: str = (
                     "Не могу отправить сообщение для токена. (Ошибка 403 - 50001)"
@@ -120,7 +122,6 @@ class ErrorsSender:
             text = (
                 f'Ошибка прокси: {self._proxy}. '
                 f'\nОбратитесь к администратору. Код ошибки 407')
-            users = True
             admins = True
         elif self._status == 429:
             if self._code == 20016:
@@ -142,8 +143,6 @@ class ErrorsSender:
                 text: str = (
                     f"Токену необходимо дополнительная верификация в дискорде (по номеру телефона):"
                 )
-                users = True
-                admins = False
         elif self._status == 500:
             text = f"Внутренняя ошибка сервера Дискорда. Код ошибки - 500."
             admins = True
