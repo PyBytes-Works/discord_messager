@@ -184,6 +184,8 @@ class DiscordManager:
         self.delay += random.randint(3, 7)
         logger.info(f"SLEEP PAUSE: {self.delay}")
         await self._send_delay_message()
+        if self.delay <= 0:
+            self.delay = 60
         timer: int = self.delay
         while timer > 0:
             timer -= 5

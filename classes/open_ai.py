@@ -22,7 +22,7 @@ class OpenAI:
 
     @logger.catch
     def __send_message(self) -> dict:
-        time.sleep(0.5)
+        time.sleep(3)
         try:
             response: dict = openai.Completion.create(
                 engine=self.__mode,
@@ -90,3 +90,16 @@ class OpenAI:
         with open('db/vocabulary_en.txt', 'r', encoding='utf-8') as f:
             data = f.readlines()
         return random.choice(data)
+
+
+
+if __name__ == '__main__':
+    # text = "sure you can definitely get what you want here, don't despair Keep communicating guys"
+    text = "I’m in year 12, how you finding uni'"
+    ai = OpenAI()
+    print(ai.get_answer(message=text))
+    # print(ai.get_answer(message=text))
+    # print(ai.get_answer(message=text))
+    # print(ai.get_answer(message=text))
+
+
