@@ -5,7 +5,7 @@ env:
   PROJECT_NAME: "discord_mailer"
   STAGE: "dev"
   VERSION: "ver-${{ github.sha }}"
-  COUNT: "4.8-develop-release"
+  COUNT: "4.9.3-develop-release"
 on:
   push:
     branches: [ test ]
@@ -37,7 +37,8 @@ jobs:
           username: ${{ secrets.USERNAME }}
           key: ${{ secrets.SSH_KEY_PROD }}
           script: |
-            cd "/home/${{ secrets.USERNAME }}/deploy/${{ env.PROJECT_NAME }}/${{ env.STAGE }}"
-            docker-compose -f docker-compose-${{ env.PROJECT_NAME}}-${{ env.STAGE }}.yml down
-            docker rmi ${{ env.DOCKER_USER }}/${{ env.DOCKER_REPOSITORY_NAME }}:${{ env.PROJECT_NAME}}-${{ env.COUNT }}
-            docker-compose -f docker-compose-${{ env.PROJECT_NAME}}-${{ env.STAGE }}.yml up -d --build
+            export DEV_VERSION="${{ env.COUNT }}"
+#            cd "/home/${{ secrets.USERNAME }}/deploy/${{ env.PROJECT_NAME }}/${{ env.STAGE }}"
+#            docker-compose -f docker-compose-${{ env.PROJECT_NAME}}-${{ env.STAGE }}.yml down
+#            docker rmi ${{ env.DOCKER_USER }}/${{ env.DOCKER_REPOSITORY_NAME }}:${{ env.PROJECT_NAME}}-${{ env.COUNT }}
+#            docker-compose -f docker-compose-${{ env.PROJECT_NAME}}-${{ env.STAGE }}.yml up -d --build
