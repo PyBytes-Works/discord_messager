@@ -92,7 +92,6 @@ class OpenAI:
         return random.choice(data)
 
 
-
 if __name__ == '__main__':
     # text = "sure you can definitely get what you want here, don't despair Keep communicating guys"
     text = "I’m in year 12, how you finding uni'"
