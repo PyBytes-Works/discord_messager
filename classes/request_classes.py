@@ -55,7 +55,7 @@ class RequestSender(ABC):
             'url': self.url,
             "proxy": self.proxy_data,
             "ssl": False,
-            "timeout": 15,
+            "timeout": 20,
         }
         error_text: str = (f"\nUrl: {self.url}"
                            f"\nProxy: {self.proxy}")
