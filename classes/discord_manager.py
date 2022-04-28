@@ -285,7 +285,7 @@ class DiscordManager:
 
         replyer: 'RepliesManager' = RepliesManager(self.__telegram_id)
         for elem in self.datastore.for_reply:
-            if not elem.get("answered") and not elem.get("answer_text"):
+            if not elem.get("answered") and not elem.get("answer_text") and not elem.get("showed"):
                 if self.auto_answer:
                     await self._auto_reply_with_davinchi(elem, replyer)
                 else:
