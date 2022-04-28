@@ -60,8 +60,6 @@ class DiscordManager:
         """Show must go on
         Запускает рабочий цикл бота, проверяет ошибки."""
 
-        if not await self.__check_reboot():
-            return
         await self._create_datastore()
         await self._make_all_token_ids()
         logger.info(f"\n\tUSER: {self.__username}: {self.__telegram_id} - Game begin.")
@@ -70,13 +68,12 @@ class DiscordManager:
             await self._lets_play()
         logger.info("\n\tGame over.")
 
-    async def __check_reboot(self) -> bool:
+    async def __check_reboot(self) -> None:
         if self.reboot:
             await self.message.answer(
                 "Ожидайте перезагрузки сервера.",
                 reply_markup=user_menu_keyboard())
-            return False
-        return True
+            self.is_working = False
 
     async def __get_full_info(self) -> str:
         return (
@@ -100,7 +97,7 @@ class DiscordManager:
 
     @logger.catch
     async def _lets_play(self) -> None:
-
+        await self.__check_reboot()
         await self._check_user_active()
         await self._get_worker()
         await self._getting_messages()

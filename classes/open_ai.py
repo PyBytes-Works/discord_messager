@@ -66,21 +66,25 @@ class OpenAI:
             logger.error("OpenAI: No data")
             return ''
         answers: list = data.get("choices", [])
+
         if not answers:
             logger.error("OpenAI: No answers")
             return ''
         result: str = answers[0].get("text", '').strip().split("\n")[0]
-        if self._last_answer == result:
+
+        if result in (self._last_answer, message):
             message = self.get_message_from_file()
             return self.get_answer(message)
         self._last_answer = result
+
         logger.debug(f"№ {self.__counter} - OpenAI answered: {result}")
+
         if any(filter(lambda x: x in result, plugs)):
             logger.warning(f"\t\tOpenAI answer in plugs. Return default.")
             return random.choice(defaults)
         if len(result) not in range(MIN_MESSAGE_LENGTH, MAX_MESSAGE_LENGTH):
             logger.warning(f"\t\tOpenAI answer no in range 3-100. Repeat.")
-            result = self.get_answer(message)
+            return self.get_answer(message)
 
         return result
 
