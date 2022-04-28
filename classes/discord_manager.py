@@ -146,7 +146,11 @@ class DiscordManager:
         словарь атрибута класса"""
 
         if not await MessageSender(datastore=self._datastore).send_message_to_discord():
-            self.is_working = False
+            self.__workers = []
+            channel_data: namedtuple = await DBI.get_channel(self._datastore.user_channel_pk)
+            self.delay = int(channel_data.cooldown)
+            logger.debug("\t\t429 - cooldown changed."
+                         f"\n\t\tNew cooldown: {channel_data.cooldown}")
             return
         self._discord_data = {}
         self._datastore.current_message_id = 0
@@ -187,6 +191,7 @@ class DiscordManager:
             if not self.is_working:
                 return
             await asyncio.sleep(5)
+        self.delay = 0
 
     @logger.catch
     def __get_max_message_time(self, elem: namedtuple) -> int:
@@ -235,6 +240,8 @@ class DiscordManager:
 
     @logger.catch
     async def _get_delay(self) -> None:
+        if self.delay:
+            return
         token_data: namedtuple = await self.__get_closest_token_time()
         message_time: int = int(token_data.last_message_time.timestamp())
         cooldown: int = token_data.cooldown
