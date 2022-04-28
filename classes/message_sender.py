@@ -16,7 +16,7 @@ class MessageSender(PostRequest):
         self._datastore: 'TokenData' = datastore
 
     @logger.catch
-    async def send_message_to_discord(self) -> bool:
+    async def send_message_to_discord(self) -> int:
         """Отправляет данные в канал дискорда, возвращает результат отправки."""
 
         if self._datastore.data_for_send:
@@ -31,7 +31,7 @@ class MessageSender(PostRequest):
             logger.warning(f"Typing ERROR: {answer}")
         await asyncio.sleep(2)
 
-    async def __send_data(self) -> bool:
+    async def __send_data(self) -> int:
         """
         Sends data to discord channel
         :return:
@@ -51,9 +51,10 @@ class MessageSender(PostRequest):
         #              f"\n\tData for send: {self._data_for_send}")
 
         answer: dict = await self._send_request()
-        if answer.get("status") == 200:
-            return True
+        status: int = answer.get("status")
+        if status == 200:
+            return 200
         self._update_err_params(answer=answer, datastore=self._datastore)
         await ErrorsSender(**self._error_params).handle_errors()
-
+        return status
 

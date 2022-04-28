@@ -153,14 +153,18 @@ class DiscordManager:
         """Отправляет сообщение в дискор и сохраняет данные об ошибках в
         словарь атрибута класса"""
 
-        if not await MessageSender(datastore=self.datastore).send_message_to_discord():
+        answer: int = await MessageSender(datastore=self.datastore).send_message_to_discord()
+        if answer == 200:
+            return
+        elif answer == 429:
             self.__workers = []
             channel_data: namedtuple = await DBI.get_channel(self.datastore.user_channel_pk)
             self.delay = 60
             if channel_data:
                 self.delay = int(channel_data.cooldown)
             return
-        self.datastore.current_message_id = 0
+        elif answer in (401, 403, 407):
+            self.is_working = False
 
     @check_working
     @logger.catch
@@ -184,6 +188,8 @@ class DiscordManager:
         self.delay += random.randint(3, 7)
         logger.info(f"SLEEP PAUSE: {self.delay}")
         await self._send_delay_message()
+        if self.delay <= 0:
+            self.delay = 60
         timer: int = self.delay
         while timer > 0:
             timer -= 5
@@ -332,14 +338,11 @@ class DiscordManager:
         """Отправляет сообщение о реплае в телеграм"""
 
         answer_keyboard: 'InlineKeyboardMarkup' = InlineKeyboardMarkup(row_width=1)
-
         answer_keyboard.add(InlineKeyboardButton(
             text="Ответить",
             callback_data=f'reply_{message_id}'
         ))
-        await self.message.answer(text, reply_markup=answer_keyboard
-        )
-
+        await self.message.answer(text, reply_markup=answer_keyboard)
 
     @check_working
     @logger.catch
@@ -370,6 +373,7 @@ class DiscordManager:
                 formed_pairs += await DBI.make_tokens_pair(first_token.token_pk, second_token.token_pk)
                 self.__related_tokens.append(first_token)
                 self.__related_tokens.append(second_token)
-        if not self.__related_tokens:
-            await self.message.answer("Не смог сформировать пары токенов.")
+        if len(self.__related_tokens) < 2:
+            await self.message.answer(
+                "Недостаточно токенов для работы. Не смог сформировать ни одной пары")
             self.is_working = False
