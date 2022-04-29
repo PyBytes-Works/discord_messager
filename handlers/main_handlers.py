@@ -1,5 +1,5 @@
 """Модуль с основными обработчиками команд, сообщений и коллбэков"""
-
+import aiogram.utils.exceptions
 from aiogram.dispatcher.filters import Text
 from aiogram.types import Message, CallbackQuery, ReplyKeyboardRemove
 from aiogram.dispatcher import FSMContext
@@ -56,10 +56,17 @@ async def answer_to_reply_handler(callback: CallbackQuery, state: FSMContext):
     """Запрашивает текст ответа на реплай для отправки в дискорд"""
 
     message_id: str = callback.data.rsplit("_", maxsplit=1)[-1]
-    await bot.delete_message(callback.message.chat.id, callback.message.message_id)
-    await callback.message.answer('Введите текст ответа:')
-    await state.update_data(message_id=message_id)
-    await callback.answer()
+    try:
+        await bot.delete_message(callback.message.chat.id, callback.message.message_id)
+        await callback.message.answer('Введите текст ответа:')
+        await state.update_data(message_id=message_id)
+        await callback.answer()
+    except aiogram.utils.exceptions.MessageToDeleteNotFound:
+        logger.warning("Не нашел сообщение для удаления.")
+        await state.finish()
+    except aiogram.utils.exceptions.InvalidQueryID:
+        logger.warning("Сообщение просрочено.")
+        await state.finish()
 
 
 @logger.catch
