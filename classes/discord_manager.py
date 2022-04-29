@@ -50,6 +50,8 @@ class DiscordManager:
         datastore: 'TokenData' - instance of TokenData class
     """
 
+    # TODO понять почему не работает reboot
+
     def __init__(self, message: Message, mute: bool = False) -> None:
         self.message: 'Message' = message
         self.datastore: Optional['TokenData'] = None

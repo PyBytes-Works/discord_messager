@@ -85,9 +85,13 @@ class RequestSender(ABC):
             logger.error(text)
             answer.update(status=-100)
         status = answer.get("status")
-        if status != 200:
-            error_text: str = (f"\nUrl: {self.url}"
-                               f"\nProxy: {self.proxy}")
+        if status not in range(200, 205):
+            error_text: str = (
+                f"Status: {status}"
+                f"\nUrl: {self.url}"
+                f"\nProxy: {self.proxy}")
+            if self.token:
+                error_text += f"\nToken: {self.token}"
             logger.error(error_text)
 
         return answer

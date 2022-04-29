@@ -27,9 +27,7 @@ class MessageSender(PostRequest):
 
         await asyncio.sleep(2)
         self.url = f'https://discord.com/api/v9/channels/{self._datastore.channel}/typing'
-        answer: dict = await self._send_request()
-        if answer.get("status") not in range(200, 205):
-            logger.warning(f"Typing ERROR: {answer}")
+        await self._send_request()
 
     async def __send_data(self) -> int:
         """
