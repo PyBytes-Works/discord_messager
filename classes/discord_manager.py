@@ -152,7 +152,7 @@ class DiscordManager:
     @check_working
     @logger.catch
     async def _sending_messages(self) -> None:
-        """Отправляет сообщение в дискор и сохраняет данные об ошибках в
+        """Отправляет сообщение в дискорд и сохраняет данные об ошибках в
         словарь атрибута класса"""
 
         answer: int = await MessageSender(datastore=self.datastore).send_message_to_discord()
@@ -187,11 +187,10 @@ class DiscordManager:
         if self.__workers:
             return
         await self._get_delay()
-        self.delay += random.randint(3, 7)
-        logger.info(f"SLEEP PAUSE: {self.delay}")
-        await self._send_delay_message()
         if self.delay <= 0:
             self.delay = 60
+        self.delay += random.randint(3, 7)
+        await self._send_delay_message()
         timer: int = self.delay
         while timer > 0:
             timer -= 5
@@ -264,6 +263,7 @@ class DiscordManager:
     async def _send_delay_message(self) -> None:
         """Отправляет сообщение что все токены заняты"""
 
+        logger.info(f"SLEEP PAUSE: {self.delay}")
         delay: int = self.delay
         text = "секунд"
         if delay > 60:
