@@ -76,7 +76,7 @@ class DiscordManager:
 
         while self.is_working:
             await self._lets_play()
-        logger.info("\n\tGame over.")
+        logger.info(f"\n\tUSER: {self.__username}: {self.__telegram_id} - Game over.")
 
     async def __check_reboot(self) -> None:
         if self.reboot:
