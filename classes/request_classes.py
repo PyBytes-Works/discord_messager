@@ -84,8 +84,8 @@ class RequestSender(ABC):
         if text:
             logger.error(text)
             answer.update(status=-100)
-
-        if answer.get("status") != 0:
+        status = answer.get("status")
+        if status != 200:
             error_text: str = (f"\nUrl: {self.url}"
                                f"\nProxy: {self.proxy}")
             logger.error(error_text)
