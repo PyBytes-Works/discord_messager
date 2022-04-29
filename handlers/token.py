@@ -226,12 +226,15 @@ async def ask_channel_cooldown_handler(callback: CallbackQuery, state: FSMContex
     :param state:
     :return:
     """
-
-    user_channel_pk: int = check_is_int(callback.data.rsplit("_", maxsplit=1)[-1])
-    await state.update_data(user_channel_pk=user_channel_pk)
-    await callback.message.answer("Введите время кулдауна в минутах:", reply_markup=cancel_keyboard())
-    await TokenStates.add_channel_cooldown.set()
-    await callback.answer()
+    try:
+        user_channel_pk: int = check_is_int(callback.data.rsplit("_", maxsplit=1)[-1])
+        await state.update_data(user_channel_pk=user_channel_pk)
+        await callback.message.answer("Введите время кулдауна в минутах:", reply_markup=cancel_keyboard())
+        await TokenStates.add_channel_cooldown.set()
+        await callback.answer()
+    except aiogram.utils.exceptions.InvalidQueryID:
+        logger.warning("Сообщение просрочено.")
+        await state.finish()
 
 
 @logger.catch

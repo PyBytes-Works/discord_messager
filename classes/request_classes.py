@@ -62,28 +62,29 @@ class RequestSender(ABC):
         text: str = ''
         try:
             answer: dict = await self._send()
-        except (
-                aiohttp.client_exceptions.ClientHttpProxyError,
-                aiohttp.client_exceptions.ClientConnectorError,
-                aiohttp.http_exceptions.BadHttpMessage
-        ) as err:
-            logger.error(f"RequestSender: PROXY ERROR: 407 {err}")
-            answer.update(status=407)
         except asyncio.exceptions.TimeoutError as err:
             logger.error(f"RequestSender._send_request: asyncio.exceptions.TimeoutError: {err}")
             answer.update(status=-99)
+        except aiohttp.http_exceptions.BadHttpMessage as err:
+            logger.error(f"RequestSender:  aiohttp.http_exceptions.BadHttpMessage: {err}")
+            answer.update(status=407)
+        except aiohttp.client_exceptions.ClientHttpProxyError as err:
+            logger.error(f"RequestSender._send_request: aiohttp.client_exceptions.ClientHttpProxyError: {err}")
+            answer.update(status=407)
+        except aiohttp.client_exceptions.ClientConnectorError as err:
+            logger.error(f"RequestSender._send_request: aiohttp.client_exceptions.ClientConnectorError: {err}")
+            answer.update(status=-99)
         except aiohttp.client_exceptions.ServerDisconnectedError as err:
             text = f"RequestSender._send_request: aiohttp.client_exceptions.ServerDisconnectedError: {err}"
-        except aiohttp.client_exceptions.ClientProxyConnectionError as err:
-            text = f"RequestSender._send_request: aiohttp.client_exceptions.ClientProxyConnectionError: {err}"
         except aiohttp.client_exceptions.ClientOSError as err:
             text = f"RequestSender._send_request: aiohttp.client_exceptions.ClientOSError: {err}"
         except aiohttp.client_exceptions.TooManyRedirects as err:
             text = f"RequestSender._send_request: aiohttp.client_exceptions.TooManyRedirects: {err}"
         # except Exception as err:
         #     text = f"RequestSender._send_request: Exception: {err}"
+        logger.error(error_text)
         if text:
-            logger.error(text + error_text)
+            logger.error(text)
             answer.update(status=-100)
 
         return answer
