@@ -50,18 +50,16 @@ class DiscordManager:
         datastore: 'TokenData' - instance of TokenData class
     """
 
-    # TODO понять почему не работает reboot
-
-    def __init__(self, message: Message, mute: bool = False) -> None:
+    def __init__(self, message: Message) -> None:
         self.message: 'Message' = message
         self.datastore: Optional['TokenData'] = None
-        self.is_working: bool = False
         self.delay: int = 0
+        self.is_working: bool = False
         self.auto_answer: bool = False
         self.reboot: bool = False
+        self.silence: bool = False
         self.__username: str = message.from_user.username
         self.__telegram_id: str = str(self.message.from_user.id)
-        self.silence: bool = mute
         self.__related_tokens: List[namedtuple] = []
         self.__workers: List[str] = []
 
