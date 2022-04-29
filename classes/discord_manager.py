@@ -152,7 +152,7 @@ class DiscordManager:
     @check_working
     @logger.catch
     async def _sending_messages(self) -> None:
-        """Отправляет сообщение в дискор и сохраняет данные об ошибках в
+        """Отправляет сообщение в дискорд и сохраняет данные об ошибках в
         словарь атрибута класса"""
 
         answer: int = await MessageSender(datastore=self.datastore).send_message_to_discord()
