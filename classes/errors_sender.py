@@ -72,7 +72,10 @@ class ErrorsSender:
         logger.error(error_message)
 
         text: str = ''
-        if self._status == -99:
+        if self._status == 0:
+            # See logs
+            pass
+        elif self._status == -99:
             text: str = f'Ошибка таймаута'
             admins = True
             users = False

@@ -57,8 +57,7 @@ class RequestSender(ABC):
             "ssl": False,
             "timeout": 20,
         }
-        error_text: str = (f"\nUrl: {self.url}"
-                           f"\nProxy: {self.proxy}")
+
         text: str = ''
         try:
             answer: dict = await self._send()
@@ -73,9 +72,9 @@ class RequestSender(ABC):
             answer.update(status=407)
         except aiohttp.client_exceptions.ClientConnectorError as err:
             logger.error(f"RequestSender._send_request: aiohttp.client_exceptions.ClientConnectorError: {err}")
-            answer.update(status=-99)
+            answer.update(status=407)
         except aiohttp.client_exceptions.ServerDisconnectedError as err:
-            text = f"RequestSender._send_request: aiohttp.client_exceptions.ServerDisconnectedError: {err}"
+            logger.error(f"RequestSender._send_request: aiohttp.client_exceptions.ServerDisconnectedError: {err}")
         except aiohttp.client_exceptions.ClientOSError as err:
             text = f"RequestSender._send_request: aiohttp.client_exceptions.ClientOSError: {err}"
         except aiohttp.client_exceptions.TooManyRedirects as err:
@@ -85,7 +84,11 @@ class RequestSender(ABC):
         if text:
             logger.error(text)
             answer.update(status=-100)
-        logger.error(error_text)
+
+        if answer.get("status") != 0:
+            error_text: str = (f"\nUrl: {self.url}"
+                               f"\nProxy: {self.proxy}")
+            logger.error(error_text)
 
         return answer
 
