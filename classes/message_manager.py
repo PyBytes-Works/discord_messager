@@ -181,13 +181,11 @@ class MessageManager(ChannelData):
 
         replies: 'RepliesManager' = RepliesManager(redis_key=self._datastore.telegram_id)
         my_answered: List[dict] = await replies.get_answered(self._datastore.my_discord_id)
-        logger.warning(f"\n\t\tMY ANSWERED before: {my_answered}")
         if my_answered:
             current_reply: dict = my_answered.pop()
             self._datastore.text_to_send = current_reply.get("answer_text")
             message_id: int = current_reply.get("message_id")
             self._datastore.current_message_id = message_id
-            logger.warning(f"\n\t\tMY ANSWERED after: {my_answered}")
             await replies.update_answered(str(message_id))
 
         return self._datastore.current_message_id
@@ -206,14 +204,14 @@ class MessageManager(ChannelData):
     async def __get_text_from_openai(self, mate_message: str) -> str:
 
         openai_answer: str = await self.__get_openai_answer(mate_message)
-        logger.warning(f"\n\t\tFirst OpenAI answer: {openai_answer}\n")
+        logger.debug(f"\n\t\tFirst OpenAI answer: {openai_answer}\n")
         if openai_answer:
             if self._fifty_fifty():
                 logger.debug("50 / 50 You got it!!!")
                 self._datastore.current_message_id = 0
             return openai_answer
         random_message: str = await self.__get_random_message_from_last_messages()
-        logger.warning(f"\n\t\tRandom OpenAI answer: {random_message}\n")
+        logger.debug(f"\n\t\tRandom OpenAI answer: {random_message}\n")
 
         return random_message
 
