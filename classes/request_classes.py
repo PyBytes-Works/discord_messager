@@ -55,7 +55,7 @@ class RequestSender(ABC):
             'url': self.url,
             "proxy": self.proxy_data,
             "ssl": False,
-            "timeout": 20,
+            "timeout": 25,
         }
 
         text: str = ''
