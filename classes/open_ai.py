@@ -17,7 +17,6 @@ class OpenAI:
     def __init__(self, davinchi: bool = False):
         self.__message: str = ''
         self.__mode: str = "text-davinci-002" if davinchi else "text-curie-001"
-        # self.__mode: str = "text-davinci-002" if davinchi else "davinci"
         self.__counter: int = 0
         self._last_answer: str = ''
 
@@ -28,12 +27,12 @@ class OpenAI:
             response: dict = openai.Completion.create(
                 engine=self.__mode,
                 prompt=self.__message,
-                temperature=0.3,
-                max_tokens=120,
-                #                top_p=0.5,
-                frequency_penalty=0.9,
-                presence_penalty=0.4,
-                stop=["You:"]
+                temperature=0.6,
+                # max_tokens=120,
+                # top_p=0.5,
+                # frequency_penalty=0.9,
+                # presence_penalty=0.4,
+                # stop=["You:"]
             )
         except openai.error.RateLimitError as err:
             logger.error(f"OpenAI: requests limit error: {err}")
@@ -57,7 +56,7 @@ class OpenAI:
 
         if self.__counter > 5:
             logger.warning(f"OpenAI counter: {self.__counter}")
-            return random.choice(defaults)
+            return ''
 
         if not message:
             logger.warning("OpenAI: No message sent to OpenAI")
@@ -75,15 +74,17 @@ class OpenAI:
         result: str = answers[0].get("text", '').strip().split("\n")[0]
         logger.debug(f"№ {self.__counter} - OpenAI answered: [{result}]")
         if result in (self._last_answer, message):
-            return ''
+            return self.get_answer(message)
         self._last_answer = result
         if any(filter(lambda x: x in result, plugs)):
             logger.warning(f"\t\tOpenAI answer in plugs. Return default.")
             self.__counter -= 1
             return self.get_answer(message)
-        if len(result) not in range(MIN_MESSAGE_LENGTH, MAX_MESSAGE_LENGTH):
+        if len(result) < MIN_MESSAGE_LENGTH:
             logger.warning(f"\t\tOpenAI answer not in range 3-100 symbols. Trying again.")
             return self.get_answer(message)
+        if len(result) >= MAX_MESSAGE_LENGTH:
+            result: str = result.split('.')[0]
 
         return result.title()
 

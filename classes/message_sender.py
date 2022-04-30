@@ -55,9 +55,10 @@ class MessageSender(PostRequest):
             return 0
         if not await self._typing():
             return 0
-        self.url = DISCORD_BASE_URL + f'{self._datastore.channel}/messages?'
 
+        self.url = DISCORD_BASE_URL + f'{self._datastore.channel}/messages?'
         answer: dict = await self._send_request()
+
         status: int = answer.get("status")
         if status == 200:
             return 200
