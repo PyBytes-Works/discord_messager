@@ -19,12 +19,11 @@ class InstancesStorage:
             cls, message: Message = None, telegram_id: str = '') -> 'DiscordManager':
         """Возвращает текущий экземпляр класса для пользователя'"""
 
-        telegram_id: str = telegram_id if telegram_id else ''
-        telegram_id: str = str(message.from_user.id) if not telegram_id else ''
+        telegram_id: str = str(message.from_user.id) if message else telegram_id
         spam: 'DiscordManager' = cls._INSTANCES.get(telegram_id)
         if not spam and message:
             await cls._add_or_update(message)
-            return cls._INSTANCES.get(telegram_id)
+        return cls._INSTANCES.get(telegram_id)
 
     @classmethod
     @logger.catch

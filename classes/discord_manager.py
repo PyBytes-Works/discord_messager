@@ -50,7 +50,7 @@ class DiscordManager:
         datastore: 'TokenData' - instance of TokenData class
     """
 
-    def __init__(self, message: Message) -> None:
+    def __init__(self, message: Message = None) -> None:
         self.message: 'Message' = message
         self.datastore: Optional['TokenData'] = None
         self.delay: int = 0

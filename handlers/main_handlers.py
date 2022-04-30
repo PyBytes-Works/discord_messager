@@ -34,7 +34,7 @@ async def start_parsing_command_handler(message: Message, state: FSMContext) -> 
     await message.answer("Запускаю бота", reply_markup=in_work_keyboard())
     await DBI.set_user_is_work(telegram_id=user_telegram_id)
     await UserStates.in_work.set()
-    manager: 'DiscordManager' = await InstancesStorage.get_or_create_instance(message)
+    manager: 'DiscordManager' = await InstancesStorage.get_or_create_instance(message=message)
     await manager.lets_play()
     await DBI.set_user_is_not_work(telegram_id=user_telegram_id)
     await message.answer("Закончил работу.", reply_markup=user_menu_keyboard())
