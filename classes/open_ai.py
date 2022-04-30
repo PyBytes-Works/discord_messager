@@ -52,7 +52,7 @@ class OpenAI:
         self.__counter += 1
         logger.debug(f"№ {self.__counter} - Message for OpenAI: [{message.strip()}]")
 
-        plugs: Tuple[str, ...] = ('server here:', 'https://discord.gg/')
+        plugs: Tuple[str, ...] = ('server here:', 'https://discord.gg/', ".com", ".net", "www.", "http://", "https://")
         defaults: Tuple[str, ...] = ('how are you', 'how are you doing')
 
         if self.__counter > 5:
@@ -79,12 +79,13 @@ class OpenAI:
         self._last_answer = result
         if any(filter(lambda x: x in result, plugs)):
             logger.warning(f"\t\tOpenAI answer in plugs. Return default.")
-            return random.choice(defaults)
+            self.__counter -= 1
+            return self.get_answer(message)
         if len(result) not in range(MIN_MESSAGE_LENGTH, MAX_MESSAGE_LENGTH):
             logger.warning(f"\t\tOpenAI answer not in range 3-100 symbols. Trying again.")
             return self.get_answer(message)
 
-        return result
+        return result.title()
 
     @staticmethod
     def get_message_from_file(filename: str = '') -> str:

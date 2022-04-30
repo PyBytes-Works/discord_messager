@@ -51,6 +51,7 @@ class RequestSender(ABC):
             "status": 0,
             "answer_data": ''
         }
+        logger.debug(f"RequestSender: send to url: {self.url}")
         self._params: dict = {
             'url': self.url,
             "proxy": self.proxy_data,
