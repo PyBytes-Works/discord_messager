@@ -4,7 +4,7 @@ from datetime import timedelta
 from typing import List
 
 import utils
-from classes.errors_sender import ErrorsSender
+from classes.errors_reporter import ErrorsReporter
 from classes.open_ai import OpenAI
 from classes.redis_interface import RedisDB
 from classes.replies import RepliesManager
@@ -46,7 +46,7 @@ class MessageManager(ChannelData):
         self.token: str = self._datastore.token
         answer: dict = await self._send_request()
         self._error_params.update(answer=answer, telegram_id=self._datastore.telegram_id)
-        result: dict = await ErrorsSender(**self._error_params).handle_errors()
+        result: dict = await ErrorsReporter(**self._error_params).handle_errors()
         if result.get("status") == 200:
             return result.get("answer_data")
         return []
@@ -198,7 +198,7 @@ class MessageManager(ChannelData):
     async def __get_text_from_vocabulary(self) -> str:
         text: str = Vocabulary.get_message()
         if not text:
-            await ErrorsSender.send_report_to_admins(text="Ошибка словаря фраз.")
+            await ErrorsReporter.send_report_to_admins(text="Ошибка словаря фраз.")
             return ''
         await RedisDB(redis_key=self._datastore.mate_id).save(data=[
             text], timeout_sec=self._datastore.delay + 300)

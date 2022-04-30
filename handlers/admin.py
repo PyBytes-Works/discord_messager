@@ -20,7 +20,7 @@ from keyboards import cancel_keyboard, user_menu_keyboard, inactive_users_keyboa
     superadmin_keyboard
 from states import AdminStates
 from classes.db_interface import DBI
-from classes.errors_sender import ErrorsSender
+from classes.errors_reporter import ErrorsReporter
 from utils import check_is_int
 
 
@@ -50,7 +50,7 @@ async def send_message_to_all_users_handler(message: Message) -> None:
                 logger.error(f"Пользователь {user} заблокировал бота", err)
                 result: bool = await DBI.deactivate_user(telegram_id=user)
                 if result:
-                    await ErrorsSender.send_report_to_admins(
+                    await ErrorsReporter.send_report_to_admins(
                         f"Пользователь {user} заблокировал бота. "
                         f"\nЕго аккаунт деактивирован.")
             except aiogram.utils.exceptions.CantInitiateConversation as err:
@@ -142,7 +142,7 @@ async def delete_all_proxies(message: Message, state: FSMContext) -> None:
 
     if message.text.lower() == "yes":
         await DBI.delete_all_proxy()
-        await ErrorsSender.send_report_to_admins(
+        await ErrorsReporter.send_report_to_admins(
             f"Пользователь {message.from_user.id} удалил ВСЕ прокси.")
         await state.finish()
         return

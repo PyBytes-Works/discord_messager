@@ -11,7 +11,7 @@ from config import logger, admins_list, bot
 
 # TODO Превратить в chain. Добавить обработку datastore
 
-class ErrorsSender:
+class ErrorsReporter:
     """Отправляет сообщения об ошибках"""
 
     def __init__(
@@ -123,8 +123,11 @@ class ErrorsSender:
                 text: str = f"Ошибка {self._status}"
         elif self._status == 407:
             text = (
-                f'Ошибка прокси: {self._proxy}. '
+                f'Ошибка прокси.'
                 f'\nОбратитесь к администратору. Код ошибки 407')
+            if self._proxy or self._datastore:
+                proxy: str = self._proxy if self._proxy else self._datastore.proxy
+                text += f"\nProxy [{proxy}]"
             admins = True
         elif self._status == 429:
             if self._code == 20016:

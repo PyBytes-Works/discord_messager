@@ -7,7 +7,7 @@ import asyncio
 
 from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
 
-from classes.errors_sender import ErrorsSender
+from classes.errors_reporter import ErrorsReporter
 from classes.message_manager import MessageManager
 from classes.message_sender import MessageSender
 from classes.open_ai import OpenAI
@@ -311,7 +311,7 @@ class DiscordManager:
         text: str = ("ИИ не ответил на реплай: "
                      f"\n{reply_text}")
         await self.message.answer(text)
-        await ErrorsSender.send_report_to_admins(text)
+        await ErrorsReporter.send_report_to_admins(text)
         await self.__send_reply_to_telegram(data)
 
     @logger.catch

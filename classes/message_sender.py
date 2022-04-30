@@ -1,6 +1,6 @@
 import asyncio
 
-from classes.errors_sender import ErrorsSender
+from classes.errors_reporter import ErrorsReporter
 from classes.request_classes import PostRequest
 from config import logger, DISCORD_BASE_URL
 from classes.token_datastorage import TokenData
@@ -14,49 +14,38 @@ class MessageSender(PostRequest):
     def __init__(self, datastore: 'TokenData'):
         super().__init__()
         self._datastore: 'TokenData' = datastore
+        self.channel: int = 0
 
     @logger.catch
     async def send_message_to_discord(self) -> int:
         """Отправляет данные в канал дискорда, возвращает результат отправки."""
 
-        if self._datastore.data_for_send:
+        if self._datastore.data_for_send and self._datastore.channel:
             return await self.__send_data()
 
-    async def _typing(self) -> bool:
+    async def _typing(self) -> None:
         """Имитирует "Пользователь печатает" в чате дискорда."""
 
         await asyncio.sleep(2)
-        if self._datastore.channel:
-            self.url = f'https://discord.com/api/v9/channels/{self._datastore.channel}/typing'
-            await self._send_request()
-            return True
-        text: str = (
-            f"\n\nCHANNEL: {self._datastore.channel}"
-            f"\n\nURL: {self.url}"
-            f"\n\nTG: {self._datastore.telegram_id}"
-            f"\n\nTOKEN: {self._datastore.token}"
-            f"\n\nPROXY: {self._datastore.proxy}"
-            f"\n\nMATE: {self._datastore.mate_id}"
-            f"\n\nMY_DISCORD: {self._datastore.my_discord_id}"
-        )
-        logger.debug(text)
-        await ErrorsSender.send_report_to_admins(text)
+        self.url = f'https://discord.com/api/v9/channels/{self.channel}/typing'
+        await self._send_request()
 
     async def __send_data(self) -> int:
         """
         Sends data to discord channel
         :return:
         """
+
+        await asyncio.sleep(1)
         self.token = self._datastore.token
         self.proxy = self._datastore.proxy
+        self.channel = self._datastore.channel
         self._data_for_send = self._datastore.data_for_send
 
-        if not await self._typing():
-            return 0
-        if not await self._typing():
-            return 0
+        await self._typing()
+        await self._typing()
 
-        self.url = DISCORD_BASE_URL + f'{self._datastore.channel}/messages?'
+        self.url = DISCORD_BASE_URL + f'{self.channel}/messages?'
         answer: dict = await self._send_request()
 
         status: int = answer.get("status")
@@ -68,5 +57,5 @@ class MessageSender(PostRequest):
                      f"\n\tChannel: {self._datastore.channel}"
                      f"\n\tData for send: {self._data_for_send}")
         self._update_err_params(answer=answer, datastore=self._datastore)
-        await ErrorsSender(**self._error_params).handle_errors()
+        await ErrorsReporter(**self._error_params).handle_errors()
         return status
