@@ -61,16 +61,6 @@ class ErrorsReporter:
     ) -> None:
         """Sending error messages"""
 
-        error_message: str = (
-            f"ErrorsSender get error:"
-            f"\n\tTelegram_id: {self._telegram_id}"
-            f"\n\tToken: {self._token}"
-            f"\n\tProxy: {self._proxy}"
-            f"\n\tError status: {self._status}"
-            f"\n\tError data: {self._answer_data}"
-        )
-        logger.error(error_message)
-
         text: str = ''
         if self._status == 0:
             # See logs
@@ -125,9 +115,6 @@ class ErrorsReporter:
             text = (
                 f'Ошибка прокси.'
                 f'\nОбратитесь к администратору. Код ошибки 407')
-            if self._proxy or self._datastore:
-                proxy: str = self._proxy if self._proxy else self._datastore.proxy
-                text += f"\nProxy [{proxy}]"
             admins = True
         elif self._status == 429:
             if self._code == 20016:
@@ -153,6 +140,7 @@ class ErrorsReporter:
                     text += f"\nТокен удален."
         elif self._status == 500 or self._status == 504:
             text = f"Внутренняя ошибка сервера Дискорда. Код ошибки - [{self._status}]"
+            users = False
             admins = True
         else:
             text = f'Unrecognised error! {self._status} {self._code}'
@@ -163,10 +151,22 @@ class ErrorsReporter:
                 text += f"\nToken: {self._token}"
             if self._telegram_id:
                 text += f"\nTelegram_ID: {self._telegram_id}"
+            if self._proxy or self._datastore:
+                self._proxy: str = self._proxy if self._proxy else self._datastore.proxy
+                text += f"\nProxy [{self._proxy}]"
             if users and self._telegram_id:
                 await self.errors_report(text=text)
             if admins:
                 await self.send_report_to_admins(text)
+        error_message: str = (
+            f"ErrorsSender get error:"
+            f"\n\tTelegram_id: {self._telegram_id}"
+            f"\n\tToken: {self._token}"
+            f"\n\tProxy: {self._proxy}"
+            f"\n\tError status: {self._status}"
+            f"\n\tError data: {self._answer_data}"
+        )
+        logger.error(error_message)
 
     @logger.catch
     async def errors_report(self, text: str) -> None:
