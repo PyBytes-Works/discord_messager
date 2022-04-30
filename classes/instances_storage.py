@@ -1,3 +1,5 @@
+from aiogram.types import Message
+
 from classes.discord_manager import DiscordManager
 from config import logger
 
@@ -13,16 +15,21 @@ class InstancesStorage:
 
     @classmethod
     @logger.catch
-    async def get_instance(cls, telegram_id: str) -> 'DiscordManager':
+    async def get_or_create_instance(cls, message: Message = None) -> 'DiscordManager':
         """Возвращает текущий экземпляр класса для пользователя'"""
 
-        return cls._INSTANCES.get(telegram_id)
+        spam: 'DiscordManager' = cls._INSTANCES.get(str(message.from_user.id))
+        if not spam:
+            await cls._add_or_update(message)
+        return cls._INSTANCES.get(message)
 
     @classmethod
     @logger.catch
-    async def add_or_update(cls, telegram_id: str, data: 'DiscordManager') -> None:
+    async def _add_or_update(cls, message: Message) -> None:
         """Сохраняет экземпляр класса пользователя"""
 
+        telegram_id: str = str(message.from_user.id)
+        data: DiscordManager = DiscordManager(message)
         cls._INSTANCES.update(
             {
                 telegram_id: data
@@ -31,24 +38,27 @@ class InstancesStorage:
 
     @classmethod
     @logger.catch
-    async def mute(cls, telegram_id):
-        user_class: 'DiscordManager' = await cls.get_instance(telegram_id=telegram_id)
+    async def mute(cls, message: Message):
+
+        user_class: 'DiscordManager' = await cls.get_or_create_instance(message)
         if user_class:
             user_class.silence = True
             return True
 
     @classmethod
     @logger.catch
-    async def unmute(cls, telegram_id):
-        user_class: 'DiscordManager' = await cls.get_instance(telegram_id=telegram_id)
+    async def unmute(cls, message: Message):
+
+        user_class: 'DiscordManager' = await cls.get_or_create_instance(message)
         if user_class:
             user_class.silence = False
             return True
 
     @classmethod
     @logger.catch
-    async def stop_work(cls, telegram_id: str):
-        user_class: 'DiscordManager' = await cls.get_instance(telegram_id=telegram_id)
+    async def stop_work(cls, message: Message):
+
+        user_class: 'DiscordManager' = await cls.get_or_create_instance(message)
         if user_class:
             user_class.is_working = False
             user_class.reboot = True

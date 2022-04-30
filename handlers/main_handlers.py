@@ -1,13 +1,13 @@
 """Модуль с основными обработчиками команд, сообщений и коллбэков"""
 import aiogram.utils.exceptions
 from aiogram.dispatcher.filters import Text
-from aiogram.types import Message, CallbackQuery, ReplyKeyboardRemove
+from aiogram.types import Message, CallbackQuery
 from aiogram.dispatcher import FSMContext
 
 from classes.instances_storage import InstancesStorage
 from classes.replies import RepliesManager
 from config import logger, Dispatcher, VERSION, bot
-from keyboards import cancel_keyboard, user_menu_keyboard, in_work_keyboard
+from keyboards import user_menu_keyboard, in_work_keyboard
 from classes.discord_manager import DiscordManager
 from classes.db_interface import DBI
 from states import UserStates
@@ -31,20 +31,10 @@ async def start_parsing_command_handler(message: Message, state: FSMContext) -> 
     if await DBI.is_user_work(telegram_id=user_telegram_id):
         await DBI.set_user_is_not_work(telegram_id=user_telegram_id)
         await state.finish()
-
-    # mute: bool = False
-    # autoanswer: bool = False
-    # mute_text: str = ''
-    # if message.text == "Старт & Mute":
-    #     mute_text: str = "в тихом режиме."
-    #     mute = True
-    # if message.text == "Автоответчик":
-    #     autoanswer = True
     await message.answer("Запускаю бота", reply_markup=in_work_keyboard())
     await DBI.set_user_is_work(telegram_id=user_telegram_id)
     await UserStates.in_work.set()
-    manager = DiscordManager(message=message)
-    await InstancesStorage.add_or_update(telegram_id=user_telegram_id, data=manager)
+    manager: 'DiscordManager' = await InstancesStorage.get_or_create_instance(message)
     await manager.lets_play()
     await DBI.set_user_is_not_work(telegram_id=user_telegram_id)
     await message.answer("Закончил работу.", reply_markup=user_menu_keyboard())
@@ -114,7 +104,7 @@ async def autoanswer_enabled_handler(message: Message):
     """Включает автоответчик ИИ"""
 
     telegram_id: str = str(message.from_user.id)
-    manager: 'DiscordManager' = await InstancesStorage.get_instance(telegram_id=telegram_id)
+    manager: 'DiscordManager' = await InstancesStorage.get_or_create_instance(telegram_id=telegram_id)
     manager.auto_answer = True
     await message.answer("Автоответчик включен.", reply_markup=in_work_keyboard())
 
@@ -124,7 +114,7 @@ async def autoanswer_disabled_handler(message: Message):
     """ВЫКЛючает автоответчик ИИ"""
 
     telegram_id: str = str(message.from_user.id)
-    manager: 'DiscordManager' = await InstancesStorage.get_instance(telegram_id=telegram_id)
+    manager: 'DiscordManager' = await InstancesStorage.get_or_create_instance(telegram_id=telegram_id)
     manager.auto_answer = False
     await message.answer("Автоответчик вЫключен.", reply_markup=in_work_keyboard())
 
@@ -134,8 +124,7 @@ async def silence_mode_handler(message: Message):
     """Включает тихий режим"""
 
     telegram_id: str = str(message.from_user.id)
-    manager: 'DiscordManager' = await InstancesStorage.get_instance(telegram_id=telegram_id)
-    manager.silence = True
+    await InstancesStorage.mute(telegram_id=telegram_id)
     await message.answer("Тихий режим включен.", reply_markup=in_work_keyboard())
 
 
