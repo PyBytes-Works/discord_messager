@@ -78,9 +78,8 @@ def in_work_keyboard() -> 'ReplyKeyboardMarkup':
     )
 
     keyboard.add(
-        KeyboardButton("Автоответчик ВКЛ"),
-        KeyboardButton("Автоответчик ВЫКЛ"),
-        KeyboardButton("Тихий режим (mute)"),
+        KeyboardButton("Автоответчик ВКЛ/ВЫКЛ"),
+        KeyboardButton("Тихий режим (mute) ВКЛ/ВЫКЛ"),
         KeyboardButton("Отмена"),
     )
     return keyboard
