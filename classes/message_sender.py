@@ -26,6 +26,16 @@ class MessageSender(PostRequest):
         """Имитирует "Пользователь печатает" в чате дискорда."""
 
         await asyncio.sleep(2)
+        if not self._datastore.channel:
+            text: str = (f"\n\n\t\tTG: {self._datastore.telegram_id}"
+                         f"\n\n\t\tTOKEN: {self._datastore.token}"
+                         f"\n\n\t\tPROXY: {self._datastore.proxy}"
+                         f"\n\n\t\tMATE: {self._datastore.mate_id}"
+                         f"\n\n\t\tMY_DISCORD: {self._datastore.my_discord_id}"
+                         )
+            logger.debug(text)
+            await ErrorsSender.send_report_to_admins(text)
+            return
         self.url = f'https://discord.com/api/v9/channels/{self._datastore.channel}/typing'
         await self._send_request()
 
@@ -42,8 +52,6 @@ class MessageSender(PostRequest):
         await self._typing()
         self.url = DISCORD_BASE_URL + f'{self._datastore.channel}/messages?'
 
-
-
         answer: dict = await self._send_request()
         status: int = answer.get("status")
         if status == 200:
@@ -56,4 +64,3 @@ class MessageSender(PostRequest):
         self._update_err_params(answer=answer, datastore=self._datastore)
         await ErrorsSender(**self._error_params).handle_errors()
         return status
-
