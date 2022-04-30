@@ -55,7 +55,8 @@ class OpenAI:
         defaults: Tuple[str, ...] = ('how are you', 'how are you doing')
 
         if self.__counter > 5:
-            logger.warning(f"OpenAI counter: {self.__counter}")
+            logger.warning(f"OpenAI counter out of range: {self.__counter}"
+                           f"\nMessage: {message}")
             return ''
 
         if not message:
