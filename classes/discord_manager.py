@@ -307,8 +307,9 @@ class DiscordManager:
             await self.message.answer(result)
             return
         logger.error(f"Davinci NOT ANSWERED to:"
-                     f"\n{data}")
-        text: str = "ИИ не ответил на реплай:"
+                     f"\n{reply_text}")
+        text: str = ("ИИ не ответил на реплай: "
+                     f"\n{reply_text}")
         await self.message.answer(text)
         await ErrorsSender.send_report_to_admins(text)
         await self.__send_reply_to_telegram(data)
@@ -357,7 +358,8 @@ class DiscordManager:
     async def form_new_tokens_pairs(self) -> None:
         """Формирует пары токенов из свободных"""
 
-        free_tokens: Tuple[List[namedtuple], ...] = await DBI.get_all_free_tokens(self.__telegram_id)
+        free_tokens: Tuple[
+            List[namedtuple], ...] = await DBI.get_all_free_tokens(self.__telegram_id)
         formed_pairs: int = 0
         sorted_tokens: Tuple[List[namedtuple], ...] = tuple(
             sorted(
@@ -368,9 +370,10 @@ class DiscordManager:
         self.__related_tokens = []
         for tokens in sorted_tokens:
             while len(tokens) > 1:
-                first_token = tokens.pop()
-                second_token = tokens.pop()
+                first_token: namedtuple = tokens.pop()
+                second_token: namedtuple = tokens.pop()
                 formed_pairs += await DBI.make_tokens_pair(first_token.token_pk, second_token.token_pk)
+                # TODO переделать под Датастор
                 self.__related_tokens.append(first_token)
                 self.__related_tokens.append(second_token)
         if len(self.__related_tokens) < 2:
