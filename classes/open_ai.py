@@ -57,7 +57,7 @@ class OpenAI:
 
         if self.__counter > 5:
             logger.warning(f"OpenAI counter: {self.__counter}")
-            return random.choice(defaults)
+            return ''
 
         if not message:
             logger.warning("OpenAI: No message sent to OpenAI")
@@ -75,7 +75,7 @@ class OpenAI:
         result: str = answers[0].get("text", '').strip().split("\n")[0]
         logger.debug(f"№ {self.__counter} - OpenAI answered: [{result}]")
         if result in (self._last_answer, message):
-            return ''
+            return self.get_answer(message)
         self._last_answer = result
         if any(filter(lambda x: x in result, plugs)):
             logger.warning(f"\t\tOpenAI answer in plugs. Return default.")
