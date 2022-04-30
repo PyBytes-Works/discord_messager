@@ -55,7 +55,7 @@ class RequestSender(ABC):
         logger.debug(f"RequestSender: send to url: {self.url}")
         self._params: dict = {
             'url': self.url,
-            "proxy": self.proxy_data,
+            # "proxy": self.proxy_data,
             "ssl": False,
             "timeout": 25,
         }
@@ -207,7 +207,7 @@ class PostRequest(RequestSender):
         }
         self._params: dict = {
             'url': self.url,
-            "proxies": self.proxy_data,
+            # "proxies": self.proxy_data,
             "timeout": 25,
         }
         if self.token:
