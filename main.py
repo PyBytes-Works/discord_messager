@@ -18,7 +18,7 @@ from handlers.login import login_register_handlers
 from handlers.token import token_register_handlers
 from handlers.cancel_handler import cancel_register_handlers
 from models import recreate_db
-from classes.errors_sender import ErrorsSender
+from classes.errors_reporter import ErrorsReporter
 
 cancel_register_handlers(dp=dp)
 login_register_handlers(dp=dp)
@@ -37,7 +37,7 @@ async def on_startup(_) -> None:
     if DEBUG:
         text += "\nDEBUG = TRUE"
     try:
-        await ErrorsSender.send_report_to_admins(text=text)
+        await ErrorsReporter.send_report_to_admins(text=text)
     except Exception:
         pass
     if not os.path.exists('./db'):
@@ -54,7 +54,7 @@ async def on_startup(_) -> None:
 async def on_shutdown(dp) -> None:
     """Действия при отключении бота."""
     try:
-        await ErrorsSender.send_report_to_admins(text="Discord_mailer stopping.")
+        await ErrorsReporter.send_report_to_admins(text="Discord_mailer stopping.")
     except Exception:
         pass
     logger.warning("BOT shutting down.")

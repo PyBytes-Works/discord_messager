@@ -12,7 +12,7 @@ from handlers import cancel_handler
 from states import TokenStates, UserChannelStates
 from utils import check_is_int
 from classes.db_interface import DBI
-from classes.errors_sender import ErrorsSender
+from classes.errors_reporter import ErrorsReporter
 from config import logger, Dispatcher, bot
 from keyboards import (
     user_menu_keyboard, cancel_keyboard, new_channel_key, yes_no_buttons, channel_menu_keyboard,
@@ -163,7 +163,7 @@ async def check_and_add_token_handler(message: Message, state: FSMContext) -> No
 
     proxy: str = await ProxyChecker().get_checked_proxy(telegram_id=telegram_id)
     if proxy == 'no proxies':
-        await ErrorsSender(telegram_id=telegram_id).errors_report(
+        await ErrorsReporter(telegram_id=telegram_id).errors_report(
             text="Ошибка прокси. Нет доступных прокси.")
         await state.finish()
         return
@@ -173,12 +173,12 @@ async def check_and_add_token_handler(message: Message, state: FSMContext) -> No
         error_text: str = (f"Не смог определить discord_id для токена:"
                            f"\nToken: [{token}]"
                            f"\nGuild/channel: [{guild}: {channel}]")
-        await ErrorsSender(telegram_id=telegram_id).errors_report(error_text)
+        await ErrorsReporter(telegram_id=telegram_id).errors_report(error_text)
         await state.finish()
         return
     if await DBI.check_token_by_discord_id(discord_id=discord_id):
         error_text: str = 'Токен с таким дискорд id уже сущестует в базе'
-        await ErrorsSender(telegram_id=telegram_id).errors_report(error_text)
+        await ErrorsReporter(telegram_id=telegram_id).errors_report(error_text)
         await state.finish()
         return
     await message.answer(f"Дискорд id получен: {discord_id}"
@@ -193,7 +193,7 @@ async def check_and_add_token_handler(message: Message, state: FSMContext) -> No
         user_channel_pk: int = await DBI.add_user_channel(telegram_id=telegram_id, channel_id=channel, guild_id=guild)
         await message.answer(f"Создаю канал {channel}")
         if not user_channel_pk:
-            await ErrorsSender(telegram_id=telegram_id).errors_report(
+            await ErrorsReporter(telegram_id=telegram_id).errors_report(
                 text=f"Не смог добавить канал:\n{telegram_id}:{channel}:{guild}"
             )
             await state.finish()
@@ -207,7 +207,7 @@ async def check_and_add_token_handler(message: Message, state: FSMContext) -> No
         error_text: str = (f"Не добавить токен:"
                            f"\nToken: [{token}]"
                            f"\nChannel: {channel}]")
-        await ErrorsSender(telegram_id=telegram_id).errors_report(error_text)
+        await ErrorsReporter(telegram_id=telegram_id).errors_report(error_text)
         await state.finish()
         return
     await message.answer(
@@ -262,7 +262,7 @@ async def add_channel_cooldown_handler(message: Message, state: FSMContext) -> N
     if not await DBI.update_user_channel_cooldown(user_channel_pk=user_channel_pk, cooldown=cooldown):
         error_text: str = (f"Не смог установить кулдаун для канала:"
                            f"\nuser_channel_pk: [{user_channel_pk}: cooldown: {cooldown}]")
-        await ErrorsSender(telegram_id=str(message.from_user.id)).errors_report(error_text)
+        await ErrorsReporter(telegram_id=str(message.from_user.id)).errors_report(error_text)
         await state.finish()
         return
     await message.answer("Кулдаун установлен.", reply_markup=user_menu_keyboard())
