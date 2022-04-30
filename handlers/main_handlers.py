@@ -103,26 +103,18 @@ async def activate_valid_user_handler(message: Message):
 async def autoanswer_enabled_handler(message: Message):
     """Включает автоответчик ИИ"""
 
-    manager: 'DiscordManager' = await InstancesStorage.get_or_create_instance(message)
-    manager.auto_answer = True
-    await message.answer("Автоответчик включен.", reply_markup=in_work_keyboard())
-
-
-@logger.catch
-async def autoanswer_disabled_handler(message: Message):
-    """ВЫКЛючает автоответчик ИИ"""
-
-    manager: 'DiscordManager' = await InstancesStorage.get_or_create_instance(message)
-    manager.auto_answer = False
-    await message.answer("Автоответчик вЫключен.", reply_markup=in_work_keyboard())
+    manager: 'DiscordManager' = await InstancesStorage.switch_autoanswer(message)
+    if manager.auto_answer:
+        await message.answer("Автоответчик включен.", reply_markup=in_work_keyboard())
+    else:
+        await message.answer("Автоответчик вЫключен.", reply_markup=in_work_keyboard())
 
 
 @logger.catch
 async def silence_mode_handler(message: Message):
     """Включает тихий режим"""
 
-    telegram_id: str = str(message.from_user.id)
-    await InstancesStorage.mute(telegram_id=telegram_id)
+    await InstancesStorage.mute(message)
     await message.answer("Тихий режим включен.", reply_markup=in_work_keyboard())
 
 
@@ -133,8 +125,7 @@ def register_handlers(dp: Dispatcher) -> None:
     """
 
     dp.register_message_handler(activate_valid_user_handler, commands=["start"])
-    dp.register_message_handler(autoanswer_enabled_handler, Text(equals=["Автоответчик ВКЛ"]), state=UserStates.in_work)
-    dp.register_message_handler(autoanswer_disabled_handler, Text(equals=["Автоответчик ВЫКЛ"]), state=UserStates.in_work)
+    dp.register_message_handler(autoanswer_enabled_handler, Text(equals=["Автоответчик ВКЛ", "Автоответчик ВЫКЛ"]), state=UserStates.in_work)
     dp.register_message_handler(silence_mode_handler, Text(equals=["Тихий режим (mute)"]), state=UserStates.in_work)
 
     dp.register_message_handler(start_parsing_command_handler, Text(equals=["Старт",

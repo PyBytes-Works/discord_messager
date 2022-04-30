@@ -81,9 +81,11 @@ class OpenAI:
             logger.warning(f"\t\tOpenAI answer in plugs. Return default.")
             self.__counter -= 1
             return self.get_answer(message)
-        if len(result) not in range(MIN_MESSAGE_LENGTH, MAX_MESSAGE_LENGTH):
+        if len(result) < MIN_MESSAGE_LENGTH:
             logger.warning(f"\t\tOpenAI answer not in range 3-100 symbols. Trying again.")
             return self.get_answer(message)
+        if len(result) >= MAX_MESSAGE_LENGTH:
+            result: str = result.split('.')[0]
 
         return result.title()
 

@@ -44,17 +44,23 @@ class InstancesStorage:
 
         user_class: 'DiscordManager' = await cls.get_or_create_instance(message)
         if user_class:
-            user_class.silence = True
+            if user_class.silence:
+                user_class.silence = False
+            else:
+                user_class.silence = True
             return True
 
     @classmethod
     @logger.catch
-    async def unmute(cls, message: Message):
+    async def switch_autoanswer(cls, message: Message):
 
         user_class: 'DiscordManager' = await cls.get_or_create_instance(message)
         if user_class:
-            user_class.silence = False
-            return True
+            if user_class.auto_answer:
+                user_class.auto_answer = False
+            else:
+                user_class.auto_answer = True
+            return user_class
 
     @classmethod
     @logger.catch
