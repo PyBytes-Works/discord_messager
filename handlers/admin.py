@@ -12,6 +12,7 @@ from aiogram.dispatcher.filters import Text
 from aiogram.types import Message, CallbackQuery, ReplyKeyboardRemove, InlineKeyboardMarkup, \
     InlineKeyboardButton
 
+from classes.instances_storage import InstancesStorage
 from classes.vocabulary import Vocabulary
 from config import logger, bot, admins_list
 from handlers.cancel_handler import message_cancel_handler
@@ -384,7 +385,8 @@ async def reboot_handler(message: Message) -> None:
         for user_telegram_id in await DBI.get_working_users():
             try:
                 await bot.send_message(user_telegram_id, text=text)
-                await DBI.set_user_is_not_work(str(user_telegram_id))
+                await DBI.set_user_is_not_work(user_telegram_id)
+                await InstancesStorage.reboot(user_telegram_id)
             except aiogram.utils.exceptions.ChatNotFound:
                 logger.warning(f"Chat {user_telegram_id} not found.")
 

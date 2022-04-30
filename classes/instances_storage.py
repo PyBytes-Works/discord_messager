@@ -63,4 +63,12 @@ class InstancesStorage:
         user_class: 'DiscordManager' = await cls.get_or_create_instance(telegram_id=telegram_id)
         if user_class:
             user_class.is_working = False
+
+    @classmethod
+    @logger.catch
+    async def reboot(cls, telegram_id: str):
+
+        user_class: 'DiscordManager' = await cls.get_or_create_instance(telegram_id=telegram_id)
+        if user_class:
             user_class.reboot = True
+
