@@ -50,7 +50,7 @@ class DiscordManager:
         datastore: 'TokenData' - instance of TokenData class
     """
 
-    def __init__(self, message: Message) -> None:
+    def __init__(self, message: Message = None) -> None:
         self.message: 'Message' = message
         self.datastore: Optional['TokenData'] = None
         self.delay: int = 0
@@ -298,7 +298,7 @@ class DiscordManager:
         Если ИИ не ответил - отправляет сообщение пользователю в обычном режиме"""
 
         reply_text: str = data.get("text")
-        ai_reply_text: str = OpenAI().get_answer(message=reply_text)
+        ai_reply_text: str = OpenAI(davinchi=False).get_answer(message=reply_text)
         if ai_reply_text:
             await replyer.update_text(
                 message_id=str(data.get("message_id")), text=ai_reply_text)

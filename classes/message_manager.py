@@ -97,6 +97,8 @@ class MessageManager(ChannelData):
     async def __get_last_messages(self, all_messages: List[dict]) -> List[dict]:
         """Возвращает список всех сообщений за последнее время"""
 
+        if not all_messages:
+            return []
         return list(
             filter(
                 lambda x: self.__get_delta_seconds(x) < self._datastore.last_message_time,
@@ -141,6 +143,8 @@ class MessageManager(ChannelData):
     async def __get_message_id_from_last_messages(self) -> int:
         """Returns message id from random message where author is mate"""
 
+        if not self._last_messages:
+            return 0
         mate_messages: List[dict] = [
             elem
             for elem in self._last_messages
