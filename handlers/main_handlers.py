@@ -103,8 +103,7 @@ async def activate_valid_user_handler(message: Message):
 async def autoanswer_enabled_handler(message: Message):
     """Включает автоответчик ИИ"""
 
-    telegram_id: str = str(message.from_user.id)
-    manager: 'DiscordManager' = await InstancesStorage.get_or_create_instance(telegram_id=telegram_id)
+    manager: 'DiscordManager' = await InstancesStorage.get_or_create_instance(message)
     manager.auto_answer = True
     await message.answer("Автоответчик включен.", reply_markup=in_work_keyboard())
 
@@ -113,8 +112,7 @@ async def autoanswer_enabled_handler(message: Message):
 async def autoanswer_disabled_handler(message: Message):
     """ВЫКЛючает автоответчик ИИ"""
 
-    telegram_id: str = str(message.from_user.id)
-    manager: 'DiscordManager' = await InstancesStorage.get_or_create_instance(telegram_id=telegram_id)
+    manager: 'DiscordManager' = await InstancesStorage.get_or_create_instance(message)
     manager.auto_answer = False
     await message.answer("Автоответчик вЫключен.", reply_markup=in_work_keyboard())
 
