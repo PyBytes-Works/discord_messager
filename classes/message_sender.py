@@ -1,6 +1,6 @@
 import asyncio
 
-from classes.errors_sender import ErrorsSender
+from classes.errors_reporter import ErrorsReporter
 from classes.request_classes import PostRequest
 from config import logger, DISCORD_BASE_URL
 from classes.token_datastorage import TokenData
@@ -57,5 +57,5 @@ class MessageSender(PostRequest):
                      f"\n\tChannel: {self._datastore.channel}"
                      f"\n\tData for send: {self._data_for_send}")
         self._update_err_params(answer=answer, datastore=self._datastore)
-        await ErrorsSender(**self._error_params).handle_errors()
+        await ErrorsReporter(**self._error_params).handle_errors()
         return status

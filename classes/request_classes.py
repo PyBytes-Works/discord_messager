@@ -7,7 +7,7 @@ import aiohttp.client_exceptions
 import aiohttp.http_exceptions
 
 from classes.db_interface import DBI
-from classes.errors_sender import ErrorsSender
+from classes.errors_reporter import ErrorsReporter
 from config import logger, DISCORD_BASE_URL, PROXY_USER, PROXY_PASSWORD
 from classes.token_datastorage import TokenData
 
@@ -122,7 +122,7 @@ class GetMe(GetRequest):
         self._update_err_params(answer=answer)
         # logger.debug("GetMe.get_discord_id call error handling:"
         #              f"\nParams: {self._error_params}")
-        answer: dict = await ErrorsSender(**self._error_params).handle_errors()
+        answer: dict = await ErrorsReporter(**self._error_params).handle_errors()
         return answer.get("answer_data", {}).get("id", '')
 
 
@@ -187,7 +187,7 @@ class TokenChecker(GetRequest):
         self._update_err_params(answer=answer, telegram_id=telegram_id)
         # logger.debug("TokenChecker.check_token call error handling:"
         #              f"\nParams: {self._error_params}")
-        await ErrorsSender(**self._error_params).handle_errors()
+        await ErrorsReporter(**self._error_params).handle_errors()
 
 
 class PostRequest(RequestSender):
