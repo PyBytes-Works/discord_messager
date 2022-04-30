@@ -5,7 +5,7 @@ env:
   PROJECT_NAME: "discord_mailer"
   STAGE: "prod"
   VERSION: "ver-${{ github.sha }}"
-  COUNT: "4.10-prod"
+  COUNT: "4.11-prod"
 on:
   push:
     branches: [ main ]
