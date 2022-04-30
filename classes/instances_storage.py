@@ -15,14 +15,16 @@ class InstancesStorage:
 
     @classmethod
     @logger.catch
-    async def get_or_create_instance(cls, message: Message = None) -> 'DiscordManager':
+    async def get_or_create_instance(
+            cls, message: Message = None, telegram_id: str = '') -> 'DiscordManager':
         """Возвращает текущий экземпляр класса для пользователя'"""
 
-        telegram_id: str = str(message.from_user.id)
+        telegram_id: str = telegram_id if telegram_id else ''
+        telegram_id: str = str(message.from_user.id) if not telegram_id else ''
         spam: 'DiscordManager' = cls._INSTANCES.get(telegram_id)
-        if not spam:
+        if not spam and message:
             await cls._add_or_update(message)
-        return cls._INSTANCES.get(telegram_id)
+            return cls._INSTANCES.get(telegram_id)
 
     @classmethod
     @logger.catch
@@ -57,9 +59,9 @@ class InstancesStorage:
 
     @classmethod
     @logger.catch
-    async def stop_work(cls, message: Message):
+    async def stop_work(cls, telegram_id: str):
 
-        user_class: 'DiscordManager' = await cls.get_or_create_instance(message)
+        user_class: 'DiscordManager' = await cls.get_or_create_instance(telegram_id=telegram_id)
         if user_class:
             user_class.is_working = False
             user_class.reboot = True
