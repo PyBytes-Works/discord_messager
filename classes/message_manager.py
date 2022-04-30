@@ -45,10 +45,8 @@ class MessageManager(ChannelData):
         self.proxy: str = self._datastore.proxy
         self.token: str = self._datastore.token
         answer: dict = await self._send_request()
-        self._error_params.update(answer=answer, telegram_id=self._datastore.telegram_id)
-        result: dict = await ErrorsReporter(**self._error_params).handle_errors()
-        if result.get("status") == 200:
-            return result.get("answer_data")
+        if answer and answer.get("status") == 200:
+            return answer.get("answer_data")
         return []
 
     @logger.catch

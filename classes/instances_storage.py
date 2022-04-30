@@ -2,6 +2,7 @@ from aiogram.types import Message
 
 from classes.discord_manager import DiscordManager
 from config import logger
+from keyboards import in_work_keyboard
 
 
 class InstancesStorage:
@@ -50,7 +51,7 @@ class InstancesStorage:
                 text: str = "Тихий режим вЫключен."
             else:
                 user_class.silence = True
-            await message.answer(text)
+            await message.answer(text, reply_markup=in_work_keyboard())
 
     @classmethod
     @logger.catch
@@ -58,13 +59,13 @@ class InstancesStorage:
 
         user_class: 'DiscordManager' = await cls.get_or_create_instance(message)
         if user_class:
-            text: str = "Тихий режим включен."
+            text: str = "Автоответчик включен."
             if user_class.auto_answer:
-                text: str = "Тихий режим вЫключен."
+                text: str = "Автоответчик вЫключен."
                 user_class.auto_answer = False
             else:
                 user_class.auto_answer = True
-            await message.answer(text)
+            await message.answer(text, reply_markup=in_work_keyboard())
 
     @classmethod
     @logger.catch
