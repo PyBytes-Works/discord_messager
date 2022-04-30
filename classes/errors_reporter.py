@@ -151,8 +151,8 @@ class ErrorsReporter:
                 )
                 if await DBI.delete_token(token=self._token):
                     text += f"\nТокен удален."
-        elif self._status == 500:
-            text = f"Внутренняя ошибка сервера Дискорда. Код ошибки - 500."
+        elif self._status == 500 or self._status == 504:
+            text = f"Внутренняя ошибка сервера Дискорда. Код ошибки - [{self._status}]"
             admins = True
         else:
             text = f'Unrecognised error! {self._status} {self._code}'
@@ -161,6 +161,8 @@ class ErrorsReporter:
         if text:
             if self._token:
                 text += f"\nToken: {self._token}"
+            if self._telegram_id:
+                text += f"\nTelegram_ID: {self._telegram_id}"
             if users and self._telegram_id:
                 await self.errors_report(text=text)
             if admins:

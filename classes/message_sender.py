@@ -56,6 +56,4 @@ class MessageSender(PostRequest):
                      f"\n\tProxy:{self.proxy}"
                      f"\n\tChannel: {self._datastore.channel}"
                      f"\n\tData for send: {self._data_for_send}")
-        self._update_err_params(answer=answer, datastore=self._datastore)
-        await ErrorsReporter(**self._error_params).handle_errors()
         return status

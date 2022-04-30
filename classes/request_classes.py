@@ -19,30 +19,31 @@ class RequestSender(ABC):
         self.proxy: str = ''
         self.token: str = ''
         self.url: str = ''
+        self.telegram_id: str = ''
         self._params: dict = {}
         self._error_params: dict = {}
+        self.datastore: 'TokenData' = None
 
     @abstractmethod
     async def _send(self, *args, **kwargs) -> dict:
         pass
 
-    def _update_err_params(self, answer: dict, telegram_id: str = '', **kwargs):
+    def _update_error_params(self, answer: dict):
         self._error_params.update(
             {
                 "answer": answer,
                 "proxy": self.proxy if self.proxy else '',
                 "token": self.token if self.token else '',
-                "telegram_id": telegram_id if telegram_id else '',
+                "telegram_id": self.telegram_id if self.telegram_id else '',
             }
         )
-        datastore = kwargs.get("datastore")
-        if datastore:
+        if self.datastore:
             self._error_params.update(
                 {
-                    "datastore": datastore,
-                    "proxy": datastore.proxy,
-                    "token": datastore.token,
-                    "telegram_id": datastore.telegram_id,
+                    "datastore": self.datastore,
+                    "proxy": self.datastore.proxy,
+                    "token": self.datastore.token,
+                    "telegram_id": self.datastore.telegram_id,
                 }
             )
 
@@ -55,7 +56,7 @@ class RequestSender(ABC):
         logger.debug(f"RequestSender: send to url: {self.url}")
         self._params: dict = {
             'url': self.url,
-            # "proxy": self.proxy_data,
+            "proxy": self.proxy_data,
             "ssl": False,
             "timeout": 25,
         }
@@ -96,6 +97,9 @@ class RequestSender(ABC):
                 error_text += f"\nToken: {self.token}"
             logger.error(error_text)
 
+        self._update_error_params(answer=answer)
+        answer: dict = await ErrorsReporter(**self._error_params).handle_errors()
+
         return answer
 
 
@@ -113,6 +117,35 @@ class GetRequest(RequestSender):
                 }
 
 
+class PostRequest(RequestSender):
+
+    def __init__(self):
+        super().__init__()
+        self._data_for_send: dict = {}
+
+    async def _send(self) -> dict:
+        """Отправляет данные в дискорд канал"""
+
+        session = requests.Session()
+        self.proxy_data: dict = {
+            "http": f"http://{PROXY_USER}:{PROXY_PASSWORD}@{self.proxy}/",
+            "https": f"http://{PROXY_USER}:{PROXY_PASSWORD}@{self.proxy}/",
+        }
+        self._params: dict = {
+            'url': self.url,
+            "proxies": self.proxy_data,
+            "timeout": 25,
+        }
+        if self.token:
+            session.headers['authorization']: str = self.token
+        self._params.update(json=self._data_for_send)
+        response = session.post(**self._params)
+        return {
+            "status": response.status_code,
+            "answer_data": response.text
+        }
+
+
 class GetMe(GetRequest):
 
     async def get_discord_id(self, token: str, proxy: str) -> str:
@@ -120,10 +153,7 @@ class GetMe(GetRequest):
         self.token = token
         self.url: str = f'https://discord.com/api/v9/users/@me'
         answer: dict = await self._send_request()
-        self._update_err_params(answer=answer)
-        # logger.debug("GetMe.get_discord_id call error handling:"
-        #              f"\nParams: {self._error_params}")
-        answer: dict = await ErrorsReporter(**self._error_params).handle_errors()
+
         return answer.get("answer_data", {}).get("id", '')
 
 
@@ -179,42 +209,10 @@ class TokenChecker(GetRequest):
         self.proxy: str = proxy
         self.token: str = token
         self.channel: int = channel
+        self.telegram_id = telegram_id
         self.url: str = DISCORD_BASE_URL + f'{self.channel}/messages?limit=1'
 
         answer: dict = await self._send_request()
         status: int = answer.get("status")
         if status == 200:
             return True
-        self._update_err_params(answer=answer, telegram_id=telegram_id)
-        # logger.debug("TokenChecker.check_token call error handling:"
-        #              f"\nParams: {self._error_params}")
-        await ErrorsReporter(**self._error_params).handle_errors()
-
-
-class PostRequest(RequestSender):
-
-    def __init__(self):
-        super().__init__()
-        self._data_for_send: dict = {}
-
-    async def _send(self) -> dict:
-        """Отправляет данные в дискорд канал"""
-
-        session = requests.Session()
-        self.proxy_data: dict = {
-            "http": f"http://{PROXY_USER}:{PROXY_PASSWORD}@{self.proxy}/",
-            "https": f"http://{PROXY_USER}:{PROXY_PASSWORD}@{self.proxy}/",
-        }
-        self._params: dict = {
-            'url': self.url,
-            # "proxies": self.proxy_data,
-            "timeout": 25,
-        }
-        if self.token:
-            session.headers['authorization']: str = self.token
-        self._params.update(json=self._data_for_send)
-        response = session.post(**self._params)
-        return {
-            "status": response.status_code,
-            "answer_data": response.text
-        }
