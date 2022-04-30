@@ -40,15 +40,17 @@ class InstancesStorage:
 
     @classmethod
     @logger.catch
-    async def mute(cls, message: Message):
+    async def switch_mute(cls, message: Message) -> None:
 
         user_class: 'DiscordManager' = await cls.get_or_create_instance(message)
         if user_class:
+            text: str = "Тихий режим включен."
             if user_class.silence:
                 user_class.silence = False
+                text: str = "Тихий режим вЫключен."
             else:
                 user_class.silence = True
-            return True
+            await message.answer(text)
 
     @classmethod
     @logger.catch
@@ -56,11 +58,13 @@ class InstancesStorage:
 
         user_class: 'DiscordManager' = await cls.get_or_create_instance(message)
         if user_class:
+            text: str = "Тихий режим включен."
             if user_class.auto_answer:
+                text: str = "Тихий режим вЫключен."
                 user_class.auto_answer = False
             else:
                 user_class.auto_answer = True
-            return user_class
+            await message.answer(text)
 
     @classmethod
     @logger.catch

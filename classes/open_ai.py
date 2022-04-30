@@ -17,7 +17,6 @@ class OpenAI:
     def __init__(self, davinchi: bool = False):
         self.__message: str = ''
         self.__mode: str = "text-davinci-002" if davinchi else "text-curie-001"
-        # self.__mode: str = "text-davinci-002" if davinchi else "davinci"
         self.__counter: int = 0
         self._last_answer: str = ''
 
@@ -28,12 +27,12 @@ class OpenAI:
             response: dict = openai.Completion.create(
                 engine=self.__mode,
                 prompt=self.__message,
-                temperature=0.3,
-                max_tokens=120,
-                #                top_p=0.5,
-                frequency_penalty=0.9,
-                presence_penalty=0.4,
-                stop=["You:"]
+                temperature=0.6,
+                # max_tokens=120,
+                # top_p=0.5,
+                # frequency_penalty=0.9,
+                # presence_penalty=0.4,
+                # stop=["You:"]
             )
         except openai.error.RateLimitError as err:
             logger.error(f"OpenAI: requests limit error: {err}")

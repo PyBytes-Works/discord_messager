@@ -103,19 +103,14 @@ async def activate_valid_user_handler(message: Message):
 async def autoanswer_enabled_handler(message: Message):
     """Включает автоответчик ИИ"""
 
-    manager: 'DiscordManager' = await InstancesStorage.switch_autoanswer(message)
-    if manager.auto_answer:
-        await message.answer("Автоответчик включен.", reply_markup=in_work_keyboard())
-    else:
-        await message.answer("Автоответчик вЫключен.", reply_markup=in_work_keyboard())
+    await InstancesStorage.switch_autoanswer(message)
 
 
 @logger.catch
 async def silence_mode_handler(message: Message):
     """Включает тихий режим"""
 
-    await InstancesStorage.mute(message)
-    await message.answer("Тихий режим включен.", reply_markup=in_work_keyboard())
+    await InstancesStorage.switch_mute(message)
 
 
 @logger.catch
