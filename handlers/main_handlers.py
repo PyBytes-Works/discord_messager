@@ -120,8 +120,8 @@ def register_handlers(dp: Dispatcher) -> None:
     """
 
     dp.register_message_handler(activate_valid_user_handler, commands=["start"])
-    dp.register_message_handler(autoanswer_enabled_handler, Text(equals=["Автоответчик ВКЛ", "Автоответчик ВЫКЛ"]), state=UserStates.in_work)
-    dp.register_message_handler(silence_mode_handler, Text(equals=["Тихий режим (mute)"]), state=UserStates.in_work)
+    dp.register_message_handler(autoanswer_enabled_handler, Text(equals=["Автоответчик ВКЛ/ВЫКЛ"]), state=UserStates.in_work)
+    dp.register_message_handler(silence_mode_handler, Text(equals=["Тихий режим (mute) ВКЛ/ВЫКЛ"]), state=UserStates.in_work)
 
     dp.register_message_handler(start_parsing_command_handler, Text(equals=["Старт",
                                                                             "Старт & Mute", "Автоответчик"]))

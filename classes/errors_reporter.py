@@ -49,7 +49,7 @@ class ErrorsReporter:
                     f"\nAnswer data: {self._answer_data}"
                 )
         self._answer.update(answer_data=data)
-        if self._status != 200:
+        if self._status not in range(200, 205):
             await self.send_message_check_token()
         return self._answer
 
