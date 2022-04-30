@@ -22,7 +22,7 @@ class OpenAI:
 
     @logger.catch
     def __send_message(self) -> dict:
-        time.sleep(3)
+        time.sleep(2)
         try:
             response: dict = openai.Completion.create(
                 engine=self.__mode,
