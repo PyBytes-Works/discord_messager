@@ -18,10 +18,11 @@ class InstancesStorage:
     async def get_or_create_instance(cls, message: Message = None) -> 'DiscordManager':
         """Возвращает текущий экземпляр класса для пользователя'"""
 
-        spam: 'DiscordManager' = cls._INSTANCES.get(str(message.from_user.id))
+        telegram_id: str = str(message.from_user.id)
+        spam: 'DiscordManager' = cls._INSTANCES.get(telegram_id)
         if not spam:
             await cls._add_or_update(message)
-        return cls._INSTANCES.get(message)
+        return cls._INSTANCES.get(telegram_id)
 
     @classmethod
     @logger.catch
