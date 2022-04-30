@@ -87,7 +87,7 @@ class OpenAI:
         if len(result) >= MAX_MESSAGE_LENGTH:
             result: str = result.split('.')[0]
 
-        return result.title()
+        return result.lower()
 
     @staticmethod
     def get_message_from_file(filename: str = '') -> str:
