@@ -298,7 +298,7 @@ class DiscordManager:
         Если ИИ не ответил - отправляет сообщение пользователю в обычном режиме"""
 
         reply_text: str = data.get("text")
-        ai_reply_text: str = OpenAI(davinchi=True).get_answer(message=reply_text)
+        ai_reply_text: str = OpenAI().get_answer(message=reply_text)
         if ai_reply_text:
             await replyer.update_text(
                 message_id=str(data.get("message_id")), text=ai_reply_text)
