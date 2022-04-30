@@ -5,6 +5,7 @@ from typing import Union
 import aiohttp
 import aiohttp.client_exceptions
 import aiohttp.http_exceptions
+import requests
 
 from classes.db_interface import DBI
 from classes.errors_reporter import ErrorsReporter
@@ -199,14 +200,21 @@ class PostRequest(RequestSender):
     async def _send(self) -> dict:
         """Отправляет данные в дискорд канал"""
 
-        # TODO переделать на реквестс
-        conn = aiohttp.TCPConnector()
-        async with aiohttp.ClientSession(trust_env=True, connector=conn) as session:
-            if self.token:
-                session.headers['authorization']: str = self.token
-            self._params.update(json=self._data_for_send)
-            async with session.post(**self._params) as response:
-                return {
-                    "status": response.status,
-                    "answer_data": await response.text()
-                }
+        session = requests.Session()
+        self.proxy_data: dict = {
+            "http": f"http://{PROXY_USER}:{PROXY_PASSWORD}@{self.proxy}/",
+            "https": f"http://{PROXY_USER}:{PROXY_PASSWORD}@{self.proxy}/",
+        }
+        self._params: dict = {
+            'url': self.url,
+            "proxies": self.proxy_data,
+            "timeout": 25,
+        }
+        if self.token:
+            session.headers['authorization']: str = self.token
+        self._params.update(json=self._data_for_send)
+        response = session.post(**self._params)
+        return {
+            "status": response.status_code,
+            "answer_data": response.text
+        }
