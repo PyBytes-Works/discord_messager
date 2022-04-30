@@ -28,11 +28,11 @@ class OpenAI:
             response: dict = openai.Completion.create(
                 engine=self.__mode,
                 prompt=self.__message,
-                temperature=0.5,
-                max_tokens=60,
-                top_p=1.0,
-                frequency_penalty=0.5,
-                presence_penalty=0.0,
+                temperature=0.3,
+                max_tokens=120,
+                #                top_p=0.5,
+                frequency_penalty=0.9,
+                presence_penalty=0.4,
                 stop=["You:"]
             )
         except openai.error.RateLimitError as err:
