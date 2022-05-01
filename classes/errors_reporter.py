@@ -29,7 +29,7 @@ class ErrorsReporter:
         self._token: str = token if token else ''
         self._telegram_id: str = telegram_id if telegram_id else ''
         self._code: Optional[int] = None
-        self._datastore: 'TokenData' = datastore
+        self.datastore: 'TokenData' = datastore
         self._answer_data_dict: dict = {}
 
     @logger.catch
@@ -121,15 +121,15 @@ class ErrorsReporter:
             if self._code == 20016:
                 cooldown: int = int(self._answer_data_dict.get("retry_after"))
                 if cooldown:
-                    cooldown += self._datastore.cooldown
+                    cooldown += self.datastore.cooldown
                     await DBI.update_user_channel_cooldown(
-                        user_channel_pk=self._datastore.user_channel_pk, cooldown=cooldown)
-                    self._datastore.delay = cooldown
+                        user_channel_pk=self.datastore.user_channel_pk, cooldown=cooldown)
+                    self.datastore.delay = cooldown
                 await self.errors_report(
                     text=(
                         "Для данного токена сообщения отправляются чаще, чем разрешено в канале."
-                        f"\nToken: {self._datastore.token}"
-                        f"\nГильдия/Канал: {self._datastore.guild}/{self._datastore.channel}"
+                        f"\nToken: {self.datastore.token}"
+                        f"\nГильдия/Канал: {self.datastore.guild}/{self.datastore.channel}"
                         f"\nВремя скорректировано. Кулдаун установлен: {cooldown} секунд"
                     )
                 )
@@ -152,11 +152,11 @@ class ErrorsReporter:
             users = False
             admins = True
         if text:
-            if self._datastore:
-                self._telegram_id = self._datastore.telegram_id
-                self._proxy = self._datastore.proxy
-                self._token = self._datastore.token_name
-                text += f"Channel: {self._datastore.channel}"
+            if self.datastore:
+                self._telegram_id = self.datastore.telegram_id
+                self._proxy = self.datastore.proxy
+                self._token = self.datastore.token_name
+                text += f"Channel: {self.datastore.channel}"
             if self._telegram_id:
                 text += f"\nTelegram_ID: {self._telegram_id}"
             if self._token:

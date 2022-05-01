@@ -13,14 +13,14 @@ class MessageSender(PostRequest):
 
     def __init__(self, datastore: 'TokenData'):
         super().__init__()
-        self._datastore: 'TokenData' = datastore
+        self.datastore: 'TokenData' = datastore
         self.channel: int = 0
 
     @logger.catch
     async def send_message_to_discord(self) -> int:
         """Отправляет данные в канал дискорда, возвращает результат отправки."""
 
-        if self._datastore.data_for_send and self._datastore.channel:
+        if self.datastore.data_for_send and self.datastore.channel:
             return await self.__send_data()
 
     async def _typing(self) -> None:
@@ -37,10 +37,10 @@ class MessageSender(PostRequest):
         """
 
         await asyncio.sleep(1)
-        self.token = self._datastore.token
-        self.proxy = self._datastore.proxy
-        self.channel = self._datastore.channel
-        self._data_for_send = self._datastore.data_for_send
+        self.token = self.datastore.token
+        self.proxy = self.datastore.proxy
+        self.channel = self.datastore.channel
+        self._data_for_send = self.datastore.data_for_send
 
         await self._typing()
         await self._typing()
@@ -54,6 +54,6 @@ class MessageSender(PostRequest):
         logger.debug("MessageSender.__send_data::"
                      f"\n\tToken: {self.token}"
                      f"\n\tProxy:{self.proxy}"
-                     f"\n\tChannel: {self._datastore.channel}"
+                     f"\n\tChannel: {self.datastore.channel}"
                      f"\n\tData for send: {self._data_for_send}")
         return status
