@@ -193,8 +193,6 @@ class DiscordManager:
         if self.__workers:
             return
         await self._get_delay()
-        # if self.delay <= 0:
-        #     self.delay = 60
         self.delay += random.randint(3, 7)
         await self._send_delay_message()
         timer: int = self.delay
@@ -269,6 +267,9 @@ class DiscordManager:
     async def _send_delay_message(self) -> None:
         """Отправляет сообщение что все токены заняты"""
 
+        logger.debug(f"\n\t\tSelf.delay: {self.delay}")
+        if self.delay <= 0:
+            return
         logger.info(f"SLEEP PAUSE: {self.delay}")
         delay: int = self.delay
         text = "секунд"
@@ -293,7 +294,6 @@ class DiscordManager:
 
         replier: 'RepliesManager' = RepliesManager(self.__telegram_id)
         data_for_reply: List[dict] = await replier.get_not_showed()
-        print(f"data_for_reply: {data_for_reply}")
         for elem in data_for_reply:
             if self.auto_answer:
                 await self._auto_reply_with_davinchi(elem, replier)

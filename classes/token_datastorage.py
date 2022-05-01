@@ -26,9 +26,9 @@ class TokenData:
         self.__MY_DISCORD_ID: str = ''
         self.data_for_send: dict = {}
         self.text_to_send: str = ''
-        self.__all_tokens_ids: List[str] = []
         self.user_channel_pk: int = 0
         self.token_name: str = ''
+        self.__all_tokens_ids: List[str] = []
 
     @logger.catch
     def update_data(self, token: str, token_data: namedtuple):
