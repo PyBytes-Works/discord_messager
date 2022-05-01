@@ -291,14 +291,14 @@ class DiscordManager:
         """Отправляет реплаи из дискорда в телеграм с кнопкой Ответить
         либо отправляет сообщение в нейросеть, чтоб она ответила"""
 
-        replyer: 'RepliesManager' = RepliesManager(self.__telegram_id)
-        data_for_reply: List[dict] = await replyer.get_not_showed()
+        replier: 'RepliesManager' = RepliesManager(self.__telegram_id)
+        data_for_reply: List[dict] = await replier.get_not_showed()
+        print(f"data_for_reply: {data_for_reply}")
         for elem in data_for_reply:
             if self.auto_answer:
-                await self._auto_reply_with_davinchi(elem, replyer)
+                await self._auto_reply_with_davinchi(elem, replier)
             else:
-                await self.__send_reply_to_telegram(elem)
-                await replyer.update_showed(str(elem.get("message_id")))
+                await self.__send_reply_to_telegram(elem, replier)
 
     @logger.catch
     async def _auto_reply_with_davinchi(self, data: dict, replyer: 'RepliesManager') -> None:
@@ -308,8 +308,10 @@ class DiscordManager:
         reply_text: str = data.get("text")
         ai_reply_text: str = OpenAI(davinchi=False).get_answer(message=reply_text)
         if ai_reply_text:
+            message_id: str = data.get("message_id")
             await replyer.update_text(
-                message_id=str(data.get("message_id")), text=ai_reply_text)
+                message_id=message_id, text=ai_reply_text)
+            await replyer.update_showed(message_id)
             text: str = await self.__get_message_text_from_dict(data)
             result: str = text + f"\nОтвет от ИИ: {ai_reply_text}"
             await self.message.answer(result)
@@ -323,10 +325,11 @@ class DiscordManager:
         await self.__send_reply_to_telegram(data)
 
     @logger.catch
-    async def __send_reply_to_telegram(self, data: dict) -> None:
+    async def __send_reply_to_telegram(self, data: dict, replier: 'RepliesManager') -> None:
         text: str = await self.__get_message_text_from_dict(data)
         message_id: str = data.get("message_id")
         await self.__reply_to_telegram(text=text, message_id=message_id)
+        await replier.update_showed(data.get("message_id"))
 
     @logger.catch
     async def __get_message_text_from_dict(self, data) -> str:

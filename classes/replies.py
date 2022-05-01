@@ -104,7 +104,7 @@ class RepliesManager(RedisDB):
         ))
 
     @logger.catch
-    async def get_answered(self, target_id: str) -> List[dict]:
+    async def get_not_answered_with_text(self, target_id: str) -> List[dict]:
         return [elem
                 for elem in await self.load()
                 if elem.get("answer_text")
@@ -117,18 +117,15 @@ class RepliesManager(RedisDB):
         for elem in replies:
             if elem.get("message_id") == message_id:
                 elem.update(answer_text=text)
-                elem.update(answered=True)
-                elem.update(showed=True)
                 await self.save(data=replies)
                 return True
 
     @logger.catch
-    async def update_answered_and_showed(self, message_id: str) -> bool:
+    async def update_answered(self, message_id: str) -> bool:
         replies: List[dict] = await self.load()
         for elem in replies:
             if elem.get("message_id") == message_id:
                 elem.update(answered=True)
-                elem.update(showed=True)
                 await self.save(data=replies)
                 return True
 

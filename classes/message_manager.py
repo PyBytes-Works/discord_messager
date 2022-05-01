@@ -201,13 +201,13 @@ class MessageManager(ChannelData):
         Returns length of replies list"""
 
         replies: 'RepliesManager' = RepliesManager(redis_key=self._datastore.telegram_id)
-        my_answered: List[dict] = await replies.get_answered(self._datastore.my_discord_id)
+        my_answered: List[dict] = await replies.get_not_answered_with_text(self._datastore.my_discord_id)
         if my_answered:
             current_reply: dict = my_answered.pop()
             self._datastore.text_to_send = current_reply.get("answer_text")
             message_id: str = current_reply.get("message_id")
             self._datastore.current_message_id = message_id
-            await replies.update_answered_and_showed(message_id)
+            await replies.update_answered(message_id)
 
         return self._datastore.current_message_id
 
