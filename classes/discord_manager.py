@@ -76,6 +76,8 @@ class DiscordManager:
             await self._lets_play()
         logger.info(f"\n\tUSER: {self.__username}: {self.__telegram_id} - Game over.")
 
+    @check_working
+    @logger.catch
     async def __check_reboot(self) -> None:
         if self.reboot:
             await self.message.answer(
@@ -83,6 +85,7 @@ class DiscordManager:
                 reply_markup=user_menu_keyboard())
             self.is_working = False
 
+    @logger.catch
     async def __get_full_info(self) -> str:
         return (
             f"\n\tUsername: {self.__username}"
@@ -119,9 +122,14 @@ class DiscordManager:
 
     @logger.catch
     async def _make_all_token_ids(self) -> None:
+        """Получает дискорд ИД всех токенов пользователя. Если их больше двух -
+        начинает работу, иначе - завершает."""
+
         self.datastore.all_tokens_ids = await DBI.get_all_discord_id(self.__telegram_id)
-        if not self.datastore.all_tokens_ids:
-            logger.debug(f"No all_tokens_ids.")
+        if len(self.datastore.all_tokens_ids) < 2:
+            logger.debug(f"_make_all_token_ids ERROR: Not enough all_tokens_ids.")
+            await self.message.answer("Нужно добавить минимум два токена в один канал для работы.")
+            self.is_working = False
             return
         self.is_working = True
 
