@@ -9,13 +9,13 @@ class ReplyData:
     """Reply dataclass"""
 
     def __init__(self, **kwargs):
-        self.token: bool = kwargs.get("token", False)
-        self.author: bool = kwargs.get("author", False)
-        self.text: bool = kwargs.get("text", False)
-        self.message_id: bool = kwargs.get("message_id", False)
-        self.to_message: bool = kwargs.get("to_message", False)
-        self.to_user: bool = kwargs.get("to_user", False)
-        self.target_id: bool = kwargs.get("target_id", False)
+        self.token: str = kwargs.get("token", '')
+        self.author: str = kwargs.get("author", '')
+        self.text: str = kwargs.get("text", '')
+        self.message_id: int = kwargs.get("message_id", 0)
+        self.to_message: int = kwargs.get("to_message", 0)
+        self.to_user: str = kwargs.get("to_user",  '')
+        self.target_id: int = kwargs.get("target_id", 0)
         self.showed: bool = False
         self.answered: bool = False
 
@@ -82,11 +82,11 @@ class RepliesManager(RedisDB):
                 return True
 
     @logger.catch
-    async def update_answered(self, message_id: str) -> bool:
+    async def update_answered_and_showed(self, message_id: str) -> bool:
         redis_data: List[dict] = await self.load()
         for elem in redis_data:
             if str(elem.get("message_id")) == str(message_id):
-                elem.update(answered=True)
+                elem.update(answered=True, showed=True)
                 await self.save(data=redis_data)
                 return True
 

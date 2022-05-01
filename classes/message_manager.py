@@ -188,7 +188,7 @@ class MessageManager(ChannelData):
             self._datastore.text_to_send = current_reply.get("answer_text")
             message_id: int = current_reply.get("message_id")
             self._datastore.current_message_id = message_id
-            await replies.update_answered(str(message_id))
+            await replies.update_answered_and_showed(str(message_id))
 
         return self._datastore.current_message_id
 
