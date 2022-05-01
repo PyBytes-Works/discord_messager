@@ -142,9 +142,6 @@ class ErrorsReporter:
         elif self._status == 500:
             text = (f"Внутренняя ошибка сервера Дискорда. Код ошибки - [{self._status}]"
                     f"\nСлишком большая нагрузка на канал")
-            if self._datastore:
-                text += f" {self._datastore.channel}"
-            users = False
             admins = True
         elif self._status == 504:
             text = f"Внутренняя ошибка сервера Дискорда. Код ошибки - [{self._status}]"
@@ -159,6 +156,7 @@ class ErrorsReporter:
                 self._telegram_id = self._datastore.telegram_id
                 self._proxy = self._datastore.proxy
                 self._token = self._datastore.token_name
+                text += f"Channel: {self._datastore.channel}"
             if self._telegram_id:
                 text += f"\nTelegram_ID: {self._telegram_id}"
             if self._token:
