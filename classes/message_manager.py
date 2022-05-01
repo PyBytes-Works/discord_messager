@@ -3,7 +3,6 @@ import random
 from datetime import timedelta
 from typing import List
 
-import utils
 from classes.errors_reporter import ErrorsReporter
 from classes.open_ai import OpenAI
 from classes.redis_interface import RedisDB
@@ -11,7 +10,7 @@ from classes.replies import RepliesManager
 from classes.request_classes import ChannelData
 from classes.token_datastorage import TokenData
 from classes.vocabulary import Vocabulary
-from config import logger, DEBUG, SAVING
+from config import logger
 
 
 class MessageManager(ChannelData):
@@ -122,8 +121,7 @@ class MessageManager(ChannelData):
     @logger.catch
     async def __get_filtered_replies(self, data: List[dict]) -> List[dict]:
         """"""
-        if data and DEBUG and SAVING:
-            utils.save_data_to_json(data, "replies_data.json", key='a')
+
         return [
             {
                 "token": self._datastore.token_name,
@@ -165,14 +163,14 @@ class MessageManager(ChannelData):
             return
         all_replies: List[dict] = await self.__get_my_replies()
         new_replies: List[dict] = await self.__get_filtered_replies(all_replies)
-        self._datastore.for_reply = await self.__get_replies_for_answer(new_replies)
+        await self.__update_replies(new_replies)
 
     @logger.catch
-    async def __get_replies_for_answer(self, new_replies: List[dict]) -> List[dict]:
+    async def __update_replies(self, new_replies: List[dict]) -> None:
         """Возвращает разницу между старыми и новыми данными в редисе,
         записывает полные данные в редис"""
 
-        return await RepliesManager(self._datastore.telegram_id).get_difference_and_update(new_replies)
+        await RepliesManager(self._datastore.telegram_id).update_new_replies(new_replies)
 
     @logger.catch
     async def __get_message_id_and_text_for_send_answer(self) -> int:
@@ -182,13 +180,13 @@ class MessageManager(ChannelData):
         Returns length of replies list"""
 
         replies: 'RepliesManager' = RepliesManager(redis_key=self._datastore.telegram_id)
-        my_answered: List[dict] = await replies.get_answered(self._datastore.my_discord_id)
+        my_answered: List[dict] = await replies.get_not_answered_with_text(self._datastore.my_discord_id)
         if my_answered:
             current_reply: dict = my_answered.pop()
             self._datastore.text_to_send = current_reply.get("answer_text")
-            message_id: int = current_reply.get("message_id")
+            message_id: str = current_reply.get("message_id")
             self._datastore.current_message_id = message_id
-            await replies.update_answered(str(message_id))
+            await replies.update_answered(message_id)
 
         return self._datastore.current_message_id
 
