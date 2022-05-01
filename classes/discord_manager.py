@@ -174,8 +174,8 @@ class DiscordManager:
         if not self.__workers:
             await self.make_token_pairs(unpair=True)
             await self._make_workers_list()
-        logger.debug(await self.__get_full_info())
         await self._get_worker_from_list()
+        logger.debug(await self.__get_full_info())
 
     @check_working
     @logger.catch
