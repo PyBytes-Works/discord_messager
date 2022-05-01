@@ -28,7 +28,6 @@ class TokenData:
         self.text_to_send: str = ''
         self.__all_tokens_ids: List[str] = []
         self.user_channel_pk: int = 0
-        self.for_reply: List[dict] = []
         self.token_name: str = ''
 
     @logger.catch

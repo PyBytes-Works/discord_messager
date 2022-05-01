@@ -11,7 +11,7 @@ from classes.errors_reporter import ErrorsReporter
 from classes.message_manager import MessageManager
 from classes.message_sender import MessageSender
 from classes.open_ai import OpenAI
-from classes.replies import RepliesManager
+from classes.replies import RepliesManager, ReplyData
 from classes.token_datastorage import TokenData
 
 from config import logger
@@ -284,54 +284,48 @@ class DiscordManager:
         либо отправляет сообщение в нейросеть, чтоб она ответила"""
 
         replyer: 'RepliesManager' = RepliesManager(self.__telegram_id)
-        for elem in self.datastore.for_reply:
-            if not elem.get("answered") and not elem.get("answer_text") and not elem.get("showed"):
-                if self.auto_answer:
-                    await self._auto_reply_with_davinchi(elem, replyer)
-                else:
-                    await self.__send_reply_to_telegram(elem)
-                    await replyer.update_showed(str(elem.get("message_id")))
+        data_for_reply: List[ReplyData] = await replyer.get_not_showed()
+        for elem in data_for_reply:
+            if self.auto_answer:
+                await self._auto_reply_with_davinchi(elem, replyer)
+            else:
+                await self.__send_reply_to_telegram(elem)
+                await replyer.update_showed(elem.message_id)
 
     @logger.catch
-    async def _auto_reply_with_davinchi(self, data: dict, replyer: 'RepliesManager') -> None:
+    async def _auto_reply_with_davinchi(self, reply: 'ReplyData', replyer: 'RepliesManager') -> None:
         """Отвечает с на реплай с помощью ИИ и сохраняет изменнные данные в Редис
         Если ИИ не ответил - отправляет сообщение пользователю в обычном режиме"""
 
-        reply_text: str = data.get("text")
-        ai_reply_text: str = OpenAI(davinchi=False).get_answer(message=reply_text)
+        ai_reply_text: str = OpenAI(davinchi=False).get_answer(message=reply.text)
         if ai_reply_text:
             await replyer.update_text(
-                message_id=str(data.get("message_id")), text=ai_reply_text)
-            text: str = await self.__get_message_text_from_dict(data)
+                message_id=str(reply.message_id), text=ai_reply_text)
+            text: str = await self.__get_message_text_from_dict(reply)
             result: str = text + f"\nОтвет от ИИ: {ai_reply_text}"
             await self.message.answer(result)
             return
         logger.error(f"Davinci NOT ANSWERED to:"
-                     f"\n{reply_text}")
+                     f"\n{reply.text}")
         text: str = ("ИИ не ответил на реплай: "
-                     f"\n{reply_text}")
+                     f"\n{reply.text}")
         await self.message.answer(text)
         await ErrorsReporter.send_report_to_admins(text)
-        await self.__send_reply_to_telegram(data)
+        await self.__send_reply_to_telegram(reply)
 
     @logger.catch
-    async def __send_reply_to_telegram(self, data: dict) -> None:
+    async def __send_reply_to_telegram(self, data: 'ReplyData') -> None:
         text: str = await self.__get_message_text_from_dict(data)
-        message_id: str = data.get("message_id")
-        await self.__reply_to_telegram(text=text, message_id=message_id)
+        await self.__reply_to_telegram(text=text, message_id=data.message_id)
 
     @logger.catch
-    async def __get_message_text_from_dict(self, data) -> str:
-        author: str = data.get("author")
-        reply_text: str = data.get("text")
-        reply_to_author: str = data.get("to_user")
-        reply_to_message: str = data.get("to_message")
+    async def __get_message_text_from_dict(self, reply: 'ReplyData') -> str:
         return (
             f"Вам пришло сообщение из ДИСКОРДА:"
-            f"\nКому: {reply_to_author}"
-            f"\nНа сообщение: {reply_to_message}"
-            f"\nОт: {author}"
-            f"\nText: {reply_text}"
+            f"\nКому: {reply.to_user}"
+            f"\nНа сообщение: {reply.to_message}"
+            f"\nОт: {reply.author}"
+            f"\nText: {reply.text}"
         )
 
     @logger.catch
@@ -372,8 +366,8 @@ class DiscordManager:
             while len(tokens) > 1:
                 first_token: namedtuple = tokens.pop()
                 second_token: namedtuple = tokens.pop()
-                formed_pairs += await DBI.make_tokens_pair(first_token.token_pk, second_token.token_pk)
-                # TODO переделать под Датастор
+                formed_pairs += await DBI.make_tokens_pair(
+                    first_token.token_pk, second_token.token_pk)
                 self.__related_tokens.append(first_token)
                 self.__related_tokens.append(second_token)
         if len(self.__related_tokens) < 2:
