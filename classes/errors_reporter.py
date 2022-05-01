@@ -37,7 +37,7 @@ class ErrorsReporter:
         """Parse status and data from answer"""
 
         data = {}
-        if self._answer_data:
+        if self._answer_data and not self._answer_data.startswith('<!doctype html>'):
             try:
                 data: dict = json.loads(self._answer_data)
                 if isinstance(data, dict):
@@ -46,6 +46,7 @@ class ErrorsReporter:
             except JSONDecodeError as err:
                 logger.error(
                     f"ErrorsSender: answer_handling: JSON ERROR: {err}"
+                    f"\nStatus: {self._status}"
                     f"\nAnswer data: {self._answer_data}"
                 )
         self._answer.update(answer_data=data)
