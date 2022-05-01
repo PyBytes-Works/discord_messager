@@ -301,7 +301,7 @@ class DiscordManager:
                 await self.__send_reply_to_telegram(elem, replier)
 
     @logger.catch
-    async def _auto_reply_with_davinchi(self, data: dict, replyer: 'RepliesManager') -> None:
+    async def _auto_reply_with_davinchi(self, data: dict, replier: 'RepliesManager') -> None:
         """Отвечает с на реплай с помощью ИИ и сохраняет изменнные данные в Редис
         Если ИИ не ответил - отправляет сообщение пользователю в обычном режиме"""
 
@@ -309,9 +309,9 @@ class DiscordManager:
         ai_reply_text: str = OpenAI(davinchi=False).get_answer(message=reply_text)
         if ai_reply_text:
             message_id: str = data.get("message_id")
-            await replyer.update_text(
+            await replier.update_text(
                 message_id=message_id, text=ai_reply_text)
-            await replyer.update_showed(message_id)
+            await replier.update_showed(message_id)
             text: str = await self.__get_message_text_from_dict(data)
             result: str = text + f"\nОтвет от ИИ: {ai_reply_text}"
             await self.message.answer(result)
@@ -322,7 +322,7 @@ class DiscordManager:
                      f"\n{reply_text}")
         await self.message.answer(text)
         await ErrorsReporter.send_report_to_admins(text)
-        await self.__send_reply_to_telegram(data)
+        await self.__send_reply_to_telegram(data, replier)
 
     @logger.catch
     async def __send_reply_to_telegram(self, data: dict, replier: 'RepliesManager') -> None:
