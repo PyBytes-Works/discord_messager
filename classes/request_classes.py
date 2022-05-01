@@ -1,6 +1,6 @@
 import asyncio
 from abc import abstractmethod, ABC
-from typing import Union
+from typing import Union, Optional
 
 import aiohttp
 import aiohttp.client_exceptions
@@ -22,7 +22,7 @@ class RequestSender(ABC):
         self.telegram_id: str = ''
         self._params: dict = {}
         self._error_params: dict = {}
-        self.datastore: 'TokenData' = None
+        self.datastore: Optional['TokenData'] = None
 
     @abstractmethod
     async def _send(self, *args, **kwargs) -> dict:
@@ -160,9 +160,9 @@ class ChannelData(GetRequest):
 
     def __init__(self, datastore: 'TokenData'):
         super().__init__()
-        self._datastore: 'TokenData' = datastore
+        self.datastore: 'TokenData' = datastore
         self.limit: int = 100
-        self.url: str = DISCORD_BASE_URL + f'{self._datastore.channel}/messages?limit={self.limit}'
+        self.url: str = DISCORD_BASE_URL + f'{self.datastore.channel}/messages?limit={self.limit}'
 
 
 class ProxyChecker(GetRequest):
