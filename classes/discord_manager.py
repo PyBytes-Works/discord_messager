@@ -76,6 +76,8 @@ class DiscordManager:
             await self._lets_play()
         logger.info(f"\n\tUSER: {self.__username}: {self.__telegram_id} - Game over.")
 
+    @check_working
+    @logger.catch
     async def __check_reboot(self) -> None:
         if self.reboot:
             await self.message.answer(
@@ -83,6 +85,7 @@ class DiscordManager:
                 reply_markup=user_menu_keyboard())
             self.is_working = False
 
+    @logger.catch
     async def __get_full_info(self) -> str:
         return (
             f"\n\tUsername: {self.__username}"
@@ -119,9 +122,14 @@ class DiscordManager:
 
     @logger.catch
     async def _make_all_token_ids(self) -> None:
+        """Получает дискорд ИД всех токенов пользователя. Если их больше двух -
+        начинает работу, иначе - завершает."""
+
         self.datastore.all_tokens_ids = await DBI.get_all_discord_id(self.__telegram_id)
-        if not self.datastore.all_tokens_ids:
-            logger.debug(f"No all_tokens_ids.")
+        if len(self.datastore.all_tokens_ids) < 2:
+            logger.debug(f"_make_all_token_ids ERROR: Not enough all_tokens_ids.")
+            await self.message.answer("Нужно добавить минимум два токена в один канал для работы.")
+            self.is_working = False
             return
         self.is_working = True
 
@@ -174,8 +182,8 @@ class DiscordManager:
         if not self.__workers:
             await self.make_token_pairs(unpair=True)
             await self._make_workers_list()
-        logger.debug(await self.__get_full_info())
         await self._get_worker_from_list()
+        logger.debug(await self.__get_full_info())
 
     @check_working
     @logger.catch
@@ -185,8 +193,6 @@ class DiscordManager:
         if self.__workers:
             return
         await self._get_delay()
-        if self.delay <= 0:
-            self.delay = 60
         self.delay += random.randint(3, 7)
         await self._send_delay_message()
         timer: int = self.delay
@@ -261,6 +267,9 @@ class DiscordManager:
     async def _send_delay_message(self) -> None:
         """Отправляет сообщение что все токены заняты"""
 
+        logger.debug(f"\n\t\tSelf.delay: {self.delay}")
+        if self.delay <= 0:
+            return
         logger.info(f"SLEEP PAUSE: {self.delay}")
         delay: int = self.delay
         text = "секунд"
@@ -283,14 +292,13 @@ class DiscordManager:
         """Отправляет реплаи из дискорда в телеграм с кнопкой Ответить
         либо отправляет сообщение в нейросеть, чтоб она ответила"""
 
-        replyer: 'RepliesManager' = RepliesManager(self.__telegram_id)
-        for elem in self.datastore.for_reply:
-            if not elem.get("answered") and not elem.get("answer_text") and not elem.get("showed"):
-                if self.auto_answer:
-                    await self._auto_reply_with_davinchi(elem, replyer)
-                else:
-                    await self.__send_reply_to_telegram(elem)
-                    await replyer.update_showed(str(elem.get("message_id")))
+        replier: 'RepliesManager' = RepliesManager(self.__telegram_id)
+        data_for_reply: List[dict] = await replier.get_not_showed()
+        for elem in data_for_reply:
+            if self.auto_answer:
+                await self._auto_reply_with_davinchi(elem, replier)
+            else:
+                await self.__send_reply_to_telegram(elem, replier)
 
     @logger.catch
     async def _auto_reply_with_davinchi(self, data: dict, replyer: 'RepliesManager') -> None:
@@ -300,8 +308,10 @@ class DiscordManager:
         reply_text: str = data.get("text")
         ai_reply_text: str = OpenAI(davinchi=False).get_answer(message=reply_text)
         if ai_reply_text:
+            message_id: str = data.get("message_id")
             await replyer.update_text(
-                message_id=str(data.get("message_id")), text=ai_reply_text)
+                message_id=message_id, text=ai_reply_text)
+            await replyer.update_showed(message_id)
             text: str = await self.__get_message_text_from_dict(data)
             result: str = text + f"\nОтвет от ИИ: {ai_reply_text}"
             await self.message.answer(result)
@@ -315,10 +325,11 @@ class DiscordManager:
         await self.__send_reply_to_telegram(data)
 
     @logger.catch
-    async def __send_reply_to_telegram(self, data: dict) -> None:
+    async def __send_reply_to_telegram(self, data: dict, replier: 'RepliesManager') -> None:
         text: str = await self.__get_message_text_from_dict(data)
         message_id: str = data.get("message_id")
         await self.__reply_to_telegram(text=text, message_id=message_id)
+        await replier.update_showed(data.get("message_id"))
 
     @logger.catch
     async def __get_message_text_from_dict(self, data) -> str:
@@ -372,8 +383,8 @@ class DiscordManager:
             while len(tokens) > 1:
                 first_token: namedtuple = tokens.pop()
                 second_token: namedtuple = tokens.pop()
-                formed_pairs += await DBI.make_tokens_pair(first_token.token_pk, second_token.token_pk)
-                # TODO переделать под Датастор
+                formed_pairs += await DBI.make_tokens_pair(
+                    first_token.token_pk, second_token.token_pk)
                 self.__related_tokens.append(first_token)
                 self.__related_tokens.append(second_token)
         if len(self.__related_tokens) < 2:
