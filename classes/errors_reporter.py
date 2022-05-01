@@ -29,7 +29,7 @@ class ErrorsReporter:
         self._token: str = token if token else ''
         self._telegram_id: str = telegram_id if telegram_id else ''
         self._code: Optional[int] = None
-        self._datastore: Optional['TokenData'] = datastore
+        self._datastore: 'TokenData' = datastore
         self._answer_data_dict: dict = {}
 
     @logger.catch
@@ -155,12 +155,15 @@ class ErrorsReporter:
             users = False
             admins = True
         if text:
-            if self._token:
-                text += f"\nToken: {self._token}"
+            if self._datastore:
+                self._telegram_id = self._datastore.telegram_id
+                self._proxy = self._datastore.proxy
+                self._token = self._datastore.token_name
             if self._telegram_id:
                 text += f"\nTelegram_ID: {self._telegram_id}"
-            if self._proxy or self._datastore:
-                self._proxy: str = self._proxy if self._proxy else self._datastore.proxy
+            if self._token:
+                text += f"\nToken: {self._token}"
+            if self._proxy:
                 text += f"\nProxy [{self._proxy}]"
             if users and self._telegram_id:
                 await self.errors_report(text=text)
