@@ -11,7 +11,7 @@ from classes.errors_reporter import ErrorsReporter
 from classes.message_manager import MessageManager
 from classes.message_sender import MessageSender
 from classes.open_ai import OpenAI
-from classes.replies import RepliesManager, ReplyData
+from classes.replies import RepliesManager
 from classes.token_datastorage import TokenData
 
 from config import logger
@@ -193,8 +193,8 @@ class DiscordManager:
         if self.__workers:
             return
         await self._get_delay()
-        if self.delay <= 0:
-            self.delay = 60
+        # if self.delay <= 0:
+        #     self.delay = 60
         self.delay += random.randint(3, 7)
         await self._send_delay_message()
         timer: int = self.delay
@@ -292,48 +292,54 @@ class DiscordManager:
         либо отправляет сообщение в нейросеть, чтоб она ответила"""
 
         replyer: 'RepliesManager' = RepliesManager(self.__telegram_id)
-        data_for_reply: List[ReplyData] = await replyer.get_not_showed()
+        data_for_reply: List[dict] = await replyer.get_not_showed()
         for elem in data_for_reply:
             if self.auto_answer:
                 await self._auto_reply_with_davinchi(elem, replyer)
             else:
                 await self.__send_reply_to_telegram(elem)
-                await replyer.update_showed(elem.message_id)
+                await replyer.update_showed(str(elem.get("message_id")))
 
     @logger.catch
-    async def _auto_reply_with_davinchi(self, reply: 'ReplyData', replyer: 'RepliesManager') -> None:
+    async def _auto_reply_with_davinchi(self, data: dict, replyer: 'RepliesManager') -> None:
         """Отвечает с на реплай с помощью ИИ и сохраняет изменнные данные в Редис
         Если ИИ не ответил - отправляет сообщение пользователю в обычном режиме"""
 
-        ai_reply_text: str = OpenAI(davinchi=False).get_answer(message=reply.text)
+        reply_text: str = data.get("text")
+        ai_reply_text: str = OpenAI(davinchi=False).get_answer(message=reply_text)
         if ai_reply_text:
             await replyer.update_text(
-                message_id=str(reply.message_id), text=ai_reply_text)
-            text: str = await self.__get_message_text_from_dict(reply)
+                message_id=str(data.get("message_id")), text=ai_reply_text)
+            text: str = await self.__get_message_text_from_dict(data)
             result: str = text + f"\nОтвет от ИИ: {ai_reply_text}"
             await self.message.answer(result)
             return
         logger.error(f"Davinci NOT ANSWERED to:"
-                     f"\n{reply.text}")
+                     f"\n{reply_text}")
         text: str = ("ИИ не ответил на реплай: "
-                     f"\n{reply.text}")
+                     f"\n{reply_text}")
         await self.message.answer(text)
         await ErrorsReporter.send_report_to_admins(text)
-        await self.__send_reply_to_telegram(reply)
+        await self.__send_reply_to_telegram(data)
 
     @logger.catch
-    async def __send_reply_to_telegram(self, data: 'ReplyData') -> None:
+    async def __send_reply_to_telegram(self, data: dict) -> None:
         text: str = await self.__get_message_text_from_dict(data)
-        await self.__reply_to_telegram(text=text, message_id=data.message_id)
+        message_id: str = data.get("message_id")
+        await self.__reply_to_telegram(text=text, message_id=message_id)
 
     @logger.catch
-    async def __get_message_text_from_dict(self, reply: 'ReplyData') -> str:
+    async def __get_message_text_from_dict(self, data) -> str:
+        author: str = data.get("author")
+        reply_text: str = data.get("text")
+        reply_to_author: str = data.get("to_user")
+        reply_to_message: str = data.get("to_message")
         return (
             f"Вам пришло сообщение из ДИСКОРДА:"
-            f"\nКому: {reply.to_user}"
-            f"\nНа сообщение: {reply.to_message}"
-            f"\nОт: {reply.author}"
-            f"\nText: {reply.text}"
+            f"\nКому: {reply_to_author}"
+            f"\nНа сообщение: {reply_to_message}"
+            f"\nОт: {author}"
+            f"\nText: {reply_text}"
         )
 
     @logger.catch

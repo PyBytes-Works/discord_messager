@@ -7,7 +7,7 @@ import utils
 from classes.errors_reporter import ErrorsReporter
 from classes.open_ai import OpenAI
 from classes.redis_interface import RedisDB
-from classes.replies import RepliesManager, ReplyData
+from classes.replies import RepliesManager
 from classes.request_classes import ChannelData
 from classes.token_datastorage import TokenData
 from classes.vocabulary import Vocabulary
@@ -104,49 +104,46 @@ class MessageManager(ChannelData):
             )
         )
 
-    # @logger.catch
-    # def __get_target_id(self, elem: dict) -> str:
-    #     return (
-    #             elem.get("referenced_message", {}).get("author", {}).get("id")
-    #             or elem.get("mentions", [{"id": '[no id]'}])[0].get("id")
-    #     )
-    #
-    # @logger.catch
-    # def __get_target_username(self, elem: dict) -> str:
-    #     return (
-    #             elem.get("referenced_message", {}).get("author", {}).get("username")
-    #             or elem.get("mentions", [{"id": '[no id]'}])[0].get("username")
-    #             or self._datastore.token
-    #     )
-    #
-    # @logger.catch
-    # async def __get_filtered_replies(self, data: List[dict]) -> List[dict]:
-    #     """"""
-    #
-    #     if data and DEBUG and SAVING:
-    #         utils.save_data_to_json(data, "replies_data.json", key='a')
-    #
-    #     return [
-    #         {
-    #             "token": self._datastore.token_name,
-    #             "author": elem.get("author", {}).get("username", 'no author'),
-    #             "text": elem.get("content", '[no content]'),
-    #             "message_id": elem.get("id", 0),
-    #             "to_message": elem.get("referenced_message", {}).get("content", 'mention'),
-    #             "to_user": self.__get_target_username(elem),
-    #             "target_id": self.__get_target_id(elem)
-    #         }
-    #         for elem in data
-    #     ]
+    @logger.catch
+    def __get_target_id(self, elem: dict) -> str:
+        return (
+                elem.get("referenced_message", {}).get("author", {}).get("id")
+                or elem.get("mentions", [{"id": '[no id]'}])[0].get("id")
+        )
 
     @logger.catch
-    async def __get_new_filtered_replies(self, data: List[dict]) -> List[ReplyData]:
-        """"""
-        new_data: List[dict] = data[:]
-        for elem in new_data:
-            elem.update(token=self._datastore.token_name)
+    def __get_target_username(self, elem: dict) -> str:
+        return (
+                elem.get("referenced_message", {}).get("author", {}).get("username")
+                or elem.get("mentions", [{"id": '[no id]'}])[0].get("username")
+                or self._datastore.token
+        )
 
-        return [ReplyData(**elem) for elem in new_data]
+    @logger.catch
+    async def __get_filtered_replies(self, data: List[dict]) -> List[dict]:
+        """"""
+
+        return [
+            {
+                "token": self._datastore.token_name,
+                "author": elem.get("author", {}).get("username", 'no author'),
+                "text": elem.get("content", '[no content]'),
+                "message_id": elem.get("id", 0),
+                "to_message": elem.get("referenced_message", {}).get("content", 'mention'),
+                "to_user": self.__get_target_username(elem),
+                "target_id": self.__get_target_id(elem)
+            }
+            for elem in data
+        ]
+
+    # @logger.catch
+    # async def __get_new_filtered_replies(self, data: List[dict]) -> List[ReplyData]:
+    #     """"""
+    #     new_data: List[dict] = data[:]
+    #     for elem in new_data:
+    #         elem.update(token=self._datastore.token_name)
+    #
+    #     return [ReplyData(**elem) for elem in new_data]
 
     @logger.catch
     async def __get_message_id_from_last_messages(self) -> int:
@@ -175,10 +172,10 @@ class MessageManager(ChannelData):
         if not self._last_messages:
             return
         all_replies: List[dict] = await self.__get_my_replies()
-        # new_replies: List[dict] = await self.__get_filtered_replies(all_replies)
-        new_new_replies: List[ReplyData] = await self.__get_new_filtered_replies(all_replies)
-        await self.__update_replies(new_new_replies)
-        print("NEWNEW REPLIES: ", new_new_replies)
+        new_replies: List[dict] = await self.__get_filtered_replies(all_replies)
+        # new_new_replies: List[ReplyData] = await self.__get_new_filtered_replies(all_replies)
+        await self.__update_replies(new_replies)
+        print("NEW REPLIES: ", new_replies)
         # self._datastore.for_reply = await self.__get_replies_for_answer(new_replies)
 
     # @logger.catch
@@ -190,7 +187,7 @@ class MessageManager(ChannelData):
     #            .get_difference_and_update(new_replies)
 
     @logger.catch
-    async def __update_replies(self, new_replies: List[ReplyData]) -> None:
+    async def __update_replies(self, new_replies: List[dict]) -> None:
         """Возвращает разницу между старыми и новыми данными в редисе,
         записывает полные данные в редис"""
 
@@ -204,12 +201,13 @@ class MessageManager(ChannelData):
         Returns length of replies list"""
 
         replies: 'RepliesManager' = RepliesManager(redis_key=self._datastore.telegram_id)
-        my_answered: List[ReplyData] = await replies.get_answered(self._datastore.my_discord_id)
+        my_answered: List[dict] = await replies.get_answered(self._datastore.my_discord_id)
         if my_answered:
-            current_reply: ReplyData = my_answered.pop()
-            self._datastore.text_to_send = current_reply.answer_text
-            self._datastore.current_message_id = current_reply.message_id
-            await replies.update_answered_and_showed(str(current_reply.message_id))
+            current_reply: dict = my_answered.pop()
+            self._datastore.text_to_send = current_reply.get("answer_text")
+            message_id: str = current_reply.get("message_id")
+            self._datastore.current_message_id = message_id
+            await replies.update_answered_and_showed(message_id)
 
         return self._datastore.current_message_id
 
