@@ -36,6 +36,8 @@ class RepliesManager(RedisDB):
     @logger.catch
     async def _get_old_replies_message_ids(
             self: 'RepliesManager', all_replies: List[dict]) -> List[str]:
+        """Возвращает список ИД-номеров сообщений"""
+
         return list(map(
             lambda x: x.get("message_id"),
             all_replies
@@ -43,6 +45,8 @@ class RepliesManager(RedisDB):
 
     @logger.catch
     async def get_not_answered_with_text(self: 'RepliesManager', target_id: str) -> List[dict]:
+        """Возвращает список словарей с непустым полем text"""
+
         return [elem
                 for elem in await self.load()
                 if elem.get("answer_text")
@@ -51,6 +55,8 @@ class RepliesManager(RedisDB):
 
     @logger.catch
     async def update_text(self: 'RepliesManager', message_id: str, text: str) -> bool:
+        """Добавляет поле text в словарь с message_id и сохраняет список в Редис"""
+
         replies: List[dict] = await self.load()
         for elem in replies:
             if elem.get("message_id") == message_id:
@@ -60,6 +66,8 @@ class RepliesManager(RedisDB):
 
     @logger.catch
     async def update_answered(self: 'RepliesManager', message_id: str) -> bool:
+        """Добавляет поле answered в словарь с message_id и сохраняет список в Редис"""
+
         replies: List[dict] = await self.load()
         for elem in replies:
             if elem.get("message_id") == message_id:
@@ -69,6 +77,8 @@ class RepliesManager(RedisDB):
 
     @logger.catch
     async def update_showed(self: 'RepliesManager', message_id: str) -> bool:
+        """Добавляет поле showed в словарь с message_id и сохраняет список в Редис"""
+
         replies: List[dict] = await self.load()
         for elem in replies:
             if elem.get("message_id") == message_id:

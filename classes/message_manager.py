@@ -3,7 +3,6 @@ import random
 from datetime import timedelta
 from typing import List
 
-import utils
 from classes.errors_reporter import ErrorsReporter
 from classes.open_ai import OpenAI
 from classes.redis_interface import RedisDB
@@ -11,7 +10,7 @@ from classes.replies import RepliesManager
 from classes.request_classes import ChannelData
 from classes.token_datastorage import TokenData
 from classes.vocabulary import Vocabulary
-from config import logger, DEBUG, SAVING
+from config import logger
 
 
 class MessageManager(ChannelData):
@@ -136,15 +135,6 @@ class MessageManager(ChannelData):
             for elem in data
         ]
 
-    # @logger.catch
-    # async def __get_new_filtered_replies(self, data: List[dict]) -> List[ReplyData]:
-    #     """"""
-    #     new_data: List[dict] = data[:]
-    #     for elem in new_data:
-    #         elem.update(token=self._datastore.token_name)
-    #
-    #     return [ReplyData(**elem) for elem in new_data]
-
     @logger.catch
     async def __get_message_id_from_last_messages(self) -> int:
         """Returns message id from random message where author is mate"""
@@ -173,18 +163,7 @@ class MessageManager(ChannelData):
             return
         all_replies: List[dict] = await self.__get_my_replies()
         new_replies: List[dict] = await self.__get_filtered_replies(all_replies)
-        # new_new_replies: List[ReplyData] = await self.__get_new_filtered_replies(all_replies)
         await self.__update_replies(new_replies)
-        print("NEW REPLIES: ", new_replies)
-        # self._datastore.for_reply = await self.__get_replies_for_answer(new_replies)
-
-    # @logger.catch
-    # async def __get_replies_for_answer(self, new_replies: List[dict]) -> List[dict]:
-    #     """Возвращает разницу между старыми и новыми данными в редисе,
-    #     записывает полные данные в редис"""
-    #
-    #     return await RepliesManager(self._datastore.telegram_id)
-    #            .get_difference_and_update(new_replies)
 
     @logger.catch
     async def __update_replies(self, new_replies: List[dict]) -> None:
