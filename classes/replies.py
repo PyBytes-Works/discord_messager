@@ -51,10 +51,10 @@ class RepliesManager(RedisDB):
 
     """Класс для работы с реплаями - загрузка, сохранение, фильтрация"""
 
-    def __init__(self, redis_key: str):
+    def __init__(self: 'RepliesManager', redis_key: str):
         super().__init__(redis_key)
 
-    async def get_not_showed(self) -> List[dict]:
+    async def get_not_showed(self: 'RepliesManager') -> List[dict]:
         return [
             elem
             for elem in await self.load()
@@ -79,7 +79,7 @@ class RepliesManager(RedisDB):
     #     return result
 
     @logger.catch
-    async def update_new_replies(self, new_replies: List[dict]) -> None:
+    async def update_new_replies(self: 'RepliesManager', new_replies: List[dict]) -> None:
         """Возвращает разницу между старыми и новыми данными в редисе,
         записывает полные данные в редис"""
 
@@ -97,14 +97,14 @@ class RepliesManager(RedisDB):
     #     return [elem for elem in total_replies if not elem.get("answered")]
 
     @logger.catch
-    async def _get_old_replies_message_ids(self, all_replies: List[dict]) -> List[str]:
+    async def _get_old_replies_message_ids(self: 'RepliesManager', all_replies: List[dict]) -> List[str]:
         return list(map(
             lambda x: x.get("message_id"),
             all_replies
         ))
 
     @logger.catch
-    async def get_not_answered_with_text(self, target_id: str) -> List[dict]:
+    async def get_not_answered_with_text(self: 'RepliesManager', target_id: str) -> List[dict]:
         return [elem
                 for elem in await self.load()
                 if elem.get("answer_text")
@@ -112,7 +112,7 @@ class RepliesManager(RedisDB):
                 and elem.get("target_id") == target_id]
 
     @logger.catch
-    async def update_text(self, message_id: str, text: str) -> bool:
+    async def update_text(self: 'RepliesManager', message_id: str, text: str) -> bool:
         replies: List[dict] = await self.load()
         for elem in replies:
             if elem.get("message_id") == message_id:
@@ -121,7 +121,7 @@ class RepliesManager(RedisDB):
                 return True
 
     @logger.catch
-    async def update_answered(self, message_id: str) -> bool:
+    async def update_answered(self: 'RepliesManager', message_id: str) -> bool:
         replies: List[dict] = await self.load()
         for elem in replies:
             if elem.get("message_id") == message_id:
@@ -130,7 +130,7 @@ class RepliesManager(RedisDB):
                 return True
 
     @logger.catch
-    async def update_showed(self, message_id: str) -> bool:
+    async def update_showed(self: 'RepliesManager', message_id: str) -> bool:
         replies: List[dict] = await self.load()
         for elem in replies:
             if elem.get("message_id") == message_id:
