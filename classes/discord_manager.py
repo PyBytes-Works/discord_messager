@@ -177,7 +177,7 @@ class DiscordManager:
         """Создает пары токенов, список работников и следующий рабочий токен."""
 
         if not self.__workers:
-            await self.make_token_pairs(unpair=True)
+            await self.make_token_pairs()
             await self._make_workers_list()
         await self._get_worker_from_list()
         logger.debug(await self.__get_full_info())
@@ -355,11 +355,10 @@ class DiscordManager:
 
     @check_working
     @logger.catch
-    async def make_token_pairs(self, unpair: bool = False) -> None:
+    async def make_token_pairs(self) -> None:
         """Формирует пары из свободных токенов если они в одном канале"""
 
-        if unpair:
-            await DBI.delete_all_pairs(telegram_id=self.__telegram_id)
+        await DBI.delete_all_pairs(telegram_id=self.__telegram_id)
         await self.form_new_tokens_pairs()
 
     @logger.catch
