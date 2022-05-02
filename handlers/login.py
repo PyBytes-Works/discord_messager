@@ -113,7 +113,7 @@ async def check_expiration_and_add_new_user_handler(message: Message, state: FSM
         f"\nПрокси: {proxy.proxy}"
     )
     if await DBI.get_user_by_telegram_id(telegram_id=new_user_telegram_id):
-        await DBI.activate_user(**user_data)
+        await DBI.reactivate_user(**user_data)
         await message.answer("Пользователь активирован.", reply_markup=user_menu_keyboard())
         await state.finish()
         return

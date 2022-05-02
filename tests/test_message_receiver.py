@@ -5,7 +5,7 @@ from fake_data import *
 
 
 async def tests():
-    print(await MessageManager(datastore=datastore).get_message())
+    print(await MessageManager(datastore=datastore).handling_messages())
 
 
 if __name__ == '__main__':

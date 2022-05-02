@@ -22,7 +22,7 @@ class MessageManager(ChannelData):
         self._last_messages: List[dict] = []
 
     @logger.catch
-    async def get_message(self) -> None:
+    async def handling_messages(self) -> None:
         """Получает данные из АПИ, выбирает случайное сообщение и
         возвращает ID сообщения
         и само сообщение"""
@@ -30,6 +30,7 @@ class MessageManager(ChannelData):
         self.datastore.for_reply = []
         self.datastore.current_message_id = 0
         self.datastore.text_to_send = ''
+        # TODO поискать метод для получения сообщений за интервал времени, а не всех
         all_messages: List[dict] = await self.__get_all_discord_messages()
         self._last_messages: List[dict] = await self.__get_last_messages(all_messages)
         if not await self.__get_message_id_and_text_for_send_answer():
@@ -44,6 +45,9 @@ class MessageManager(ChannelData):
         self.proxy: str = self.datastore.proxy
         self.token: str = self.datastore.token
         if not self.datastore.channel:
+            logger.warning(f"\nDatastore {self.datastore} have not channel. "
+                           f"\nTG ID: {self.datastore.telegram_id}"
+                           f"\nTOKEN: {self.datastore.token}")
             return []
         answer: dict = await self._send_request()
         if answer and answer.get("status") == 200:
