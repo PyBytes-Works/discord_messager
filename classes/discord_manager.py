@@ -104,6 +104,8 @@ class DiscordManager:
         user_deactivated: bool = await DBI.is_expired_user_deactivated(self.message)
         user_is_work: bool = await DBI.is_user_work(telegram_id=self.__telegram_id)
         if user_deactivated or not user_is_work:
+            await self.message.answer(
+                "Работа завершена - пользователь не работает или деактивирован")
             self.is_working = False
 
     @logger.catch
