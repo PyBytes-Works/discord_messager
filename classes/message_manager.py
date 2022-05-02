@@ -30,6 +30,7 @@ class MessageManager(ChannelData):
         self.datastore.for_reply = []
         self.datastore.current_message_id = 0
         self.datastore.text_to_send = ''
+        # TODO поискать метод для получения сообщений за интервал времени, а не всех
         all_messages: List[dict] = await self.__get_all_discord_messages()
         self._last_messages: List[dict] = await self.__get_last_messages(all_messages)
         if not await self.__get_message_id_and_text_for_send_answer():
