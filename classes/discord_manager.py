@@ -164,15 +164,13 @@ class DiscordManager:
         answer: int = await MessageSender(datastore=self.datastore).send_message_to_discord()
         if answer == 200:
             return
-        elif answer == 429:
+        elif answer in (407, 429):
             self.__workers = []
             channel_data: namedtuple = await DBI.get_channel(self.datastore.user_channel_pk)
             self.delay = 60
             if channel_data:
                 self.delay = int(channel_data.cooldown)
             return
-        elif answer == 407:
-            self.is_working = False
 
     @check_working
     @logger.catch
