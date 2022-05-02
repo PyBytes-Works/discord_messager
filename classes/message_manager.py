@@ -44,6 +44,9 @@ class MessageManager(ChannelData):
         self.proxy: str = self.datastore.proxy
         self.token: str = self.datastore.token
         if not self.datastore.channel:
+            logger.warning(f"\nDatastore {self.datastore} have not channel. "
+                           f"\nTG ID: {self.datastore.telegram_id}"
+                           f"\nTOKEN: {self.datastore.token}")
             return []
         answer: dict = await self._send_request()
         if answer and answer.get("status") == 200:
