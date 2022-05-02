@@ -44,7 +44,7 @@ class DiscordManager:
         message: 'Message' - instance of aiogram Message class
         silence: bool - flag for silence mode
         is_working: bool - flag for check working mode
-        auto_answer: bool - flag for OpenAI autoansweri to replies from discord
+        auto_answer: bool - flag for OpenAI autoanswer to replies from discord
         reboot: bool - if True - dont start working than server will not rebooted yet
         delay: int - time for sleep after all tokens worked
         datastore: 'TokenData' - instance of TokenData class
@@ -52,14 +52,14 @@ class DiscordManager:
 
     def __init__(self, message: Message = None) -> None:
         self.message: 'Message' = message
-        self.datastore: Optional['TokenData'] = None
+        self.__telegram_id: str = str(self.message.from_user.id)
+        self.datastore: Optional['TokenData'] = TokenData(self.__telegram_id)
         self.delay: int = 0
         self.is_working: bool = False
         self.auto_answer: bool = False
         self.reboot: bool = False
         self.silence: bool = False
         self.__username: str = message.from_user.username
-        self.__telegram_id: str = str(self.message.from_user.id)
         self.__related_tokens: List[namedtuple] = []
         self.__workers: List[str] = []
 
@@ -69,7 +69,6 @@ class DiscordManager:
         Запускает рабочий цикл бота, проверяет ошибки."""
 
         logger.info(f"\n\tUSER: {self.__username}: {self.__telegram_id} - Game begin.")
-        await self._create_datastore()
         await self._make_all_token_ids()
 
         while self.is_working:
@@ -115,10 +114,6 @@ class DiscordManager:
         await self._send_replies()
         await self._sending_messages()
         await self._sleep()
-
-    @logger.catch
-    async def _create_datastore(self) -> None:
-        self.datastore: 'TokenData' = TokenData(self.__telegram_id)
 
     @logger.catch
     async def _make_all_token_ids(self) -> None:
