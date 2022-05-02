@@ -108,9 +108,10 @@ class DiscordManager:
 
     @logger.catch
     async def _lets_play(self) -> None:
+        # TODO сделать декоратор из reboot
         await self.__check_reboot()
         await self._check_user_active()
-        await self._get_working_data()
+        await self._make_working_data()
         await self._getting_messages()
         await self._send_replies()
         await self._sending_messages()
@@ -172,7 +173,7 @@ class DiscordManager:
 
     @check_working
     @logger.catch
-    async def _get_working_data(self) -> None:
+    async def _make_working_data(self) -> None:
         """Создает пары токенов, список работников и следующий рабочий токен."""
 
         if not self.__workers:
