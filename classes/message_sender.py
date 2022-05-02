@@ -1,6 +1,5 @@
 import asyncio
 
-from classes.errors_reporter import ErrorsReporter
 from classes.request_classes import PostRequest
 from config import logger, DISCORD_BASE_URL
 from classes.token_datastorage import TokenData
