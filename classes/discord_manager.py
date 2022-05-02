@@ -135,8 +135,6 @@ class DiscordManager:
         Если удачно - перезаписывает кулдаун текущего токена"""
 
         await MessageManager(datastore=self.datastore).get_message()
-        await DBI.update_token_last_message_time(token=self.datastore.token)
-        await self.__update_token_last_message_time(token=self.datastore.token)
 
     @logger.catch
     def __replace_time_to_now(self, elem) -> namedtuple:
@@ -168,6 +166,8 @@ class DiscordManager:
                 f"\nError [{answer}]"
                 f"\nUser: [{self.datastore.telegram_id}]"
                 f"\nDeleting workers and sleep {self.delay} time.")
+        await DBI.update_token_last_message_time(token=self.datastore.token)
+        await self.__update_token_last_message_time(token=self.datastore.token)
 
     @check_working
     @logger.catch
