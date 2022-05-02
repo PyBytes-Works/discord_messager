@@ -16,7 +16,7 @@ from classes.token_datastorage import TokenData
 
 from config import logger
 from classes.db_interface import DBI
-from keyboards import user_menu_keyboard
+from keyboards import user_menu_keyboard, in_work_keyboard
 
 
 def check_working(func):
@@ -162,17 +162,17 @@ class DiscordManager:
         словарь атрибута класса"""
 
         answer: int = await MessageSender(datastore=self.datastore).send_message_to_discord()
-        if answer == 200:
-            return
-        elif answer == 429:
+        if answer in (407, 429):
+            await self.__get_full_info()
             self.__workers = []
             channel_data: namedtuple = await DBI.get_channel(self.datastore.user_channel_pk)
             self.delay = 60
             if channel_data:
                 self.delay = int(channel_data.cooldown)
-            return
-        elif answer == 407:
-            self.is_working = False
+            logger.warning(
+                f"\nError [{answer}]"
+                f"\nUser: [{self.datastore.telegram_id}]"
+                f"\nDeleting workers and sleep {self.delay} time.")
 
     @check_working
     @logger.catch
@@ -284,7 +284,7 @@ class DiscordManager:
             text = "минут"
         text: str = f"Все токены отработали. Следующий старт через {delay} {text}."
         if not self.silence:
-            await self.message.answer(text)
+            await self.message.answer(text, reply_markup=in_work_keyboard())
 
     @check_working
     @logger.catch
@@ -314,13 +314,13 @@ class DiscordManager:
             await replier.update_showed(message_id)
             text: str = await self.__get_message_text_from_dict(data)
             result: str = text + f"\nОтвет от ИИ: {ai_reply_text}"
-            await self.message.answer(result)
+            await self.message.answer(result, reply_markup=in_work_keyboard())
             return
         logger.error(f"Davinci NOT ANSWERED to:"
                      f"\n{reply_text}")
         text: str = ("ИИ не ответил на реплай: "
                      f"\n{reply_text}")
-        await self.message.answer(text)
+        await self.message.answer(text, reply_markup=in_work_keyboard())
         await ErrorsReporter.send_report_to_admins(text)
         await self.__send_reply_to_telegram(data, replier)
 

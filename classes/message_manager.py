@@ -43,6 +43,8 @@ class MessageManager(ChannelData):
 
         self.proxy: str = self.datastore.proxy
         self.token: str = self.datastore.token
+        if not self.datastore.channel:
+            return []
         answer: dict = await self._send_request()
         if answer and answer.get("status") == 200:
             return answer.get("answer_data")
