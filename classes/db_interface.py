@@ -78,10 +78,15 @@ class DBI:
 
     @classmethod
     @logger.catch
-    async def activate_user(
+    async def reactivate_user(
             cls, telegram_id: str, max_tokens: int, expiration: int, **kwargs) -> bool:
         await DBI.set_max_tokens(telegram_id=telegram_id, max_tokens=max_tokens)
         await DBI.set_expiration_date(telegram_id=telegram_id, subscription_period=expiration)
+        return User.activate_user(telegram_id=telegram_id)
+
+    @classmethod
+    @logger.catch
+    async def activate_user(cls, telegram_id: str) -> bool:
         return User.activate_user(telegram_id=telegram_id)
 
     @classmethod

@@ -44,7 +44,7 @@ class DiscordManager:
         message: 'Message' - instance of aiogram Message class
         silence: bool - flag for silence mode
         is_working: bool - flag for check working mode
-        auto_answer: bool - flag for OpenAI autoansweri to replies from discord
+        auto_answer: bool - flag for OpenAI autoanswer to replies from discord
         reboot: bool - if True - dont start working than server will not rebooted yet
         delay: int - time for sleep after all tokens worked
         datastore: 'TokenData' - instance of TokenData class
@@ -52,14 +52,14 @@ class DiscordManager:
 
     def __init__(self, message: Message = None) -> None:
         self.message: 'Message' = message
-        self.datastore: Optional['TokenData'] = None
+        self.__telegram_id: str = str(self.message.from_user.id)
+        self.datastore: Optional['TokenData'] = TokenData(self.__telegram_id)
         self.delay: int = 0
         self.is_working: bool = False
         self.auto_answer: bool = False
         self.reboot: bool = False
         self.silence: bool = False
         self.__username: str = message.from_user.username
-        self.__telegram_id: str = str(self.message.from_user.id)
         self.__related_tokens: List[namedtuple] = []
         self.__workers: List[str] = []
 
@@ -69,7 +69,7 @@ class DiscordManager:
         Запускает рабочий цикл бота, проверяет ошибки."""
 
         logger.info(f"\n\tUSER: {self.__username}: {self.__telegram_id} - Game begin.")
-        await self._create_datastore()
+        # TODO перенести в MessageManager class
         await self._make_all_token_ids()
 
         while self.is_working:
@@ -104,21 +104,20 @@ class DiscordManager:
         user_deactivated: bool = await DBI.is_expired_user_deactivated(self.message)
         user_is_work: bool = await DBI.is_user_work(telegram_id=self.__telegram_id)
         if user_deactivated or not user_is_work:
+            await self.message.answer(
+                "Работа завершена - пользователь не работает или деактивирован")
             self.is_working = False
 
     @logger.catch
     async def _lets_play(self) -> None:
+        # TODO сделать декоратор из reboot
         await self.__check_reboot()
         await self._check_user_active()
-        await self._get_working_data()
-        await self._getting_messages()
+        await self._make_working_data()
+        await self._handling_received_messages()
         await self._send_replies()
         await self._sending_messages()
         await self._sleep()
-
-    @logger.catch
-    async def _create_datastore(self) -> None:
-        self.datastore: 'TokenData' = TokenData(self.__telegram_id)
 
     @logger.catch
     async def _make_all_token_ids(self) -> None:
@@ -135,13 +134,11 @@ class DiscordManager:
 
     @check_working
     @logger.catch
-    async def _getting_messages(self) -> None:
+    async def _handling_received_messages(self) -> None:
         """Получает сообщения из чата и обрабатывает их
         Если удачно - перезаписывает кулдаун текущего токена"""
 
-        await MessageManager(datastore=self.datastore).get_message()
-        await DBI.update_token_last_message_time(token=self.datastore.token)
-        await self.__update_token_last_message_time(token=self.datastore.token)
+        await MessageManager(datastore=self.datastore).handling_messages()
 
     @logger.catch
     def __replace_time_to_now(self, elem) -> namedtuple:
@@ -173,14 +170,16 @@ class DiscordManager:
                 f"\nError [{answer}]"
                 f"\nUser: [{self.datastore.telegram_id}]"
                 f"\nDeleting workers and sleep {self.delay} time.")
+        await DBI.update_token_last_message_time(token=self.datastore.token)
+        await self.__update_token_last_message_time(token=self.datastore.token)
 
     @check_working
     @logger.catch
-    async def _get_working_data(self) -> None:
+    async def _make_working_data(self) -> None:
         """Создает пары токенов, список работников и следующий рабочий токен."""
 
         if not self.__workers:
-            await self.make_token_pairs(unpair=True)
+            await self._make_token_pairs()
             await self._make_workers_list()
         await self._get_worker_from_list()
         logger.debug(await self.__get_full_info())
@@ -358,11 +357,10 @@ class DiscordManager:
 
     @check_working
     @logger.catch
-    async def make_token_pairs(self, unpair: bool = False) -> None:
+    async def _make_token_pairs(self) -> None:
         """Формирует пары из свободных токенов если они в одном канале"""
 
-        if unpair:
-            await DBI.delete_all_pairs(telegram_id=self.__telegram_id)
+        await DBI.delete_all_pairs(telegram_id=self.__telegram_id)
         await self.form_new_tokens_pairs()
 
     @logger.catch
