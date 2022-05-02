@@ -112,7 +112,7 @@ class DiscordManager:
         await self.__check_reboot()
         await self._check_user_active()
         await self._make_working_data()
-        await self._getting_messages()
+        await self._handling_received_messages()
         await self._send_replies()
         await self._sending_messages()
         await self._sleep()
@@ -132,11 +132,11 @@ class DiscordManager:
 
     @check_working
     @logger.catch
-    async def _getting_messages(self) -> None:
+    async def _handling_received_messages(self) -> None:
         """Получает сообщения из чата и обрабатывает их
         Если удачно - перезаписывает кулдаун текущего токена"""
 
-        await MessageManager(datastore=self.datastore).get_message()
+        await MessageManager(datastore=self.datastore).handling_messages()
 
     @logger.catch
     def __replace_time_to_now(self, elem) -> namedtuple:

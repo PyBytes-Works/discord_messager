@@ -22,7 +22,7 @@ class MessageManager(ChannelData):
         self._last_messages: List[dict] = []
 
     @logger.catch
-    async def get_message(self) -> None:
+    async def handling_messages(self) -> None:
         """Получает данные из АПИ, выбирает случайное сообщение и
         возвращает ID сообщения
         и само сообщение"""
