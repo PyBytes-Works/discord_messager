@@ -69,6 +69,7 @@ class DiscordManager:
         Запускает рабочий цикл бота, проверяет ошибки."""
 
         logger.info(f"\n\tUSER: {self.__username}: {self.__telegram_id} - Game begin.")
+        # TODO перенести в MessageManager class
         await self._make_all_token_ids()
 
         while self.is_working:
