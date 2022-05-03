@@ -27,7 +27,7 @@ class Vocabulary:
             if length > 60:
                 return cls.get_message()
             cls.__count_symbols(length)
-            return message_text
+            return message_text.lower()
 
     @classmethod
     @logger.catch
