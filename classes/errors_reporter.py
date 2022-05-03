@@ -37,7 +37,7 @@ class ErrorsReporter:
         """Parse status and data from answer"""
 
         data = {}
-        if self._answer_data and not self._answer_data.startswith('<!doctype html>'):
+        if self._answer_data and not self._answer_data.startswith('<!'):
             try:
                 data: dict = json.loads(self._answer_data)
                 if isinstance(data, dict):
