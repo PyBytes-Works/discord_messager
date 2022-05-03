@@ -71,7 +71,7 @@ class ErrorsReporter:
             admins = True
             users = False
         elif self._status == -99:
-            text: str = f'Ошибка таймаута'
+            text: str = f'Ошибка таймаута. Проверьте прокси.'
             admins = True
             users = False
         elif self._status == -100:

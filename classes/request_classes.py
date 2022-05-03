@@ -5,7 +5,6 @@ from typing import Union, Optional
 import aiohttp
 import aiohttp.client_exceptions
 import aiohttp.http_exceptions
-import requests
 
 from classes.db_interface import DBI
 from classes.errors_reporter import ErrorsReporter
