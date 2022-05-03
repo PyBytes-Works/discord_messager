@@ -124,7 +124,7 @@ class PostRequest(RequestSender):
 
     async def _send(self) -> dict:
         """Отправляет данные в дискорд канал"""
-
+        # переписать на аиохттп
         session = requests.Session()
         self.proxy_data: dict = {
             "http": f"http://{PROXY_USER}:{PROXY_PASSWORD}@{self.proxy}/",

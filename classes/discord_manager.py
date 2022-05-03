@@ -115,7 +115,9 @@ class DiscordManager:
         await self._check_user_active()
         await self._make_working_data()
         await self._handling_received_messages()
+        await asyncio.sleep(3)
         await self._send_replies()
+        await asyncio.sleep(3)
         await self._sending_messages()
         await self._sleep()
 
