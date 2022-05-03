@@ -5,7 +5,6 @@ from typing import Union, Optional
 import aiohttp
 import aiohttp.client_exceptions
 import aiohttp.http_exceptions
-import requests
 
 from classes.db_interface import DBI
 from classes.errors_reporter import ErrorsReporter
@@ -78,7 +77,8 @@ class RequestSender(ABC):
         except aiohttp.client_exceptions.ServerDisconnectedError as err:
             logger.error(f"RequestSender._send_request: aiohttp.client_exceptions.ServerDisconnectedError: {err}")
         except aiohttp.client_exceptions.ClientOSError as err:
-            text = f"RequestSender._send_request: aiohttp.client_exceptions.ClientOSError: {err}"
+            logger.error(f"RequestSender._send_request: aiohttp.client_exceptions.ClientOSError: {err}")
+            answer.update(status=-98)
         except aiohttp.client_exceptions.TooManyRedirects as err:
             text = f"RequestSender._send_request: aiohttp.client_exceptions.TooManyRedirects: {err}"
         # except Exception as err:
@@ -125,24 +125,36 @@ class PostRequest(RequestSender):
     async def _send(self) -> dict:
         """Отправляет данные в дискорд канал"""
 
-        session = requests.Session()
-        self.proxy_data: dict = {
-            "http": f"http://{PROXY_USER}:{PROXY_PASSWORD}@{self.proxy}/",
-            "https": f"http://{PROXY_USER}:{PROXY_PASSWORD}@{self.proxy}/",
-        }
-        self._params: dict = {
-            'url': self.url,
-            "proxies": self.proxy_data,
-            "timeout": 25,
-        }
-        if self.token:
-            session.headers['authorization']: str = self.token
-        self._params.update(json=self._data_for_send)
-        response = session.post(**self._params)
-        return {
-            "status": response.status_code,
-            "answer_data": response.text
-        }
+        conn = aiohttp.TCPConnector()
+        async with aiohttp.ClientSession(trust_env=True, connector=conn) as session:
+            if self.token:
+                session.headers['authorization']: str = self.token
+            self._params.update(json=self._data_for_send)
+            async with session.post(**self._params) as response:
+                return {
+                    "status": response.status,
+                    "answer_data": await response.text()
+                }
+
+        # переписать на аиохттп
+        # session = requests.Session()
+        # self.proxy_data: dict = {
+        #     "http": f"http://{PROXY_USER}:{PROXY_PASSWORD}@{self.proxy}/",
+        #     "https": f"http://{PROXY_USER}:{PROXY_PASSWORD}@{self.proxy}/",
+        # }
+        # self._params: dict = {
+        #     'url': self.url,
+        #     "proxies": self.proxy_data,
+        #     "timeout": 25,
+        # }
+        # if self.token:
+        #     session.headers['authorization']: str = self.token
+        # self._params.update(json=self._data_for_send)
+        # response = session.post(**self._params)
+        # return {
+        #     "status": response.status_code,
+        #     "answer_data": response.text
+        # }
 
 
 class GetMe(GetRequest):

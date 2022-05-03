@@ -115,7 +115,9 @@ class DiscordManager:
         await self._check_user_active()
         await self._make_working_data()
         await self._handling_received_messages()
+        await asyncio.sleep(3)
         await self._send_replies()
+        await asyncio.sleep(3)
         await self._sending_messages()
         await self._sleep()
 
@@ -193,6 +195,9 @@ class DiscordManager:
             return
         await self._get_delay()
         self.delay += random.randint(3, 7)
+        logger.debug(f"\n\t\tSelf.delay: {self.delay}")
+        if self.delay <= 0:
+            return
         await self._send_delay_message()
         timer: int = self.delay
         while timer > 0:
@@ -266,9 +271,6 @@ class DiscordManager:
     async def _send_delay_message(self) -> None:
         """Отправляет сообщение что все токены заняты"""
 
-        logger.debug(f"\n\t\tSelf.delay: {self.delay}")
-        if self.delay <= 0:
-            return
         logger.info(f"SLEEP PAUSE: {self.delay}")
         delay: int = self.delay
         text = "секунд"
@@ -320,7 +322,7 @@ class DiscordManager:
         text: str = ("ИИ не ответил на реплай: "
                      f"\n{reply_text}")
         await self.message.answer(text, reply_markup=in_work_keyboard())
-        await ErrorsReporter.send_report_to_admins(text)
+        # await ErrorsReporter.send_report_to_admins(text)
         await self.__send_reply_to_telegram(data, replier)
 
     @logger.catch
