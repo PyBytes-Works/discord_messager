@@ -25,7 +25,7 @@ async def start_parsing_command_handler(message: Message, state: FSMContext) -> 
     user_expired: bool = await DBI.is_expired_user_deactivated(message)
     if not user_is_active or user_expired:
         return
-    if not await DBI.get_all_user_tokens(user_telegram_id):
+    if 2 > await DBI.get_all_user_tokens(user_telegram_id):
         await message.answer("Сначала добавьте пару токенов.", reply_markup=user_menu_keyboard())
         return
     if await DBI.is_user_work(telegram_id=user_telegram_id):
