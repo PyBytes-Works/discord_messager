@@ -320,7 +320,7 @@ class DiscordManager:
         text: str = ("ИИ не ответил на реплай: "
                      f"\n{reply_text}")
         await self.message.answer(text, reply_markup=in_work_keyboard())
-        await ErrorsReporter.send_report_to_admins(text)
+        # await ErrorsReporter.send_report_to_admins(text)
         await self.__send_reply_to_telegram(data, replier)
 
     @logger.catch
