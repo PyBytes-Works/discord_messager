@@ -301,7 +301,10 @@ class DBI:
     @classmethod
     @logger.catch
     async def delete_proxy(cls, proxy: str) -> bool:
-        return Proxy.delete_proxy(proxy=proxy)
+        result = False
+        if Proxy.delete_proxy(proxy=proxy):
+            result = bool(Proxy.set_proxy_if_not_exists())
+        return result
 
     @classmethod
     @logger.catch
