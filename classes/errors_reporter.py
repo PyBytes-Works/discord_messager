@@ -156,7 +156,7 @@ class ErrorsReporter:
                 self._telegram_id = self.datastore.telegram_id
                 self._proxy = self.datastore.proxy
                 self._token = self.datastore.token_name
-                text += f"Channel: {self.datastore.channel}"
+                text += f"\nChannel: {self.datastore.channel}"
             if self._telegram_id:
                 text += f"\nTelegram_ID: {self._telegram_id}"
             if self._token:
