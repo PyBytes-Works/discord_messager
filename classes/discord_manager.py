@@ -195,6 +195,9 @@ class DiscordManager:
             return
         await self._get_delay()
         self.delay += random.randint(3, 7)
+        logger.debug(f"\n\t\tSelf.delay: {self.delay}")
+        if self.delay <= 0:
+            return
         await self._send_delay_message()
         timer: int = self.delay
         while timer > 0:
@@ -268,9 +271,6 @@ class DiscordManager:
     async def _send_delay_message(self) -> None:
         """Отправляет сообщение что все токены заняты"""
 
-        logger.debug(f"\n\t\tSelf.delay: {self.delay}")
-        if self.delay <= 0:
-            return
         logger.info(f"SLEEP PAUSE: {self.delay}")
         delay: int = self.delay
         text = "секунд"
