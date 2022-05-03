@@ -66,12 +66,17 @@ class ErrorsReporter:
         if self._status == 0:
             # See logs
             pass
+        elif self._status == -98:
+            text: str = f'Ошибка ClientOSError (возникает при частых запросах)'
+            admins = True
+            users = False
         elif self._status == -99:
             text: str = f'Ошибка таймаута'
             admins = True
             users = False
         elif self._status == -100:
-            text: str = f'Произошла ошибка запроса. RequestSender._EXCEPTIONS: read the logs.'
+            text: str = (f'Произошла ошибка RequestSender. read the logs.'
+                        f'Код ошибки [-100]')
             admins = True
             users = False
         elif self._status == 400:

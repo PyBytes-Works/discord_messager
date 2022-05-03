@@ -78,7 +78,8 @@ class RequestSender(ABC):
         except aiohttp.client_exceptions.ServerDisconnectedError as err:
             logger.error(f"RequestSender._send_request: aiohttp.client_exceptions.ServerDisconnectedError: {err}")
         except aiohttp.client_exceptions.ClientOSError as err:
-            text = f"RequestSender._send_request: aiohttp.client_exceptions.ClientOSError: {err}"
+            logger.error(f"RequestSender._send_request: aiohttp.client_exceptions.ClientOSError: {err}")
+            answer.update(status=-98)
         except aiohttp.client_exceptions.TooManyRedirects as err:
             text = f"RequestSender._send_request: aiohttp.client_exceptions.TooManyRedirects: {err}"
         # except Exception as err:
