@@ -22,7 +22,7 @@ class OpenAI:
 
     @logger.catch
     def __send_message(self) -> dict:
-        time.sleep(2)
+        time.sleep(1)
         try:
             response: dict = openai.Completion.create(
                 engine=self.__mode,
@@ -78,11 +78,11 @@ class OpenAI:
             return self.get_answer(message)
         self._last_answer = result
         if any(filter(lambda x: x in result, plugs)):
-            logger.warning(f"\t\tOpenAI answer in plugs. Return default.")
+            logger.debug(f"\t\tOpenAI answer in plugs. Return default.")
             self.__counter -= 1
             return self.get_answer(message)
         if len(result) < MIN_MESSAGE_LENGTH:
-            logger.warning(f"\t\tOpenAI answer not in range 3-100 symbols. Trying again.")
+            logger.debug(f"\t\tOpenAI answer not in range 3-100 symbols. Trying again.")
             return self.get_answer(message)
         if len(result) >= MAX_MESSAGE_LENGTH:
             result: str = result.split('.')[0]

@@ -25,7 +25,6 @@ class MessageSender(PostRequest):
     async def _typing(self) -> None:
         """Имитирует "Пользователь печатает" в чате дискорда."""
 
-        await asyncio.sleep(2)
         self.url = f'https://discord.com/api/v9/channels/{self.channel}/typing'
         await self._send_request()
 
@@ -42,6 +41,7 @@ class MessageSender(PostRequest):
         self._data_for_send = self.datastore.data_for_send
 
         await self._typing()
+        await asyncio.sleep(2)
         await self._typing()
 
         self.url = DISCORD_BASE_URL + f'{self.channel}/messages?'

@@ -37,7 +37,7 @@ class ErrorsReporter:
         """Parse status and data from answer"""
 
         data = {}
-        if self._answer_data and not self._answer_data.startswith('<!doctype html>'):
+        if self._answer_data and not self._answer_data.startswith('<!'):
             try:
                 data: dict = json.loads(self._answer_data)
                 if isinstance(data, dict):
@@ -66,12 +66,17 @@ class ErrorsReporter:
         if self._status == 0:
             # See logs
             pass
+        elif self._status == -98:
+            text: str = f'Ошибка ClientOSError (возникает при частых запросах)'
+            admins = True
+            users = False
         elif self._status == -99:
-            text: str = f'Ошибка таймаута'
+            text: str = f'Ошибка таймаута. Проверьте прокси.'
             admins = True
             users = False
         elif self._status == -100:
-            text: str = f'Произошла ошибка запроса. RequestSender._EXCEPTIONS: read the logs.'
+            text: str = (f'Произошла ошибка RequestSender. read the logs.'
+                        f'Код ошибки [-100]')
             admins = True
             users = False
         elif self._status == 400:
@@ -156,7 +161,7 @@ class ErrorsReporter:
                 self._telegram_id = self.datastore.telegram_id
                 self._proxy = self.datastore.proxy
                 self._token = self.datastore.token_name
-                text += f"Channel: {self.datastore.channel}"
+                text += f"\nChannel: {self.datastore.channel}"
             if self._telegram_id:
                 text += f"\nTelegram_ID: {self._telegram_id}"
             if self._token:
