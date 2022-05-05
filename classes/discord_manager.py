@@ -145,7 +145,7 @@ class DiscordManager:
             return
         self.is_working = True
 
-    @check_token
+    # @check_token
     @check_working
     @logger.catch
     async def _handling_received_messages(self) -> None:
@@ -166,7 +166,7 @@ class DiscordManager:
                                  if elem.token == token else elem
                                  for elem in self.__related_tokens]
 
-    @check_token
+    # @check_token
     @check_working
     @logger.catch
     async def _sending_messages(self) -> None:
@@ -276,11 +276,9 @@ class DiscordManager:
             return
         token_data: namedtuple = await self.__get_second_closest_token_time()
         message_time: int = int(token_data.last_message_time.timestamp())
-        logger.warning(f"Message time: {token_data.last_message_time}")
         cooldown: int = token_data.cooldown
-        logger.warning(f"cooldown: {cooldown}")
-        self.delay = cooldown - abs(message_time - self.__get_current_timestamp())
-        logger.warning(f"self.delay: {self.delay}")
+        self.delay = cooldown + message_time - self.__get_current_timestamp()
+        logger.warning(f"_get_delay: self.delay: {self.delay}")
 
     @check_working
     @logger.catch
