@@ -283,7 +283,6 @@ class DiscordManager:
         message_time: int = int(token_data.last_message_time.timestamp())
         cooldown: int = token_data.cooldown
         self.delay = cooldown + message_time - self.__get_current_timestamp()
-        logger.warning(f"self.delay: {self.delay}")
 
     @check_working
     @logger.catch
