@@ -108,6 +108,7 @@ async def check_channel_and_add_token_handler(message: Message, state: FSMContex
     :param state:
     :return:
     """
+
     try:
         guild, channel = message.text.rsplit('/', maxsplit=3)[-2:]
     except ValueError as err:

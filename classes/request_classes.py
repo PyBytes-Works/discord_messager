@@ -63,33 +63,34 @@ class RequestSender(ABC):
         try:
             answer: dict = await self._send()
         except asyncio.exceptions.TimeoutError as err:
-            logger.error(f"RequestSender._send_request: asyncio.exceptions.TimeoutError: {err}")
+            logger.error(f"{self._send_request.__qualname__}: asyncio.exceptions.TimeoutError: {err}")
             answer.update(status=-99)
         except aiohttp.http_exceptions.BadHttpMessage as err:
-            logger.error(f"RequestSender:  aiohttp.http_exceptions.BadHttpMessage: {err}")
+            logger.error(f"{self._send_request.__qualname__}:  aiohttp.http_exceptions.BadHttpMessage: {err}")
             answer.update(status=407)
         except aiohttp.client_exceptions.ClientHttpProxyError as err:
-            logger.error(f"RequestSender._send_request: aiohttp.client_exceptions.ClientHttpProxyError: {err}")
+            logger.error(f"{self._send_request.__qualname__}: aiohttp.client_exceptions.ClientHttpProxyError: {err}")
             answer.update(status=407)
         except aiohttp.client_exceptions.ClientConnectorError as err:
-            logger.error(f"RequestSender._send_request: aiohttp.client_exceptions.ClientConnectorError: {err}")
+            logger.error(f"{self._send_request.__qualname__}: aiohttp.client_exceptions.ClientConnectorError: {err}")
             answer.update(status=407)
         except aiohttp.client_exceptions.ServerDisconnectedError as err:
-            logger.error(f"RequestSender._send_request: aiohttp.client_exceptions.ServerDisconnectedError: {err}")
+            logger.error(f"{self._send_request.__qualname__}: aiohttp.client_exceptions.ServerDisconnectedError: {err}")
         except aiohttp.client_exceptions.ClientOSError as err:
-            logger.error(f"RequestSender._send_request: aiohttp.client_exceptions.ClientOSError: {err}")
+            logger.error(f"{self._send_request.__qualname__}: aiohttp.client_exceptions.ClientOSError: {err}")
             answer.update(status=-98)
         except aiohttp.client_exceptions.TooManyRedirects as err:
-            text = f"RequestSender._send_request: aiohttp.client_exceptions.TooManyRedirects: {err}"
+            text = f"{self._send_request.__qualname__}: aiohttp.client_exceptions.TooManyRedirects: {err}"
         # except Exception as err:
         #     text = f"RequestSender._send_request: Exception: {err}"
         if text:
-            logger.error(text)
+            logger.error(f"\n{self._send_request.__qualname__}: {text}")
             answer.update(status=-100)
         status = answer.get("status")
         if status not in range(200, 205):
             error_text: str = (
-                f"Status: {status}"
+                f"\n{self._send_request.__qualname__}:"
+                f"\nStatus: {status}"
                 f"\nUrl: {self.url}"
                 f"\nProxy: {self.proxy}")
             if self.token:
