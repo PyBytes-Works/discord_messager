@@ -96,7 +96,7 @@ class DiscordManager:
             f"\n\tSilence: {self.silence}"
             f"\n\tAutoanswer: {self.auto_answer}"
             f"\n\tWorkers: {len(self.__workers)}/{len(self.__related_tokens)}"
-            # f"\n\tRelated tokens: {self.__related_tokens}"
+            f"\n\tDelay: {self.delay}"
         )
 
     async def _check_user_active(self):
@@ -204,8 +204,6 @@ class DiscordManager:
         await self._get_delay()
         self.delay += random.randint(3, 7)
         logger.debug(f"\n\t\tSelf.delay: {self.delay}")
-        if self.delay <= 0:
-            return
         await self._send_delay_message()
         timer: int = self.delay
         while timer > 0:
@@ -281,6 +279,8 @@ class DiscordManager:
         """Отправляет сообщение что все токены заняты"""
 
         logger.info(f"SLEEP PAUSE: {self.delay}")
+        if self.delay <= 0:
+            return
         delay: int = self.delay
         text = "секунд"
         if delay > 60:
