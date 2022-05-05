@@ -55,6 +55,13 @@ class ErrorsReporter:
         return self._answer
 
     @logger.catch
+    async def _delete_token(self) -> str:
+        if await DBI.delete_token(token=self._token):
+            self.datastore.token = ''
+            return f"\nТокен удален."
+        return ''
+
+    @logger.catch
     async def errors_manager(
             self,
             admins: bool = False,
@@ -87,8 +94,7 @@ class ErrorsReporter:
         elif self._status == 401:
             if self._code == 0:
                 text: str = f"Токен не рабочий."
-                if await DBI.delete_token(token=self._token):
-                    text += f"\nТокен удален."
+                text += await self._delete_token()
             else:
                 text: str = (
                     "Произошла ошибка данных."
@@ -100,16 +106,14 @@ class ErrorsReporter:
                     "Не могу отправить сообщение для токена. (Ошибка 403 - 50013)"
                     "\nТокен в муте."
                 )
-                if await DBI.delete_token(token=self._token):
-                    text += f"\nТокен удален."
+                text += await self._delete_token()
             elif self._code == 50001:
                 text: str = (
                     "Не могу отправить сообщение для токена. (Ошибка 403 - 50001)"
                     "\nТокен забанили."
                     f"\nФормирую новые пары."
                 )
-                if await DBI.delete_token(token=self._token):
-                    text += f"\nТокен удален."
+                text += await self._delete_token()
             else:
                 text: str = f"Ошибка {self._status} Code: {self._code}"
         elif self._status == 404:
@@ -142,9 +146,7 @@ class ErrorsReporter:
                 text: str = (
                     f"Токену необходимо дополнительная верификация в дискорде (по номеру телефона):"
                 )
-                if await DBI.delete_token(token=self._token):
-                    text += f"\nТокен удален."
-                    self.datastore.token = ''
+                text += await self._delete_token()
         elif self._status == 500:
             text = (f"Внутренняя ошибка сервера Дискорда. Код ошибки - [{self._status}]"
                     f"\nСлишком большая нагрузка на канал")
