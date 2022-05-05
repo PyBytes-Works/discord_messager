@@ -32,18 +32,6 @@ def check_working(func):
     return wrapper
 
 
-def check_token(func):
-    async def wrapper(*args, **kwargs):
-        name: str = func.__name__
-        if args and hasattr(args[0].__class__, name):
-            datastore: 'TokenData' = getattr(args[0], "datastore")
-            if datastore and datastore.token:
-                return await func(*args, **kwargs)
-        return
-
-    return wrapper
-
-
 class DiscordManager:
     """Bot work manager. Checking tokens data, getting and sending requests
     to discord.
@@ -145,13 +133,16 @@ class DiscordManager:
             return
         self.is_working = True
 
-    @check_token
     @check_working
     @logger.catch
     async def _handling_received_messages(self) -> None:
-        """Получает сообщения из чата и обрабатывает их
-        Если удачно - перезаписывает кулдаун текущего токена"""
+        """Получает сообщения из чата и обрабатывает их"""
 
+        if not all((self.datastore.token, self.datastore.channel)):
+            logger.error(f"\nError: TG: {self.datastore.telegram_id}"
+                         f"\nToken: {self.datastore.token}"
+                         f"\nChannel: {self.datastore.channel}")
+            return
         await MessageManager(datastore=self.datastore).handling_messages()
 
     @logger.catch
@@ -166,13 +157,16 @@ class DiscordManager:
                                  if elem.token == token else elem
                                  for elem in self.__related_tokens]
 
-    @check_token
     @check_working
     @logger.catch
     async def _sending_messages(self) -> None:
-        """Отправляет сообщение в дискорд и сохраняет данные об ошибках в
-        словарь атрибута класса"""
+        """Отправляет сообщение в дискорд"""
 
+        if not all((self.datastore.token, self.datastore.channel)):
+            logger.error(f"\nError: TG: {self.datastore.telegram_id}"
+                         f"\nToken: {self.datastore.token}"
+                         f"\nChannel: {self.datastore.channel}")
+            return
         answer: int = await MessageSender(datastore=self.datastore).send_message_to_discord()
         if answer in (407, 429):
             await self.__get_full_info()
@@ -184,7 +178,7 @@ class DiscordManager:
             logger.warning(
                 f"\nError [{answer}]"
                 f"\nUser: [{self.datastore.telegram_id}]"
-                f"\nDeleting workers and sleep {self.delay} time.")
+                f"\nDeleting workers and sleep {self.delay} seconds.")
             await self.form_new_tokens_pairs()
         await DBI.update_token_last_message_time(token=self.datastore.token)
         await self.__update_token_last_message_time(token=self.datastore.token)
