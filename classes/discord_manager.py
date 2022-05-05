@@ -7,7 +7,6 @@ import asyncio
 
 from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
 
-from classes.errors_reporter import ErrorsReporter
 from classes.message_manager import MessageManager
 from classes.message_sender import MessageSender
 from classes.open_ai import OpenAI
@@ -28,6 +27,18 @@ def check_working(func):
                 # logger.debug(f"\t{name}: OK")
                 return await func(*args, **kwargs)
         # logger.debug(f"\t{name}: FAIL")
+        return
+
+    return wrapper
+
+
+def check_token(func):
+    async def wrapper(*args, **kwargs):
+        name: str = func.__name__
+        if args and hasattr(args[0].__class__, name):
+            datastore: 'TokenData' = getattr(args[0], "datastore")
+            if datastore and datastore.token:
+                return await func(*args, **kwargs)
         return
 
     return wrapper
@@ -134,6 +145,7 @@ class DiscordManager:
             return
         self.is_working = True
 
+    @check_token
     @check_working
     @logger.catch
     async def _handling_received_messages(self) -> None:
@@ -154,6 +166,7 @@ class DiscordManager:
                                  if elem.token == token else elem
                                  for elem in self.__related_tokens]
 
+    @check_token
     @check_working
     @logger.catch
     async def _sending_messages(self) -> None:
@@ -184,13 +197,13 @@ class DiscordManager:
             await self._make_token_pairs()
             await self._make_workers_list()
         await self._get_worker_from_list()
-        logger.debug(await self.__get_full_info())
 
     @check_working
     @logger.catch
     async def _sleep(self) -> None:
         """Спит на время ближайшего токена."""
 
+        logger.debug(await self.__get_full_info())
         if self.__workers:
             return
         await self._get_delay()
@@ -263,8 +276,11 @@ class DiscordManager:
             return
         token_data: namedtuple = await self.__get_second_closest_token_time()
         message_time: int = int(token_data.last_message_time.timestamp())
+        logger.warning(f"Message time: {token_data.last_message_time}")
         cooldown: int = token_data.cooldown
+        logger.warning(f"cooldown: {cooldown}")
         self.delay = cooldown - abs(message_time - self.__get_current_timestamp())
+        logger.warning(f"self.delay: {self.delay}")
 
     @check_working
     @logger.catch

@@ -144,6 +144,7 @@ class ErrorsReporter:
                 )
                 if await DBI.delete_token(token=self._token):
                     text += f"\nТокен удален."
+                    self.datastore.token = ''
         elif self._status == 500:
             text = (f"Внутренняя ошибка сервера Дискорда. Код ошибки - [{self._status}]"
                     f"\nСлишком большая нагрузка на канал")
