@@ -145,7 +145,7 @@ class DiscordManager:
             return
         self.is_working = True
 
-    # @check_token
+    @check_token
     @check_working
     @logger.catch
     async def _handling_received_messages(self) -> None:
@@ -166,7 +166,7 @@ class DiscordManager:
                                  if elem.token == token else elem
                                  for elem in self.__related_tokens]
 
-    # @check_token
+    @check_token
     @check_working
     @logger.catch
     async def _sending_messages(self) -> None:
@@ -185,6 +185,7 @@ class DiscordManager:
                 f"\nError [{answer}]"
                 f"\nUser: [{self.datastore.telegram_id}]"
                 f"\nDeleting workers and sleep {self.delay} time.")
+            await self.form_new_tokens_pairs()
         await DBI.update_token_last_message_time(token=self.datastore.token)
         await self.__update_token_last_message_time(token=self.datastore.token)
 
@@ -278,7 +279,7 @@ class DiscordManager:
         message_time: int = int(token_data.last_message_time.timestamp())
         cooldown: int = token_data.cooldown
         self.delay = cooldown + message_time - self.__get_current_timestamp()
-        logger.warning(f"_get_delay: self.delay: {self.delay}")
+        logger.warning(f"self.delay: {self.delay}")
 
     @check_working
     @logger.catch
