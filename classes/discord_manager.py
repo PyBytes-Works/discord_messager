@@ -96,7 +96,7 @@ class DiscordManager:
             f"\n\tSilence: {self.silence}"
             f"\n\tAutoanswer: {self.auto_answer}"
             f"\n\tWorkers: {len(self.__workers)}/{len(self.__related_tokens)}"
-            # f"\n\tRelated tokens: {self.__related_tokens}"
+            f"\n\tDelay: {self.delay}"
         )
 
     async def _check_user_active(self):
@@ -167,21 +167,33 @@ class DiscordManager:
                          f"\nToken: {self.datastore.token}"
                          f"\nChannel: {self.datastore.channel}")
             return
-        answer: int = await MessageSender(datastore=self.datastore).send_message_to_discord()
-        if answer in (407, 429):
-            await self.__get_full_info()
-            self.__workers = []
-            channel_data: namedtuple = await DBI.get_channel(self.datastore.user_channel_pk)
-            self.delay = 60
-            if channel_data:
-                self.delay = int(channel_data.cooldown)
-            logger.warning(
-                f"\nError [{answer}]"
-                f"\nUser: [{self.datastore.telegram_id}]"
-                f"\nDeleting workers and sleep {self.delay} seconds.")
-            await self.form_new_tokens_pairs()
+        answer: dict = await MessageSender(datastore=self.datastore).send_message_to_discord()
         await DBI.update_token_last_message_time(token=self.datastore.token)
         await self.__update_token_last_message_time(token=self.datastore.token)
+        status = answer.get("status")
+        if status == 200:
+            return
+        elif status == 407:
+            await self._set_delay_and_delete_all_workers()
+        elif status == 429:
+            code: int = answer.get("answer_data").get("code")
+            if code == 20016:
+                await self._set_delay_and_delete_all_workers()
+            elif code == 40062:
+                await self._set_delay_and_delete_all_workers()
+                await self.form_new_tokens_pairs()
+        logger.warning(
+            f"\nError [{answer}]"
+            f"\nUser: [{self.datastore.telegram_id}]"
+            f"\nDeleting workers and sleep {self.delay} seconds.")
+
+    @logger.catch
+    async def _set_delay_and_delete_all_workers(self):
+        self.__workers = []
+        self.delay = 60
+        channel_data: namedtuple = await DBI.get_channel(self.datastore.user_channel_pk)
+        if channel_data:
+            self.delay = int(channel_data.cooldown)
 
     @check_working
     @logger.catch
@@ -204,8 +216,6 @@ class DiscordManager:
         await self._get_delay()
         self.delay += random.randint(3, 7)
         logger.debug(f"\n\t\tSelf.delay: {self.delay}")
-        if self.delay <= 0:
-            return
         await self._send_delay_message()
         timer: int = self.delay
         while timer > 0:
@@ -281,6 +291,8 @@ class DiscordManager:
         """Отправляет сообщение что все токены заняты"""
 
         logger.info(f"SLEEP PAUSE: {self.delay}")
+        if self.delay <= 0:
+            return
         delay: int = self.delay
         text = "секунд"
         if delay > 60:
@@ -399,4 +411,6 @@ class DiscordManager:
         if len(self.__related_tokens) < 2:
             await self.message.answer(
                 "Недостаточно токенов для работы. Не смог сформировать ни одной пары")
+            logger.error(f"\n\nTotal tokens: {len(free_tokens)}"
+                         f"\nTokens: {free_tokens}\n")
             self.is_working = False
