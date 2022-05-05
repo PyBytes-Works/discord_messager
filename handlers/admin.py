@@ -143,7 +143,7 @@ async def delete_all_proxies(message: Message, state: FSMContext) -> None:
     if message.text.lower() == "yes":
         await DBI.delete_all_proxy()
         await ErrorsReporter.send_report_to_admins(
-            f"Пользователь {message.from_user.id} удалил ВСЕ прокси.")
+            f"Пользователь {message.from_user.username}: {message.from_user.id} удалил ВСЕ прокси.")
         await state.finish()
         return
     await message.answer("Прокси не удалены.")

@@ -108,14 +108,15 @@ async def check_channel_and_add_token_handler(message: Message, state: FSMContex
     :param state:
     :return:
     """
+
     try:
         guild, channel = message.text.rsplit('/', maxsplit=3)[-2:]
     except ValueError as err:
         logger.error("F: add_channel_handler error: err", err)
         guild: str = ''
         channel: str = ''
-    guild: str = str(check_is_int(guild))
-    channel: str = str(check_is_int(channel))
+    guild: int = check_is_int(guild)
+    channel: int = check_is_int(channel)
     if not all((guild, channel)):
         await message.answer(
             "Проверьте ссылку на канал и попробуйте ещё раз", reply_markup=cancel_keyboard())

@@ -7,7 +7,6 @@ import asyncio
 
 from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
 
-from classes.errors_reporter import ErrorsReporter
 from classes.message_manager import MessageManager
 from classes.message_sender import MessageSender
 from classes.open_ai import OpenAI
@@ -137,9 +136,13 @@ class DiscordManager:
     @check_working
     @logger.catch
     async def _handling_received_messages(self) -> None:
-        """Получает сообщения из чата и обрабатывает их
-        Если удачно - перезаписывает кулдаун текущего токена"""
+        """Получает сообщения из чата и обрабатывает их"""
 
+        if not all((self.datastore.token, self.datastore.channel)):
+            logger.error(f"\nError: TG: {self.datastore.telegram_id}"
+                         f"\nToken: {self.datastore.token}"
+                         f"\nChannel: {self.datastore.channel}")
+            return
         await MessageManager(datastore=self.datastore).handling_messages()
 
     @logger.catch
@@ -157,9 +160,13 @@ class DiscordManager:
     @check_working
     @logger.catch
     async def _sending_messages(self) -> None:
-        """Отправляет сообщение в дискорд и сохраняет данные об ошибках в
-        словарь атрибута класса"""
+        """Отправляет сообщение в дискорд"""
 
+        if not all((self.datastore.token, self.datastore.channel)):
+            logger.error(f"\nError: TG: {self.datastore.telegram_id}"
+                         f"\nToken: {self.datastore.token}"
+                         f"\nChannel: {self.datastore.channel}")
+            return
         answer: int = await MessageSender(datastore=self.datastore).send_message_to_discord()
         if answer in (407, 429):
             await self.__get_full_info()
@@ -171,7 +178,8 @@ class DiscordManager:
             logger.warning(
                 f"\nError [{answer}]"
                 f"\nUser: [{self.datastore.telegram_id}]"
-                f"\nDeleting workers and sleep {self.delay} time.")
+                f"\nDeleting workers and sleep {self.delay} seconds.")
+            await self.form_new_tokens_pairs()
         await DBI.update_token_last_message_time(token=self.datastore.token)
         await self.__update_token_last_message_time(token=self.datastore.token)
 
@@ -184,13 +192,13 @@ class DiscordManager:
             await self._make_token_pairs()
             await self._make_workers_list()
         await self._get_worker_from_list()
-        logger.debug(await self.__get_full_info())
 
     @check_working
     @logger.catch
     async def _sleep(self) -> None:
         """Спит на время ближайшего токена."""
 
+        logger.debug(await self.__get_full_info())
         if self.__workers:
             return
         await self._get_delay()
@@ -264,7 +272,8 @@ class DiscordManager:
         token_data: namedtuple = await self.__get_second_closest_token_time()
         message_time: int = int(token_data.last_message_time.timestamp())
         cooldown: int = token_data.cooldown
-        self.delay = cooldown - abs(message_time - self.__get_current_timestamp())
+        self.delay = cooldown + message_time - self.__get_current_timestamp()
+        logger.warning(f"self.delay: {self.delay}")
 
     @check_working
     @logger.catch
