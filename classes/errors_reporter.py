@@ -131,6 +131,9 @@ class ErrorsReporter:
                 cooldown: int = int(self._answer_data_dict.get("retry_after")) + 1
                 if cooldown:
                     cooldown += self.datastore.cooldown
+                    logger.warning(f"New cooldown set: "
+                                   f"\nChannel: {self.datastore.channel}"
+                                   f"\nCooldown: {cooldown}")
                     await DBI.update_user_channel_cooldown(
                         user_channel_pk=self.datastore.user_channel_pk, cooldown=cooldown)
                     self.datastore.delay = cooldown
