@@ -289,7 +289,7 @@ class DiscordManager:
     async def _send_delay_message(self) -> None:
         """Отправляет сообщение что все токены заняты"""
 
-        logger.info(f"SLEEP PAUSE: {self.delay}")
+        logger.info(f"{self.__telegram_id}: SLEEP PAUSE: {self.delay}")
         if self.delay <= 0:
             return
         delay: int = self.delay

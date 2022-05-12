@@ -65,7 +65,7 @@ class MessageManager(ChannelData):
             if openai_text:
                 return openai_text
         if self._ten_from_hundred():
-            logger.debug("Random message! You are lucky!!!")
+            logger.info(f"{self.datastore.telegram_id} Random message 10 from 100! You are lucky!!!")
             self.datastore.current_message_id = 0
         return await self.__get_text_from_vocabulary()
 
@@ -212,8 +212,8 @@ class MessageManager(ChannelData):
         openai_answer: str = await self.__get_openai_answer(mate_message)
         logger.debug(f"\n\t\tFirst OpenAI answer: {openai_answer}\n")
         if openai_answer:
-            if self._fifty_fifty():
-                logger.debug("50 / 50 You got it!!!")
+            if self._ten_from_hundred():
+                logger.info(f"{self.datastore.telegram_id}: 10 from 100 You got it!!!")
                 self.datastore.current_message_id = 0
             return openai_answer
         random_message: str = await self.__get_random_message_from_last_messages()
@@ -284,7 +284,7 @@ class MessageManager(ChannelData):
     def _ten_from_hundred() -> bool:
         return random.randint(1, 100) <= 10
 
-    @staticmethod
-    @logger.catch
-    def _fifty_fifty() -> bool:
-        return random.randint(1, 100) <= 50
+    # @staticmethod
+    # @logger.catch
+    # def _fifty_fifty() -> bool:
+    #     return random.randint(1, 100) <= 50
