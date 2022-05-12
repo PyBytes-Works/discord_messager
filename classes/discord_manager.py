@@ -21,12 +21,20 @@ from keyboards import user_menu_keyboard, in_work_keyboard
 def check_working(func):
     async def wrapper(*args, **kwargs):
         name: str = func.__name__
+        telegram_id: str = ''
         if args and hasattr(args[0].__class__, name):
             is_working: bool = getattr(args[0], "is_working")
+            datastore: 'TokenData' = getattr(args[0], "datastore")
+            if datastore:
+                telegram_id: str = datastore.telegram_id
             if is_working:
                 # logger.debug(f"\t{name}: OK")
                 return await func(*args, **kwargs)
-        # logger.debug(f"\t{name}: FAIL")
+        logger.warning(
+            f"Work stopped:"
+            f"\n\tMethod: {name}: FAIL"
+            f"\n\tTelegram_id: [{telegram_id}]"
+        )
         return
 
     return wrapper
@@ -173,14 +181,10 @@ class DiscordManager:
         status = answer.get("status")
         if status == 200:
             return
-        elif status == 407:
+        elif status in (407, 429):
             await self._set_delay_and_delete_all_workers()
-        elif status == 429:
-            code: int = answer.get("answer_data").get("code")
-            if code == 20016:
-                await self._set_delay_and_delete_all_workers()
-            elif code == 40062:
-                await self._set_delay_and_delete_all_workers()
+            code: int = answer.get("answer_data", {}).get("code")
+            if code == 40062:
                 await self.form_new_tokens_pairs()
         logger.warning(
             f"\nError [{answer}]"
