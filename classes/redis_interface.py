@@ -17,9 +17,17 @@ class RedisDB:
 
     async def _send_request_do_redis_db(self, key: str, mate_id: str = '', data: list = None) -> list:
         """Запрашивает или записывает данные в редис, возвращает список если запрашивали"""
+
         result: list = []
         name: str = mate_id if mate_id else self.redis_key
         data: list = data if data else self.data
+        log_data: str = (
+            f"\nData:"
+            f"\nKey: {key}"
+            f"\nName: {name}"
+            f"\nMate id: {mate_id}"
+            f"\nData: \n{data}")
+        error_text: str = ''
         try:
             async with self.redis_db.client() as conn:
                 if key == "set":
@@ -31,19 +39,22 @@ class RedisDB:
                         try:
                             result: list = json.loads(data)
                         except TypeError as err:
-                            logger.error(f"F: load_from_redis: {err}", err)
+                            error_text = f"{err}"
                         except Exception as err:
-                            logger.error(f"RedisInterface.__get_or_set_from_db(): JSON error: {err}")
+                            error_text = f"JSON error: {err}"
                 elif key == 'del':
                     await conn.delete(self.redis_key, mate_id)
                 else:
-                    raise ValueError("RedisInterface.__get_or_set_from_db(key=???) error")
+                    raise ValueError(f"(key=???) error")
         except ConnectionRefusedError as err:
-            logger.error(f"Unable to connect to redis, data: '{self.data}' not saved!", err)
+            error_text = (f"Unable to connect to redis, data: '{self.data}' not saved!"
+                          f"\n {err}")
         except aioredis.exceptions.ConnectionError as err:
-            logger.error(f"RedisInterface.__get_or_set_from_db(): Connection error: {err}")
+            error_text = f"Connection error: {err}"
         except Exception as err:
-            logger.error(f"RedisInterface.__get_or_set_from_db(): {err}")
+            error_text = f"Exception Error: {err}"
+        if error_text:
+            logger.error(error_text + log_data)
         return result
 
     @logger.catch
