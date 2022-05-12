@@ -182,10 +182,11 @@ class DiscordManager:
             elif code == 40062:
                 await self._set_delay_and_delete_all_workers()
                 await self.form_new_tokens_pairs()
-        logger.warning(
-            f"\nError [{answer}]"
-            f"\nUser: [{self.datastore.telegram_id}]"
-            f"\nDeleting workers and sleep {self.delay} seconds.")
+        if self.delay:
+            logger.warning(
+                f"\nError [{answer}]"
+                f"\nUser: [{self.datastore.telegram_id}]"
+                f"\nDeleting workers and sleep {self.delay} seconds.")
 
     @logger.catch
     async def _set_delay_and_delete_all_workers(self):
