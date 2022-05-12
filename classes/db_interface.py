@@ -234,6 +234,25 @@ class DBI:
     @classmethod
     @logger.catch
     async def get_info_by_token(cls, token: str) -> 'namedtuple':
+        """
+        Вернуть info по токен
+        возвращает объект токен
+            'user_channel_pk' int
+
+            'proxy':proxy(str),
+
+            'guild_id':guild_id(int),
+
+            'channel_id': channel_id(int),
+
+            'cooldown': cooldown(int, seconds)}
+
+            'mate_discord_id' str (discord_id)
+
+            'token_discord_id' str
+
+            'token_name' str
+        """
         return Token.get_token_info(token=token)
 
     @classmethod

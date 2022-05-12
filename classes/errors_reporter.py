@@ -128,7 +128,7 @@ class ErrorsReporter:
             admins = True
         elif self._status == 429:
             if self._code == 20016:
-                cooldown: int = int(self._answer_data_dict.get("retry_after"))
+                cooldown: int = int(self._answer_data_dict.get("retry_after")) + 1
                 if cooldown:
                     cooldown += self.datastore.cooldown
                     await DBI.update_user_channel_cooldown(
