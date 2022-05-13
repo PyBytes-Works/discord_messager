@@ -1,7 +1,7 @@
 import asyncio
 
-from classes.request_classes import PostRequest
-from config import logger, DISCORD_BASE_URL
+from classes.request_classes import PostRequest, DISCORD_BASE_URL
+from config import logger
 from classes.token_datastorage import TokenData
 
 

@@ -153,13 +153,19 @@ class ErrorsReporter:
         elif self._status == 500:
             text = (f"Внутренняя ошибка сервера Дискорда. Код ошибки - [{self._status}]"
                     f"\nСлишком большая нагрузка на канал")
-            admins = True
+            users = False
+            admins = False
+        elif self._status == 502:
+            text = f"Внутренняя ошибка сервера Дискорда. Код ошибки - 502 Bad Gateway"
+            users = False
+            admins = False
         elif self._status == 504:
             text = f"Внутренняя ошибка сервера Дискорда. Код ошибки - [{self._status}]"
             users = False
-            admins = True
+            admins = False
         else:
-            text = f'Unrecognised error! {self._status} {self._code}'
+            text = (f'Unrecognised error! {self._status} {self._code}'
+                   f'\n')
             users = False
             admins = True
         if text:

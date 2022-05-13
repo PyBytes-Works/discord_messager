@@ -200,7 +200,7 @@ async def check_and_add_token_handler(message: Message, state: FSMContext) -> No
             await state.finish()
             return
     await message.answer(f"Канал {channel} создан."
-                         f"Добавляю токен в канал...\n")
+                         f"\nДобавляю токен в канал...")
 
     if not await DBI.add_token_by_telegram_id(
             telegram_id=telegram_id, token=token, discord_id=discord_id, user_channel_pk=user_channel_pk
@@ -213,7 +213,7 @@ async def check_and_add_token_handler(message: Message, state: FSMContext) -> No
         return
     await message.answer(
         "Токен удачно добавлен."
-        "Хотите ввести кулдаун для данного канала?",
+        "\nХотите ввести кулдаун для данного канала?",
         reply_markup=yes_no_buttons(yes_msg=f'set_cooldown_{user_channel_pk}', no_msg='endof')
     )
     await state.finish()
