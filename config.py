@@ -52,7 +52,7 @@ bot = Bot(token=tgToken)
 storage = MemoryStorage()
 dp = Dispatcher(bot, storage=storage)
 
-# Constants # TODO переместить в request sender
+# Constants
 DISCORD_BASE_URL: str = f'https://discord.com/api/v9/channels/'
 
 #  ********** LOGGER CONFIG ********************************
