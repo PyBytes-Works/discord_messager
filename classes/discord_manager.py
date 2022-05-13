@@ -121,20 +121,23 @@ class DiscordManager:
 
     @check_working
     @logger.catch
-    async def _handling_received_messages(self) -> None:
+    async def _handling_received_messages(self) -> bool:
         """Получает сообщения из чата и обрабатывает их"""
 
         if not all((self.datastore.token, self.datastore.channel)):
             logger.error(f"\nError: TG: {self.datastore.telegram_id}"
                          f"\nToken: {self.datastore.token}"
                          f"\nChannel: {self.datastore.channel}")
-            return
+            return False
         status: int = await MessageManager(datastore=self.datastore).handling_messages()
         if status and status >= 500:
-            await self._set_delay_and_delete_all_workers()
+            await self._set_delay_equal_channel_cooldown()
             await self.message.answer(
                 f"На сервере {self.datastore.channel} дискорда слишком высокая нагрузка."
             )
+            await asyncio.sleep(self.delay)
+            return False
+        return True
 
     @logger.catch
     def __replace_time_to_now(self, elem) -> namedtuple:
@@ -165,7 +168,8 @@ class DiscordManager:
         if status == 200:
             return
         elif status in (407, 429):
-            await self._set_delay_and_delete_all_workers()
+            self.__workers = []
+            await self._set_delay_equal_channel_cooldown()
             code: int = answer.get("answer_data", {}).get("code")
             if code == 40062:
                 await self.form_new_tokens_pairs()
@@ -175,8 +179,7 @@ class DiscordManager:
             f"\nDeleting workers and sleep {self.delay} seconds.")
 
     @logger.catch
-    async def _set_delay_and_delete_all_workers(self):
-        self.__workers = []
+    async def _set_delay_equal_channel_cooldown(self):
         self.delay = 60
         channel_data: namedtuple = await DBI.get_channel(self.datastore.user_channel_pk)
         if channel_data:
