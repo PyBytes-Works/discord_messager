@@ -40,7 +40,7 @@ class TokenData:
         self.mate_id: str = token_data.mate_discord_id
         self.my_discord_id: str = token_data.token_discord_id
         self.user_channel_pk: int = token_data.user_channel_pk
-        self.token_name: str = token  # TODO поправить после реализации на token_data.token_name
+        self.token_name: str = token_data.token_name
 
     @property
     def all_tokens_ids(self) -> List[str]:
