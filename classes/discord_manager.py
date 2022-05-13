@@ -121,23 +121,15 @@ class DiscordManager:
 
     @check_working
     @logger.catch
-    async def _handling_received_messages(self) -> bool:
+    async def _handling_received_messages(self) -> None:
         """Получает сообщения из чата и обрабатывает их"""
 
         if not all((self.datastore.token, self.datastore.channel)):
             logger.error(f"\nError: TG: {self.datastore.telegram_id}"
                          f"\nToken: {self.datastore.token}"
                          f"\nChannel: {self.datastore.channel}")
-            return False
-        status: int = await MessageManager(datastore=self.datastore).handling_messages()
-        if status and status >= 500:
-            await self._set_delay_equal_channel_cooldown()
-            await self.message.answer(
-                f"На сервере {self.datastore.channel} дискорда слишком высокая нагрузка."
-            )
-            await asyncio.sleep(self.delay)
-            return False
-        return True
+            return
+        await MessageManager(datastore=self.datastore).handling_messages()
 
     @logger.catch
     def __replace_time_to_now(self, elem) -> namedtuple:

@@ -1,7 +1,7 @@
 import datetime
 import random
 from datetime import timedelta
-from typing import List, Tuple
+from typing import List
 
 from classes.errors_reporter import ErrorsReporter
 from classes.open_ai import OpenAI
@@ -22,7 +22,7 @@ class MessageManager(ChannelData):
         self._last_messages: List[dict] = []
 
     @logger.catch
-    async def handling_messages(self) -> int:
+    async def handling_messages(self) -> None:
         """Получает данные из АПИ, выбирает случайное сообщение и
         возвращает ID сообщения
         и само сообщение"""
@@ -31,9 +31,7 @@ class MessageManager(ChannelData):
         self.datastore.current_message_id = 0
         self.datastore.text_to_send = ''
         # TODO поискать метод для получения сообщений за интервал времени, а не всех
-        status, all_messages = await self.__get_all_discord_messages()
-        if status >= 500:
-            return status
+        all_messages = await self.__get_all_discord_messages()
         self._last_messages: List[dict] = await self.__get_last_messages(all_messages)
         if not await self.__get_message_id_and_text_for_send_answer():
             self.datastore.current_message_id = await self.__get_message_id_from_last_messages()
@@ -42,7 +40,7 @@ class MessageManager(ChannelData):
         await self.__get_data_for_send()
 
     @logger.catch
-    async def __get_all_discord_messages(self) -> Tuple[int, List[dict]]:
+    async def __get_all_discord_messages(self) -> List[dict]:
 
         self.proxy: str = self.datastore.proxy
         self.token: str = self.datastore.token
@@ -50,12 +48,9 @@ class MessageManager(ChannelData):
             logger.warning(f"\nDatastore {self.datastore} have not channel. "
                            f"\nTG ID: {self.datastore.telegram_id}"
                            f"\nTOKEN: {self.datastore.token}")
-            return 0, []
+            return []
         answer: dict = await self._send_request()
-        if not answer:
-            return 0, []
-
-        return answer.get("status"), answer.get('answer_data', [])
+        return answer.get('answer_data', []) if answer else []
 
     @logger.catch
     async def _get_message_text(self) -> str:
