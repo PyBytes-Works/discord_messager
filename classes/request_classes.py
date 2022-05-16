@@ -106,7 +106,7 @@ class RequestSender(ABC):
 class GetRequest(RequestSender):
 
     async def _send(self) -> dict:
-        conn = aiohttp.TCPConnector()
+        conn = aiohttp.TCPConnector(verify_ssl=False)
         async with aiohttp.ClientSession(trust_env=True, connector=conn) as session:
             if self.token:
                 session.headers['authorization']: str = self.token
@@ -126,7 +126,7 @@ class PostRequest(RequestSender):
     async def _send(self) -> dict:
         """Отправляет данные в дискорд канал"""
 
-        conn = aiohttp.TCPConnector()
+        conn = aiohttp.TCPConnector(verify_ssl=False)
         async with aiohttp.ClientSession(trust_env=True, connector=conn) as session:
             if self.token:
                 session.headers['authorization']: str = self.token
