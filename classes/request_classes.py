@@ -137,26 +137,6 @@ class PostRequest(RequestSender):
                     "answer_data": await response.text()
                 }
 
-        # переписать на аиохттп
-        # session = requests.Session()
-        # self.proxy_data: dict = {
-        #     "http": f"http://{PROXY_USER}:{PROXY_PASSWORD}@{self.proxy}/",
-        #     "https": f"http://{PROXY_USER}:{PROXY_PASSWORD}@{self.proxy}/",
-        # }
-        # self._params: dict = {
-        #     'url': self.url,
-        #     "proxies": self.proxy_data,
-        #     "timeout": 25,
-        # }
-        # if self.token:
-        #     session.headers['authorization']: str = self.token
-        # self._params.update(json=self._data_for_send)
-        # response = session.post(**self._params)
-        # return {
-        #     "status": response.status_code,
-        #     "answer_data": response.text
-        # }
-
 
 class GetMe(GetRequest):
 
