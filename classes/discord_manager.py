@@ -13,7 +13,7 @@ from classes.open_ai import OpenAI
 from classes.replies import RepliesManager
 from classes.token_datastorage import TokenData
 
-from config import logger
+from config import logger, SEMAPHORE
 from classes.db_interface import DBI
 from decorators.decorators import check_working, info_logger
 from keyboards import user_menu_keyboard, in_work_keyboard
@@ -40,6 +40,7 @@ class DiscordManager:
         self.message: 'Message' = message
         self._telegram_id: str = str(self.message.from_user.id)
         self.datastore: Optional['TokenData'] = TokenData(self._telegram_id)
+        self.semaphore = SEMAPHORE
         self.delay: int = 0
         self.is_working: bool = False
         self.auto_answer: bool = False
@@ -77,11 +78,10 @@ class DiscordManager:
         await self.__check_reboot()
         await self._check_user_active()
         await self._make_working_data()
-        await self._handling_received_messages()
-        await asyncio.sleep(3)
-        await self._send_replies()
-        await asyncio.sleep(3)
-        await self._sending_messages()
+        async with self.semaphore:
+            await self._handling_received_messages()
+            await self._send_replies()
+            await self._sending_messages()
         await self._sleep()
 
     @logger.catch
