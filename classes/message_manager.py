@@ -86,8 +86,8 @@ class MessageManager(ChannelData):
     async def __get_last_messages(self, all_messages: List[dict]) -> List[dict]:
         """Возвращает список всех сообщений за последнее время"""
 
-        all_dicts: bool = all(map(lambda x: isinstance(x, dict), all_messages))
-        if not all_messages or not all_dicts:
+        is_not_dict: bool = any(map(lambda x: isinstance(x, str), all_messages))
+        if not all_messages or is_not_dict:
             return []
         return list(
             filter(
