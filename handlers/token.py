@@ -320,15 +320,15 @@ async def delete_token_handler(callback: CallbackQuery, state: FSMContext) -> No
     telegram_id: str = str(callback.from_user.id)
     if await DBI.is_user_work(telegram_id=telegram_id):
         await callback.message.answer("Бот запущен, сначала остановите бота.", reply_markup=cancel_keyboard())
-    else:
-        token_pk: int = int(callback.data.rsplit('_', maxsplit=1)[-1])
-        await DBI.delete_token_by_pk(token_pk=token_pk)
-        await callback.message.answer("Токен удален.", reply_markup=user_menu_keyboard())
-        try:
-            await callback.message.delete()
-        except aiogram.utils.exceptions.MessageToDeleteNotFound as err:
-            logger.error(err)
-        await state.finish()
+        return
+    token_pk: int = int(callback.data.rsplit('_', maxsplit=1)[-1])
+    await DBI.delete_token_by_pk(token_pk=token_pk)
+    await callback.message.answer("Токен удален.", reply_markup=user_menu_keyboard())
+    try:
+        await callback.message.delete()
+    except aiogram.utils.exceptions.MessageToDeleteNotFound as err:
+        logger.error(f"delete_token_handler: {err}")
+    await state.finish()
     await callback.answer()
 
 
