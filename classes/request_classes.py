@@ -22,6 +22,7 @@ class RequestSender(ABC):
         self._params: dict = {}
         self._error_params: dict = {}
         self.datastore: Optional['TokenData'] = None
+        self.trust_env: bool = False
 
     @abstractmethod
     async def _send(self, *args, **kwargs) -> dict:
@@ -66,7 +67,7 @@ class RequestSender(ABC):
             logger.error(f"{self._send_request.__qualname__}: asyncio.exceptions.TimeoutError: {err}")
             answer.update(status=-99)
         except aiohttp.http_exceptions.BadHttpMessage as err:
-            logger.error(f"{self._send_request.__qualname__}:  aiohttp.http_exceptions.BadHttpMessage: {err}")
+            logger.error(f"{self._send_request.__qualname__}: aiohttp.http_exceptions.BadHttpMessage: {err}")
             answer.update(status=407)
         except aiohttp.client_exceptions.ClientHttpProxyError as err:
             logger.error(f"{self._send_request.__qualname__}: aiohttp.client_exceptions.ClientHttpProxyError: {err}")
@@ -81,8 +82,9 @@ class RequestSender(ABC):
             answer.update(status=-98)
         except aiohttp.client_exceptions.TooManyRedirects as err:
             text = f"{self._send_request.__qualname__}: aiohttp.client_exceptions.TooManyRedirects: {err}"
-        # except Exception as err:
-        #     text = f"RequestSender._send_request: Exception: {err}"
+        except Exception as err:
+            text = f"{self._send_request.__qualname__}: Exception: {err}"
+
         if text:
             logger.error(f"\n{self._send_request.__qualname__}: {text}")
             answer.update(status=-100)
@@ -104,12 +106,11 @@ class RequestSender(ABC):
 
 
 class GetRequest(RequestSender):
-
     """Класс для отправки GET запросов"""
 
     async def _send(self) -> dict:
         conn = aiohttp.TCPConnector(verify_ssl=False)
-        async with aiohttp.ClientSession(trust_env=True, connector=conn) as session:
+        async with aiohttp.ClientSession(trust_env=self.trust_env, connector=conn) as session:
             if self.token:
                 session.headers['authorization']: str = self.token
             async with session.get(**self._params) as response:
@@ -120,7 +121,6 @@ class GetRequest(RequestSender):
 
 
 class PostRequest(RequestSender):
-
     """Класс для отправки POST запросов"""
 
     def __init__(self):
@@ -131,7 +131,7 @@ class PostRequest(RequestSender):
         """Отправляет данные в дискорд канал"""
 
         conn = aiohttp.TCPConnector(verify_ssl=False)
-        async with aiohttp.ClientSession(trust_env=True, connector=conn) as session:
+        async with aiohttp.ClientSession(trust_env=self.trust_env, connector=conn) as session:
             if self.token:
                 session.headers['authorization']: str = self.token
             self._params.update(json=self._data_for_send)
@@ -143,7 +143,6 @@ class PostRequest(RequestSender):
 
 
 class GetMe(GetRequest):
-
     """Класс для получения дискорд_ид по токену"""
 
     async def get_discord_id(self, token: str, proxy: str) -> str:
@@ -156,7 +155,6 @@ class GetMe(GetRequest):
 
 
 class ChannelData(GetRequest):
-
     """Класс для получения сообщений из канала дискорда"""
 
     def __init__(self, datastore: 'TokenData'):
@@ -167,7 +165,6 @@ class ChannelData(GetRequest):
 
 
 class ProxyChecker(GetRequest):
-
     """Класс для проверки прокси"""
 
     def __init__(self):
@@ -199,7 +196,6 @@ class ProxyChecker(GetRequest):
 
 
 class TokenChecker(GetRequest):
-
     """Класс для проверки токена в дискорд канале"""
 
     def __init__(self):

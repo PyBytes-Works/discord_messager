@@ -156,6 +156,8 @@ class ErrorsReporter:
                     f"\nСлишком большая нагрузка на канал")
         elif self._status == 502:
             text = f"Внутренняя ошибка сервера Дискорда. Код ошибки - 502 Bad Gateway"
+        elif self._status == 503:
+            text = f"Код ошибки - 503"
         elif self._status == 504:
             text = f"Внутренняя ошибка сервера Дискорда. Код ошибки - [{self._status}]"
         else:
