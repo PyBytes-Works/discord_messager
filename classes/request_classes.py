@@ -23,7 +23,7 @@ class RequestSender(ABC):
         self._error_params: dict = {}
         self.datastore: Optional['TokenData'] = None
         self.trust_env: bool = False
-        self.timeout: int = 10
+        self.timeout: int = 25
 
     @abstractmethod
     async def _send(self, *args, **kwargs) -> dict:
