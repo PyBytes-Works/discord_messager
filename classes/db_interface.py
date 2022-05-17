@@ -78,10 +78,15 @@ class DBI:
 
     @classmethod
     @logger.catch
-    async def activate_user(
+    async def reactivate_user(
             cls, telegram_id: str, max_tokens: int, expiration: int, **kwargs) -> bool:
         await DBI.set_max_tokens(telegram_id=telegram_id, max_tokens=max_tokens)
         await DBI.set_expiration_date(telegram_id=telegram_id, subscription_period=expiration)
+        return User.activate_user(telegram_id=telegram_id)
+
+    @classmethod
+    @logger.catch
+    async def activate_user(cls, telegram_id: str) -> bool:
         return User.activate_user(telegram_id=telegram_id)
 
     @classmethod
@@ -229,6 +234,25 @@ class DBI:
     @classmethod
     @logger.catch
     async def get_info_by_token(cls, token: str) -> 'namedtuple':
+        """
+        Вернуть info по токен
+        возвращает объект токен
+            'user_channel_pk' int
+
+            'proxy':proxy(str),
+
+            'guild_id':guild_id(int),
+
+            'channel_id': channel_id(int),
+
+            'cooldown': cooldown(int, seconds)}
+
+            'mate_discord_id' str (discord_id)
+
+            'token_discord_id' str
+
+            'token_name' str
+        """
         return Token.get_token_info(token=token)
 
     @classmethod
@@ -296,7 +320,10 @@ class DBI:
     @classmethod
     @logger.catch
     async def delete_proxy(cls, proxy: str) -> bool:
-        return Proxy.delete_proxy(proxy=proxy)
+        result = False
+        if Proxy.delete_proxy(proxy=proxy):
+            result = bool(Proxy.set_proxy_if_not_exists())
+        return result
 
     @classmethod
     @logger.catch

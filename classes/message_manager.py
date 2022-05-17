@@ -3,15 +3,14 @@ import random
 from datetime import timedelta
 from typing import List
 
-import utils
-from classes.errors_sender import ErrorsSender
+from classes.errors_reporter import ErrorsReporter
 from classes.open_ai import OpenAI
 from classes.redis_interface import RedisDB
 from classes.replies import RepliesManager
 from classes.request_classes import ChannelData
 from classes.token_datastorage import TokenData
 from classes.vocabulary import Vocabulary
-from config import logger, DEBUG, SAVING
+from config import logger
 
 
 class MessageManager(ChannelData):
@@ -23,33 +22,35 @@ class MessageManager(ChannelData):
         self._last_messages: List[dict] = []
 
     @logger.catch
-    async def get_message(self) -> None:
+    async def handling_messages(self) -> None:
         """Получает данные из АПИ, выбирает случайное сообщение и
         возвращает ID сообщения
         и само сообщение"""
 
-        self._datastore.for_reply = []
-        self._datastore.current_message_id = 0
-        self._datastore.text_to_send = ''
+        self.datastore.for_reply = []
+        self.datastore.current_message_id = 0
+        self.datastore.text_to_send = ''
+        # TODO поискать метод для получения сообщений за интервал времени, а не всех
         all_messages: List[dict] = await self.__get_all_discord_messages()
         self._last_messages: List[dict] = await self.__get_last_messages(all_messages)
-        if not await self.__update_datastore_message_id_and_answer_text_from_replies():
-            self._datastore.current_message_id = await self.__get_last_message_id()
-            self._datastore.text_to_send = await self._get_message_text()
+        if not await self.__get_message_id_and_text_for_send_answer():
+            self.datastore.current_message_id = await self.__get_message_id_from_last_messages()
+            self.datastore.text_to_send = await self._get_message_text()
         await self.__update_datastore_replies()
         await self.__get_data_for_send()
 
     @logger.catch
     async def __get_all_discord_messages(self) -> List[dict]:
 
-        self.proxy: str = self._datastore.proxy
-        self.token: str = self._datastore.token
+        self.proxy: str = self.datastore.proxy
+        self.token: str = self.datastore.token
+        if not self.datastore.channel:
+            logger.warning(f"\nDatastore {self.datastore} have not channel. "
+                           f"\nTG ID: {self.datastore.telegram_id}"
+                           f"\nTOKEN: {self.datastore.token}")
+            return []
         answer: dict = await self._send_request()
-        self._error_params.update(answer=answer, telegram_id=self._datastore.telegram_id)
-        result: dict = await ErrorsSender(**self._error_params).handle_errors()
-        if result.get("status") == 200:
-            return result.get("answer_data")
-        return []
+        return answer.get('answer_data', []) if answer else []
 
     @logger.catch
     async def _get_message_text(self) -> str:
@@ -62,21 +63,9 @@ class MessageManager(ChannelData):
             if openai_text:
                 return openai_text
         if self._ten_from_hundred():
-            logger.debug("Random message! You are lucky!!!")
-            self._datastore.current_message_id = 0
+            logger.info(f"{self.datastore.telegram_id} Random message 10 from 100! You are lucky!!!")
+            self.datastore.current_message_id = 0
         return await self.__get_text_from_vocabulary()
-
-    @staticmethod
-    @logger.catch
-    def __get_delta_seconds(elem: dict) -> int:
-        """Возвращает время, в пределах которого надо найти сообщения
-        которое в секундах"""
-
-        message_time: 'datetime' = elem.get("timestamp")
-        mes_time: 'datetime' = datetime.datetime.fromisoformat(message_time).replace(tzinfo=None)
-        delta: 'timedelta' = datetime.datetime.utcnow().replace(tzinfo=None) - mes_time
-
-        return delta.seconds
 
     @logger.catch
     async def __get_my_replies(self) -> List[dict]:
@@ -88,8 +77,8 @@ class MessageManager(ChannelData):
             for elem in self._last_messages
             if (
                     elem.get("mentions")
-                    and elem.get("mentions")[0].get("id", '') in self._datastore.all_tokens_ids
-                    and elem.get("id") != self._datastore.mate_id
+                    and elem.get("mentions")[0].get("id", '') in self.datastore.all_tokens_ids
+                    and elem.get("id") != self.datastore.mate_id
             )
         ]
 
@@ -97,12 +86,29 @@ class MessageManager(ChannelData):
     async def __get_last_messages(self, all_messages: List[dict]) -> List[dict]:
         """Возвращает список всех сообщений за последнее время"""
 
+        is_not_dict: bool = any(map(lambda x: isinstance(x, str), all_messages))
+        if not all_messages or is_not_dict:
+            return []
         return list(
             filter(
-                lambda x: self.__get_delta_seconds(x) < self._datastore.last_message_time,
+                lambda elem: self.__get_delta_seconds(elem) < self.datastore.last_message_time,
                 all_messages
             )
         )
+
+    @staticmethod
+    @logger.catch
+    def __get_delta_seconds(elem: dict) -> int:
+        """Возвращает время, в пределах которого надо найти сообщения
+        которое в секундах"""
+
+        if not isinstance(elem, dict):
+            return 0
+        message_time: 'datetime' = elem.get("timestamp")
+        mes_time: 'datetime' = datetime.datetime.fromisoformat(message_time).replace(tzinfo=None)
+        delta: 'timedelta' = datetime.datetime.utcnow().replace(tzinfo=None) - mes_time
+
+        return delta.seconds
 
     @logger.catch
     def __get_target_id(self, elem: dict) -> str:
@@ -116,17 +122,16 @@ class MessageManager(ChannelData):
         return (
                 elem.get("referenced_message", {}).get("author", {}).get("username")
                 or elem.get("mentions", [{"id": '[no id]'}])[0].get("username")
-                or self._datastore.token
+                or self.datastore.token
         )
 
     @logger.catch
     async def __get_filtered_replies(self, data: List[dict]) -> List[dict]:
         """"""
-        if data and DEBUG and SAVING:
-            utils.save_data_to_json(data, "replies_data.json", key='a')
+
         return [
             {
-                "token": self._datastore.token_name,
+                "token": self.datastore.token_name,
                 "author": elem.get("author", {}).get("username", 'no author'),
                 "text": elem.get("content", '[no content]'),
                 "message_id": elem.get("id", 0),
@@ -138,15 +143,24 @@ class MessageManager(ChannelData):
         ]
 
     @logger.catch
-    async def __get_last_message_id(self) -> int:
-        """"""
+    async def __get_message_id_from_last_messages(self) -> int:
+        """Returns message id from random message where author is mate"""
 
-        messages: List[dict] = [
+        if not self._last_messages:
+            return 0
+        mate_messages: List[dict] = [
             elem
             for elem in self._last_messages
-            if self._datastore.mate_id == str(elem["author"]["id"])
+            if self.datastore.mate_id == str(elem["author"]["id"])
         ]
-        return await self.__get_last_message_id_from_messages(messages)
+        return await self.__get_random_message_id(mate_messages)
+
+    @logger.catch
+    async def __get_random_message_id(self, data: list) -> int:
+        if not data:
+            return 0
+        random_elem: dict = random.choice(data)
+        return random_elem.get("id", 0)
 
     @logger.catch
     async def __update_datastore_replies(self) -> None:
@@ -156,61 +170,58 @@ class MessageManager(ChannelData):
             return
         all_replies: List[dict] = await self.__get_my_replies()
         new_replies: List[dict] = await self.__get_filtered_replies(all_replies)
-        self._datastore.for_reply = await self.__get_replies_for_answer(new_replies)
+        await self.__update_replies(new_replies)
 
     @logger.catch
-    async def __get_last_message_id_from_messages(self, data: list) -> int:
-        return int(max(data, key=lambda x: x.get("timestamp"))["id"]) if data else 0
-
-    @logger.catch
-    async def __get_replies_for_answer(self, new_replies: List[dict]) -> List[dict]:
+    async def __update_replies(self, new_replies: List[dict]) -> None:
         """Возвращает разницу между старыми и новыми данными в редисе,
         записывает полные данные в редис"""
 
-        return await RepliesManager(self._datastore.telegram_id).get_difference_and_update(new_replies)
+        await RepliesManager(self.datastore.telegram_id).update_new_replies(new_replies)
 
     @logger.catch
-    async def __update_datastore_message_id_and_answer_text_from_replies(self) -> int:
+    async def __get_message_id_and_text_for_send_answer(self) -> int:
 
         """Update datastore message id and answer text from answered replies from Redis
 
         Returns length of replies list"""
 
-        replies: 'RepliesManager' = RepliesManager(redis_key=self._datastore.telegram_id)
-        my_answered: List[dict] = await replies.get_answered(self._datastore.my_discord_id)
+        replies: 'RepliesManager' = RepliesManager(redis_key=self.datastore.telegram_id)
+        my_answered: List[
+            dict] = await replies.get_not_answered_with_text(self.datastore.my_discord_id)
         if my_answered:
-            current_reply: dict = random.choice(my_answered)
-            self._datastore.text_to_send = current_reply.get("answer_text")
-            message_id: int = current_reply.get("message_id")
-            self._datastore.current_message_id = message_id
+            current_reply: dict = my_answered.pop()
+            self.datastore.text_to_send = current_reply.get("answer_text")
+            message_id: str = current_reply.get("message_id")
+            self.datastore.current_message_id = message_id
+            await replies.update_answered(message_id)
 
-        return len(my_answered)
+        return self.datastore.current_message_id
 
     @logger.catch
     async def __get_text_from_vocabulary(self) -> str:
         text: str = Vocabulary.get_message()
         if not text:
-            await ErrorsSender.send_report_to_admins(text="Ошибка словаря фраз.")
+            await ErrorsReporter.send_report_to_admins(text="Ошибка словаря фраз.")
             return ''
-        await RedisDB(redis_key=self._datastore.mate_id).save(data=[
-            text], timeout_sec=self._datastore.delay + 300)
+        await RedisDB(redis_key=self.datastore.mate_id).save(data=[
+            text], timeout_sec=self.datastore.delay + 300)
         return text
 
     @logger.catch
     async def __get_text_from_openai(self, mate_message: str) -> str:
 
         openai_answer: str = await self.__get_openai_answer(mate_message)
-        logger.warning(f"\n\t\tFirst OpenAI answer: {openai_answer}\n")
+        logger.debug(f"\n\t\tFirst OpenAI answer: {openai_answer}\n")
         if openai_answer:
-            if self._fifty_fifty():
-                logger.debug("50 / 50 You got it!!!")
-                self._datastore.current_message_id = 0
+            if self._ten_from_hundred():
+                logger.info(f"{self.datastore.telegram_id}: 10 from 100 You got it!!!")
+                self.datastore.current_message_id = 0
             return openai_answer
         random_message: str = await self.__get_random_message_from_last_messages()
-        logger.warning(f"\n\t\tRandom OpenAI answer: {random_message}\n")
+        logger.debug(f"\n\t\tRandom OpenAI answer: {random_message}\n")
 
         return random_message
-
 
     @logger.catch
     async def __get_random_message_from_last_messages(self) -> str:
@@ -219,16 +230,16 @@ class MessageManager(ChannelData):
         logger.debug(f"Random message from last messages: {text}")
         result: str = await self.__get_openai_answer(text)
         if result != text:
-            self._datastore.current_message_id = int(message_data.get("id", 0))
+            self.datastore.current_message_id = int(message_data.get("id", 0))
             return result
         return ''
 
     @logger.catch
     async def __get_mate_message(self) -> str:
-        mate_message: List[str] = await RedisDB(redis_key=self._datastore.my_discord_id).load()
+        mate_message: List[str] = await RedisDB(redis_key=self.datastore.my_discord_id).load()
         if mate_message:
             await RedisDB(
-                redis_key=self._datastore.my_discord_id).delete(mate_id=self._datastore.mate_id)
+                redis_key=self.datastore.my_discord_id).delete(mate_id=self.datastore.mate_id)
             return mate_message[0]
         return ''
 
@@ -243,20 +254,20 @@ class MessageManager(ChannelData):
     async def __get_data_for_send(self) -> None:
         """Сохраняет в datastore данные для отправки в дискорд"""
 
-        if not self._datastore.text_to_send:
+        if not self.datastore.text_to_send:
             logger.warning("\n\t\tMessage_receiver.__prepare_data: no text for sending.\n")
             return
-        self._datastore.data_for_send = {
-            "content": self._datastore.text_to_send,
+        self.datastore.data_for_send = {
+            "content": self.datastore.text_to_send,
             "tts": "false"
         }
-        if self._datastore.current_message_id:
+        if self.datastore.current_message_id:
             params: dict = {
                 "message_reference":
                     {
-                        "guild_id": self._datastore.guild,
-                        "channel_id": self._datastore.channel,
-                        "message_id": self._datastore.current_message_id
+                        "guild_id": self.datastore.guild,
+                        "channel_id": self.datastore.channel,
+                        "message_id": self.datastore.current_message_id
                     },
                 "allowed_mentions":
                     {
@@ -268,14 +279,14 @@ class MessageManager(ChannelData):
                         "replied_user": "false"
                     }
             }
-            self._datastore.data_for_send.update(**params)
+            self.datastore.data_for_send.update(**params)
 
     @staticmethod
     @logger.catch
     def _ten_from_hundred() -> bool:
         return random.randint(1, 100) <= 10
 
-    @staticmethod
-    @logger.catch
-    def _fifty_fifty() -> bool:
-        return random.randint(1, 100) <= 50
+    # @staticmethod
+    # @logger.catch
+    # def _fifty_fifty() -> bool:
+    #     return random.randint(1, 100) <= 50

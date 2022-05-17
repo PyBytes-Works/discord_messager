@@ -1,3 +1,4 @@
+import asyncio
 import datetime
 import os
 import sys
@@ -51,8 +52,10 @@ tgToken = os.getenv("TELEBOT_TOKEN")
 bot = Bot(token=tgToken)
 storage = MemoryStorage()
 dp = Dispatcher(bot, storage=storage)
+SEMAPHORE_MAX_TASKS: int = int(os.getenv("SEMAPHORE_MAX_TASKS"))
+SEMAPHORE = asyncio.Semaphore(SEMAPHORE_MAX_TASKS)
 
-# Constants # TODO переместить в request sender
+# Constants
 DISCORD_BASE_URL: str = f'https://discord.com/api/v9/channels/'
 
 #  ********** LOGGER CONFIG ********************************
@@ -67,22 +70,18 @@ LOG_LEVEL = "WARNING"
 DEBUG_LEVEL = "INFO"
 if DEBUG:
     DEBUG_LEVEL = "DEBUG"
-logger_cfg = {
-    "handlers": [
-        {
-            "sink": sys.stdout,
-            "level": DEBUG_LEVEL,
-            "format": "<white>{time:HH:mm:ss}</white> - <yellow>{level}</yellow> | <green>{message}</green>"
-        },
-        {
-            "sink": file_path, "level": LOG_LEVEL,
-            "format": "{time:YYYY-MM-DD HH:mm:ss} - {level} | {message}",
-            "rotation": "50 MB"
-        },
+logger.remove()
+logger.add(sink=file_path, enqueue=True, level=LOG_LEVEL, rotation="50 MB")
+logger.add(sink=sys.stdout, level=DEBUG_LEVEL)
+logger.configure(
+    levels=[
+        dict(name="DEBUG", color="<white>"),
+        dict(name="INFO", color="<fg #afffff>"),
+        dict(name="WARNING", color="<light-yellow>"),
+        dict(name="ERROR", color="<red>"),
     ]
-}
-logger.configure(**logger_cfg)
-logger.info('Start logging to:', file_path)
+)
+logger.info(f'Start logging to: {file_path}')
 #  ********** END OF LOGGER CONFIG *************************
 
 #  ********** DATABASE CONFIG *************************

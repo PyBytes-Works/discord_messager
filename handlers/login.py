@@ -5,7 +5,7 @@ from aiogram.types import Message
 from aiogram.dispatcher import FSMContext
 
 from classes.db_interface import DBI
-from classes.errors_sender import ErrorsSender
+from classes.errors_reporter import ErrorsReporter
 from config import logger, Dispatcher, admins_list, bot
 from keyboards import user_menu_keyboard, cancel_keyboard
 from models import User
@@ -97,7 +97,7 @@ async def check_expiration_and_add_new_user_handler(message: Message, state: FSM
     max_tokens: int = state_data["max_tokens"]
     proxy: namedtuple = await DBI.get_low_used_proxy()
     if not proxy.proxy_pk:
-        await ErrorsSender.send_report_to_admins(text="Нет проксей.")
+        await ErrorsReporter.send_report_to_admins(text="Нет проксей.")
     user_data: dict = {
         "telegram_id": new_user_telegram_id,
         "nick_name": new_user_nickname,
@@ -113,7 +113,7 @@ async def check_expiration_and_add_new_user_handler(message: Message, state: FSM
         f"\nПрокси: {proxy.proxy}"
     )
     if await DBI.get_user_by_telegram_id(telegram_id=new_user_telegram_id):
-        await DBI.activate_user(**user_data)
+        await DBI.reactivate_user(**user_data)
         await message.answer("Пользователь активирован.", reply_markup=user_menu_keyboard())
         await state.finish()
         return
@@ -121,7 +121,7 @@ async def check_expiration_and_add_new_user_handler(message: Message, state: FSM
     if not await DBI.add_new_user(**user_data):
         text: str = (f"ОШИБКА ДОБАВЛЕНИЯ ПОЛЬЗОВАТЕЛЯ В БД: "
                      f"\nИмя: {new_user_nickname}  ID:{new_user_telegram_id}")
-        await ErrorsSender.send_report_to_admins(text)
+        await ErrorsReporter.send_report_to_admins(text)
         await message.answer(text)
         logger.error(text)
         await state.finish()

@@ -1,8 +1,7 @@
 import asyncio
 
-from classes.errors_sender import ErrorsSender
-from classes.request_classes import PostRequest
-from config import logger, DISCORD_BASE_URL
+from classes.request_classes import PostRequest, DISCORD_BASE_URL
+from config import logger
 from classes.token_datastorage import TokenData
 
 
@@ -13,47 +12,38 @@ class MessageSender(PostRequest):
 
     def __init__(self, datastore: 'TokenData'):
         super().__init__()
-        self._datastore: 'TokenData' = datastore
+        self.datastore: 'TokenData' = datastore
+        self.channel: int = 0
 
     @logger.catch
-    async def send_message_to_discord(self) -> bool:
+    async def send_message_to_discord(self) -> dict:
         """Отправляет данные в канал дискорда, возвращает результат отправки."""
 
-        if self._datastore.data_for_send:
+        if self.datastore.data_for_send:
             return await self.__send_data()
+        return {}
 
     async def _typing(self) -> None:
         """Имитирует "Пользователь печатает" в чате дискорда."""
 
-        self.url = f'https://discord.com/api/v9/channels/{self._datastore.channel}/typing'
-        answer: dict = await self._send_request()
-        if answer.get("status") not in range(200, 205):
-            logger.warning(f"Typing ERROR: {answer}")
-        await asyncio.sleep(2)
+        self.url = f'https://discord.com/api/v9/channels/{self.channel}/typing'
+        await self._send_request()
 
-    async def __send_data(self) -> bool:
+    async def __send_data(self) -> dict:
         """
         Sends data to discord channel
         :return:
         """
-        self.token = self._datastore.token
-        self.proxy = self._datastore.proxy
-        self._data_for_send = self._datastore.data_for_send
+
+        await asyncio.sleep(1)
+        self.token = self.datastore.token
+        self.proxy = self.datastore.proxy
+        self.channel = self.datastore.channel
+        self._data_for_send = self.datastore.data_for_send
 
         await self._typing()
+        await asyncio.sleep(2)
         await self._typing()
-        self.url = DISCORD_BASE_URL + f'{self._datastore.channel}/messages?'
 
-        # logger.debug("MessageSender.__send_data::"
-        #              f"\n\tToken: {self.token}"
-        #              f"\n\tProxy:{self.proxy}"
-        #              f"\n\tChannel: {self._datastore.channel}"
-        #              f"\n\tData for send: {self._data_for_send}")
-
-        answer: dict = await self._send_request()
-        if answer.get("status") == 200:
-            return True
-        self._update_err_params(answer=answer, datastore=self._datastore)
-        await ErrorsSender(**self._error_params).handle_errors()
-
-
+        self.url = DISCORD_BASE_URL + f'{self.channel}/messages?'
+        return await self._send_request()

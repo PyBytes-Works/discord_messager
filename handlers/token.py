@@ -12,7 +12,7 @@ from handlers import cancel_handler
 from states import TokenStates, UserChannelStates
 from utils import check_is_int
 from classes.db_interface import DBI
-from classes.errors_sender import ErrorsSender
+from classes.errors_reporter import ErrorsReporter
 from config import logger, Dispatcher, bot
 from keyboards import (
     user_menu_keyboard, cancel_keyboard, new_channel_key, yes_no_buttons, channel_menu_keyboard,
@@ -108,14 +108,15 @@ async def check_channel_and_add_token_handler(message: Message, state: FSMContex
     :param state:
     :return:
     """
+
     try:
         guild, channel = message.text.rsplit('/', maxsplit=3)[-2:]
     except ValueError as err:
         logger.error("F: add_channel_handler error: err", err)
         guild: str = ''
         channel: str = ''
-    guild: str = str(check_is_int(guild))
-    channel: str = str(check_is_int(channel))
+    guild: int = check_is_int(guild)
+    channel: int = check_is_int(channel)
     if not all((guild, channel)):
         await message.answer(
             "Проверьте ссылку на канал и попробуйте ещё раз", reply_markup=cancel_keyboard())
@@ -163,7 +164,7 @@ async def check_and_add_token_handler(message: Message, state: FSMContext) -> No
 
     proxy: str = await ProxyChecker().get_checked_proxy(telegram_id=telegram_id)
     if proxy == 'no proxies':
-        await ErrorsSender(telegram_id=telegram_id).errors_report(
+        await ErrorsReporter(telegram_id=telegram_id).errors_report(
             text="Ошибка прокси. Нет доступных прокси.")
         await state.finish()
         return
@@ -173,12 +174,12 @@ async def check_and_add_token_handler(message: Message, state: FSMContext) -> No
         error_text: str = (f"Не смог определить discord_id для токена:"
                            f"\nToken: [{token}]"
                            f"\nGuild/channel: [{guild}: {channel}]")
-        await ErrorsSender(telegram_id=telegram_id).errors_report(error_text)
+        await ErrorsReporter(telegram_id=telegram_id).errors_report(error_text)
         await state.finish()
         return
     if await DBI.check_token_by_discord_id(discord_id=discord_id):
         error_text: str = 'Токен с таким дискорд id уже сущестует в базе'
-        await ErrorsSender(telegram_id=telegram_id).errors_report(error_text)
+        await ErrorsReporter(telegram_id=telegram_id).errors_report(error_text)
         await state.finish()
         return
     await message.answer(f"Дискорд id получен: {discord_id}"
@@ -193,13 +194,13 @@ async def check_and_add_token_handler(message: Message, state: FSMContext) -> No
         user_channel_pk: int = await DBI.add_user_channel(telegram_id=telegram_id, channel_id=channel, guild_id=guild)
         await message.answer(f"Создаю канал {channel}")
         if not user_channel_pk:
-            await ErrorsSender(telegram_id=telegram_id).errors_report(
+            await ErrorsReporter(telegram_id=telegram_id).errors_report(
                 text=f"Не смог добавить канал:\n{telegram_id}:{channel}:{guild}"
             )
             await state.finish()
             return
     await message.answer(f"Канал {channel} создан."
-                         f"Добавляю токен в канал...\n")
+                         f"\nДобавляю токен в канал...")
 
     if not await DBI.add_token_by_telegram_id(
             telegram_id=telegram_id, token=token, discord_id=discord_id, user_channel_pk=user_channel_pk
@@ -207,12 +208,12 @@ async def check_and_add_token_handler(message: Message, state: FSMContext) -> No
         error_text: str = (f"Не добавить токен:"
                            f"\nToken: [{token}]"
                            f"\nChannel: {channel}]")
-        await ErrorsSender(telegram_id=telegram_id).errors_report(error_text)
+        await ErrorsReporter(telegram_id=telegram_id).errors_report(error_text)
         await state.finish()
         return
     await message.answer(
         "Токен удачно добавлен."
-        "Хотите ввести кулдаун для данного канала?",
+        "\nХотите ввести кулдаун для данного канала?",
         reply_markup=yes_no_buttons(yes_msg=f'set_cooldown_{user_channel_pk}', no_msg='endof')
     )
     await state.finish()
@@ -226,12 +227,15 @@ async def ask_channel_cooldown_handler(callback: CallbackQuery, state: FSMContex
     :param state:
     :return:
     """
-
-    user_channel_pk: int = check_is_int(callback.data.rsplit("_", maxsplit=1)[-1])
-    await state.update_data(user_channel_pk=user_channel_pk)
-    await callback.message.answer("Введите время кулдауна в минутах:", reply_markup=cancel_keyboard())
-    await TokenStates.add_channel_cooldown.set()
-    await callback.answer()
+    try:
+        user_channel_pk: int = check_is_int(callback.data.rsplit("_", maxsplit=1)[-1])
+        await state.update_data(user_channel_pk=user_channel_pk)
+        await callback.message.answer("Введите время кулдауна в минутах:", reply_markup=cancel_keyboard())
+        await TokenStates.add_channel_cooldown.set()
+        await callback.answer()
+    except aiogram.utils.exceptions.InvalidQueryID:
+        logger.warning("Сообщение просрочено.")
+        await state.finish()
 
 
 @logger.catch
@@ -259,7 +263,7 @@ async def add_channel_cooldown_handler(message: Message, state: FSMContext) -> N
     if not await DBI.update_user_channel_cooldown(user_channel_pk=user_channel_pk, cooldown=cooldown):
         error_text: str = (f"Не смог установить кулдаун для канала:"
                            f"\nuser_channel_pk: [{user_channel_pk}: cooldown: {cooldown}]")
-        await ErrorsSender(telegram_id=str(message.from_user.id)).errors_report(error_text)
+        await ErrorsReporter(telegram_id=str(message.from_user.id)).errors_report(error_text)
         await state.finish()
         return
     await message.answer("Кулдаун установлен.", reply_markup=user_menu_keyboard())
@@ -409,6 +413,7 @@ async def rename_channel_handler(callback: CallbackQuery, state: FSMContext) -> 
 @logger.catch
 async def set_user_channel_name(message: Message, state: FSMContext) -> None:
     """Хэндлер для переименования канала """
+
     if await DBI.is_expired_user_deactivated(message):
         return
     name = message.text

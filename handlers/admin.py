@@ -12,6 +12,7 @@ from aiogram.dispatcher.filters import Text
 from aiogram.types import Message, CallbackQuery, ReplyKeyboardRemove, InlineKeyboardMarkup, \
     InlineKeyboardButton
 
+from classes.instances_storage import InstancesStorage
 from classes.vocabulary import Vocabulary
 from config import logger, bot, admins_list
 from handlers.cancel_handler import message_cancel_handler
@@ -19,7 +20,7 @@ from keyboards import cancel_keyboard, user_menu_keyboard, inactive_users_keyboa
     superadmin_keyboard
 from states import AdminStates
 from classes.db_interface import DBI
-from classes.errors_sender import ErrorsSender
+from classes.errors_reporter import ErrorsReporter
 from utils import check_is_int
 
 
@@ -49,7 +50,7 @@ async def send_message_to_all_users_handler(message: Message) -> None:
                 logger.error(f"Пользователь {user} заблокировал бота", err)
                 result: bool = await DBI.deactivate_user(telegram_id=user)
                 if result:
-                    await ErrorsSender.send_report_to_admins(
+                    await ErrorsReporter.send_report_to_admins(
                         f"Пользователь {user} заблокировал бота. "
                         f"\nЕго аккаунт деактивирован.")
             except aiogram.utils.exceptions.CantInitiateConversation as err:
@@ -141,8 +142,8 @@ async def delete_all_proxies(message: Message, state: FSMContext) -> None:
 
     if message.text.lower() == "yes":
         await DBI.delete_all_proxy()
-        await ErrorsSender.send_report_to_admins(
-            f"Пользователь {message.from_user.id} удалил ВСЕ прокси.")
+        await ErrorsReporter.send_report_to_admins(
+            f"Пользователь {message.from_user.username}: {message.from_user.id} удалил ВСЕ прокси.")
         await state.finish()
         return
     await message.answer("Прокси не удалены.")
@@ -384,7 +385,8 @@ async def reboot_handler(message: Message) -> None:
         for user_telegram_id in await DBI.get_working_users():
             try:
                 await bot.send_message(user_telegram_id, text=text)
-                await DBI.set_user_is_not_work(str(user_telegram_id))
+                await DBI.set_user_is_not_work(user_telegram_id)
+                await InstancesStorage.reboot(user_telegram_id)
             except aiogram.utils.exceptions.ChatNotFound:
                 logger.warning(f"Chat {user_telegram_id} not found.")
 
