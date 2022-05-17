@@ -1,7 +1,6 @@
 import asyncio
 
 from classes.message_sender import MessageSender
-from config import SEMAPHORE
 from fake_data import datastore
 
 
