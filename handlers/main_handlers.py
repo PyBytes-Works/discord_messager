@@ -99,7 +99,7 @@ async def activate_valid_user_handler(message: Message):
             await message.answer("Добро пожаловать.", reply_markup=user_menu_keyboard())
             return
         await DBI.activate_user(telegram_id=user_telegram_id)
-        await message.answer("Аккаунт активирован.")
+        await message.answer("Аккаунт активирован.", reply_markup=user_menu_keyboard())
 
 
 @logger.catch
