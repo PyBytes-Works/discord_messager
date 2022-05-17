@@ -8,7 +8,7 @@ import aiohttp.http_exceptions
 
 from classes.db_interface import DBI
 from classes.errors_reporter import ErrorsReporter
-from config import logger, DISCORD_BASE_URL, PROXY_USER, PROXY_PASSWORD
+from config import logger, DISCORD_BASE_URL, PROXY_USER, PROXY_PASSWORD, SEMAPHORE
 from classes.token_datastorage import TokenData
 
 
@@ -105,6 +105,8 @@ class RequestSender(ABC):
 
 class GetRequest(RequestSender):
 
+    """Класс для отправки GET запросов"""
+
     async def _send(self) -> dict:
         conn = aiohttp.TCPConnector(verify_ssl=False)
         async with aiohttp.ClientSession(trust_env=True, connector=conn) as session:
@@ -118,6 +120,8 @@ class GetRequest(RequestSender):
 
 
 class PostRequest(RequestSender):
+
+    """Класс для отправки POST запросов"""
 
     def __init__(self):
         super().__init__()
@@ -137,28 +141,10 @@ class PostRequest(RequestSender):
                     "answer_data": await response.text()
                 }
 
-        # переписать на аиохттп
-        # session = requests.Session()
-        # self.proxy_data: dict = {
-        #     "http": f"http://{PROXY_USER}:{PROXY_PASSWORD}@{self.proxy}/",
-        #     "https": f"http://{PROXY_USER}:{PROXY_PASSWORD}@{self.proxy}/",
-        # }
-        # self._params: dict = {
-        #     'url': self.url,
-        #     "proxies": self.proxy_data,
-        #     "timeout": 25,
-        # }
-        # if self.token:
-        #     session.headers['authorization']: str = self.token
-        # self._params.update(json=self._data_for_send)
-        # response = session.post(**self._params)
-        # return {
-        #     "status": response.status_code,
-        #     "answer_data": response.text
-        # }
-
 
 class GetMe(GetRequest):
+
+    """Класс для получения дискорд_ид по токену"""
 
     async def get_discord_id(self, token: str, proxy: str) -> str:
         self.proxy = proxy
@@ -171,6 +157,8 @@ class GetMe(GetRequest):
 
 class ChannelData(GetRequest):
 
+    """Класс для получения сообщений из канала дискорда"""
+
     def __init__(self, datastore: 'TokenData'):
         super().__init__()
         self.datastore: 'TokenData' = datastore
@@ -179,6 +167,8 @@ class ChannelData(GetRequest):
 
 
 class ProxyChecker(GetRequest):
+
+    """Класс для проверки прокси"""
 
     def __init__(self):
         super().__init__()
@@ -210,6 +200,8 @@ class ProxyChecker(GetRequest):
 
 class TokenChecker(GetRequest):
 
+    """Класс для проверки токена в дискорд канале"""
+
     def __init__(self):
         super().__init__()
         self.channel: Union[str, int] = 0
@@ -225,6 +217,5 @@ class TokenChecker(GetRequest):
         self.url: str = DISCORD_BASE_URL + f'{self.channel}/messages?limit=1'
 
         answer: dict = await self._send_request()
-        status: int = answer.get("status")
-        if status == 200:
-            return True
+
+        return answer.get("status") == 200

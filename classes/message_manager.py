@@ -31,7 +31,7 @@ class MessageManager(ChannelData):
         self.datastore.current_message_id = 0
         self.datastore.text_to_send = ''
         # TODO поискать метод для получения сообщений за интервал времени, а не всех
-        all_messages = await self.__get_all_discord_messages()
+        all_messages: List[dict] = await self.__get_all_discord_messages()
         self._last_messages: List[dict] = await self.__get_last_messages(all_messages)
         if not await self.__get_message_id_and_text_for_send_answer():
             self.datastore.current_message_id = await self.__get_message_id_from_last_messages()
@@ -67,18 +67,6 @@ class MessageManager(ChannelData):
             self.datastore.current_message_id = 0
         return await self.__get_text_from_vocabulary()
 
-    @staticmethod
-    @logger.catch
-    def __get_delta_seconds(elem: dict) -> int:
-        """Возвращает время, в пределах которого надо найти сообщения
-        которое в секундах"""
-
-        message_time: 'datetime' = elem.get("timestamp")
-        mes_time: 'datetime' = datetime.datetime.fromisoformat(message_time).replace(tzinfo=None)
-        delta: 'timedelta' = datetime.datetime.utcnow().replace(tzinfo=None) - mes_time
-
-        return delta.seconds
-
     @logger.catch
     async def __get_my_replies(self) -> List[dict]:
         """Возвращает список всех упоминаний и реплаев наших токенов в
@@ -98,14 +86,29 @@ class MessageManager(ChannelData):
     async def __get_last_messages(self, all_messages: List[dict]) -> List[dict]:
         """Возвращает список всех сообщений за последнее время"""
 
-        if not all_messages:
+        is_not_dict: bool = any(map(lambda x: isinstance(x, str), all_messages))
+        if not all_messages or is_not_dict:
             return []
         return list(
             filter(
-                lambda x: self.__get_delta_seconds(x) < self.datastore.last_message_time,
+                lambda elem: self.__get_delta_seconds(elem) < self.datastore.last_message_time,
                 all_messages
             )
         )
+
+    @staticmethod
+    @logger.catch
+    def __get_delta_seconds(elem: dict) -> int:
+        """Возвращает время, в пределах которого надо найти сообщения
+        которое в секундах"""
+
+        if not isinstance(elem, dict):
+            return 0
+        message_time: 'datetime' = elem.get("timestamp")
+        mes_time: 'datetime' = datetime.datetime.fromisoformat(message_time).replace(tzinfo=None)
+        delta: 'timedelta' = datetime.datetime.utcnow().replace(tzinfo=None) - mes_time
+
+        return delta.seconds
 
     @logger.catch
     def __get_target_id(self, elem: dict) -> str:
@@ -184,7 +187,8 @@ class MessageManager(ChannelData):
         Returns length of replies list"""
 
         replies: 'RepliesManager' = RepliesManager(redis_key=self.datastore.telegram_id)
-        my_answered: List[dict] = await replies.get_not_answered_with_text(self.datastore.my_discord_id)
+        my_answered: List[
+            dict] = await replies.get_not_answered_with_text(self.datastore.my_discord_id)
         if my_answered:
             current_reply: dict = my_answered.pop()
             self.datastore.text_to_send = current_reply.get("answer_text")
