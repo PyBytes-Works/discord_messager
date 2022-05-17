@@ -125,6 +125,7 @@ class ErrorsReporter:
             text = (
                 f'Ошибка прокси.'
                 f'\nОбратитесь к администратору. Код ошибки 407')
+            users = False
             admins = True
         elif self._status == 429:
             if self._code == 20016:
@@ -155,6 +156,8 @@ class ErrorsReporter:
                     f"\nСлишком большая нагрузка на канал")
         elif self._status == 502:
             text = f"Внутренняя ошибка сервера Дискорда. Код ошибки - 502 Bad Gateway"
+        elif self._status == 503:
+            text = f"Код ошибки - 503"
         elif self._status == 504:
             text = f"Внутренняя ошибка сервера Дискорда. Код ошибки - [{self._status}]"
         else:
