@@ -52,11 +52,11 @@ async def answer_to_reply_handler(callback: CallbackQuery, state: FSMContext):
         await state.update_data(message_id=message_id)
     except aiogram.utils.exceptions.MessageToDeleteNotFound:
         logger.warning("Не нашел сообщение для удаления.")
-        await state.finish()
+    await state.finish()
+    try:
+        await callback.answer()
     except aiogram.utils.exceptions.InvalidQueryID:
         logger.warning("Сообщение просрочено.")
-        await state.finish()
-    await callback.answer()
 
 
 @logger.catch
