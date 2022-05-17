@@ -109,8 +109,8 @@ class GetRequest(RequestSender):
     """Класс для отправки GET запросов"""
 
     async def _send(self) -> dict:
-        conn = aiohttp.TCPConnector(verify_ssl=False)
-        async with aiohttp.ClientSession(trust_env=self.trust_env, connector=conn) as session:
+        # conn = aiohttp.TCPConnector(verify_ssl=False)
+        async with aiohttp.ClientSession(trust_env=self.trust_env) as session:
             if self.token:
                 session.headers['authorization']: str = self.token
             async with session.get(**self._params) as response:
@@ -130,8 +130,8 @@ class PostRequest(RequestSender):
     async def _send(self) -> dict:
         """Отправляет данные в дискорд канал"""
 
-        conn = aiohttp.TCPConnector(verify_ssl=False)
-        async with aiohttp.ClientSession(trust_env=self.trust_env, connector=conn) as session:
+        # conn = aiohttp.TCPConnector(verify_ssl=False)
+        async with aiohttp.ClientSession(trust_env=self.trust_env) as session:
             if self.token:
                 session.headers['authorization']: str = self.token
             self._params.update(json=self._data_for_send)
