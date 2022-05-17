@@ -8,7 +8,7 @@ import aiohttp.http_exceptions
 
 from classes.db_interface import DBI
 from classes.errors_reporter import ErrorsReporter
-from config import logger, DISCORD_BASE_URL, PROXY_USER, PROXY_PASSWORD, SEMAPHORE
+from config import logger, DISCORD_BASE_URL, PROXY_USER, PROXY_PASSWORD
 from classes.token_datastorage import TokenData
 
 
@@ -23,6 +23,7 @@ class RequestSender(ABC):
         self._error_params: dict = {}
         self.datastore: Optional['TokenData'] = None
         self.trust_env: bool = False
+        self.timeout: int = 10
 
     @abstractmethod
     async def _send(self, *args, **kwargs) -> dict:
@@ -57,33 +58,34 @@ class RequestSender(ABC):
             'url': self.url,
             "proxy": self.proxy_data,
             "ssl": False,
-            "timeout": 25,
+            "timeout": self.timeout,
         }
 
         text: str = ''
         try:
+            await asyncio.sleep(3)
             answer: dict = await self._send()
         except asyncio.exceptions.TimeoutError as err:
-            logger.error(f"{self._send_request.__qualname__}: asyncio.exceptions.TimeoutError: {err}")
+            logger.error(f"asyncio.exceptions.TimeoutError: {err}")
             answer.update(status=-99)
         except aiohttp.http_exceptions.BadHttpMessage as err:
-            logger.error(f"{self._send_request.__qualname__}: aiohttp.http_exceptions.BadHttpMessage: {err}")
+            logger.error(f"aiohttp.http_exceptions.BadHttpMessage: {err}")
             answer.update(status=407)
         except aiohttp.client_exceptions.ClientHttpProxyError as err:
-            logger.error(f"{self._send_request.__qualname__}: aiohttp.client_exceptions.ClientHttpProxyError: {err}")
+            logger.error(f"aiohttp.client_exceptions.ClientHttpProxyError: {err}")
             answer.update(status=407)
         except aiohttp.client_exceptions.ClientConnectorError as err:
-            logger.error(f"{self._send_request.__qualname__}: aiohttp.client_exceptions.ClientConnectorError: {err}")
+            logger.error(f"aiohttp.client_exceptions.ClientConnectorError: {err}")
             answer.update(status=407)
         except aiohttp.client_exceptions.ServerDisconnectedError as err:
-            logger.error(f"{self._send_request.__qualname__}: aiohttp.client_exceptions.ServerDisconnectedError: {err}")
+            logger.error(f"aiohttp.client_exceptions.ServerDisconnectedError: {err}")
         except aiohttp.client_exceptions.ClientOSError as err:
-            logger.error(f"{self._send_request.__qualname__}: aiohttp.client_exceptions.ClientOSError: {err}")
+            logger.error(f"aiohttp.client_exceptions.ClientOSError: {err}")
             answer.update(status=-98)
         except aiohttp.client_exceptions.TooManyRedirects as err:
-            text = f"{self._send_request.__qualname__}: aiohttp.client_exceptions.TooManyRedirects: {err}"
+            text = f"aiohttp.client_exceptions.TooManyRedirects: {err}"
         except Exception as err:
-            text = f"{self._send_request.__qualname__}: Exception: {err}"
+            text = f"Exception: {err}"
 
         if text:
             logger.error(f"\n{self._send_request.__qualname__}: {text}")
@@ -109,8 +111,8 @@ class GetRequest(RequestSender):
     """Класс для отправки GET запросов"""
 
     async def _send(self) -> dict:
-        # conn = aiohttp.TCPConnector(verify_ssl=False)
-        async with aiohttp.ClientSession(trust_env=self.trust_env) as session:
+        conn = aiohttp.TCPConnector(verify_ssl=False)
+        async with aiohttp.ClientSession(trust_env=self.trust_env, connector=conn) as session:
             if self.token:
                 session.headers['authorization']: str = self.token
             async with session.get(**self._params) as response:
@@ -130,8 +132,8 @@ class PostRequest(RequestSender):
     async def _send(self) -> dict:
         """Отправляет данные в дискорд канал"""
 
-        # conn = aiohttp.TCPConnector(verify_ssl=False)
-        async with aiohttp.ClientSession(trust_env=self.trust_env) as session:
+        conn = aiohttp.TCPConnector(verify_ssl=False)
+        async with aiohttp.ClientSession(trust_env=self.trust_env, connector=conn) as session:
             if self.token:
                 session.headers['authorization']: str = self.token
             self._params.update(json=self._data_for_send)
