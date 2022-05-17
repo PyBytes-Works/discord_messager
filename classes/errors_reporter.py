@@ -125,6 +125,7 @@ class ErrorsReporter:
             text = (
                 f'Ошибка прокси.'
                 f'\nОбратитесь к администратору. Код ошибки 407')
+            users = False
             admins = True
         elif self._status == 429:
             if self._code == 20016:
