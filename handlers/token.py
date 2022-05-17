@@ -413,6 +413,7 @@ async def rename_channel_handler(callback: CallbackQuery, state: FSMContext) -> 
 @logger.catch
 async def set_user_channel_name(message: Message, state: FSMContext) -> None:
     """Хэндлер для переименования канала """
+
     if await DBI.is_expired_user_deactivated(message):
         return
     name = message.text

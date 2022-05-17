@@ -8,7 +8,7 @@ import aiohttp.http_exceptions
 
 from classes.db_interface import DBI
 from classes.errors_reporter import ErrorsReporter
-from config import logger, DISCORD_BASE_URL, PROXY_USER, PROXY_PASSWORD, semaphore
+from config import logger, DISCORD_BASE_URL, PROXY_USER, PROXY_PASSWORD, SEMAPHORE
 from classes.token_datastorage import TokenData
 
 
@@ -61,8 +61,7 @@ class RequestSender(ABC):
 
         text: str = ''
         try:
-            async with semaphore:
-                answer: dict = await self._send()
+            answer: dict = await self._send()
         except asyncio.exceptions.TimeoutError as err:
             logger.error(f"{self._send_request.__qualname__}: asyncio.exceptions.TimeoutError: {err}")
             answer.update(status=-99)
