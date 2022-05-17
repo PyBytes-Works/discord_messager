@@ -14,10 +14,10 @@ from classes.token_datastorage import TokenData
 
 class RequestSender(ABC):
 
-    def __init__(self):
+    def __init__(self, url: str = ''):
         self.proxy: str = ''
         self.token: str = ''
-        self.url: str = ''
+        self.url: str = url
         self.telegram_id: str = ''
         self._params: dict = {}
         self._error_params: dict = {}
@@ -109,6 +109,9 @@ class RequestSender(ABC):
 
 class GetRequest(RequestSender):
     """Класс для отправки GET запросов"""
+
+    def __init__(self):
+        super().__init__()
 
     async def _send(self) -> dict:
         conn = aiohttp.TCPConnector(verify_ssl=False)
