@@ -33,9 +33,9 @@ jobs:
       - name: Executing remote ssh commands using ssh key
         uses: appleboy/ssh-action@master
         with:
-          host: ${{ secrets.HOST_PROD }}
+          host: ${{ secrets.AMAZON_HOST }}
           username: ${{ secrets.USERNAME }}
-          key: ${{ secrets.SSH_KEY_PROD }}
+          key: ${{ secrets.SSH_KEY_AMAZON }}
           script: |
             cd "/home/${{ secrets.USERNAME }}/deploy/${{ env.PROJECT_NAME }}/${{ env.STAGE }}"
             docker-compose -f docker-compose-${{ env.PROJECT_NAME}}-${{ env.STAGE }}.yml down
