@@ -41,7 +41,6 @@ class MessageSender(PostRequest):
         self._data_for_send = self.datastore.data_for_send
 
         await self._typing()
-        await self._typing()
 
         self.url = DISCORD_BASE_URL + f'{self.channel}/messages?'
         return await self._send_request()
