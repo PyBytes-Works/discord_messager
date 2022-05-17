@@ -8,7 +8,7 @@ import aiohttp.http_exceptions
 
 from classes.db_interface import DBI
 from classes.errors_reporter import ErrorsReporter
-from config import logger, DISCORD_BASE_URL, PROXY_USER, PROXY_PASSWORD
+from config import logger, DISCORD_BASE_URL, PROXY_USER, PROXY_PASSWORD, semaphore
 from classes.token_datastorage import TokenData
 
 
@@ -61,7 +61,8 @@ class RequestSender(ABC):
 
         text: str = ''
         try:
-            answer: dict = await self._send()
+            async with semaphore:
+                answer: dict = await self._send()
         except asyncio.exceptions.TimeoutError as err:
             logger.error(f"{self._send_request.__qualname__}: asyncio.exceptions.TimeoutError: {err}")
             answer.update(status=-99)
@@ -105,6 +106,8 @@ class RequestSender(ABC):
 
 class GetRequest(RequestSender):
 
+    """Класс для отправки GET запросов"""
+
     async def _send(self) -> dict:
         conn = aiohttp.TCPConnector(verify_ssl=False)
         async with aiohttp.ClientSession(trust_env=True, connector=conn) as session:
@@ -118,6 +121,8 @@ class GetRequest(RequestSender):
 
 
 class PostRequest(RequestSender):
+
+    """Класс для отправки POST запросов"""
 
     def __init__(self):
         super().__init__()
@@ -140,6 +145,8 @@ class PostRequest(RequestSender):
 
 class GetMe(GetRequest):
 
+    """Класс для получения дискорд_ид по токену"""
+
     async def get_discord_id(self, token: str, proxy: str) -> str:
         self.proxy = proxy
         self.token = token
@@ -151,6 +158,8 @@ class GetMe(GetRequest):
 
 class ChannelData(GetRequest):
 
+    """Класс для получения сообщений из канала дискорда"""
+
     def __init__(self, datastore: 'TokenData'):
         super().__init__()
         self.datastore: 'TokenData' = datastore
@@ -159,6 +168,8 @@ class ChannelData(GetRequest):
 
 
 class ProxyChecker(GetRequest):
+
+    """Класс для проверки прокси"""
 
     def __init__(self):
         super().__init__()
@@ -190,6 +201,8 @@ class ProxyChecker(GetRequest):
 
 class TokenChecker(GetRequest):
 
+    """Класс для проверки токена в дискорд канале"""
+
     def __init__(self):
         super().__init__()
         self.channel: Union[str, int] = 0
@@ -205,6 +218,5 @@ class TokenChecker(GetRequest):
         self.url: str = DISCORD_BASE_URL + f'{self.channel}/messages?limit=1'
 
         answer: dict = await self._send_request()
-        status: int = answer.get("status")
-        if status == 200:
-            return True
+
+        return answer.get("status") == 200
