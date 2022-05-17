@@ -50,13 +50,13 @@ async def answer_to_reply_handler(callback: CallbackQuery, state: FSMContext):
         await bot.delete_message(callback.message.chat.id, callback.message.message_id)
         await callback.message.answer('Введите текст ответа:')
         await state.update_data(message_id=message_id)
-    except aiogram.utils.exceptions.MessageToDeleteNotFound:
-        logger.warning("Не нашел сообщение для удаления.")
-        await state.finish()
-    except aiogram.utils.exceptions.InvalidQueryID:
-        logger.warning("Сообщение просрочено.")
-        await state.finish()
-    await callback.answer()
+    except aiogram.utils.exceptions.MessageToDeleteNotFound as err:
+        logger.warning(f"Не нашел сообщение для удаления. \n{err}")
+    await state.finish()
+    try:
+        await callback.answer(cache_time=1000)
+    except aiogram.utils.exceptions.InvalidQueryID as err:
+        logger.warning(f"Сообщение просрочено. \n{err}")
 
 
 @logger.catch
