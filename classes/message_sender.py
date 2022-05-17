@@ -35,14 +35,12 @@ class MessageSender(PostRequest):
         :return:
         """
 
-        await asyncio.sleep(1)
         self.token = self.datastore.token
         self.proxy = self.datastore.proxy
         self.channel = self.datastore.channel
         self._data_for_send = self.datastore.data_for_send
 
         await self._typing()
-        await asyncio.sleep(2)
         await self._typing()
 
         self.url = DISCORD_BASE_URL + f'{self.channel}/messages?'
