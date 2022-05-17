@@ -324,7 +324,10 @@ async def delete_token_handler(callback: CallbackQuery, state: FSMContext) -> No
         token_pk: int = int(callback.data.rsplit('_', maxsplit=1)[-1])
         await DBI.delete_token_by_pk(token_pk=token_pk)
         await callback.message.answer("Токен удален.", reply_markup=user_menu_keyboard())
-        await callback.message.delete()
+        try:
+            await callback.message.delete()
+        except aiogram.utils.exceptions.MessageToDeleteNotFound as err:
+            logger.error(err)
         await state.finish()
     await callback.answer()
 
