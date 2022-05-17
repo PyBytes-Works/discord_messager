@@ -63,7 +63,7 @@ class RequestSender(ABC):
 
         text: str = ''
         try:
-            await asyncio.sleep(3)
+            await asyncio.sleep(2)
             answer: dict = await self._send()
         except asyncio.exceptions.TimeoutError as err:
             logger.error(f"asyncio.exceptions.TimeoutError: {err}")
