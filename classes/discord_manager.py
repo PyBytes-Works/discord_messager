@@ -99,6 +99,9 @@ class DiscordManager:
 
     @logger.catch
     async def _check_user_active(self):
+
+        # TODO добавить проверку на админа/суперадмина
+
         user_deactivated: bool = await DBI.is_expired_user_deactivated(self.message)
         user_is_work: bool = await DBI.is_user_work(telegram_id=self._telegram_id)
         if user_deactivated or not user_is_work:
