@@ -68,19 +68,19 @@ class RedisDB:
         self.data: list = data
         if timeout_sec:
             self.timeout_sec: int = timeout_sec
-        with self.semaphore:
+        async with self.semaphore:
             await self._send_request_do_redis_db(key="set")
 
     @logger.catch
     async def load(self) -> list:
         """Возвращает десериализованные данные из Редис (список)"""
 
-        with self.semaphore:
+        async with self.semaphore:
             return await self._send_request_do_redis_db(key="get")
 
     @logger.catch
     async def delete(self, mate_id: str) -> List[dict]:
         """Удаляет данные из Редис для себя и напарника"""
 
-        with self.semaphore:
+        async with self.semaphore:
             return await self._send_request_do_redis_db(key="del", mate_id=mate_id)
