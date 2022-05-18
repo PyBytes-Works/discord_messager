@@ -73,6 +73,14 @@ class ErrorsReporter:
         if self._status == 0:
             # See logs
             pass
+        elif self._status == -96:
+            text: str = f'Ошибка ServerDisconnectedError ПРОКСИ НЕ РАБОТАЕТ!!!'
+            admins = True
+            users = False
+        elif self._status == -97:
+            text: str = f'Ошибка TooManyRedirects.'
+            admins = True
+            users = False
         elif self._status == -98:
             text: str = f'Ошибка ClientOSError (возникает при частых запросах)'
             admins = True
