@@ -24,6 +24,7 @@ class RequestSender(ABC):
         self.datastore: Optional['TokenData'] = None
         self.trust_env: bool = False
         self.timeout: int = 30
+        self.request_delay: int = 3
 
     @abstractmethod
     async def _send(self, *args, **kwargs) -> dict:
@@ -76,17 +77,14 @@ class RequestSender(ABC):
                                f"\nChannel: {self.datastore.channel}"
                                f"\nToken: {self.datastore.token}"
                 )
-                await asyncio.sleep(2)
+                await asyncio.sleep(self.request_delay)
                 answer: dict = await self._send()
                 logger.warning(f"\n\t\tAnswer status: "
                                f"\n\t\t{answer.get('status')}")
             else:
-                await asyncio.sleep(2)
+                await asyncio.sleep(self.request_delay)
                 answer: dict = await self._send()
 
-        except asyncio.exceptions.TimeoutError as err:
-            logger.error(f"asyncio.exceptions.TimeoutError: {err}")
-            answer.update(status=-99)
         except aiohttp.http_exceptions.BadHttpMessage as err:
             logger.error(f"aiohttp.http_exceptions.BadHttpMessage: {err}")
             answer.update(status=407)
@@ -99,12 +97,15 @@ class RequestSender(ABC):
         except aiohttp.client_exceptions.ServerDisconnectedError as err:
             logger.error(f"aiohttp.client_exceptions.ServerDisconnectedError: {err}")
             answer.update(status=-96)
-        except aiohttp.client_exceptions.ClientOSError as err:
-            logger.error(f"aiohttp.client_exceptions.ClientOSError: {err}")
-            answer.update(status=-98)
         except aiohttp.client_exceptions.TooManyRedirects as err:
             text = f"aiohttp.client_exceptions.TooManyRedirects: {err}"
             answer.update(status=-97)
+        except aiohttp.client_exceptions.ClientOSError as err:
+            logger.error(f"aiohttp.client_exceptions.ClientOSError: {err}")
+            answer.update(status=-98)
+        except asyncio.exceptions.TimeoutError as err:
+            logger.error(f"asyncio.exceptions.TimeoutError: {err}")
+            answer.update(status=-99)
         except Exception as err:
             text = f"Exception: {err}"
 

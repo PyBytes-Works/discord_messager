@@ -19,6 +19,3 @@ async def test_get_request_wrong_url():
     }
     answer: dict = await spam._send()
     assert answer.get("status") == 404
-
-
-# TODO написать тесты для овердофига запросов и для PostRequest

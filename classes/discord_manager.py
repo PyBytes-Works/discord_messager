@@ -166,14 +166,14 @@ class DiscordManager:
             self.__workers = []
             await self._set_delay_equal_channel_cooldown()
             code: int = answer.get("answer_data", {}).get("code")
-            token_deleted: bool = code in (50013, 50001)
             token_wrong: bool = (status == 401 and code == 0)
-            if token_deleted or token_wrong:
+            if status == 403 or token_wrong:
                 await self.form_new_tokens_pairs()
         logger.warning(
-            f"\nError [{answer}]"
             f"\nUser: [{self.datastore.telegram_id}]"
-            f"\nDeleting workers and sleep {self.delay} seconds.")
+            f"\nDeleting workers and sleep {self.delay} seconds."
+            f"\nError [{answer}]"
+        )
 
     @logger.catch
     async def _set_delay_equal_channel_cooldown(self):

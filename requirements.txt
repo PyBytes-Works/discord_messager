@@ -3,5 +3,5 @@ aioredis==2.0.1
 loguru==0.5.3
 openai==0.18.1
 peewee==3.14.8
-psycopg2-binary==2.9.3
+psycopg2==2.9.3
 python-dotenv==0.19.2
