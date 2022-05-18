@@ -78,8 +78,8 @@ class RequestSender(ABC):
                 )
                 await asyncio.sleep(2)
                 answer: dict = await self._send()
-                logger.warning(f"\n\t\tAnswer: "
-                            f"\n\t\t{answer}")
+                logger.warning(f"\n\t\tAnswer status: "
+                               f"\n\t\t{answer.get('status')}")
             else:
                 await asyncio.sleep(2)
                 answer: dict = await self._send()
