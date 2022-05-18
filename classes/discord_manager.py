@@ -157,11 +157,13 @@ class DiscordManager:
         status = answer.get("status")
         if status == 200:
             return
-        elif status in (407, 429):
+        elif status in (403, 407, 429):
             self.__workers = []
             await self._set_delay_equal_channel_cooldown()
             code: int = answer.get("answer_data", {}).get("code")
-            if code == 40062:
+            token_deleted: bool = code in (50013, 50001)
+            token_wrong: bool = (status == 401 and code == 0)
+            if token_deleted or token_wrong:
                 await self.form_new_tokens_pairs()
         logger.warning(
             f"\nError [{answer}]"
