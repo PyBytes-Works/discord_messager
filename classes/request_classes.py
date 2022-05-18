@@ -24,6 +24,7 @@ class RequestSender(ABC):
         self.datastore: Optional['TokenData'] = None
         self.trust_env: bool = False
         self.timeout: int = 30
+        self.request_delay: int = 3
 
     @abstractmethod
     async def _send(self, *args, **kwargs) -> dict:
@@ -76,12 +77,12 @@ class RequestSender(ABC):
                                f"\nChannel: {self.datastore.channel}"
                                f"\nToken: {self.datastore.token}"
                 )
-                await asyncio.sleep(2)
+                await asyncio.sleep(self.request_delay)
                 answer: dict = await self._send()
                 logger.warning(f"\n\t\tAnswer status: "
                                f"\n\t\t{answer.get('status')}")
             else:
-                await asyncio.sleep(2)
+                await asyncio.sleep(self.request_delay)
                 answer: dict = await self._send()
 
         except asyncio.exceptions.TimeoutError as err:
