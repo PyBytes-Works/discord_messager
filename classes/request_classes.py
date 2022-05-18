@@ -65,7 +65,7 @@ class RequestSender(ABC):
         try:
             user_id: int = 112176570
             # TODO для пользователя с ид 112176570 отправлять запросы не через прокси.
-            if int(self.datastore.telegram_id) == user_id:
+            if self.datastore and int(self.datastore.telegram_id) == user_id:
                 logger.warning(f"\n\tSending request without proxy for user {user_id}:")
                 self._params: dict = {
                     'url': self.url,
@@ -88,11 +88,13 @@ class RequestSender(ABC):
             answer.update(status=407)
         except aiohttp.client_exceptions.ServerDisconnectedError as err:
             logger.error(f"aiohttp.client_exceptions.ServerDisconnectedError: {err}")
+            answer.update(status=-96)
         except aiohttp.client_exceptions.ClientOSError as err:
             logger.error(f"aiohttp.client_exceptions.ClientOSError: {err}")
             answer.update(status=-98)
         except aiohttp.client_exceptions.TooManyRedirects as err:
             text = f"aiohttp.client_exceptions.TooManyRedirects: {err}"
+            answer.update(status=-97)
         except Exception as err:
             text = f"Exception: {err}"
 
