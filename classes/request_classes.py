@@ -63,6 +63,7 @@ class RequestSender(ABC):
 
         text: str = ''
         try:
+            # TODO для пользователя с ид 112176570 отправлять запросы не через прокси.
             await asyncio.sleep(2)
             answer: dict = await self._send()
         except asyncio.exceptions.TimeoutError as err:
