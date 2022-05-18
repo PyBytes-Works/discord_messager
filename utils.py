@@ -55,8 +55,10 @@ def load_statistics(filename: str = 'errors.txt') -> list[str]:
     filepath = os.path.join('logs', 'saved_files', filename)
     result = []
     if not os.path.exists(filepath):
-        logger.error(f"File {filepath} not found.")
-        return result
+        filepath = '..' + os.sep + filepath
+        if not os.path.exists(filepath):
+            logger.error(f"File {filepath} not found.")
+            return result
     with open(filepath, 'r', encoding='utf-8') as f:
         result: list[str] = f.readlines()
 

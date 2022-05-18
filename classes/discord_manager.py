@@ -57,12 +57,10 @@ class DiscordManager:
         """Show must go on
         Запускает рабочий цикл бота, проверяет ошибки."""
 
-        # logger.info(f"\n\tUSER: {self.__username}: {self.__telegram_id} - Game begin.")
         await self._get_all_discord_ids()
 
         while self.is_working:
             await self._lets_play()
-        # logger.info(f"\n\tUSER: {self.__username}: {self.__telegram_id} - Game over.")
 
     @logger.catch
     async def __check_reboot(self) -> None:
