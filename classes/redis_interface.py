@@ -20,6 +20,8 @@ class RedisDB:
 
         result: list = []
         name: str = mate_id if mate_id else self.redis_key
+        if not name:
+            return []
         data: list = data if data else self.data
         log_data: str = (
             f"\nData:"

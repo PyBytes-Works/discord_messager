@@ -33,7 +33,6 @@ class Vocabulary:
     @logger.catch
     def __count_symbols(cls, count: int):
         cls.__SYMBOLS_COUNT += count
-        logger.info(f"Total symbols sent: {cls.__SYMBOLS_COUNT}")
 
     @classmethod
     @logger.catch
