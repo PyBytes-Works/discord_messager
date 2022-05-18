@@ -114,7 +114,7 @@ class ErrorsReporter:
                 )
             elif self._code == 40002:
                 text: str = (
-                    "You need to verify your account in order to perform this action."
+                    "Необходимо подтвердить учетную запись дискорда."
                     "(Ошибка 403 - 40002)"
                 )
             else:
