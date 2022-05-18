@@ -57,6 +57,8 @@ class DiscordManager:
         """Show must go on
         Запускает рабочий цикл бота, проверяет ошибки."""
 
+        # TODO сделать команду для отображения работающих в данный момент пользователей
+
         await self._get_all_discord_ids()
 
         while self.is_working:
