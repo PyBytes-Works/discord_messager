@@ -57,12 +57,10 @@ class DiscordManager:
         """Show must go on
         Запускает рабочий цикл бота, проверяет ошибки."""
 
-        # logger.info(f"\n\tUSER: {self.__username}: {self.__telegram_id} - Game begin.")
         await self._get_all_discord_ids()
 
         while self.is_working:
             await self._lets_play()
-        # logger.info(f"\n\tUSER: {self.__username}: {self.__telegram_id} - Game over.")
 
     @logger.catch
     async def __check_reboot(self) -> None:
@@ -101,6 +99,9 @@ class DiscordManager:
 
     @logger.catch
     async def _check_user_active(self):
+
+        # TODO добавить проверку на админа/суперадмина
+
         user_deactivated: bool = await DBI.is_expired_user_deactivated(self.message)
         user_is_work: bool = await DBI.is_user_work(telegram_id=self._telegram_id)
         if user_deactivated or not user_is_work:
@@ -159,11 +160,13 @@ class DiscordManager:
         status = answer.get("status")
         if status == 200:
             return
-        elif status in (407, 429):
+        elif status in (403, 407, 429):
             self.__workers = []
             await self._set_delay_equal_channel_cooldown()
             code: int = answer.get("answer_data", {}).get("code")
-            if code == 40062:
+            token_deleted: bool = code in (50013, 50001)
+            token_wrong: bool = (status == 401 and code == 0)
+            if token_deleted or token_wrong:
                 await self.form_new_tokens_pairs()
         logger.warning(
             f"\nError [{answer}]"
