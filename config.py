@@ -68,13 +68,14 @@ if not os.path.exists('./logs'):
 today = datetime.datetime.today().strftime("%Y-%m-%d")
 errors_file_path = os.path.join(PATH, LOGGING_DIRECTORY, today, ERRORS_FILENAME)
 warnings_file_path = os.path.join(PATH, LOGGING_DIRECTORY, today, WARNINGS_FILENAME)
+json_file_path = os.path.join(PATH, LOGGING_DIRECTORY, today, 'errors.json')
 DEBUG_LEVEL = "INFO"
 if DEBUG:
     DEBUG_LEVEL = "DEBUG"
 logger.remove()
 logger.add(sink=errors_file_path, enqueue=True, level='ERROR', rotation="50 MB")
 logger.add(sink=warnings_file_path, enqueue=True, level='WARNING', rotation="50 MB")
-logger.add(sink='errors.json', enqueue=True, level='WARNING', rotation="50 MB", serialize=True)
+logger.add(sink=json_file_path, enqueue=True, level='WARNING', rotation="50 MB", serialize=True)
 logger.add(sink=sys.stdout, level=DEBUG_LEVEL)
 logger.configure(
     levels=[
