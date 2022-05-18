@@ -68,7 +68,7 @@ if not os.path.exists('./logs'):
 today = datetime.datetime.today().strftime("%Y-%m-%d")
 errors_file_path = os.path.join(PATH, LOGGING_DIRECTORY, today, ERRORS_FILENAME)
 warnings_file_path = os.path.join(PATH, LOGGING_DIRECTORY, today, WARNINGS_FILENAME)
-json_file_path = os.path.join(PATH, LOGGING_DIRECTORY, today, 'errors.json')
+json_file_path = os.path.join(PATH, LOGGING_DIRECTORY, today, 'errors.txt')
 DEBUG_LEVEL = "INFO"
 if DEBUG:
     DEBUG_LEVEL = "DEBUG"
