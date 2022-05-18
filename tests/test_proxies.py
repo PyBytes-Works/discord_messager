@@ -1,4 +1,3 @@
-import asyncio
 import datetime
 
 import aiohttp
@@ -20,6 +19,18 @@ async def test_all_proxies():
 
     print("test_all_proxies start")
     counter = 0
+    proxies = (
+        "191.101.148.69:45785",
+        "50.114.84.57:45785",
+        "108.165.218.24:45785",
+        "64.137.24.253:45785",
+        "185.240.120.61:45785",
+        "166.1.8.227:45785",
+        "216.162.209.189:45785",
+        "45.152.177.17:45785",
+        "2.59.60.149:45785",
+        "104.227.110.173:45785",
+    )
     for proxy in proxies:
         t0 = datetime.datetime.now()
         print(f"\nChecking proxy: {proxy} at {t0}")
@@ -31,21 +42,3 @@ async def test_all_proxies():
     print(f"Total proxies: {len(proxies)}")
     print(f"Working: {counter}")
 
-
-if __name__ == '__main__':
-    proxies = (
-        "185.242.85.250:45785",
-        "80.82.222.140:45785",
-        "46.228.205.187:45785",
-        "62.113.216.167:45785",
-        "54.38.154.153:45785",
-        "185.17.123.31:45785",
-        "51.68.178.15:45785",
-        "195.54.32.129:45785",
-        "51.38.116.213:45785",
-        "213.226.71.112:45785",
-    )
-    try:
-        asyncio.new_event_loop().run_until_complete(test_all_proxies())
-    except KeyboardInterrupt:
-        pass
