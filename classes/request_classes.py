@@ -66,14 +66,24 @@ class RequestSender(ABC):
             user_id: int = 112176570
             # TODO для пользователя с ид 112176570 отправлять запросы не через прокси.
             if self.datastore and int(self.datastore.telegram_id) == user_id:
-                logger.warning(f"\n\tSending request without proxy for user {user_id}:")
                 self._params: dict = {
                     'url': self.url,
                     "ssl": False,
                     "timeout": self.timeout,
                 }
-            await asyncio.sleep(2)
-            answer: dict = await self._send()
+                logger.warning(f"\n\tSending request without proxy for user {user_id}:"
+                               f"\nURL: {self.url}"
+                               f"\nChannel: {self.datastore.channel}"
+                               f"\nToken: {self.datastore.token}"
+                )
+                await asyncio.sleep(2)
+                answer: dict = await self._send()
+                logger.warning(f"\n\t\tAnswer: "
+                            f"\n\t\t{answer}")
+            else:
+                await asyncio.sleep(2)
+                answer: dict = await self._send()
+
         except asyncio.exceptions.TimeoutError as err:
             logger.error(f"asyncio.exceptions.TimeoutError: {err}")
             answer.update(status=-99)
