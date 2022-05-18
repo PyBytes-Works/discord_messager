@@ -85,9 +85,6 @@ class RequestSender(ABC):
                 await asyncio.sleep(self.request_delay)
                 answer: dict = await self._send()
 
-        except asyncio.exceptions.TimeoutError as err:
-            logger.error(f"asyncio.exceptions.TimeoutError: {err}")
-            answer.update(status=-99)
         except aiohttp.http_exceptions.BadHttpMessage as err:
             logger.error(f"aiohttp.http_exceptions.BadHttpMessage: {err}")
             answer.update(status=407)
@@ -100,12 +97,15 @@ class RequestSender(ABC):
         except aiohttp.client_exceptions.ServerDisconnectedError as err:
             logger.error(f"aiohttp.client_exceptions.ServerDisconnectedError: {err}")
             answer.update(status=-96)
-        except aiohttp.client_exceptions.ClientOSError as err:
-            logger.error(f"aiohttp.client_exceptions.ClientOSError: {err}")
-            answer.update(status=-98)
         except aiohttp.client_exceptions.TooManyRedirects as err:
             text = f"aiohttp.client_exceptions.TooManyRedirects: {err}"
             answer.update(status=-97)
+        except aiohttp.client_exceptions.ClientOSError as err:
+            logger.error(f"aiohttp.client_exceptions.ClientOSError: {err}")
+            answer.update(status=-98)
+        except asyncio.exceptions.TimeoutError as err:
+            logger.error(f"asyncio.exceptions.TimeoutError: {err}")
+            answer.update(status=-99)
         except Exception as err:
             text = f"Exception: {err}"
 
