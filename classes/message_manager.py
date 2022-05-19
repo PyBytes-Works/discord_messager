@@ -135,7 +135,7 @@ class MessageManager(ChannelData):
                 "author": elem.get("author", {}).get("username", 'no author'),
                 "text": elem.get("content", '[no content]'),
                 "message_id": elem.get("id", 0),
-                "to_message": elem.get("referenced_message", {}).get("content", 'mention'),
+                "to_message": elem.get("referenced_message", {}).get("content", 'what?'),
                 "to_user": self.__get_target_username(elem),
                 "target_id": self.__get_target_id(elem)
             }
@@ -248,7 +248,7 @@ class MessageManager(ChannelData):
     async def __get_openai_answer(text: str) -> str:
         if not text:
             return ''
-        return OpenAI().get_answer(text.strip())
+        return await OpenAI().get_answer(text.strip())
 
     @logger.catch
     async def __get_data_for_send(self) -> None:
@@ -285,8 +285,3 @@ class MessageManager(ChannelData):
     @logger.catch
     def _ten_from_hundred() -> bool:
         return random.randint(1, 100) <= 10
-
-    # @staticmethod
-    # @logger.catch
-    # def _fifty_fifty() -> bool:
-    #     return random.randint(1, 100) <= 50
