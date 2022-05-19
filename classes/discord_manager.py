@@ -209,7 +209,7 @@ class DiscordManager:
     async def _sleep(self) -> None:
         """Спит на время ближайшего токена."""
 
-        logger.debug(await self.__get_full_info())
+        # logger.debug(await self.__get_full_info())
         if self.__workers:
             return
         await self._get_delay()
@@ -264,33 +264,28 @@ class DiscordManager:
     @logger.catch
     async def __get_second_closest_token_time(self) -> namedtuple:
         """Возвращает время второго ближайшего токена"""
-        tokens = sorted(self.__related_tokens, key=lambda x: x.last_message_time.timestamp() + x.cooldown)
-        logger.debug(f"\n\t\tSorted tokens:")
-        for elem in tokens:
-            print(f"\t\t{elem}")
-        result = tokens[1]
-        logger.debug(f"{result=}")
-        return result
+
+        return sorted(
+            self.__related_tokens,
+            key=lambda x: x.last_message_time.timestamp() + x.cooldown
+        )[1]
 
     @logger.catch
     async def _get_delay(self) -> None:
         """Сохраняет время паузы взяв его из второго в очереди на работу токена"""
 
-        # Delay может быть уже задан в функции _set_delay_equal_channel_cooldown
-        if self.delay:
+        if self.delay:  # Delay может быть уже задан в функции: _set_delay_equal_channel_cooldown
             return
         token_data: namedtuple = await self.__get_second_closest_token_time()
         message_time: int = int(token_data.last_message_time.timestamp())
         cooldown: int = token_data.cooldown
         self.delay = cooldown + message_time - get_current_timestamp()
-        logger.debug(f"{self.delay=}")
 
     @check_working
     @logger.catch
     async def _send_delay_message(self) -> None:
         """Отправляет сообщение что все токены заняты"""
 
-        logger.info(f"{self._telegram_id}: SLEEP PAUSE: {self.delay}")
         if self.delay <= 0:
             return
         delay: int = self.delay
@@ -305,6 +300,7 @@ class DiscordManager:
             delay: str = f"{minutes}:{seconds}"
             text = "минут"
         text: str = f"Все токены отработали. Следующий старт через {delay} {text}."
+        logger.info(text)
         if not self.silence:
             await self.message.answer(text, reply_markup=in_work_keyboard())
 

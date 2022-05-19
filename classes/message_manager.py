@@ -1,6 +1,5 @@
 import datetime
 import random
-from datetime import timedelta
 from typing import List
 
 from classes.errors_reporter import ErrorsReporter
@@ -11,7 +10,7 @@ from classes.request_classes import ChannelData
 from classes.token_datastorage import TokenData
 from classes.vocabulary import Vocabulary
 from config import logger
-from utils import get_current_time
+from utils import get_current_timestamp
 
 
 class MessageManager(ChannelData):
@@ -92,20 +91,20 @@ class MessageManager(ChannelData):
             return []
         return list(
             filter(
-                lambda elem: self.__get_message_timestamp(elem) < self.datastore.last_message_time,
+                lambda elem: self.__is_message_in_time_delta(elem),
                 all_messages
             )
         )
 
-    @staticmethod
     @logger.catch
-    def __get_message_timestamp(elem: dict) -> float:
-        """Возвращает время в секундах, в пределах которого надо найти сообщения"""
+    def __is_message_in_time_delta(self, elem: dict) -> bool:
+        """Возвращает True если сообщение пределах искомого интервала"""
 
         if not isinstance(elem, dict):
-            return 0
+            return False
         message_time: 'datetime' = elem.get("timestamp")
-        return datetime.datetime.fromisoformat(message_time).replace(tzinfo=None).timestamp()
+        mes_time = datetime.datetime.fromisoformat(message_time).replace(tzinfo=None).timestamp()
+        return mes_time >= get_current_timestamp() - self.datastore.max_last_message_time
 
     @logger.catch
     def __get_target_id(self, elem: dict) -> str:

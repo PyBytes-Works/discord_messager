@@ -1,6 +1,7 @@
 import datetime
 import os
 import json
+import time
 
 from typing import Union
 from config import logger, DEBUG, SAVING
@@ -79,9 +80,9 @@ def get_current_timestamp() -> int:
 
     return int(get_current_time().timestamp())
 
+
 @logger.catch
 def get_from_timestamp(data: float) -> datetime:
     """Возвращает текущее время из timstamp."""
 
     return datetime.datetime.fromtimestamp(data)
-
