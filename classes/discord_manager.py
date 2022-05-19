@@ -215,7 +215,7 @@ class DiscordManager:
             return
         await self._get_delay()
         self.delay += random.randint(3, 7)
-        logger.debug(f"\n\t\tSelf.delay: {self.delay}")
+        logger.debug(f"User: {self._username}: {self._telegram_id}: Sleep delay = [{self.delay}]")
         await self._send_delay_message()
         timer: int = self.delay
         while timer > 0:
@@ -260,12 +260,13 @@ class DiscordManager:
 
         token_data: namedtuple = await DBI.get_info_by_token(token)
         if not token_data:
-            await ErrorsReporter.send_report_to_admins(
+            error_text: str = (
                 f'NOT TOKEN DATA FOR TOKEN: {token}'
                 f'\nTelegram_id: {self.datastore.telegram_id}'
                 f'\nChannel: {self.datastore.channel}'
                 f'\nWorkers: {self.__workers}'
             )
+            await ErrorsReporter.send_report_to_admins(error_text)
             await self.__get_full_info()
             self.is_working = False
             return

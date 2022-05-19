@@ -9,7 +9,7 @@ def check_working(func):
             if is_working:
                 # logger.debug(f"\t{name}: OK")
                 return await func(*args, **kwargs)
-        logger.warning(
+        logger.info(
             f"Work stopped:"
             f"\n\tMethod: {name}: FAIL"
         )
@@ -24,11 +24,9 @@ def info_logger(func):
         if args and hasattr(args[0].__class__, name):
             username: str = getattr(args[0], "_username")
             telegram_id: str = getattr(args[0], "_telegram_id")
-            logger.info(f"Function: {name}"
-                        f"\n\tUSER: {username}: {telegram_id} - begin.")
+            logger.info(f"Function: {name}: USER: {username}: {telegram_id} - begin.")
             spam = await func(*args, **kwargs)
-            logger.info(f"Function: {name}"
-                        f"\n\tUSER: {username}: {telegram_id} - over.")
+            logger.info(f"Function: {name}: USER: {username}: {telegram_id} - over.")
             return spam
         return await func(*args, **kwargs)
 
