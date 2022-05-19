@@ -197,7 +197,7 @@ class ErrorsReporter:
             f"\n\tToken: {self._token}"
             f"\n\tProxy: {self._proxy}"
             f"\n\tError status: {self._status}"
-            f"\n\tError data: {self._answer_data}]"
+            f"\n\tError data: {self._answer_data if not self._answer_data.startswith('<!') else 'HTML'}]"
         )
         logger.error(error_message)
 

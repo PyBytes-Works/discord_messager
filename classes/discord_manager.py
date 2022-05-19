@@ -311,7 +311,7 @@ class DiscordManager:
             delay: str = f"{minutes}:{seconds}"
             text = "минут"
         text: str = f"Все токены отработали. Следующий старт через {delay} {text}."
-        logger.info(text)
+        logger.info(f"{self.message.from_user.username}: {self.message.from_user.id}: {text}")
         if not self.silence:
             await self.message.answer(text, reply_markup=in_work_keyboard())
 

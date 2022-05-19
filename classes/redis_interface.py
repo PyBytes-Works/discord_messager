@@ -10,7 +10,7 @@ class RedisDB:
     """Сохраняет и загружает данные из редис."""
 
     def __init__(self, redis_key: str):
-        self.redis_db = aioredis.from_url(url=REDIS_DB, encoding="utf-8", decode_responses=True)
+        self.redis_db = None
         self.redis_key: str = redis_key
         self.data: list = []
         self.timeout_sec: int = 300
@@ -18,6 +18,7 @@ class RedisDB:
     async def _send_request_do_redis_db(self, key: str, mate_id: str = '', data: list = None) -> list:
         """Запрашивает или записывает данные в редис, возвращает список если запрашивали"""
 
+        self.redis_db = aioredis.from_url(url=REDIS_DB, encoding="utf-8", decode_responses=True)
         result: list = []
         name: str = mate_id if mate_id else self.redis_key
         if not name:

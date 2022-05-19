@@ -158,13 +158,14 @@ class MessageManager(ChannelData):
             if self.datastore.mate_id == str(elem["author"]["id"])
         ]
         id = await self.__get_random_message_id(mate_messages)
+        print(f"\nMate messages: {len(mate_messages)}")
         for mes in mate_messages:
             print(f"\nID: {mes.get('id')}"
                   f"\nTEXT: {mes.get('content', 'NO CONTENT')}"
                   f"\nAuthor: {mes.get('author', {}).get('id')}"
                   f"\nAuthor name: {mes.get('author', {}).get('username')}"
-                  f"\n\nSelected ID: {id}"
             )
+        print(f"\n\nSelected ID: {id}")
 
         return id
 
