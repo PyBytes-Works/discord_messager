@@ -273,8 +273,13 @@ class DiscordManager:
     @logger.catch
     async def __get_second_closest_token_time(self) -> namedtuple:
         """Возвращает время второго ближайшего токена"""
-
-        return sorted(self.__related_tokens, key=lambda x: x.last_message_time)[1]
+        tokens = sorted(self.__related_tokens, key=lambda x: x.last_message_time.timestamp() + x.cooldown)
+        logger.debug(f"\n\t\tSorted tokens:")
+        for elem in tokens:
+            print(f"\t\t{elem}")
+        result = tokens[1]
+        logger.debug(f"{result=}")
+        return result
 
     @logger.catch
     async def _get_delay(self) -> None:
@@ -287,6 +292,7 @@ class DiscordManager:
         message_time: int = int(token_data.last_message_time.timestamp())
         cooldown: int = token_data.cooldown
         self.delay = cooldown + message_time - self.__get_current_timestamp()
+        logger.debug(f"{self.delay=}")
 
     @check_working
     @logger.catch
@@ -346,7 +352,6 @@ class DiscordManager:
         text: str = ("ИИ не ответил на реплай: "
                      f"\n{reply_text}")
         await self.message.answer(text, reply_markup=in_work_keyboard())
-        # await ErrorsReporter.send_report_to_admins(text)
         await self.__send_reply_to_telegram(data, replier)
 
     @logger.catch
