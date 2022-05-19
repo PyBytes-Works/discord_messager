@@ -1134,8 +1134,8 @@ class Token(BaseModel):
     def get_number_of_free_slots_for_tokens(cls, telegram_id: str) -> int:
         """
         Вернуть количество свободных мест для размещения токенов
-        TODO admin super admin
         """
+
         return (
             User.select(
                 Case(

@@ -1,4 +1,3 @@
-import random
 from typing import List, Tuple, Dict
 from collections import namedtuple
 
@@ -6,7 +5,6 @@ from aiogram.types import ReplyKeyboardRemove, Message
 
 from models import User, Token, Proxy, UserChannel
 from config import logger, admins_list
-from checks import check_users
 
 
 class DBI:
@@ -278,10 +276,6 @@ class DBI:
     @classmethod
     @logger.catch
     async def get_number_of_free_slots_for_tokens(cls, telegram_id: str) -> int:
-        """Todo вот убрать проверку и что возвращать?"""
-        if (check_users.is_super_admin(telegram_id=telegram_id) or
-                check_users.is_super_admin(telegram_id=telegram_id)):
-            return 100
         return Token.get_number_of_free_slots_for_tokens(telegram_id)
 
     @classmethod
