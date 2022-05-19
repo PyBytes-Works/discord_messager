@@ -33,12 +33,17 @@ class MessageManager(ChannelData):
         # TODO поискать метод для получения сообщений за интервал времени, а не всех
         all_messages: List[dict] = await self.__get_all_discord_messages()
         self._last_messages: List[dict] = await self.__get_last_messages(all_messages)
-        print(f"{self.datastore.max_last_message_time=}")
         if not await self.__get_message_id_and_text_for_send_answer():
             self.datastore.current_message_id = await self.__get_message_id_from_last_messages()
-            print(f"\n\n\t\tMate message id: {self.datastore.current_message_id}")
             self.datastore.text_to_send = await self._get_message_text()
-            print(f"\n\n\t\tText to send: {self.datastore.text_to_send}")
+            print(
+                ""
+                f"\n\t\t{self.datastore.max_last_message_time=}"
+                f"\n\t\tDiscord ID: {self.datastore.my_discord_id}"
+                f"\n\t\tMate ID: {self.datastore.mate_id}"
+                f"\n\t\tMate message id: {self.datastore.current_message_id}"
+                f"\n\t\tText to send: {self.datastore.text_to_send}"
+            )
         await self.__update_datastore_replies()
         await self.__get_data_for_send()
 
@@ -152,8 +157,16 @@ class MessageManager(ChannelData):
             for elem in self._last_messages
             if self.datastore.mate_id == str(elem["author"]["id"])
         ]
-        print(f"\n\n{mate_messages=}\n\n")
-        return await self.__get_random_message_id(mate_messages)
+        id = await self.__get_random_message_id(mate_messages)
+        for mes in mate_messages:
+            print(f"\nID: {mes.get('id')}"
+                  f"\nTEXT: {mes.get('content', 'NO CONTENT')}"
+                  f"\nAuthor: {mes.get('author', {}).get('id')}"
+                  f"\nAuthor name: {mes.get('author', {}).get('username')}"
+                  f"\n\nSelected ID: {id}"
+            )
+
+        return id
 
     @logger.catch
     async def __get_random_message_id(self, data: list) -> int:
@@ -213,14 +226,14 @@ class MessageManager(ChannelData):
     async def __get_text_from_openai(self, mate_message: str) -> str:
 
         openai_answer: str = await self.__get_openai_answer(mate_message)
-        logger.debug(f"\n\t\tFirst OpenAI answer: {openai_answer}\n")
+        # logger.debug(f"\n\t\tFirst OpenAI answer: {openai_answer}\n")
         if openai_answer:
             if self._ten_from_hundred():
                 logger.info(f"{self.datastore.telegram_id}: 10 from 100 You got it!!!")
                 self.datastore.current_message_id = 0
             return openai_answer
         random_message: str = await self.__get_random_message_from_last_messages()
-        logger.debug(f"\n\t\tRandom OpenAI answer: {random_message}\n")
+        # logger.debug(f"\n\t\tRandom OpenAI answer: {random_message}\n")
 
         return random_message
 
@@ -230,7 +243,6 @@ class MessageManager(ChannelData):
 
         message_data: dict = random.choice(self._last_messages)
         text: str = message_data.get("content", '')
-        logger.debug(f"Random message from last messages: {text}")
         result: str = await self.__get_openai_answer(text)
         if result != text:
             self.datastore.current_message_id = int(message_data.get("id", 0))

@@ -7,6 +7,7 @@ import asyncio
 
 from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
 
+from classes.errors_reporter import ErrorsReporter
 from classes.message_manager import MessageManager
 from classes.message_sender import MessageSender
 from classes.open_ai import OpenAI
@@ -258,6 +259,16 @@ class DiscordManager:
         """Обновляет данные datastore информацией о токене, полученной из БД"""
 
         token_data: namedtuple = await DBI.get_info_by_token(token)
+        if not token_data:
+            await ErrorsReporter.send_report_to_admins(
+                f'NOT TOKEN DATA FOR TOKEN: {token}'
+                f'\nTelegram_id: {self.datastore.telegram_id}'
+                f'\nChannel: {self.datastore.channel}'
+                f'\nWorkers: {self.__workers}'
+            )
+            await self.__get_full_info()
+            self.is_working = False
+            return
         self.datastore.update_data(token=token, token_data=token_data)
         self.datastore.all_tokens_ids = self.__all_user_tokens_discord_ids
 

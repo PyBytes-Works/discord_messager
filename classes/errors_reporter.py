@@ -205,7 +205,6 @@ class ErrorsReporter:
     async def send_message_to_user(self, text: str, telegram_id: str = '', keyboard=None) -> None:
         """Errors report"""
 
-        logger.error(f"{self.errors_manager.__qualname__} report: {text}")
         chat_id: str = telegram_id if telegram_id else self._telegram_id
         if not chat_id:
             logger.error(f"Chat id not found.")
@@ -221,9 +220,10 @@ class ErrorsReporter:
         except aiogram.utils.exceptions.ChatNotFound:
             logger.error(f"Chat {chat_id} not found")
         except aiogram.utils.exceptions.BotBlocked as err:
-            logger.error(f"Пользователь {chat_id} заблокировал бота", err)
+            logger.error(f"Пользователь {chat_id} заблокировал бота {err}")
         except aiogram.utils.exceptions.CantInitiateConversation as err:
-            logger.error(f"Не смог отправить сообщение пользователю {chat_id}.", err)
+            logger.error(f"Не смог отправить сообщение пользователю {chat_id}. {err}")
+        logger.success(f"Send_message_to_user: {chat_id}: {text}")
 
     @classmethod
     @logger.catch
