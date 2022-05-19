@@ -33,8 +33,9 @@ class MessageManager(ChannelData):
         # TODO поискать метод для получения сообщений за интервал времени, а не всех
         all_messages: List[dict] = await self.__get_all_discord_messages()
         self._last_messages: List[dict] = await self.__get_last_messages(all_messages)
+        print(f"{self.datastore.max_last_message_time=}")
         if not await self.__get_message_id_and_text_for_send_answer():
-            print(f"\n\n\t\tMate message id: {self.datastore.current_message_id}")
+            print(f"\n\n\t\tMate message id before: {self.datastore.current_message_id}")
             self.datastore.current_message_id = await self.__get_message_id_from_last_messages()
             print(f"\n\n\t\tMate message id: {self.datastore.current_message_id}")
             self.datastore.text_to_send = await self._get_message_text()
@@ -287,4 +288,4 @@ class MessageManager(ChannelData):
     @staticmethod
     @logger.catch
     def _ten_from_hundred() -> bool:
-        return random.randint(1, 100) <= 10
+        return random.randint(1, 100) <= 5
