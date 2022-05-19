@@ -34,8 +34,11 @@ class MessageManager(ChannelData):
         all_messages: List[dict] = await self.__get_all_discord_messages()
         self._last_messages: List[dict] = await self.__get_last_messages(all_messages)
         if not await self.__get_message_id_and_text_for_send_answer():
+            print(f"\n\n\t\tMate message id: {self.datastore.current_message_id}")
             self.datastore.current_message_id = await self.__get_message_id_from_last_messages()
+            print(f"\n\n\t\tMate message id: {self.datastore.current_message_id}")
             self.datastore.text_to_send = await self._get_message_text()
+            print(f"\n\n\t\tText to send: {self.datastore.text_to_send}")
         await self.__update_datastore_replies()
         await self.__get_data_for_send()
 
@@ -149,6 +152,7 @@ class MessageManager(ChannelData):
             for elem in self._last_messages
             if self.datastore.mate_id == str(elem["author"]["id"])
         ]
+        print(f"\n\n{mate_messages=}\n\n")
         return await self.__get_random_message_id(mate_messages)
 
     @logger.catch
@@ -185,12 +189,13 @@ class MessageManager(ChannelData):
         replies: 'RepliesManager' = RepliesManager(redis_key=self.datastore.telegram_id)
         my_answered: List[
             dict] = await replies.get_not_answered_with_text(self.datastore.my_discord_id)
-        if my_answered:
-            current_reply: dict = my_answered.pop()
-            self.datastore.text_to_send = current_reply.get("answer_text")
-            message_id: str = current_reply.get("message_id")
-            self.datastore.current_message_id = message_id
-            await replies.update_answered(message_id)
+        if not my_answered:
+            return 0
+        current_reply: dict = my_answered.pop()
+        self.datastore.text_to_send = current_reply.get("answer_text")
+        message_id: str = current_reply.get("message_id")
+        self.datastore.current_message_id = message_id
+        await replies.update_answered(message_id)
 
         return self.datastore.current_message_id
 
