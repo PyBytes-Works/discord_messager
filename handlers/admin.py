@@ -157,7 +157,9 @@ async def delete_proxy_handler(message: Message) -> None:
     proxies: list = re.findall(r'\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}:\d{1,6}\b', message.text)
     for proxy in proxies:
         await DBI.delete_proxy(proxy=proxy)
-        await message.answer(f"Удалена прокси: {proxy}")
+        await ErrorsReporter.send_report_to_admins(
+            f"Удалена прокси: {proxy}"
+            f"\nУдалил: {message.from_user.username} - {message.from_user.id}")
 
 
 @logger.catch
