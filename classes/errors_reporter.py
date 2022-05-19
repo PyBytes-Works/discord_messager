@@ -91,7 +91,7 @@ class ErrorsReporter:
             users = False
         elif self._status == -100:
             text: str = (f'Произошла ошибка RequestSender. read the logs.'
-                        f'Код ошибки [-100]')
+                         f'Код ошибки [-100]')
             admins = True
             users = False
         elif self._status == 400:
@@ -150,7 +150,7 @@ class ErrorsReporter:
                     await DBI.update_user_channel_cooldown(
                         user_channel_pk=self.datastore.user_channel_pk, cooldown=cooldown)
                     self.datastore.delay = cooldown
-                await self.errors_report(
+                await self.send_message_to_user(
                     text=(
                         "Для данного токена сообщения отправляются чаще, чем разрешено в канале."
                         f"\nToken: {self.datastore.token}"
@@ -188,7 +188,7 @@ class ErrorsReporter:
             if self._proxy:
                 text += f"\nProxy [{self._proxy}]"
             if users and self._telegram_id:
-                await self.errors_report(text=text)
+                await self.send_message_to_user(text=text)
             if admins:
                 await self.send_report_to_admins(text)
         error_message: str = (
@@ -202,15 +202,28 @@ class ErrorsReporter:
         logger.error(error_message)
 
     @logger.catch
-    async def errors_report(self, text: str) -> None:
+    async def send_message_to_user(self, text: str, telegram_id: str = '', keyboard=None) -> None:
         """Errors report"""
 
         logger.error(f"{self.errors_manager.__qualname__} report: {text}")
+        chat_id: str = telegram_id if telegram_id else self._telegram_id
+        if not chat_id:
+            logger.error(f"Chat id not found.")
+            return
+        params: dict = {
+            "chat_id": chat_id,
+            "text": text
+        }
+        if keyboard:
+            params.update(reply_markup=keyboard)
         try:
-            await bot.send_message(
-                chat_id=self._telegram_id, text=text)
+            await bot.send_message(**params)
         except aiogram.utils.exceptions.ChatNotFound:
-            logger.error(f"{self.errors_manager.__qualname__} Chat {self._telegram_id} not found")
+            logger.error(f"Chat {chat_id} not found")
+        except aiogram.utils.exceptions.BotBlocked as err:
+            logger.error(f"Пользователь {chat_id} заблокировал бота", err)
+        except aiogram.utils.exceptions.CantInitiateConversation as err:
+            logger.error(f"Не смог отправить сообщение пользователю {chat_id}.", err)
 
     @classmethod
     @logger.catch
@@ -219,11 +232,7 @@ class ErrorsReporter:
 
         text = f'[Рассылка][Superusers]: {text}'
         for admin_id in admins_list:
-            try:
-                await bot.send_message(
-                    chat_id=admin_id, text=text)
-            except aiogram.utils.exceptions.ChatNotFound as err:
-                logger.error(f"Не смог отправить сообщение пользователю {admin_id}.", err)
+            await cls.send_message_to_user(text=text, telegram_id=admin_id)
 
     @classmethod
     @logger.catch

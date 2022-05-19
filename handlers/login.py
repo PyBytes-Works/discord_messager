@@ -55,6 +55,9 @@ async def check_new_user_is_exists_handler(message: Message, state: FSMContext) 
     await state.update_data(
         new_user_telegram_id=new_user_telegram_id, new_user_nickname=new_user_nickname
     )
+    if await DBI.get_user_by_telegram_id(telegram_id=new_user_telegram_id):
+        await message.answer("Пользователь существует и будет перезаписан."
+                             "\nВсе его токены и каналы будут удалены.")
     text: str = f"Введите количество токенов для пользователя {new_user_nickname}:"
     await message.answer(text, reply_markup=cancel_keyboard())
     await LogiStates.add_new_user_max_tokens.set()
@@ -96,7 +99,7 @@ async def check_expiration_and_add_new_user_handler(message: Message, state: FSM
     new_user_nickname: str = state_data["new_user_nickname"]
     max_tokens: int = state_data["max_tokens"]
     proxy: namedtuple = await DBI.get_low_used_proxy()
-    if not proxy.proxy_pk:
+    if not proxy or not proxy.proxy_pk:
         await ErrorsReporter.send_report_to_admins(text="Нет проксей.")
     user_data: dict = {
         "telegram_id": new_user_telegram_id,
@@ -127,16 +130,10 @@ async def check_expiration_and_add_new_user_handler(message: Message, state: FSM
         await state.finish()
         return
     await message.answer(text, reply_markup=user_menu_keyboard())
-    try:
-        await bot.send_message(
-            chat_id=new_user_telegram_id, text="Вы добавлены в базу данных.",
-            reply_markup=user_menu_keyboard())
-    except aiogram.utils.exceptions.ChatNotFound as err:
-        logger.error(f"Не смог отправить сообщение пользователю {new_user_telegram_id}.", err)
-    except aiogram.utils.exceptions.BotBlocked as err:
-        logger.error(f"Пользователь {new_user_telegram_id} заблокировал бота", err)
-    except aiogram.utils.exceptions.CantInitiateConversation as err:
-        logger.error(f"Не смог отправить сообщение пользователю {new_user_telegram_id}.", err)
+    await ErrorsReporter.send_message_to_user(
+        text="Вы добавлены в базу данных.",
+        telegram_id=new_user_telegram_id,
+        keyboard=user_menu_keyboard())
     await state.finish()
 
 

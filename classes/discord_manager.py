@@ -268,13 +268,9 @@ class DiscordManager:
         if self.delay:
             return
         token_data: namedtuple = await self.__get_second_closest_token_time()
-        logger.debug(f"Token_data: {token_data}")
         message_time: int = int(token_data.last_message_time.timestamp())
-        logger.debug(f"{message_time=}")
         cooldown: int = token_data.cooldown
-        logger.debug(f"{cooldown=}")
         self.delay = cooldown + message_time - self.__get_current_timestamp()
-        logger.debug(f"{self.delay=}")
 
     @check_working
     @logger.catch
