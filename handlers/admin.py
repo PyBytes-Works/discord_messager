@@ -157,7 +157,9 @@ async def delete_proxy_handler(message: Message) -> None:
     proxies: list = re.findall(r'\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}:\d{1,6}\b', message.text)
     for proxy in proxies:
         await DBI.delete_proxy(proxy=proxy)
-        await message.answer(f"Удалена прокси: {proxy}")
+        await ErrorsReporter.send_report_to_admins(
+            f"Удалена прокси: {proxy}"
+            f"\nУдалил: {message.from_user.username} - {message.from_user.id}")
 
 
 @logger.catch
@@ -245,63 +247,6 @@ async def request_activate_user_handler(message: Message) -> None:
                 "Нет неактивных пользователей.",
                 reply_markup=user_menu_keyboard()
             )
-
-
-# @logger.catch
-# async def tokens_and_hours_request_callback_handler(callback: CallbackQuery, state: FSMContext) -> None:
-#     """Запрашивает количество часов и токенов для активации пользователя"""
-#
-#     user_telegram_id: str = str(callback.data.rsplit("_", maxsplit=1)[-1])
-#     if await DBI.get_user_by_telegram_id(telegram_id=user_telegram_id):
-#         await callback.message.answer(
-#             "Введите количество часов и количество токенов для активации через пробел."
-#             "\nНапример: '24 10'",
-#             reply_markup=cancel_keyboard()
-#         )
-#         await state.update_data(activate_user=user_telegram_id)
-#         await AdminStates.user_activate.set()
-#     else:
-#         await callback.message.answer(
-#             "ОШИБКА!!!КАКИМ ТО ОБРАЗОМ ПОЛЬЗОВАТЕЛЬ НЕ НАЙДЕН",
-#             reply_markup=user_menu_keyboard()
-#         )
-#         await state.finish()
-#     await callback.answer()
-
-#
-# @logger.catch
-# async def activate_user_handler(message: Message, state: FSMContext) -> None:
-#     """Активирует пользователя на введенное количество часов с заданным количеством токенов"""
-#
-#     state_data: dict = await state.get_data()
-#     user_telegram_id: str = state_data.get("activate_user")
-#
-#     data: list = message.text.strip().split()
-#     if len(data) != 2:
-#         await message.answer(
-#             "Введите количество часов и количество токенов для активации через пробел."
-#             "Например: '24 10'\n",
-#             reply_markup=cancel_keyboard()
-#         )
-#         return
-#     hours: int = check_is_int(data[0])
-#     max_tokens: int = check_is_int(data[1])
-#     if all((hours, max_tokens)):
-#         await DBI.set_max_tokens(telegram_id=user_telegram_id, max_tokens=max_tokens)
-#         await DBI.set_expiration_date(telegram_id=user_telegram_id, subscription_period=hours)
-#         await DBI.activate_user(telegram_id=user_telegram_id)
-#         await message.answer(
-#             f"Для пользователя {user_telegram_id} установлено:"
-#             f"\nТокенов: {max_tokens}"
-#             f"\nЧасов: {hours}",
-#             reply_markup=user_menu_keyboard()
-#         )
-#         await state.finish()
-#     else:
-#         await message.answer(
-#             f"Ввели неверные данные часов или количества токенов.", reply_markup=cancel_keyboard()
-#         )
-#         return
 
 
 @logger.catch
@@ -409,10 +354,6 @@ def register_admin_handlers(dp: Dispatcher) -> None:
     dp.register_message_handler(delete_user_name_handler, commands=['delete_user'])
     dp.register_callback_query_handler(delete_user_handler, Text(startswith=['user_']), state=AdminStates.name_for_del)
     dp.register_message_handler(request_activate_user_handler, commands=['activate_user'])
-    # dp.register_callback_query_handler(
-    #     tokens_and_hours_request_callback_handler, Text(startswith=['activate_']), state=AdminStates.user_add_token
-    # )
-    # dp.register_message_handler(activate_user_handler, state=AdminStates.user_activate)
     dp.register_message_handler(show_all_users_handler, commands=['show_users', 'su'])
     dp.register_message_handler(reboot_handler, commands=['reboot'], state="*")
     dp.register_message_handler(admin_help_handler, commands=['admin', 'adm'])

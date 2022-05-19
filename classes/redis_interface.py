@@ -1,7 +1,7 @@
 import json
 
 import aioredis
-from typing import Optional, List
+from typing import List
 
 from config import logger, REDIS_DB
 
@@ -13,13 +13,15 @@ class RedisDB:
         self.redis_db = aioredis.from_url(url=REDIS_DB, encoding="utf-8", decode_responses=True)
         self.redis_key: str = redis_key
         self.data: list = []
-        self.timeout_sec: int = 1000
+        self.timeout_sec: int = 300
 
     async def _send_request_do_redis_db(self, key: str, mate_id: str = '', data: list = None) -> list:
         """Запрашивает или записывает данные в редис, возвращает список если запрашивали"""
 
         result: list = []
         name: str = mate_id if mate_id else self.redis_key
+        if not name:
+            return []
         data: list = data if data else self.data
         log_data: str = (
             f"\nData:"
@@ -65,7 +67,6 @@ class RedisDB:
         self.data: list = data
         if timeout_sec:
             self.timeout_sec: int = timeout_sec
-
         await self._send_request_do_redis_db(key="set")
 
     @logger.catch

@@ -73,6 +73,14 @@ class ErrorsReporter:
         if self._status == 0:
             # See logs
             pass
+        elif self._status == -96:
+            text: str = f'Ошибка ServerDisconnectedError ПРОКСИ НЕ РАБОТАЕТ!!!'
+            admins = True
+            users = False
+        elif self._status == -97:
+            text: str = f'Ошибка TooManyRedirects.'
+            admins = True
+            users = False
         elif self._status == -98:
             text: str = f'Ошибка ClientOSError (возникает при частых запросах)'
             admins = True
@@ -106,16 +114,20 @@ class ErrorsReporter:
                     "Не могу отправить сообщение для токена. (Ошибка 403 - 50013)"
                     "\nТокен в муте."
                 )
-                text += await self._delete_token()
             elif self._code == 50001:
                 text: str = (
                     "Не могу отправить сообщение для токена. (Ошибка 403 - 50001)"
                     "\nТокен забанили."
                     f"\nФормирую новые пары."
                 )
-                text += await self._delete_token()
+            elif self._code == 40002:
+                text: str = (
+                    "Необходимо подтвердить учетную запись дискорда."
+                    "(Ошибка 403 - 40002)"
+                )
             else:
                 text: str = f"Ошибка {self._status} Code: {self._code}"
+                text += await self._delete_token()
         elif self._status == 404:
             if self._code == 10003:
                 text: str = "Ошибка отправки сообщения. Неверный канал. (Ошибка 404 - 10003)"
@@ -148,9 +160,8 @@ class ErrorsReporter:
                 )
             elif self._code == 40062:
                 text: str = (
-                    f"Токену необходимо дополнительная верификация в дискорде (по номеру телефона):"
+                    f"Ошибка 429 код ошибки 40062."
                 )
-                text += await self._delete_token()
         elif self._status == 500:
             text = (f"Внутренняя ошибка сервера Дискорда. Код ошибки - [{self._status}]"
                     f"\nСлишком большая нагрузка на канал")

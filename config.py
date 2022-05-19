@@ -60,18 +60,22 @@ DISCORD_BASE_URL: str = f'https://discord.com/api/v9/channels/'
 
 #  ********** LOGGER CONFIG ********************************
 LOGGING_DIRECTORY = 'logs'
-LOGGING_FILENAME = 'discord_mailer.log'
+ERRORS_FILENAME = 'errors.log'
+WARNINGS_FILENAME = 'warnings.log'
 PATH = os.getcwd()
 if not os.path.exists('./logs'):
     os.mkdir("./logs")
 today = datetime.datetime.today().strftime("%Y-%m-%d")
-file_path = os.path.join(PATH, LOGGING_DIRECTORY, today, LOGGING_FILENAME)
-LOG_LEVEL = "WARNING"
+errors_file_path = os.path.join(PATH, LOGGING_DIRECTORY, today, ERRORS_FILENAME)
+warnings_file_path = os.path.join(PATH, LOGGING_DIRECTORY, today, WARNINGS_FILENAME)
+json_file_path = os.path.join(PATH, LOGGING_DIRECTORY, today, 'errors.txt')
 DEBUG_LEVEL = "INFO"
 if DEBUG:
     DEBUG_LEVEL = "DEBUG"
 logger.remove()
-logger.add(sink=file_path, enqueue=True, level=LOG_LEVEL, rotation="50 MB")
+logger.add(sink=errors_file_path, enqueue=True, level='ERROR', rotation="50 MB")
+logger.add(sink=warnings_file_path, enqueue=True, level='WARNING', rotation="50 MB")
+logger.add(sink=json_file_path, enqueue=True, level='WARNING', rotation="50 MB", serialize=True)
 logger.add(sink=sys.stdout, level=DEBUG_LEVEL)
 logger.configure(
     levels=[
@@ -81,7 +85,7 @@ logger.configure(
         dict(name="ERROR", color="<red>"),
     ]
 )
-logger.info(f'Start logging to: {file_path}')
+logger.info(f'Start logging to: {errors_file_path}')
 #  ********** END OF LOGGER CONFIG *************************
 
 #  ********** DATABASE CONFIG *************************

@@ -4,9 +4,11 @@ WORKDIR /app
 
 ADD requirements.txt .
 
-RUN python3 -m pip install --no-cache-dir --upgrade pip \
-  && python3 -m pip install --no-cache-dir  \
-    -r requirements.txt
+RUN apt-get update && \
+    apt-get -y install libpq-dev gcc && \
+    pip install psycopg2 && \
+    python3 -m pip install --no-cache-dir --upgrade pip && \
+    python3 -m pip install --no-cache-dir -r requirements.txt
 
 ADD . .
 
