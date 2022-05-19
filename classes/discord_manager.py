@@ -87,7 +87,6 @@ class DiscordManager:
 
     @logger.catch
     async def __get_full_info(self) -> str:
-        time = self.__get_current_timestamp()
         return (
             f"\n\tUsername: {self._username}"
             f"\n\tProxy: {self.datastore.proxy}"
@@ -102,8 +101,8 @@ class DiscordManager:
             f"\n\tDelay: {self.delay}"
             f"\n\tTokens cooldowns:\n\t\t"
         ) + '\n\t\t'.join(
-                f"PK: {elem.token_pk}\tCD:{elem.cooldown}\tLMT: {elem.last_message_time}\tTIME: {time}\tCHN: {elem.channel_id}"
-                f"\tDELAY: {time + elem.cooldown - elem.last_message_time.timestamp()}"
+                f"PK: {elem.token_pk}\tCD:{elem.cooldown}\tLMT: {elem.last_message_time}\tTIME: {self.__get_current_time()}\tCHN: {elem.channel_id}"
+                f"\tDELAY: {self.__get_current_timestamp() + elem.cooldown - elem.last_message_time.timestamp()}"
                 for elem in self.__related_tokens
             )
 
@@ -146,7 +145,7 @@ class DiscordManager:
 
     @logger.catch
     def __replace_time_to_now(self, elem) -> namedtuple:
-        return elem._replace(last_message_time=datetime.datetime.now())
+        return elem._replace(last_message_time=datetime.datetime.utcnow().replace(tzinfo=None))
 
     @logger.catch
     async def __update_token_last_message_time(self, token: str) -> None:
@@ -260,10 +259,16 @@ class DiscordManager:
         self.datastore.all_tokens_ids = self.__all_user_tokens_discord_ids
 
     @logger.catch
+    def __get_current_time(self) -> datetime:
+        """Возвращает текущее время целое."""
+
+        return datetime.datetime.utcnow().replace(tzinfo=None)
+
+    @logger.catch
     def __get_current_timestamp(self) -> int:
         """Возвращает текущее время (timestamp) целое."""
 
-        return int(datetime.datetime.utcnow().replace(tzinfo=None).timestamp())
+        return int(self.__get_current_time().timestamp())
 
     @logger.catch
     async def __get_second_closest_token_time(self) -> namedtuple:
