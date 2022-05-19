@@ -71,7 +71,7 @@ class ErrorsReporter:
 
         text: str = ''
         if self._status == 0:
-            # See logs
+            # See logs.
             pass
         elif self._status == -96:
             text: str = f'Ошибка ServerDisconnectedError ПРОКСИ НЕ РАБОТАЕТ!!!'
