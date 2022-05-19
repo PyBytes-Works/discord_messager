@@ -15,6 +15,7 @@ from classes.token_datastorage import TokenData
 
 from config import logger, SEMAPHORE
 from classes.db_interface import DBI
+from decorators.checkers import check_is_super_admin, check_is_admin
 from decorators.decorators import check_working, info_logger
 from keyboards import user_menu_keyboard, in_work_keyboard
 
@@ -74,6 +75,7 @@ class DiscordManager:
 
     @logger.catch
     async def _lets_play(self) -> None:
+
         # TODO сделать декоратор из reboot
         await self.__check_reboot()
         await self._check_user_active()
@@ -86,6 +88,7 @@ class DiscordManager:
 
     @logger.catch
     async def __get_full_info(self) -> str:
+
         return (
             f"\n\tUsername: {self._username}"
             f"\n\tUser telegram id: {self._telegram_id}"
@@ -102,8 +105,10 @@ class DiscordManager:
     @logger.catch
     async def _check_user_active(self):
 
-        # TODO добавить проверку на админа/суперадмина
-
+        user_is_admin: bool = await DBI.is_admin(telegram_id=self._telegram_id)
+        user_is_superadmin: bool = await DBI.is_superadmin(telegram_id=self._telegram_id)
+        if user_is_admin or user_is_superadmin:
+            return
         user_deactivated: bool = await DBI.is_expired_user_deactivated(self.message)
         user_is_work: bool = await DBI.is_user_work(telegram_id=self._telegram_id)
         if user_deactivated or not user_is_work:
@@ -265,6 +270,7 @@ class DiscordManager:
     async def _get_delay(self) -> None:
         """Сохраняет время паузы взяв его из второго в очереди на работу токена"""
 
+        # Delay может быть уже задан в функции _set_delay_equal_channel_cooldown
         if self.delay:
             return
         token_data: namedtuple = await self.__get_second_closest_token_time()

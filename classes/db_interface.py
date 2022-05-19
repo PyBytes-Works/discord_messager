@@ -106,6 +106,11 @@ class DBI:
 
     @classmethod
     @logger.catch
+    async def is_superadmin(cls, telegram_id: str) -> bool:
+        return telegram_id in admins_list
+
+    @classmethod
+    @logger.catch
     async def get_expiration_date(cls, telegram_id: str) -> int:
         return User.get_expiration_date(telegram_id=telegram_id)
 
