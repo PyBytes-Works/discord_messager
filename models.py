@@ -10,6 +10,7 @@ from peewee import (
 )
 
 from config import logger, admins_list, db, DB_FILE_NAME, DEFAULT_PROXY
+from utils import get_current_time, get_current_timestamp, get_from_timestamp
 
 
 class BaseModel(Model):
@@ -160,11 +161,11 @@ class User(BaseModel):
     admin = BooleanField(default=False, verbose_name="Администраторство")
     max_tokens = IntegerField(default=5, verbose_name="Максимальное количество токенов")
     created_at = DateTimeField(
-        default=datetime.datetime.now(),
+        default=get_current_time(),
         verbose_name='Дата добавления в базу'
     )
     expiration = DateTimeField(
-        default=datetime.datetime.now(),
+        default=get_current_time(),
         verbose_name='Срок истечения подписки'
     )
     proxy = ForeignKeyField(
@@ -222,8 +223,8 @@ class User(BaseModel):
         if not user:
             new_expiration: int = 10 * 365 * 24 if expiration == -1 else expiration
             expiration_time_stamp: float = (
-                    datetime.datetime.now().timestamp() + new_expiration * 60 * 60)
-            expiration: 'datetime' = datetime.datetime.fromtimestamp(expiration_time_stamp)
+                    get_current_timestamp() + new_expiration * 60 * 60)
+            expiration: 'datetime' = get_from_timestamp(expiration_time_stamp)
             result, answer = cls.get_or_create(
                 nick_name=f'{nick_name}_{telegram_id}',
                 telegram_id=telegram_id,
@@ -394,7 +395,7 @@ class User(BaseModel):
     @logger.catch
     def get_subscribers_list(cls: 'User') -> list:
         """ Возвращает список пользователей которым должна отправляться рассылка"""
-        now = datetime.datetime.now()
+        now = get_current_time()
         return [user.telegram_id
                 for user in cls
                     .select(cls.telegram_id)
@@ -419,7 +420,7 @@ class User(BaseModel):
         return list of telegram ids for active users without admins
         return: list
         """
-        now = datetime.datetime.now()
+        now = get_current_time()
         return cls.update(active=False).where(cls.expiration < now).execute()
 
     @classmethod
@@ -467,9 +468,9 @@ class User(BaseModel):
         set subscription expiration date for user
         subscription_period:  (int) number of hours for which the subscription is activated
         """
-        now = datetime.datetime.now().timestamp()
+        now = get_current_timestamp()
         period = subscription_period * 60 * 60 + now
-        new_period = datetime.datetime.fromtimestamp(period)
+        new_period = get_from_timestamp(period)
         return cls.update(expiration=new_period).where(cls.telegram_id == telegram_id).execute()
 
     @classmethod
@@ -503,9 +504,9 @@ class User(BaseModel):
         """
 
         user: User = cls.get_or_none(cls.telegram_id == telegram_id)
-        expiration = user.expiration if user else datetime.datetime.now()
+        expiration = user.expiration if user else get_current_time()
 
-        return expiration > datetime.datetime.now() if expiration else False
+        return expiration > get_current_time() if expiration else False
 
     @classmethod
     @logger.catch
@@ -583,7 +584,7 @@ class User(BaseModel):
         """
         set work status enabled fo all users
         """
-        now = datetime.datetime.now()
+        now = get_current_time()
         return cls.update(active=True).where(cls.expiration > now).execute()
 
 
@@ -738,7 +739,6 @@ class Token(BaseModel):
           get_count_bu_user_channel
           set_token_name
           check_token_by_discord_id
-          update_token_time
     """
     user_channel = ForeignKeyField(
         UserChannel, backref='token', verbose_name="Канал для подключения", on_delete='CASCADE')
@@ -746,7 +746,7 @@ class Token(BaseModel):
     token = CharField(max_length=255, unique=True, verbose_name="Токен пользователя в discord")
     discord_id = CharField(max_length=255, unique=True, verbose_name="ID пользователя в discord")
     last_message_time = TimestampField(
-        default=datetime.datetime.now().timestamp() - 60 * 5,
+        default=get_current_timestamp() - 60 * 5,
         verbose_name="Время отправки последнего сообщения"
     )
 
@@ -806,7 +806,7 @@ class Token(BaseModel):
         set last_time: now datetime last message
         token: (str)
         """
-        current_time = datetime.datetime.now().timestamp()
+        current_time = get_current_timestamp()
         return cls.update(last_message_time=current_time).where(cls.token == token).execute()
 
     @classmethod
@@ -1134,8 +1134,8 @@ class Token(BaseModel):
     def get_number_of_free_slots_for_tokens(cls, telegram_id: str) -> int:
         """
         Вернуть количество свободных мест для размещения токенов
-        TODO admin super admin
         """
+
         return (
             User.select(
                 Case(

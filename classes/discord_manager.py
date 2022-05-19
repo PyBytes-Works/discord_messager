@@ -7,6 +7,7 @@ import asyncio
 
 from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
 
+from classes.errors_reporter import ErrorsReporter
 from classes.message_manager import MessageManager
 from classes.message_sender import MessageSender
 from classes.open_ai import OpenAI
@@ -17,6 +18,7 @@ from config import logger, SEMAPHORE
 from classes.db_interface import DBI
 from decorators.decorators import check_working, info_logger
 from keyboards import user_menu_keyboard, in_work_keyboard
+from utils import get_current_timestamp
 
 
 class DiscordManager:
@@ -74,6 +76,7 @@ class DiscordManager:
 
     @logger.catch
     async def _lets_play(self) -> None:
+
         # TODO сделать декоратор из reboot
         await self.__check_reboot()
         await self._check_user_active()
@@ -87,23 +90,33 @@ class DiscordManager:
     @logger.catch
     async def __get_full_info(self) -> str:
         return (
-            f"\n\tUsername: {self._username}"
-            f"\n\tUser telegram id: {self._telegram_id}"
-            f"\n\tToken: {self.datastore.token}"
-            f"\n\tProxy: {self.datastore.proxy}"
-            f"\n\tDiscord ID: {self.datastore.my_discord_id}"
-            f"\n\tMate discord id: {self.datastore.mate_id}"
-            f"\n\tSilence: {self.silence}"
-            f"\n\tAutoanswer: {self.auto_answer}"
-            f"\n\tWorkers: {len(self.__workers)}/{len(self.__related_tokens)}"
-            f"\n\tDelay: {self.delay}"
+                f"\n\tUsername: {self._username}"
+                f"\n\tProxy: {self.datastore.proxy}"
+                f"\n\tUser telegram id: {self._telegram_id}"
+                f"\n\tToken: {self.datastore.token}"
+                f"\n\tChannel: {self.datastore.channel}"
+                f"\n\tDiscord ID: {self.datastore.my_discord_id}"
+                f"\n\tMate discord id: {self.datastore.mate_id}"
+                f"\n\tSilence: {self.silence}"
+                f"\n\tAutoanswer: {self.auto_answer}"
+                f"\n\tWorkers: {len(self.__workers)}/{len(self.__related_tokens)}"
+                f"\n\tDelay: {self.delay}"
+                f"\n\tTokens cooldowns:\n\t\t"
+        #         + '\n\t\t'.join(
+        #     f"PK: {elem.token_pk}\tCD:{elem.cooldown}\tLMT: {elem.last_message_time}"
+        #     f"\tTIME: {get_current_time()}\tCHN: {elem.channel_id}"
+        #     f"\tDELAY: {get_current_timestamp() + elem.cooldown - elem.last_message_time.timestamp()}"
+        #     for elem in self.__related_tokens
+        # )
         )
 
     @logger.catch
     async def _check_user_active(self):
 
-        # TODO добавить проверку на админа/суперадмина
-
+        user_is_admin: bool = await DBI.is_admin(telegram_id=self._telegram_id)
+        user_is_superadmin: bool = await DBI.is_superadmin(telegram_id=self._telegram_id)
+        if user_is_admin or user_is_superadmin:
+            return
         user_deactivated: bool = await DBI.is_expired_user_deactivated(self.message)
         user_is_work: bool = await DBI.is_user_work(telegram_id=self._telegram_id)
         if user_deactivated or not user_is_work:
@@ -136,7 +149,7 @@ class DiscordManager:
 
     @logger.catch
     def __replace_time_to_now(self, elem) -> namedtuple:
-        return elem._replace(last_message_time=datetime.datetime.now())
+        return elem._replace(last_message_time=datetime.datetime.utcnow().replace(tzinfo=None))
 
     @logger.catch
     async def __update_token_last_message_time(self, token: str) -> None:
@@ -197,7 +210,7 @@ class DiscordManager:
     async def _sleep(self) -> None:
         """Спит на время ближайшего токена."""
 
-        logger.debug(await self.__get_full_info())
+        # logger.debug(await self.__get_full_info())
         if self.__workers:
             return
         await self._get_delay()
@@ -227,7 +240,7 @@ class DiscordManager:
         self.__workers = [
             elem.token
             for elem in self.__related_tokens
-            if self.__get_current_timestamp() > self.__get_max_message_time(elem)
+            if get_current_timestamp() > self.__get_max_message_time(elem)
         ]
 
     @check_working
@@ -246,42 +259,44 @@ class DiscordManager:
         """Обновляет данные datastore информацией о токене, полученной из БД"""
 
         token_data: namedtuple = await DBI.get_info_by_token(token)
+        if not token_data:
+            await ErrorsReporter.send_report_to_admins(
+                f'NOT TOKEN DATA FOR TOKEN: {token}'
+                f'\nTelegram_id: {self.datastore.telegram_id}'
+                f'\nChannel: {self.datastore.channel}'
+                f'\nWorkers: {self.__workers}'
+            )
+            await self.__get_full_info()
+            self.is_working = False
+            return
         self.datastore.update_data(token=token, token_data=token_data)
         self.datastore.all_tokens_ids = self.__all_user_tokens_discord_ids
-
-    @logger.catch
-    def __get_current_timestamp(self) -> int:
-        """Возвращает текущее время (timestamp) целое."""
-
-        return int(datetime.datetime.utcnow().replace(tzinfo=None).timestamp())
 
     @logger.catch
     async def __get_second_closest_token_time(self) -> namedtuple:
         """Возвращает время второго ближайшего токена"""
 
-        return sorted(self.__related_tokens, key=lambda x: x.last_message_time)[1]
+        return sorted(
+            self.__related_tokens,
+            key=lambda x: x.last_message_time.timestamp() + x.cooldown
+        )[1]
 
     @logger.catch
     async def _get_delay(self) -> None:
         """Сохраняет время паузы взяв его из второго в очереди на работу токена"""
 
-        if self.delay:
+        if self.delay:  # Delay может быть уже задан в функции: _set_delay_equal_channel_cooldown
             return
         token_data: namedtuple = await self.__get_second_closest_token_time()
-        logger.debug(f"Token_data: {token_data}")
         message_time: int = int(token_data.last_message_time.timestamp())
-        logger.debug(f"{message_time=}")
         cooldown: int = token_data.cooldown
-        logger.debug(f"{cooldown=}")
-        self.delay = cooldown + message_time - self.__get_current_timestamp()
-        logger.debug(f"{self.delay=}")
+        self.delay = cooldown + message_time - get_current_timestamp()
 
     @check_working
     @logger.catch
     async def _send_delay_message(self) -> None:
         """Отправляет сообщение что все токены заняты"""
 
-        logger.info(f"{self._telegram_id}: SLEEP PAUSE: {self.delay}")
         if self.delay <= 0:
             return
         delay: int = self.delay
@@ -296,6 +311,7 @@ class DiscordManager:
             delay: str = f"{minutes}:{seconds}"
             text = "минут"
         text: str = f"Все токены отработали. Следующий старт через {delay} {text}."
+        logger.info(f"{self.message.from_user.username}: {self.message.from_user.id}: {text}")
         if not self.silence:
             await self.message.answer(text, reply_markup=in_work_keyboard())
 
@@ -319,7 +335,7 @@ class DiscordManager:
         Если ИИ не ответил - отправляет сообщение пользователю в обычном режиме"""
 
         reply_text: str = data.get("text")
-        ai_reply_text: str = OpenAI(davinchi=False).get_answer(message=reply_text)
+        ai_reply_text: str = await OpenAI(davinchi=False).get_answer(message=reply_text)
         if ai_reply_text:
             message_id: str = data.get("message_id")
             await replier.update_text(
@@ -334,7 +350,6 @@ class DiscordManager:
         text: str = ("ИИ не ответил на реплай: "
                      f"\n{reply_text}")
         await self.message.answer(text, reply_markup=in_work_keyboard())
-        # await ErrorsReporter.send_report_to_admins(text)
         await self.__send_reply_to_telegram(data, replier)
 
     @logger.catch

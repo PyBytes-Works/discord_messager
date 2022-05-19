@@ -69,8 +69,8 @@ class TokenData:
         self.__MATE_DISCORD_ID = mate_id
 
     @property
-    def last_message_time(self) -> float:
-        return self.__TOKEN_COOLDOWN + 120
+    def max_last_message_time(self) -> float:
+        return self.__TOKEN_COOLDOWN * 2
 
     @property
     def delay(self) -> int:
