@@ -130,7 +130,7 @@ async def check_expiration_and_add_new_user_handler(message: Message, state: FSM
         await state.finish()
         return
     await message.answer(text, reply_markup=user_menu_keyboard())
-    await ErrorsReporter.send_message_to_user(
+    await ErrorsReporter().send_message_to_user(
         text="Вы добавлены в базу данных.",
         telegram_id=new_user_telegram_id,
         keyboard=user_menu_keyboard())

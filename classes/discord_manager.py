@@ -15,7 +15,6 @@ from classes.token_datastorage import TokenData
 
 from config import logger, SEMAPHORE
 from classes.db_interface import DBI
-from decorators.checkers import check_is_super_admin, check_is_admin
 from decorators.decorators import check_working, info_logger
 from keyboards import user_menu_keyboard, in_work_keyboard
 
@@ -88,19 +87,25 @@ class DiscordManager:
 
     @logger.catch
     async def __get_full_info(self) -> str:
-
+        time = self.__get_current_timestamp()
         return (
             f"\n\tUsername: {self._username}"
+            f"\n\tProxy: {self.datastore.proxy}"
             f"\n\tUser telegram id: {self._telegram_id}"
             f"\n\tToken: {self.datastore.token}"
-            f"\n\tProxy: {self.datastore.proxy}"
+            f"\n\tChannel: {self.datastore.channel}"
             f"\n\tDiscord ID: {self.datastore.my_discord_id}"
             f"\n\tMate discord id: {self.datastore.mate_id}"
             f"\n\tSilence: {self.silence}"
             f"\n\tAutoanswer: {self.auto_answer}"
             f"\n\tWorkers: {len(self.__workers)}/{len(self.__related_tokens)}"
             f"\n\tDelay: {self.delay}"
-        )
+            f"\n\tTokens cooldowns:\n\t\t"
+        ) + '\n\t\t'.join(
+                f"PK: {elem.token_pk}\tCD:{elem.cooldown}\tLMT: {elem.last_message_time}\tTIME: {time}\tCHN: {elem.channel_id}"
+                f"\tDELAY: {time + elem.cooldown - elem.last_message_time.timestamp()}"
+                for elem in self.__related_tokens
+            )
 
     @logger.catch
     async def _check_user_active(self):

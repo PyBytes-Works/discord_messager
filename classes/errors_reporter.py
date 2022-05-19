@@ -232,7 +232,7 @@ class ErrorsReporter:
 
         text = f'[Рассылка][Superusers]: {text}'
         for admin_id in admins_list:
-            await cls.send_message_to_user(text=text, telegram_id=admin_id)
+            await cls().send_message_to_user(text=text, telegram_id=admin_id)
 
     @classmethod
     @logger.catch

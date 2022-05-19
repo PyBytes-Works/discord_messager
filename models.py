@@ -738,7 +738,6 @@ class Token(BaseModel):
           get_count_bu_user_channel
           set_token_name
           check_token_by_discord_id
-          update_token_time
     """
     user_channel = ForeignKeyField(
         UserChannel, backref='token', verbose_name="Канал для подключения", on_delete='CASCADE')
@@ -806,7 +805,7 @@ class Token(BaseModel):
         set last_time: now datetime last message
         token: (str)
         """
-        current_time = datetime.datetime.now().timestamp()
+        current_time = datetime.datetime.utcnow().replace(tzinfo=None).timestamp()
         return cls.update(last_message_time=current_time).where(cls.token == token).execute()
 
     @classmethod

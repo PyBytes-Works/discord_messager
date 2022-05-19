@@ -3,9 +3,8 @@ from typing import Callable, Any
 
 from aiogram.types import Message
 
-from checks.check_users import is_admin, is_super_admin, is_user_subscribe_active
 from classes.db_interface import DBI
-from config import logger, admins_list
+from config import logger
 
 
 @logger.catch
