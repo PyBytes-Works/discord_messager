@@ -29,7 +29,6 @@ class TokenData:
         self.user_channel_pk: int = 0
         self.token_name: str = ''
         self.__all_tokens_ids: List[str] = []
-        self.__PING_TIME: int = 60
 
     @logger.catch
     def update_data(self, token: str, token_data: namedtuple):
@@ -71,7 +70,7 @@ class TokenData:
 
     @property
     def max_last_message_time(self) -> float:
-        return self.__TOKEN_COOLDOWN + self.__PING_TIME
+        return self.__TOKEN_COOLDOWN * 2
 
     @property
     def delay(self) -> int:
