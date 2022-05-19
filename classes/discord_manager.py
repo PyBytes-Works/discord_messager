@@ -17,6 +17,7 @@ from config import logger, SEMAPHORE
 from classes.db_interface import DBI
 from decorators.decorators import check_working, info_logger
 from keyboards import user_menu_keyboard, in_work_keyboard
+from utils import get_current_timestamp
 
 
 class DiscordManager:
@@ -88,23 +89,25 @@ class DiscordManager:
     @logger.catch
     async def __get_full_info(self) -> str:
         return (
-            f"\n\tUsername: {self._username}"
-            f"\n\tProxy: {self.datastore.proxy}"
-            f"\n\tUser telegram id: {self._telegram_id}"
-            f"\n\tToken: {self.datastore.token}"
-            f"\n\tChannel: {self.datastore.channel}"
-            f"\n\tDiscord ID: {self.datastore.my_discord_id}"
-            f"\n\tMate discord id: {self.datastore.mate_id}"
-            f"\n\tSilence: {self.silence}"
-            f"\n\tAutoanswer: {self.auto_answer}"
-            f"\n\tWorkers: {len(self.__workers)}/{len(self.__related_tokens)}"
-            f"\n\tDelay: {self.delay}"
-            f"\n\tTokens cooldowns:\n\t\t"
-        ) + '\n\t\t'.join(
-                f"PK: {elem.token_pk}\tCD:{elem.cooldown}\tLMT: {elem.last_message_time}\tTIME: {self.__get_current_time()}\tCHN: {elem.channel_id}"
-                f"\tDELAY: {self.__get_current_timestamp() + elem.cooldown - elem.last_message_time.timestamp()}"
-                for elem in self.__related_tokens
-            )
+                f"\n\tUsername: {self._username}"
+                f"\n\tProxy: {self.datastore.proxy}"
+                f"\n\tUser telegram id: {self._telegram_id}"
+                f"\n\tToken: {self.datastore.token}"
+                f"\n\tChannel: {self.datastore.channel}"
+                f"\n\tDiscord ID: {self.datastore.my_discord_id}"
+                f"\n\tMate discord id: {self.datastore.mate_id}"
+                f"\n\tSilence: {self.silence}"
+                f"\n\tAutoanswer: {self.auto_answer}"
+                f"\n\tWorkers: {len(self.__workers)}/{len(self.__related_tokens)}"
+                f"\n\tDelay: {self.delay}"
+                f"\n\tTokens cooldowns:\n\t\t"
+        #         + '\n\t\t'.join(
+        #     f"PK: {elem.token_pk}\tCD:{elem.cooldown}\tLMT: {elem.last_message_time}"
+        #     f"\tTIME: {get_current_time()}\tCHN: {elem.channel_id}"
+        #     f"\tDELAY: {get_current_timestamp() + elem.cooldown - elem.last_message_time.timestamp()}"
+        #     for elem in self.__related_tokens
+        # )
+        )
 
     @logger.catch
     async def _check_user_active(self):
@@ -236,7 +239,7 @@ class DiscordManager:
         self.__workers = [
             elem.token
             for elem in self.__related_tokens
-            if self.__get_current_timestamp() > self.__get_max_message_time(elem)
+            if get_current_timestamp() > self.__get_max_message_time(elem)
         ]
 
     @check_working
@@ -259,18 +262,6 @@ class DiscordManager:
         self.datastore.all_tokens_ids = self.__all_user_tokens_discord_ids
 
     @logger.catch
-    def __get_current_time(self) -> datetime:
-        """Возвращает текущее время целое."""
-
-        return datetime.datetime.utcnow().replace(tzinfo=None)
-
-    @logger.catch
-    def __get_current_timestamp(self) -> int:
-        """Возвращает текущее время (timestamp) целое."""
-
-        return int(self.__get_current_time().timestamp())
-
-    @logger.catch
     async def __get_second_closest_token_time(self) -> namedtuple:
         """Возвращает время второго ближайшего токена"""
         tokens = sorted(self.__related_tokens, key=lambda x: x.last_message_time.timestamp() + x.cooldown)
@@ -291,7 +282,7 @@ class DiscordManager:
         token_data: namedtuple = await self.__get_second_closest_token_time()
         message_time: int = int(token_data.last_message_time.timestamp())
         cooldown: int = token_data.cooldown
-        self.delay = cooldown + message_time - self.__get_current_timestamp()
+        self.delay = cooldown + message_time - get_current_timestamp()
         logger.debug(f"{self.delay=}")
 
     @check_working

@@ -11,6 +11,7 @@ from classes.request_classes import ChannelData
 from classes.token_datastorage import TokenData
 from classes.vocabulary import Vocabulary
 from config import logger
+from utils import get_current_time
 
 
 class MessageManager(ChannelData):
@@ -91,24 +92,20 @@ class MessageManager(ChannelData):
             return []
         return list(
             filter(
-                lambda elem: self.__get_delta_seconds(elem) < self.datastore.last_message_time,
+                lambda elem: self.__get_message_timestamp(elem) < self.datastore.last_message_time,
                 all_messages
             )
         )
 
     @staticmethod
     @logger.catch
-    def __get_delta_seconds(elem: dict) -> int:
-        """Возвращает время, в пределах которого надо найти сообщения
-        которое в секундах"""
+    def __get_message_timestamp(elem: dict) -> float:
+        """Возвращает время в секундах, в пределах которого надо найти сообщения"""
 
         if not isinstance(elem, dict):
             return 0
         message_time: 'datetime' = elem.get("timestamp")
-        mes_time: 'datetime' = datetime.datetime.fromisoformat(message_time).replace(tzinfo=None)
-        delta: 'timedelta' = datetime.datetime.utcnow().replace(tzinfo=None) - mes_time
-
-        return delta.seconds
+        return datetime.datetime.fromisoformat(message_time).replace(tzinfo=None).timestamp()
 
     @logger.catch
     def __get_target_id(self, elem: dict) -> str:
@@ -225,6 +222,8 @@ class MessageManager(ChannelData):
 
     @logger.catch
     async def __get_random_message_from_last_messages(self) -> str:
+        """Возвращает ответ ИИ на случайного сообщение из чата"""
+
         message_data: dict = random.choice(self._last_messages)
         text: str = message_data.get("content", '')
         logger.debug(f"Random message from last messages: {text}")

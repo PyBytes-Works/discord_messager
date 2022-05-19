@@ -1,3 +1,4 @@
+import datetime
 import os
 import json
 
@@ -63,3 +64,24 @@ def load_statistics(filename: str = 'errors.txt') -> list[str]:
         result: list[str] = f.readlines()
 
     return result
+
+
+@logger.catch
+def get_current_time() -> datetime:
+    """Возвращает текущее время целое."""
+
+    return datetime.datetime.utcnow().replace(tzinfo=None)
+
+
+@logger.catch
+def get_current_timestamp() -> int:
+    """Возвращает текущее время (timestamp) целое."""
+
+    return int(get_current_time().timestamp())
+
+@logger.catch
+def get_from_timestamp(data: float) -> datetime:
+    """Возвращает текущее время из timstamp."""
+
+    return datetime.datetime.fromtimestamp(data)
+
