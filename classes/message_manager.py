@@ -36,14 +36,6 @@ class MessageManager(ChannelData):
         if not await self.__get_message_id_and_text_for_send_answer():
             self.datastore.current_message_id = await self.__get_message_id_from_last_messages()
             self.datastore.text_to_send = await self._get_message_text()
-            print(
-                ""
-                f"\n\t\t{self.datastore.max_last_message_time=}"
-                f"\n\t\tDiscord ID: {self.datastore.my_discord_id}"
-                f"\n\t\tMate ID: {self.datastore.mate_id}"
-                f"\n\t\tMate message id: {self.datastore.current_message_id}"
-                f"\n\t\tText to send: {self.datastore.text_to_send}"
-            )
         await self.__update_datastore_replies()
         await self.__get_data_for_send()
 
@@ -157,17 +149,7 @@ class MessageManager(ChannelData):
             for elem in self._last_messages
             if self.datastore.mate_id == str(elem["author"]["id"])
         ]
-        id = await self.__get_random_message_id(mate_messages)
-        print(f"\nMate messages: {len(mate_messages)}")
-        for mes in mate_messages:
-            print(f"\nID: {mes.get('id')}"
-                  f"\nTEXT: {mes.get('content', 'NO CONTENT')}"
-                  f"\nAuthor: {mes.get('author', {}).get('id')}"
-                  f"\nAuthor name: {mes.get('author', {}).get('username')}"
-            )
-        print(f"\n\nSelected ID: {id}")
-
-        return id
+        return await self.__get_random_message_id(mate_messages)
 
     @logger.catch
     async def __get_random_message_id(self, data: list) -> int:
