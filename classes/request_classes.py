@@ -72,15 +72,20 @@ class RequestSender(ABC):
                     "ssl": False,
                     "timeout": self.timeout,
                 }
-                logger.warning(f"\n\tSending request without proxy for user {user_id}:"
-                               f"\nURL: {self.url}"
-                               f"\nChannel: {self.datastore.channel}"
-                               f"\nToken: {self.datastore.token}"
-                )
+                logger.info(f"\n\tSending request without proxy for user \n\t\t{user_id}")
                 await asyncio.sleep(self.request_delay)
                 answer: dict = await self._send()
-                logger.warning(f"\n\t\tAnswer status: "
-                               f"\n\t\t{answer.get('status')}")
+                status = answer.get("status")
+                if status > 299:
+                    logger.warning(f"\n\tSending request without proxy for user {user_id}:"
+                                   f"\nURL: {self.url}"
+                                   f"\nChannel: {self.datastore.channel}"
+                                   f"\nToken: {self.datastore.token}"
+                    )
+                    logger.warning(f"\n\t\tAnswer status: "
+                                   f"\n\t\t{status}")
+                    await ErrorsReporter.send_report_to_admins(f"User SAN: {user_id}: error: {status}"
+                                                               f"\nAnswer: {answer.get('answer_data')}")
             else:
                 await asyncio.sleep(self.request_delay)
                 answer: dict = await self._send()
