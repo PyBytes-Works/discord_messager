@@ -267,6 +267,7 @@ async def add_channel_cooldown_handler(message: Message, state: FSMContext) -> N
         await state.finish()
         return
     await message.answer("Кулдаун установлен.", reply_markup=user_menu_keyboard())
+    logger.info(f"User: {message.from_user.id} set cooldown {cooldown} for channel {user_channel_pk}")
     await state.finish()
 
 

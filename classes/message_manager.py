@@ -35,7 +35,6 @@ class MessageManager(ChannelData):
         self._last_messages: List[dict] = await self.__get_last_messages(all_messages)
         print(f"{self.datastore.max_last_message_time=}")
         if not await self.__get_message_id_and_text_for_send_answer():
-            print(f"\n\n\t\tMate message id before: {self.datastore.current_message_id}")
             self.datastore.current_message_id = await self.__get_message_id_from_last_messages()
             print(f"\n\n\t\tMate message id: {self.datastore.current_message_id}")
             self.datastore.text_to_send = await self._get_message_text()
