@@ -4,10 +4,11 @@ import os
 import sys
 from typing import Union
 
+import aioredis
 from aiogram import Bot, Dispatcher
+from aiogram.contrib.fsm_storage.memory import MemoryStorage
 from dotenv import load_dotenv
 from loguru import logger
-from aiogram.contrib.fsm_storage.memory import MemoryStorage
 from peewee import SqliteDatabase, PostgresqlDatabase
 import psycopg2
 
@@ -26,6 +27,7 @@ DEBUG = bool(os.getenv("DEBUG", 0))
 
 # # redis init
 REDIS_DB = os.environ.get("REDIS_DB", "redis://127.0.0.1:6379/0")
+REDIS_CLIENT = aioredis.from_url(url=REDIS_DB, encoding="utf-8", decode_responses=True)
 
 # initialization admins list
 deskent = os.getenv("DESKENT_TELEGRAM_ID")
