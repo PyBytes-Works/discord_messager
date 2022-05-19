@@ -215,7 +215,7 @@ class DiscordManager:
             return
         await self._get_delay()
         self.delay += random.randint(3, 7)
-        logger.debug(f"\n\t\tSelf.delay: {self.delay}")
+        logger.debug(f"{self.delay=}")
         await self._send_delay_message()
         timer: int = self.delay
         while timer > 0:

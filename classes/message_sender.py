@@ -20,8 +20,8 @@ class MessageSender(PostRequest):
         if not self.datastore.data_for_send:
             return {}
         logger.info(
-            f"User: [{self.datastore.telegram_id}]: "
-            f"send to channel: [{self.datastore.channel}]:"
+            f"User: [{self.datastore.telegram_id}]:\t"
+            f"send to channel: [{self.datastore.channel}]:\t"
             f"message text: [{self.datastore.text_to_send}]"
         )
         return await self.__send_data()
