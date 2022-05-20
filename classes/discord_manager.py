@@ -238,7 +238,7 @@ class DiscordManager:
         """Возвращает список токенов, которые не на КД"""
 
         self.__workers = [
-            elem.token
+            elem.token.strip()
             for elem in self.__related_tokens
             if get_current_timestamp() > self.__get_max_message_time(elem)
         ]
