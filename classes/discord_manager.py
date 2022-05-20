@@ -67,14 +67,6 @@ class DiscordManager:
             await self._lets_play()
 
     @logger.catch
-    async def __check_reboot(self) -> None:
-        if self.reboot:
-            await self.message.answer(
-                "Ожидайте перезагрузки сервера.",
-                reply_markup=user_menu_keyboard())
-            self.is_working = False
-
-    @logger.catch
     async def _lets_play(self) -> None:
 
         # TODO сделать декоратор из reboot
@@ -86,6 +78,14 @@ class DiscordManager:
             await self._send_replies()
             await self._sending_messages()
         await self._sleep()
+
+    @logger.catch
+    async def __check_reboot(self) -> None:
+        if self.reboot:
+            await self.message.answer(
+                "Ожидайте перезагрузки сервера.",
+                reply_markup=user_menu_keyboard())
+            self.is_working = False
 
     @logger.catch
     async def __get_full_info(self) -> str:
@@ -267,16 +267,21 @@ class DiscordManager:
         """Обновляет данные datastore информацией о токене, полученной из БД"""
 
         token_data: namedtuple = await DBI.get_info_by_token(token)
+        # TODO выяснить почему???
         if not token_data:
+            self.datastore.token = 'deleted'
+            await self.__is_token_deleted()
             error_text: str = (
                 f'NOT TOKEN DATA FOR TOKEN: {token}'
+                f'\nToken_data: {token_data}'
                 f'\nTelegram_id: {self.datastore.telegram_id}'
                 f'\nChannel: {self.datastore.channel}'
                 f'\nWorkers: {self.__workers}'
             )
-            await ErrorsReporter.send_report_to_admins(error_text)
+            # await ErrorsReporter.send_report_to_admins(error_text)
+            logger.error(error_text)
             await self.__get_full_info()
-            self.is_working = False
+            # self.is_working = False
             return
         self.datastore.update_data(token=token, token_data=token_data)
         self.datastore.all_tokens_ids = self.__all_user_tokens_discord_ids
