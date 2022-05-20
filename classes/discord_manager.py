@@ -112,6 +112,7 @@ class DiscordManager:
 
     @logger.catch
     async def _check_user_active(self):
+        """Проверяет активный ли пользователь и не истекла ли у него подписка"""
 
         user_is_admin: bool = await DBI.is_admin(telegram_id=self._telegram_id)
         user_is_superadmin: bool = await DBI.is_superadmin(telegram_id=self._telegram_id)
@@ -146,6 +147,7 @@ class DiscordManager:
                          f"\nChannel: {self.datastore.channel}")
             return
         await MessageManager(datastore=self.datastore).handling_messages()
+        await self.__is_token_deleted()
 
     @logger.catch
     def __replace_time_to_now(self, elem) -> namedtuple:
@@ -159,6 +161,14 @@ class DiscordManager:
                                  if elem.token == token else elem
                                  for elem in self.__related_tokens]
 
+    @logger.catch
+    async def __is_token_deleted(self) -> bool:
+        if self.datastore.token == 'deleted':
+            self.__workers = []
+            await self.form_new_tokens_pairs()
+            return True
+        return False
+
     @check_working
     @logger.catch
     async def _sending_messages(self) -> None:
@@ -170,18 +180,16 @@ class DiscordManager:
                          f"\nChannel: {self.datastore.channel}")
             return
         answer: dict = await MessageSender(datastore=self.datastore).send_message_to_discord()
+        if await self.__is_token_deleted():
+            return
         await DBI.update_token_last_message_time(token=self.datastore.token)
         await self.__update_token_last_message_time(token=self.datastore.token)
         status = answer.get("status")
         if status == 200:
             return
-        elif status in (403, 407, 429):
+        elif status in (407, 429):
             self.__workers = []
             await self._set_delay_equal_channel_cooldown()
-            code: int = answer.get("answer_data", {}).get("code")
-            token_wrong: bool = (status == 401 and code == 0)
-            if status == 403 or token_wrong:
-                await self.form_new_tokens_pairs()
         logger.warning(
             f"\nUser: [{self.datastore.telegram_id}]"
             f"\nDeleting workers and sleep {self.delay} seconds."
@@ -238,7 +246,7 @@ class DiscordManager:
         """Возвращает список токенов, которые не на КД"""
 
         self.__workers = [
-            elem.token
+            elem.token.strip()
             for elem in self.__related_tokens
             if get_current_timestamp() > self.__get_max_message_time(elem)
         ]
