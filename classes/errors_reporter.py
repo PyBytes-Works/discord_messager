@@ -127,7 +127,7 @@ class ErrorsReporter:
                 )
             else:
                 text: str = f"Ошибка {self._status} Code: {self._code}"
-                text += await self._delete_token()
+            text += await self._delete_token()
         elif self._status == 404:
             if self._code == 10003:
                 text: str = "Ошибка отправки сообщения. Неверный канал. (Ошибка 404 - 10003)"

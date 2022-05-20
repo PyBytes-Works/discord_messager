@@ -346,10 +346,8 @@ class DiscordManager:
             result: str = text + f"\nОтвет от ИИ: {ai_reply_text}"
             await self.message.answer(result, reply_markup=in_work_keyboard())
             return
-        logger.error(f"Davinci NOT ANSWERED to:"
-                     f"\n{reply_text}")
-        text: str = ("ИИ не ответил на реплай: "
-                     f"\n{reply_text}")
+        text: str = f"ИИ не ответил на реплай: [{reply_text}]"
+        logger.warning(text)
         await self.message.answer(text, reply_markup=in_work_keyboard())
         await self.__send_reply_to_telegram(data, replier)
 
