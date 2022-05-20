@@ -9,10 +9,7 @@ def check_working(func):
             if is_working:
                 # logger.debug(f"\t{name}: OK")
                 return await func(*args, **kwargs)
-        logger.info(
-            f"Work stopped:"
-            f"\n\tMethod: {name}: FAIL"
-        )
+        logger.info(f"Work stopped: Method: {name}: FAIL")
         return
 
     return wrapper
