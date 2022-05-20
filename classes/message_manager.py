@@ -224,6 +224,8 @@ class MessageManager(ChannelData):
     async def __get_random_message_from_last_messages(self) -> str:
         """Возвращает ответ ИИ на случайного сообщение из чата"""
 
+        if not self._last_messages:
+            return ''
         message_data: dict = random.choice(self._last_messages)
         text: str = message_data.get("content", '')
         result: str = await self.__get_openai_answer(text)
