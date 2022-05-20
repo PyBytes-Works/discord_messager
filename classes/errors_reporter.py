@@ -60,8 +60,10 @@ class ErrorsReporter:
     @logger.catch
     async def _delete_token(self) -> str:
         if await DBI.delete_token(token=self._token):
-            self.datastore.token = ''
-            return f"\nТокен удален."
+            self.datastore.token = 'deleted'
+            text: str = f"\nТокен удален."
+            logger.warning(text + self._token)
+            return text
         return ''
 
     @logger.catch
