@@ -24,7 +24,7 @@ class ErrorsReporter:
     ) -> None:
         self._answer: dict = answer if answer else {}
         self._status: int = answer.get("status", 0) if answer else 0
-        self._answer_data: str = answer.get("answer_data", {}) if answer else {}
+        self._answer_data: str = answer.get("answer_data", '')
         self._proxy: str = proxy if proxy else ''
         self._token: str = token if token else ''
         self._telegram_id: str = telegram_id if telegram_id else ''
@@ -37,18 +37,21 @@ class ErrorsReporter:
         """Parse status and data from answer"""
 
         data = {}
-        if self._answer_data and not self._answer_data.startswith('<!'):
-            try:
-                data: dict = json.loads(self._answer_data)
-                if isinstance(data, dict):
-                    self._code = data.get("code", 0)
-                    self._answer_data_dict = data
-            except JSONDecodeError as err:
-                logger.error(
-                    f"\n{self.handle_errors.__qualname__}: JSON ERROR: {err}"
-                    f"\nStatus: {self._status}"
-                    f"\nAnswer data: {self._answer_data}"
-                )
+        if self._answer_data:
+            if self._answer_data.startswith('<'):
+                self._answer_data = 'some HTML answer'
+            else:
+                try:
+                    data: dict = json.loads(self._answer_data)
+                    if isinstance(data, dict):
+                        self._code = data.get("code", 0)
+                        self._answer_data_dict: dict = data
+                except JSONDecodeError as err:
+                    logger.error(
+                        f"\n{self.handle_errors.__qualname__}: JSON ERROR: {err}"
+                        f"\nStatus: {self._status}"
+                        f"\nAnswer data: {self._answer_data}"
+                    )
         self._answer.update(answer_data=data)
         if self._status not in range(200, 205):
             await self.errors_manager()
@@ -145,8 +148,8 @@ class ErrorsReporter:
                 if cooldown:
                     cooldown += self.datastore.cooldown
                     logger.warning(f"New cooldown set: "
-                                   f"\nChannel: {self.datastore.channel}"
-                                   f"\nCooldown: {cooldown}")
+                                   f"\tChannel: {self.datastore.channel}"
+                                   f"\tCooldown: {cooldown}")
                     await DBI.update_user_channel_cooldown(
                         user_channel_pk=self.datastore.user_channel_pk, cooldown=cooldown)
                     self.datastore.delay = cooldown
@@ -156,7 +159,8 @@ class ErrorsReporter:
                         f"\nToken: {self.datastore.token}"
                         f"\nГильдия/Канал: {self.datastore.guild}/{self.datastore.channel}"
                         f"\nВремя скорректировано. Кулдаун установлен: {cooldown} секунд"
-                    )
+                    ),
+                    telegram_id=self._telegram_id
                 )
             elif self._code == 40062:
                 text: str = (
@@ -188,29 +192,25 @@ class ErrorsReporter:
             if self._proxy:
                 text += f"\nProxy [{self._proxy}]"
             if users and self._telegram_id:
-                await self.send_message_to_user(text=text)
+                await self.send_message_to_user(text=text, telegram_id=self._telegram_id)
             if admins:
                 await self.send_report_to_admins(text)
         error_message: str = (
-            f"\n[{self.errors_manager.__qualname__}:"
-            f"\n\tTelegram_id: {self._telegram_id}"
-            f"\n\tToken: {self._token}"
-            f"\n\tProxy: {self._proxy}"
-            f"\n\tError status: {self._status}"
-            f"\n\tError data: {self._answer_data if not self._answer_data.startswith('<!') else 'HTML'}]"
+            f"\n[Telegram_id: {self._telegram_id}"
+            f"\tToken: {self._token}"
+            f"\tProxy: {self._proxy}"
+            f"\tError status: {self._status}"
+            f"\n\tError data: {self._answer_data}]"
         )
         logger.error(error_message)
 
+    @classmethod
     @logger.catch
-    async def send_message_to_user(self, text: str, telegram_id: str = '', keyboard=None) -> None:
-        """Errors report"""
+    async def send_message_to_user(cls, text: str, telegram_id: str, keyboard=None) -> None:
+        """Отправляет сообщение пользователю в телеграм"""
 
-        chat_id: str = telegram_id if telegram_id else self._telegram_id
-        if not chat_id:
-            logger.error(f"Chat id not found.")
-            return
         params: dict = {
-            "chat_id": chat_id,
+            "chat_id": telegram_id,
             "text": text
         }
         if keyboard:
@@ -218,12 +218,12 @@ class ErrorsReporter:
         try:
             await bot.send_message(**params)
         except aiogram.utils.exceptions.ChatNotFound:
-            logger.error(f"Chat {chat_id} not found")
+            logger.error(f"Chat {telegram_id} not found")
         except aiogram.utils.exceptions.BotBlocked as err:
-            logger.error(f"Пользователь {chat_id} заблокировал бота {err}")
+            logger.error(f"Пользователь {telegram_id} заблокировал бота {err}")
         except aiogram.utils.exceptions.CantInitiateConversation as err:
-            logger.error(f"Не смог отправить сообщение пользователю {chat_id}. {err}")
-        logger.success(f"Send_message_to_user: {chat_id}: {text}")
+            logger.error(f"Не смог отправить сообщение пользователю {telegram_id}. {err}")
+        logger.success(f"Send_message_to_user: {telegram_id}: {text}")
 
     @classmethod
     @logger.catch
@@ -232,10 +232,4 @@ class ErrorsReporter:
 
         text = f'[Рассылка][Superusers]: {text}'
         for admin_id in admins_list:
-            await cls().send_message_to_user(text=text, telegram_id=admin_id)
-
-    @classmethod
-    @logger.catch
-    async def proxy_not_found_error(cls):
-        text: str = "Нет доступных прокси."
-        await cls.send_report_to_admins(text)
+            await cls.send_message_to_user(text=text, telegram_id=admin_id)
