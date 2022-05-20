@@ -62,7 +62,6 @@ class RequestSender(ABC):
             "timeout": self.timeout,
         }
 
-        text: str = ''
         try:
             await asyncio.sleep(self.request_delay)
             answer: dict = await self._send()
