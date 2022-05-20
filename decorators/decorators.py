@@ -7,7 +7,6 @@ def check_working(func):
         if args and hasattr(args[0].__class__, name):
             is_working: bool = getattr(args[0], "is_working")
             if is_working:
-                # logger.debug(f"\t{name}: OK")
                 return await func(*args, **kwargs)
         logger.info(f"Work stopped: Method: {name}: FAIL")
         return
