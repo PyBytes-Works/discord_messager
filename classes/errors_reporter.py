@@ -60,8 +60,10 @@ class ErrorsReporter:
     @logger.catch
     async def _delete_token(self) -> str:
         if await DBI.delete_token(token=self._token):
-            self.datastore.token = ''
-            return f"\nТокен удален."
+            self.datastore.token = 'deleted'
+            text: str = f"\nТокен удален."
+            logger.warning(text + self._token)
+            return text
         return ''
 
     @logger.catch
@@ -223,7 +225,7 @@ class ErrorsReporter:
             logger.error(f"Пользователь {telegram_id} заблокировал бота {err}")
         except aiogram.utils.exceptions.CantInitiateConversation as err:
             logger.error(f"Не смог отправить сообщение пользователю {telegram_id}. {err}")
-        logger.success(f"Send_message_to_user: {telegram_id}: {text}")
+        logger.warning(f"Send_message_to_user: {telegram_id}: {text}")
 
     @classmethod
     @logger.catch
