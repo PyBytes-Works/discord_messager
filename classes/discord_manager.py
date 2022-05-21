@@ -278,7 +278,7 @@ class DiscordManager:
                 f'\nChannel: {self.datastore.channel}'
                 f'\nWorkers: {self.__workers}'
             )
-            # await ErrorsReporter.send_report_to_admins(error_text)
+            await ErrorsReporter.send_message_to_user(telegram_id="305353027", text=error_text)
             logger.error(error_text)
             await self.__get_full_info()
             # self.is_working = False
