@@ -232,9 +232,10 @@ class DiscordManager:
         if self.__workers:
             return
         await self._get_delay()
-        self.delay += random.randint(0, 7)
-        logger.debug(f"User: {self._username}: {self._telegram_id}: Sleep delay = [{self.delay}]")
         await self._send_delay_message()
+        await self.__go_sleep()
+
+    async def __go_sleep(self):
         timer: int = self.delay
         while timer > 0:
             timer -= 5
@@ -319,6 +320,8 @@ class DiscordManager:
         # cooldown: int = token_data.cooldown
         # self.delay = cooldown + message_time - get_current_timestamp()
         self.delay = self.__get_cooldown()
+        self.delay += random.randint(0, 7)
+        logger.debug(f"User: {self._username}: {self._telegram_id}: Sleep delay = [{self.delay}]")
 
     @check_working
     @logger.catch
@@ -478,9 +481,7 @@ class DiscordManager:
         min_delay: int = self.__get_cooldown()
         logger.warning(
             f"\nNew channels list: [{len(self.channels_list)}]:"
-            f"\n{self.channels_list}"
-            f"\nNew workers: [{len(workers)}]"
-            f"\n{workers}"
+            f"\nNew workers list: [{len(workers)}]"
             f"\nNew {min_delay=}"
         )
         return workers
@@ -497,10 +498,14 @@ class DiscordManager:
             map(lambda x: self.__get_last_time_token(x), self.channels_list),
             key=lambda x: x.last_message_time.timestamp()
         )
-        logger.warning(f"\n{token_data=}")
+        min_cooldown: int = min(
+            map(lambda x: self.__get_last_time_token(x), self.channels_list),
+            key=lambda x: x.cooldown
+        ).cooldown
+
         message_time: int = int(token_data.last_message_time.timestamp())
-        cooldown: int = token_data.cooldown
-        min_time: int = cooldown + message_time - get_current_timestamp()
+        # cooldown: int = token_data.cooldown
+        min_time: int = min_cooldown + message_time - get_current_timestamp()
 
         return min_time
 
