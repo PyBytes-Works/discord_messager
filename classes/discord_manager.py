@@ -502,7 +502,7 @@ class DiscordManager:
             map(lambda x: self.__get_last_time_token(x), self.channels_list),
             key=lambda x: x.cooldown
         ).cooldown
-
+        # TODO придумать алгоритм как вычислять этот кулдаун
         message_time: int = int(token_data.last_message_time.timestamp())
         # cooldown: int = token_data.cooldown
         min_time: int = min_cooldown + message_time - get_current_timestamp()
