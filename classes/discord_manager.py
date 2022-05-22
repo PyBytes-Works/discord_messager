@@ -467,7 +467,7 @@ class DiscordManager:
                 # IN TESTING
                 channel_list.append(first_token)
                 channel_list.append(second_token)
-            if channel_list:
+            if len(channel_list) > 1:
                 self.channels_list.append(channel_list)
                 # *****
         # if len(self.__related_tokens) < 2:
