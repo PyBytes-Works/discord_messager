@@ -50,6 +50,7 @@ class DiscordManager:
         self.silence: bool = False
         self._username: str = message.from_user.username if message else ''
         # self.__related_tokens: List[namedtuple] = []
+        self.total_tokens_count: int = 0
         self.__workers: List[str] = []
         self.__all_user_tokens_discord_ids: List[str] = []
         self.__token_work_time: int = 10
@@ -101,15 +102,9 @@ class DiscordManager:
             f"\n\tMate discord id: {self.datastore.mate_id}"
             f"\n\tSilence: {self.silence}"
             f"\n\tAutoanswer: {self.auto_answer}"
-            # f"\n\tWorkers: {len(self.__workers)}/{len(self.__related_tokens)}"
+            f"\n\tWorkers: {len(self.__workers)}/{self.total_tokens_count}"
             f"\n\tDelay: {self.delay}"
             f"\n\tTokens cooldowns:\n\t\t"
-            #         + '\n\t\t'.join(
-            #     f"PK: {elem.token_pk}\tCD:{elem.cooldown}\tLMT: {elem.last_message_time}"
-            #     f"\tTIME: {get_current_time()}\tCHN: {elem.channel_id}"
-            #     f"\tDELAY: {get_current_timestamp() + elem.cooldown - elem.last_message_time.timestamp()}"
-            #     for elem in self.__related_tokens
-            # )
         )
 
     @logger.catch
@@ -148,13 +143,13 @@ class DiscordManager:
                          f"\nToken: {self.datastore.token}"
                          f"\nChannel: {self.datastore.channel}")
             return
-        total_tokens: List[namedtuple] = [
-            elem
-            for tokens in self.channels_list
-            for elem in tokens
-        ]
+        # self.total_tokens_count = len([
+        #     elem
+        #     for tokens in self.channels_list
+        #     for elem in tokens
+        # ])
         self.datastore.token_time_delta = (
-                (len(total_tokens) - len(self.__workers))
+                (self.total_tokens_count - len(self.__workers))
                 * self.__token_work_time
         )
         # self.datastore.token_time_delta = (
@@ -234,7 +229,6 @@ class DiscordManager:
     async def _sleep(self) -> None:
         """Спит на время ближайшего токена."""
 
-        # logger.debug(await self.__get_full_info())
         if self.__workers:
             return
         await self._get_delay()
@@ -253,24 +247,14 @@ class DiscordManager:
     def __get_max_message_time(self, elem: namedtuple) -> int:
         """Возвращает максимальное время фильтрации сообщения. Сообщения с временем меньше
         данного будут отфильтрованы"""
-        res = int(elem.last_message_time.timestamp()) + elem.cooldown
-        # logger.debug(
-        #     f"\nToken: [{elem.token_pk}]"
-        #     f"\n{get_current_timestamp()} - {res} = {get_current_timestamp() - res}"
-        # )
-        return res
+
+        return int(elem.last_message_time.timestamp()) + elem.cooldown
 
     @check_working
     @logger.catch
     async def _make_workers_list(self) -> None:
         """Создает список токенов, которые не на КД"""
 
-        # for elem in sorted(self.__related_tokens, key=lambda x: x.last_message_time.timestamp()):
-        #     logger.warning(f"\nCur time: {get_current_timestamp()}"
-        #                    f"\nMax time: {self.__get_max_message_time(elem)}")
-        #     if get_current_timestamp() > self.__get_max_message_time(elem):
-        #         self.__workers.append(elem.token.strip())
-        # TODO копию может быть?
         # self.__workers = [
         #     elem.token.strip()
         #     for elem in sorted(self.__related_tokens, key=lambda x: x.last_message_time.timestamp())
@@ -284,16 +268,11 @@ class DiscordManager:
     async def _get_worker_from_list(self) -> None:
         """Возвращает токен для работы"""
 
-        # logger.debug(
-        #     f"\nRelated tokens: [{len(self.__related_tokens)}]"
-        #     f"\nWorkers: [{len(self.__workers)}]"
-        # )
         if not self.__workers:
             return
 
         random.shuffle(self.__workers)
         random_token: str = self.__workers.pop()
-        # logger.debug(f"\nWorker selected: {random_token}")
         await self._update_datastore(random_token)
 
     @logger.catch
@@ -455,6 +434,7 @@ class DiscordManager:
         )
         # self.__related_tokens = []
         self.channels_list = []
+        self.total_tokens_count = 0
         for tokens_list in sorted_tokens:
             channel_list = []
             while len(tokens_list) > 1:
@@ -469,6 +449,7 @@ class DiscordManager:
                 channel_list.append(second_token)
             if len(channel_list) > 1:
                 self.channels_list.append(channel_list)
+                self.total_tokens_count += 2
                 # *****
         # if len(self.__related_tokens) < 2:
         #     await self.message.answer(
