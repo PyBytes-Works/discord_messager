@@ -40,7 +40,7 @@ class DiscordManager:
 
     def __init__(self, message: Message = None) -> None:
         self.message: 'Message' = message
-        self._telegram_id: str = str(self.message.from_user.id)
+        self._telegram_id: str = str(self.message.from_user.id) if message else ''
         self.datastore: Optional['TokenData'] = TokenData(self._telegram_id)
         self.semaphore = SEMAPHORE
         self.delay: int = 0
@@ -48,11 +48,12 @@ class DiscordManager:
         self.auto_answer: bool = False
         self.reboot: bool = False
         self.silence: bool = False
-        self._username: str = message.from_user.username
-        self.__related_tokens: List[namedtuple] = []
+        self._username: str = message.from_user.username if message else ''
+        # self.__related_tokens: List[namedtuple] = []
         self.__workers: List[str] = []
         self.__all_user_tokens_discord_ids: List[str] = []
         self.__token_work_time: int = 10
+        self.channels_list: List[List[namedtuple]] = []
 
     @info_logger
     @logger.catch
@@ -91,24 +92,24 @@ class DiscordManager:
     @logger.catch
     async def __get_full_info(self) -> str:
         return (
-                f"\n\tUsername: {self._username}"
-                f"\n\tProxy: {self.datastore.proxy}"
-                f"\n\tUser telegram id: {self._telegram_id}"
-                f"\n\tToken: {self.datastore.token}"
-                f"\n\tChannel: {self.datastore.channel}"
-                f"\n\tDiscord ID: {self.datastore.my_discord_id}"
-                f"\n\tMate discord id: {self.datastore.mate_id}"
-                f"\n\tSilence: {self.silence}"
-                f"\n\tAutoanswer: {self.auto_answer}"
-                f"\n\tWorkers: {len(self.__workers)}/{len(self.__related_tokens)}"
-                f"\n\tDelay: {self.delay}"
-                f"\n\tTokens cooldowns:\n\t\t"
-        #         + '\n\t\t'.join(
-        #     f"PK: {elem.token_pk}\tCD:{elem.cooldown}\tLMT: {elem.last_message_time}"
-        #     f"\tTIME: {get_current_time()}\tCHN: {elem.channel_id}"
-        #     f"\tDELAY: {get_current_timestamp() + elem.cooldown - elem.last_message_time.timestamp()}"
-        #     for elem in self.__related_tokens
-        # )
+            f"\n\tUsername: {self._username}"
+            f"\n\tProxy: {self.datastore.proxy}"
+            f"\n\tUser telegram id: {self._telegram_id}"
+            f"\n\tToken: {self.datastore.token}"
+            f"\n\tChannel: {self.datastore.channel}"
+            f"\n\tDiscord ID: {self.datastore.my_discord_id}"
+            f"\n\tMate discord id: {self.datastore.mate_id}"
+            f"\n\tSilence: {self.silence}"
+            f"\n\tAutoanswer: {self.auto_answer}"
+            # f"\n\tWorkers: {len(self.__workers)}/{len(self.__related_tokens)}"
+            f"\n\tDelay: {self.delay}"
+            f"\n\tTokens cooldowns:\n\t\t"
+            #         + '\n\t\t'.join(
+            #     f"PK: {elem.token_pk}\tCD:{elem.cooldown}\tLMT: {elem.last_message_time}"
+            #     f"\tTIME: {get_current_time()}\tCHN: {elem.channel_id}"
+            #     f"\tDELAY: {get_current_timestamp() + elem.cooldown - elem.last_message_time.timestamp()}"
+            #     for elem in self.__related_tokens
+            # )
         )
 
     @logger.catch
@@ -147,25 +148,34 @@ class DiscordManager:
                          f"\nToken: {self.datastore.token}"
                          f"\nChannel: {self.datastore.channel}")
             return
+        total_tokens: List[namedtuple] = [
+            elem
+            for tokens in self.channels_list
+            for elem in tokens
+        ]
         self.datastore.token_time_delta = (
-                (len(self.__related_tokens) - len(self.__workers))
+                (len(total_tokens) - len(self.__workers))
                 * self.__token_work_time
         )
+        # self.datastore.token_time_delta = (
+        #         (len(self.__related_tokens) - len(self.__workers))
+        #         * self.__token_work_time
+        # )
         logger.debug(f"{self.datastore.token_time_delta=}")
         await MessageManager(datastore=self.datastore).handling_messages()
         await self.__is_token_deleted()
 
     @logger.catch
-    def __replace_time_to_now(self, elem) -> namedtuple:
+    def _replace_time_to_now(self, elem: namedtuple) -> namedtuple:
         return elem._replace(last_message_time=datetime.datetime.utcnow().replace(tzinfo=None))
 
-    @logger.catch
-    async def __update_token_last_message_time(self, token: str) -> None:
-        """"""
-
-        self.__related_tokens = [self.__replace_time_to_now(elem)
-                                 if elem.token == token else elem
-                                 for elem in self.__related_tokens]
+    # @logger.catch
+    # async def __update_token_last_message_time(self, token: str) -> None:
+    #     """"""
+    #
+    #     self.__related_tokens = [self._replace_time_to_now(elem)
+    #                              if elem.token == token else elem
+    #                              for elem in self.__related_tokens]
 
     @logger.catch
     async def __is_token_deleted(self) -> bool:
@@ -188,7 +198,8 @@ class DiscordManager:
         if await self.__is_token_deleted():
             return
         await DBI.update_token_last_message_time(token=self.datastore.token)
-        await self.__update_token_last_message_time(token=self.datastore.token)
+        # await self.__update_token_last_message_time(token=self.datastore.token)
+        self.__new_update_token_last_message_time(token=self.datastore.token)
         status = answer.get("status")
         if status == 200:
             return
@@ -243,16 +254,16 @@ class DiscordManager:
         """Возвращает максимальное время фильтрации сообщения. Сообщения с временем меньше
         данного будут отфильтрованы"""
         res = int(elem.last_message_time.timestamp()) + elem.cooldown
-        logger.debug(
-            f"\nToken: [{elem.token_pk}]"
-            f"\n{get_current_timestamp()} - {res} = {get_current_timestamp() - res}"
-        )
+        # logger.debug(
+        #     f"\nToken: [{elem.token_pk}]"
+        #     f"\n{get_current_timestamp()} - {res} = {get_current_timestamp() - res}"
+        # )
         return res
 
     @check_working
     @logger.catch
     async def _make_workers_list(self) -> None:
-        """Возвращает список токенов, которые не на КД"""
+        """Создает список токенов, которые не на КД"""
 
         # for elem in sorted(self.__related_tokens, key=lambda x: x.last_message_time.timestamp()):
         #     logger.warning(f"\nCur time: {get_current_timestamp()}"
@@ -260,27 +271,29 @@ class DiscordManager:
         #     if get_current_timestamp() > self.__get_max_message_time(elem):
         #         self.__workers.append(elem.token.strip())
         # TODO копию может быть?
-        self.__workers = [
-            elem.token.strip()
-            for elem in sorted(self.__related_tokens, key=lambda x: x.last_message_time.timestamp())
-            if get_current_timestamp() > self.__get_max_message_time(elem)
-        ]
+        # self.__workers = [
+        #     elem.token.strip()
+        #     for elem in sorted(self.__related_tokens, key=lambda x: x.last_message_time.timestamp())
+        #     if get_current_timestamp() > self.__get_max_message_time(elem)
+        # ]
+        # IN TESTING
+        self.__workers = await self.__get_workers_list_from_channels_list()
 
     @check_working
     @logger.catch
     async def _get_worker_from_list(self) -> None:
         """Возвращает токен для работы"""
 
-        logger.debug(
-            f"\nRelated tokens: [{len(self.__related_tokens)}]"
-            f"\nWorkers: [{len(self.__workers)}]"
-        )
+        # logger.debug(
+        #     f"\nRelated tokens: [{len(self.__related_tokens)}]"
+        #     f"\nWorkers: [{len(self.__workers)}]"
+        # )
         if not self.__workers:
             return
 
         random.shuffle(self.__workers)
         random_token: str = self.__workers.pop()
-        logger.debug(f"\nWorker selected: {random_token}")
+        # logger.debug(f"\nWorker selected: {random_token}")
         await self._update_datastore(random_token)
 
     @logger.catch
@@ -307,14 +320,14 @@ class DiscordManager:
         self.datastore.update_data(token=token, token_data=token_data)
         self.datastore.all_tokens_ids = self.__all_user_tokens_discord_ids
 
-    @logger.catch
-    async def __get_last_token_time(self) -> namedtuple:
-        """Возвращает время второго ближайшего токена"""
-
-        return sorted(
-            self.__related_tokens,
-            key=lambda x: x.last_message_time.timestamp() + x.cooldown
-        )[-1]
+    # @logger.catch
+    # async def __get_last_token_time(self) -> namedtuple:
+    #     """Возвращает время второго ближайшего токена"""
+    #
+    #     return sorted(
+    #         self.__related_tokens,
+    #         key=lambda x: x.last_message_time.timestamp() + x.cooldown
+    #     )[-1]
 
     @logger.catch
     async def _get_delay(self) -> None:
@@ -322,10 +335,11 @@ class DiscordManager:
 
         if self.delay:  # Delay может быть уже задан в функции: _set_delay_equal_channel_cooldown
             return
-        token_data: namedtuple = await self.__get_last_token_time()
-        message_time: int = int(token_data.last_message_time.timestamp())
-        cooldown: int = token_data.cooldown
-        self.delay = cooldown + message_time - get_current_timestamp()
+        # token_data: namedtuple = await self.__get_last_token_time()
+        # message_time: int = int(token_data.last_message_time.timestamp())
+        # cooldown: int = token_data.cooldown
+        # self.delay = cooldown + message_time - get_current_timestamp()
+        self.delay = self.__get_cooldown()
 
     @check_working
     @logger.catch
@@ -439,18 +453,89 @@ class DiscordManager:
             )
             for array in free_tokens
         )
-        self.__related_tokens = []
-        for tokens in sorted_tokens:
-            while len(tokens) > 1:
-                first_token: namedtuple = tokens.pop()
-                second_token: namedtuple = tokens.pop()
+        # self.__related_tokens = []
+        self.channels_list = []
+        for tokens_list in sorted_tokens:
+            channel_list = []
+            while len(tokens_list) > 1:
+                first_token: namedtuple = tokens_list.pop()
+                second_token: namedtuple = tokens_list.pop()
                 formed_pairs += await DBI.make_tokens_pair(
                     first_token.token_pk, second_token.token_pk)
-                self.__related_tokens.append(first_token)
-                self.__related_tokens.append(second_token)
-        if len(self.__related_tokens) < 2:
+                # self.__related_tokens.append(first_token)
+                # self.__related_tokens.append(second_token)
+                # IN TESTING
+                channel_list.append(first_token)
+                channel_list.append(second_token)
+            if channel_list:
+                self.channels_list.append(channel_list)
+                # *****
+        # if len(self.__related_tokens) < 2:
+        #     await self.message.answer(
+        #         "Недостаточно токенов для работы. Не смог сформировать ни одной пары")
+        #     logger.error(f"\n\nTotal tokens: {len(free_tokens)}"
+        #                  f"\nTokens: {free_tokens}\n")
+        #     self.is_working = False
+
+        # IN TESTING
+        if not self.channels_list:
             await self.message.answer(
                 "Недостаточно токенов для работы. Не смог сформировать ни одной пары")
-            logger.error(f"\n\nTotal tokens: {len(free_tokens)}"
-                         f"\nTokens: {free_tokens}\n")
+            logger.error(f"\n\nNEW Total tokens: {len(free_tokens)}"
+                         f"\nNEW Tokens: {free_tokens}\n")
             self.is_working = False
+
+    # IN TESTING!!! *************************
+
+    async def __get_workers_list_from_channels_list(self) -> List[str]:
+        workers = []
+        for tokens_list in self.channels_list:
+            channel_workers: List[str] = self.__get_workers_from_tokens_list(tokens_list)
+            if len(channel_workers) > 1:
+                workers.extend(channel_workers)
+
+        min_delay: int = self.__get_cooldown()
+        logger.warning(
+            f"\nNew channels list: [{len(self.channels_list)}]:"
+            f"\n{self.channels_list}"
+            f"\nNew workers: [{len(workers)}]"
+            f"\n{workers}"
+            f"\nNew {min_delay=}"
+        )
+        return workers
+
+    def __get_workers_from_tokens_list(self, tokens_list: List[namedtuple]) -> List[str]:
+        return [
+            elem.token.strip()
+            for elem in sorted(tokens_list, key=lambda x: x.last_message_time.timestamp())
+            if get_current_timestamp() > self.__get_max_message_time(elem)
+        ]
+
+    def __get_cooldown(self) -> int:
+        token_data: namedtuple = min(
+            map(lambda x: self.__get_last_time_token(x), self.channels_list),
+            key=lambda x: x.last_message_time.timestamp()
+        )
+        logger.warning(f"\n{token_data=}")
+        message_time: int = int(token_data.last_message_time.timestamp())
+        cooldown: int = token_data.cooldown
+        min_time: int = cooldown + message_time - get_current_timestamp()
+
+        return min_time
+
+    @staticmethod
+    def __get_last_time_token(data: List[namedtuple]) -> namedtuple:
+        return sorted(
+            data,
+            key=lambda x: x.last_message_time.timestamp() + x.cooldown
+        )[-1]
+
+    def __new_update_token_last_message_time(self, token: str):
+        self.channels_list = [
+            [
+                self._replace_time_to_now(elem)
+                if elem.token == token else elem
+                for elem in tokens
+            ]
+            for tokens in self.channels_list
+        ]
