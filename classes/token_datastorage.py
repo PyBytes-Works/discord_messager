@@ -28,6 +28,7 @@ class TokenData:
         self.text_to_send: str = ''
         self.user_channel_pk: int = 0
         self.token_name: str = ''
+        self.token_time_delta = 0
         self.__all_tokens_ids: List[str] = []
 
     @logger.catch
@@ -69,8 +70,8 @@ class TokenData:
         self.__MATE_DISCORD_ID = mate_id
 
     @property
-    def last_message_time(self) -> float:
-        return self.__TOKEN_COOLDOWN + 120
+    def max_last_message_time(self) -> float:
+        return self.__TOKEN_COOLDOWN + self.token_time_delta
 
     @property
     def delay(self) -> int:

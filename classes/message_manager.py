@@ -1,6 +1,5 @@
 import datetime
 import random
-from datetime import timedelta
 from typing import List
 
 from classes.errors_reporter import ErrorsReporter
@@ -11,6 +10,7 @@ from classes.request_classes import ChannelData
 from classes.token_datastorage import TokenData
 from classes.vocabulary import Vocabulary
 from config import logger
+from utils import get_current_timestamp
 
 
 class MessageManager(ChannelData):
@@ -91,24 +91,20 @@ class MessageManager(ChannelData):
             return []
         return list(
             filter(
-                lambda elem: self.__get_delta_seconds(elem) < self.datastore.last_message_time,
+                lambda elem: self.__is_message_in_time_delta(elem),
                 all_messages
             )
         )
 
-    @staticmethod
     @logger.catch
-    def __get_delta_seconds(elem: dict) -> int:
-        """Возвращает время, в пределах которого надо найти сообщения
-        которое в секундах"""
+    def __is_message_in_time_delta(self, elem: dict) -> bool:
+        """Возвращает True если сообщение пределах искомого интервала"""
 
         if not isinstance(elem, dict):
-            return 0
+            return False
         message_time: 'datetime' = elem.get("timestamp")
-        mes_time: 'datetime' = datetime.datetime.fromisoformat(message_time).replace(tzinfo=None)
-        delta: 'timedelta' = datetime.datetime.utcnow().replace(tzinfo=None) - mes_time
-
-        return delta.seconds
+        mes_time = datetime.datetime.fromisoformat(message_time).replace(tzinfo=None).timestamp()
+        return mes_time >= get_current_timestamp() - self.datastore.max_last_message_time
 
     @logger.catch
     def __get_target_id(self, elem: dict) -> str:
@@ -135,7 +131,7 @@ class MessageManager(ChannelData):
                 "author": elem.get("author", {}).get("username", 'no author'),
                 "text": elem.get("content", '[no content]'),
                 "message_id": elem.get("id", 0),
-                "to_message": elem.get("referenced_message", {}).get("content", 'mention'),
+                "to_message": elem.get("referenced_message", {}).get("content", 'what?'),
                 "to_user": self.__get_target_username(elem),
                 "target_id": self.__get_target_id(elem)
             }
@@ -189,12 +185,13 @@ class MessageManager(ChannelData):
         replies: 'RepliesManager' = RepliesManager(redis_key=self.datastore.telegram_id)
         my_answered: List[
             dict] = await replies.get_not_answered_with_text(self.datastore.my_discord_id)
-        if my_answered:
-            current_reply: dict = my_answered.pop()
-            self.datastore.text_to_send = current_reply.get("answer_text")
-            message_id: str = current_reply.get("message_id")
-            self.datastore.current_message_id = message_id
-            await replies.update_answered(message_id)
+        if not my_answered:
+            return 0
+        current_reply: dict = my_answered.pop()
+        self.datastore.text_to_send = current_reply.get("answer_text")
+        message_id: str = current_reply.get("message_id")
+        self.datastore.current_message_id = message_id
+        await replies.update_answered(message_id)
 
         return self.datastore.current_message_id
 
@@ -212,22 +209,25 @@ class MessageManager(ChannelData):
     async def __get_text_from_openai(self, mate_message: str) -> str:
 
         openai_answer: str = await self.__get_openai_answer(mate_message)
-        logger.debug(f"\n\t\tFirst OpenAI answer: {openai_answer}\n")
+        # logger.debug(f"\n\t\tFirst OpenAI answer: {openai_answer}\n")
         if openai_answer:
             if self._ten_from_hundred():
                 logger.info(f"{self.datastore.telegram_id}: 10 from 100 You got it!!!")
                 self.datastore.current_message_id = 0
             return openai_answer
         random_message: str = await self.__get_random_message_from_last_messages()
-        logger.debug(f"\n\t\tRandom OpenAI answer: {random_message}\n")
+        # logger.debug(f"\n\t\tRandom OpenAI answer: {random_message}\n")
 
         return random_message
 
     @logger.catch
     async def __get_random_message_from_last_messages(self) -> str:
+        """Возвращает ответ ИИ на случайного сообщение из чата"""
+
+        if not self._last_messages:
+            return ''
         message_data: dict = random.choice(self._last_messages)
         text: str = message_data.get("content", '')
-        logger.debug(f"Random message from last messages: {text}")
         result: str = await self.__get_openai_answer(text)
         if result != text:
             self.datastore.current_message_id = int(message_data.get("id", 0))
@@ -248,7 +248,7 @@ class MessageManager(ChannelData):
     async def __get_openai_answer(text: str) -> str:
         if not text:
             return ''
-        return OpenAI().get_answer(text.strip())
+        return await OpenAI().get_answer(text.strip())
 
     @logger.catch
     async def __get_data_for_send(self) -> None:
@@ -284,9 +284,4 @@ class MessageManager(ChannelData):
     @staticmethod
     @logger.catch
     def _ten_from_hundred() -> bool:
-        return random.randint(1, 100) <= 10
-
-    # @staticmethod
-    # @logger.catch
-    # def _fifty_fifty() -> bool:
-    #     return random.randint(1, 100) <= 50
+        return random.randint(1, 100) <= 5

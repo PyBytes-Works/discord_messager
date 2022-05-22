@@ -62,34 +62,9 @@ class RequestSender(ABC):
             "timeout": self.timeout,
         }
 
-        text: str = ''
         try:
-            user_id: int = 112176570
-            # TODO для пользователя с ид 112176570 отправлять запросы не через прокси.
-            if self.datastore and int(self.datastore.telegram_id) == user_id:
-                self._params: dict = {
-                    'url': self.url,
-                    "ssl": False,
-                    "timeout": self.timeout,
-                }
-                logger.info(f"\n\tSending request without proxy for user \n\t\t{user_id}")
-                await asyncio.sleep(self.request_delay)
-                answer: dict = await self._send()
-                status = answer.get("status")
-                if status > 299:
-                    logger.warning(f"\n\tSending request without proxy for user {user_id}:"
-                                   f"\nURL: {self.url}"
-                                   f"\nChannel: {self.datastore.channel}"
-                                   f"\nToken: {self.datastore.token}"
-                    )
-                    logger.warning(f"\n\t\tAnswer status: "
-                                   f"\n\t\t{status}")
-                    await ErrorsReporter.send_report_to_admins(f"User SAN: {user_id}: error: {status}"
-                                                               f"\nAnswer: {answer.get('answer_data')}")
-            else:
-                await asyncio.sleep(self.request_delay)
-                answer: dict = await self._send()
-
+            await asyncio.sleep(self.request_delay)
+            answer: dict = await self._send()
         except aiohttp.http_exceptions.BadHttpMessage as err:
             logger.error(f"aiohttp.http_exceptions.BadHttpMessage: {err}")
             answer.update(status=407)
@@ -103,7 +78,7 @@ class RequestSender(ABC):
             logger.error(f"aiohttp.client_exceptions.ServerDisconnectedError: {err}")
             answer.update(status=-96)
         except aiohttp.client_exceptions.TooManyRedirects as err:
-            text = f"aiohttp.client_exceptions.TooManyRedirects: {err}"
+            logger.error(f"aiohttp.client_exceptions.TooManyRedirects: {err}")
             answer.update(status=-97)
         except aiohttp.client_exceptions.ClientOSError as err:
             logger.error(f"aiohttp.client_exceptions.ClientOSError: {err}")
@@ -112,15 +87,12 @@ class RequestSender(ABC):
             logger.error(f"asyncio.exceptions.TimeoutError: {err}")
             answer.update(status=-99)
         except Exception as err:
-            text = f"Exception: {err}"
-
-        if text:
-            logger.error(f"\n{self._send_request.__qualname__}: {text}")
+            logger.error(f"Exception: {err}")
             answer.update(status=-100)
+
         status = answer.get("status")
         if status not in range(200, 205):
             error_text: str = (
-                f"\n{self._send_request.__qualname__}:"
                 f"\nStatus: {status}"
                 f"\nUrl: {self.url}"
                 f"\nProxy: {self.proxy}")
@@ -215,15 +187,14 @@ class ProxyChecker(GetRequest):
     async def get_checked_proxy(self, telegram_id: str) -> str:
         """Возвращает рабочую прокси из базы данных, если нет рабочих возвращает 'no proxies'"""
 
-        result: str = 'no proxies'
         if not await DBI.get_proxy_count():
-            return result
+            return 'no proxies'
         proxy: str = str(await DBI.get_user_proxy(telegram_id=telegram_id))
         if await self._check_proxy(proxy=proxy) == 200:
             return proxy
         logger.error(f"Proxy {proxy} doesn`t work. Will be delete.")
         if not await DBI.update_proxies_for_owners(proxy=proxy):
-            return result
+            return 'no proxies'
         return await self.get_checked_proxy(telegram_id=telegram_id)
 
 

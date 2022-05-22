@@ -1,5 +1,3 @@
-import asyncio
-
 from classes.request_classes import PostRequest, DISCORD_BASE_URL
 from config import logger
 from classes.token_datastorage import TokenData
@@ -19,9 +17,14 @@ class MessageSender(PostRequest):
     async def send_message_to_discord(self) -> dict:
         """Отправляет данные в канал дискорда, возвращает результат отправки."""
 
-        if self.datastore.data_for_send:
-            return await self.__send_data()
-        return {}
+        if not self.datastore.data_for_send:
+            return {}
+        logger.info(
+            f"User: {self.datastore.telegram_id}:\t"
+            f"send to channel: [{self.datastore.channel}]:\t"
+            f"message text: [{self.datastore.text_to_send}]"
+        )
+        return await self.__send_data()
 
     async def _typing(self) -> None:
         """Имитирует "Пользователь печатает" в чате дискорда."""
