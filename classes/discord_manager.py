@@ -52,6 +52,7 @@ class DiscordManager:
         self.__related_tokens: List[namedtuple] = []
         self.__workers: List[str] = []
         self.__all_user_tokens_discord_ids: List[str] = []
+        self.__token_work_time: int = 10
 
     @info_logger
     @logger.catch
@@ -146,6 +147,10 @@ class DiscordManager:
                          f"\nToken: {self.datastore.token}"
                          f"\nChannel: {self.datastore.channel}")
             return
+        self.datastore.token_time_delta = (
+                (len(self.__related_tokens) - len(self.__workers))
+                * self.__token_work_time
+        )
         await MessageManager(datastore=self.datastore).handling_messages()
         await self.__is_token_deleted()
 
@@ -164,8 +169,7 @@ class DiscordManager:
     @logger.catch
     async def __is_token_deleted(self) -> bool:
         if self.datastore.token == 'deleted':
-            self.__workers = []
-            await self.form_new_tokens_pairs()
+            await self._make_token_pairs()
             return True
         return False
 
@@ -401,11 +405,12 @@ class DiscordManager:
     async def _make_token_pairs(self) -> None:
         """Формирует пары из свободных токенов если они в одном канале"""
 
+        self.__workers = []
         await DBI.delete_all_pairs(telegram_id=self._telegram_id)
-        await self.form_new_tokens_pairs()
+        await self.__form_new_tokens_pairs()
 
     @logger.catch
-    async def form_new_tokens_pairs(self) -> None:
+    async def __form_new_tokens_pairs(self) -> None:
         """Формирует пары токенов из свободных"""
 
         free_tokens: Tuple[
