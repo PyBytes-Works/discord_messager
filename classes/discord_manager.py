@@ -425,7 +425,8 @@ class DiscordManager:
             token_data = await DBI.get_info_by_token(token=elem.token)
             datastore.update_data(
                 token=elem.token, token_data=token_data,
-                last_message_time=elem.last_message_time.timestamp()
+                last_message_time=elem.last_message_time.timestamp(),
+                token_pk=elem.token_pk
             )
             self._datastores_list.append(datastore)
 

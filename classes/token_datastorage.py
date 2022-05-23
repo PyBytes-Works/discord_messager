@@ -78,7 +78,7 @@ class TokenData:
     @last_message_time.setter
     def last_message_time(self, data: float):
         if not isinstance(data, float):
-            raise TypeError(f"Last message time should be float.")
+            raise TypeError(f"Last message time should be float got {type(data)}: value: {data}")
         self.__last_message_time = data
 
     @property
@@ -88,7 +88,7 @@ class TokenData:
     @text_to_send.setter
     def text_to_send(self, data: str):
         if not isinstance(data, str):
-            raise TypeError(f"Data for send should be string.")
+            raise TypeError(f"Data for send should be string got {type(data)}: value: {data}")
         self.__text_to_send = data
 
     @property
@@ -98,7 +98,7 @@ class TokenData:
     @data_for_send.setter
     def data_for_send(self, data: dict):
         if not isinstance(data, dict):
-            raise TypeError(f"Text for send should be dictionary.")
+            raise TypeError(f"Text for send should be dictionary got {type(data)}: value: {data}")
         self.__data_for_send = data
 
     @property
@@ -110,9 +110,9 @@ class TokenData:
         return self.__user_channel_pk
 
     @user_channel_pk.setter
-    def user_channel_pk(self, data: str):
-        if not isinstance(data, str):
-            raise TypeError(f"User channel pk should be integer.")
+    def user_channel_pk(self, data: int):
+        if not isinstance(data, int):
+            raise TypeError(f"User channel pk should be integer got {type(data)}: value: {data}")
         self.__user_channel_pk = data
 
     @property
@@ -126,7 +126,7 @@ class TokenData:
     @token_name.setter
     def token_name(self, data: str):
         if not isinstance(data, str):
-            raise TypeError(f"Token name should be string.")
+            raise TypeError(f"Token name should be string got {type(data)}: value: {data}")
         self.__token_name = data
 
     @property
@@ -136,7 +136,7 @@ class TokenData:
     @token_pk.setter
     def token_pk(self, data: int):
         if not isinstance(data, int):
-            raise TypeError(f"Token pk should be integer.")
+            raise TypeError(f"Token pk should be integer got {type(data)}: value: {data}")
         self.__token_pk = data
 
     @property
@@ -174,8 +174,8 @@ class TokenData:
         return self.__mate_discord_id
 
     @mate_id.setter
-    def mate_id(self, mate_id: str):
-        self.__mate_discord_id = mate_id
+    def mate_id(self, data: str):
+        self.__mate_discord_id = data
 
     @property
     def max_message_search_time(self) -> float:
@@ -199,7 +199,7 @@ class TokenData:
     @new_delay.setter
     def new_delay(self, data: int):
         if not isinstance(data, int):
-            raise TypeError(f"new_delay should be integer.")
+            raise TypeError(f"new_delay should be integer got {type(data)}: value: {data}")
         self.__new_delay = data
 
     @property
