@@ -7,7 +7,6 @@ import asyncio
 
 from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
 
-# from classes.errors_reporter import ErrorsReporter
 from classes.message_manager import MessageManager
 from classes.message_sender import MessageSender
 from classes.open_ai import OpenAI
@@ -49,7 +48,6 @@ class DiscordManager:
         self.reboot: bool = False
         self.silence: bool = False
         self._username: str = message.from_user.username if message else ''
-        # self.__related_tokens: List[namedtuple] = []
         self.total_tokens_count: int = 0
         self.__workers: List['TokenData'] = []
         self.__all_user_tokens_discord_ids: List[str] = []
@@ -144,34 +142,13 @@ class DiscordManager:
                          f"\nToken: {self.datastore.token}"
                          f"\nChannel: {self.datastore.channel}")
             return
-        # self.total_tokens_count = len([
-        #     elem
-        #     for tokens in self.channels_list
-        #     for elem in tokens
-        # ])
         self.datastore.token_time_delta = (
                 (self.total_tokens_count - len(self.__workers))
                 * self.__token_work_time
         )
-        # self.datastore.token_time_delta = (
-        #         (len(self.__related_tokens) - len(self.__workers))
-        #         * self.__token_work_time
-        # )
         logger.debug(f"{self.datastore.token_time_delta=}")
         await MessageManager(datastore=self.datastore).handling_messages()
         await self.__is_token_deleted()
-
-    # @logger.catch
-    # def _replace_time_to_now(self, elem: namedtuple) -> namedtuple:
-    #     return elem._replace(last_message_time=datetime.datetime.utcnow().replace(tzinfo=None))
-
-    # @logger.catch
-    # async def __update_token_last_message_time(self, token: str) -> None:
-    #     """"""
-    #
-    #     self.__related_tokens = [self._replace_time_to_now(elem)
-    #                              if elem.token == token else elem
-    #                              for elem in self.__related_tokens]
 
     @logger.catch
     async def __is_token_deleted(self) -> bool:
@@ -194,8 +171,6 @@ class DiscordManager:
         if await self.__is_token_deleted():
             return
         await DBI.update_token_last_message_time(token=self.datastore.token)
-        # await self.__update_token_last_message_time(token=self.datastore.token)
-        # self.__new_update_token_last_message_time(token=self.datastore.token)
         await self.__update_datastore_end_cooldown_time()
         status = answer.get("status")
         if status == 200:
@@ -247,25 +222,11 @@ class DiscordManager:
             await asyncio.sleep(5)
         self.delay = 0
 
-    # @logger.catch
-    # def __get_max_message_time(self, elem: namedtuple) -> int:
-    #     """Возвращает максимальное время фильтрации сообщения. Сообщения с временем меньше
-    #     данного будут отфильтрованы"""
-    #
-    #     return int(elem.last_message_time.timestamp()) + elem.cooldown
-
     @check_working
     @logger.catch
     async def _make_workers_list(self) -> None:
         """Создает список токенов, которые не на КД"""
 
-        # self.__workers = [
-        #     elem.token.strip()
-        #     for elem in sorted(self.__related_tokens, key=lambda x: x.last_message_time.timestamp())
-        #     if get_current_timestamp() > self.__get_max_message_time(elem)
-        # ]
-        # IN TESTING
-        # self.__workers = await self.__get_workers_list_from_channels_list()
         self.__workers = [
             elem
             for elem in sorted(self._datastores_list, key=lambda x: x.end_cooldown_time)
@@ -285,51 +246,14 @@ class DiscordManager:
         self.datastore: 'TokenData' = self.__workers.pop(0)
         logger.debug(f"\n\tCurrent worker: {self.datastore.token}")
 
-    # @logger.catch
-    # async def _update_datastore(self, token: str) -> None:
-    #     """Обновляет данные datastore информацией о токене, полученной из БД"""
-    #
-    #     token_data: namedtuple = await DBI.get_info_by_token(token)
-    #     # TODO выяснить почему???
-    #     if not token_data:
-    #         self.datastore.token = 'deleted'
-    #         await self.__is_token_deleted()
-    #         error_text: str = (
-    #             f'NOT TOKEN DATA FOR TOKEN: {token}'
-    #             f'\nToken_data: {token_data}'
-    #             f'\nTelegram_id: {self.datastore.telegram_id}'
-    #             f'\nChannel: {self.datastore.channel}'
-    #             f'\nWorkers: {self.__workers}'
-    #         )
-    #         await ErrorsReporter.send_message_to_user(telegram_id="305353027", text=error_text)
-    #         logger.error(error_text)
-    #         await self.__get_full_info()
-    #         # self.is_working = False
-    #         return
-    #     self.datastore.update_data(token=token, token_data=token_data)
-    #     self.datastore.all_tokens_ids = self.__all_user_tokens_discord_ids
-
-    # @logger.catch
-    # async def __get_last_token_time(self) -> namedtuple:
-    #     """Возвращает время второго ближайшего токена"""
-    #
-    #     return sorted(
-    #         self.__related_tokens,
-    #         key=lambda x: x.last_message_time.timestamp() + x.cooldown
-    #     )[-1]
-
     @logger.catch
     async def _get_delay(self) -> None:
         """Сохраняет время паузы взяв его из второго в очереди на работу токена"""
 
         if self.delay:  # Delay может быть уже задан в функции: _set_delay_equal_channel_cooldown
             return
-        # token_data: namedtuple = await self.__get_last_token_time()
-        # message_time: int = int(token_data.last_message_time.timestamp())
-        # cooldown: int = token_data.cooldown
-        # self.delay = cooldown + message_time - get_current_timestamp()
         self.delay = self.__get_cooldown()
-        self.delay += random.randint(0, 7)
+        self.delay += random.randint(3, 7)
         logger.debug(f"User: {self._username}: {self._telegram_id}: Sleep delay = [{self.delay}]")
 
     @check_working
@@ -444,9 +368,7 @@ class DiscordManager:
             )
             for array in free_tokens
         )
-        # self.__related_tokens = []
         self._datastores_list = []
-        # self.channels_list = []
         self.total_tokens_count = 0
         for tokens_list in sorted_tokens:
             channel_list = []
@@ -455,32 +377,11 @@ class DiscordManager:
                 second_token: namedtuple = tokens_list.pop()
                 formed_pairs += await DBI.make_tokens_pair(
                     first_token.token_pk, second_token.token_pk)
-                # self.__related_tokens.append(first_token)
-                # self.__related_tokens.append(second_token)
-                # IN TESTING
                 channel_list.append(first_token)
                 channel_list.append(second_token)
             if channel_list:
-                # FIXME OLD
-                # self.channels_list.append(channel_list)
-                # ******
                 self.total_tokens_count += 2
                 await self.__update_datastore_list(channel_list=channel_list)
-                # *****
-        # if len(self.__related_tokens) < 2:
-        #     await self.message.answer(
-        #         "Недостаточно токенов для работы. Не смог сформировать ни одной пары")
-        #     logger.error(f"\n\nTotal tokens: {len(free_tokens)}"
-        #                  f"\nTokens: {free_tokens}\n")
-        #     self.is_working = False
-
-        # IN TESTING
-        # if not self.channels_list:
-        #     await self.message.answer(
-        #         "Недостаточно токенов для работы. Не смог сформировать ни одной пары")
-        #     logger.error(f"\n\nNEW Total tokens: {len(free_tokens)}"
-        #                  f"\nNEW Tokens: {free_tokens}\n")
-        #     self.is_working = False
 
         if len(self._datastores_list) < 2:
             await self.message.answer(
@@ -488,8 +389,6 @@ class DiscordManager:
             logger.error(f"\n\nNEW Total tokens: {len(free_tokens)}"
                          f"\nNEW Tokens: {free_tokens}\n")
             self.is_working = False
-
-    # IN TESTING!!! *************************
 
     async def __update_datastore_list(self, channel_list: List[namedtuple]):
         for elem in channel_list:
@@ -500,32 +399,6 @@ class DiscordManager:
                 last_message_time=elem.last_message_time.timestamp()
             )
             self._datastores_list.append(datastore)
-            logger.debug(f"\n\tDatastore added to Token Data list [{len(self._datastores_list)}]: "
-                         f"\n\tToken: {datastore.token}"
-                         f"\n\tCooldown: {datastore.cooldown}"
-                         f"\n\tEnd cooldown time: {datastore.end_cooldown_time}")
-
-    # async def __get_workers_list_from_channels_list(self) -> List[str]:
-    #     workers = []
-    #     for tokens_list in self.channels_list:
-    #         channel_workers: List[str] = self.__get_workers_from_tokens_list(tokens_list)
-    #         if len(channel_workers) > 1:
-    #             workers.extend(channel_workers)
-    #
-    #     min_delay: int = self.__get_cooldown()
-    #     logger.warning(
-    #         f"\nNew channels list: [{len(self.channels_list)}]:"
-    #         f"\nNew workers list: [{len(workers)}]"
-    #         f"\nNew {min_delay=}"
-    #     )
-    #     return workers
-
-    # def __get_workers_from_tokens_list(self, tokens_list: List[namedtuple]) -> List[str]:
-    #     return [
-    #         elem.token.strip()
-    #         for elem in sorted(tokens_list, key=lambda x: x.last_message_time.timestamp())
-    #         if get_current_timestamp() > self.__get_max_message_time(elem)
-    #     ]
 
     def __get_cooldown(self) -> int:
         self.min_cooldown: int = min(self._datastores_list, key=lambda x: x.cooldown).cooldown
@@ -544,20 +417,3 @@ class DiscordManager:
             f"\n\t\tMin time: {min_time}"
         )
         return min_time
-
-    # @staticmethod
-    # def __get_last_time_token(data: List[namedtuple]) -> namedtuple:
-    #     return sorted(
-    #         data,
-    #         key=lambda x: x.last_message_time.timestamp() + x.cooldown
-    #     )[0]
-
-    # def __new_update_token_last_message_time(self, token: str):
-    #     self.channels_list = [
-    #         [
-    #             self._replace_time_to_now(elem)
-    #             if elem.token == token else elem
-    #             for elem in tokens
-    #         ]
-    #         for tokens in self.channels_list
-    #     ]
