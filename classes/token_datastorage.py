@@ -1,3 +1,4 @@
+import datetime
 from typing import List
 from collections import namedtuple
 
@@ -21,21 +22,28 @@ class TokenData:
         self.__PROXY: str = ''
         self.__CHANNEL: int = 0
         self.__GUILD: int = 0
-        self._cooldown: int = 0
+        self.__cooldown: int = 0
         self.__MATE_DISCORD_ID: str = ''
         self.__DELAY: int = 0
         self.__MY_DISCORD_ID: str = ''
         self.data_for_send: dict = {}
         self.text_to_send: str = ''
-        self.user_channel_pk: int = 0
-        self.token_name: str = ''
-        self.token_time_delta = 0
+        self.__user_channel_pk: int = 0
+        self.__token_name: str = ''
+        self.__token_time_delta = 0
         self.__all_tokens_ids: List[str] = []
-        self._last_message_time: float = 0
-        self._end_cooldown_time: float = 0
+        self.__last_message_time: float = 0
+        self.__end_cooldown_time: float = 0
+        self.__to_delete: bool = False
+        self.__token_pk: int = 0
 
     @logger.catch
-    def update_data(self, token: str, token_data: namedtuple, last_message_time: float = 0):
+    def update_data(
+            self,
+            token: str,
+            token_data: namedtuple,
+            last_message_time: float = 0,
+            token_pk: int = 0):
         self.token: str = token
         self.proxy: str = token_data.proxy
         self.channel: int = token_data.channel_id
@@ -43,13 +51,42 @@ class TokenData:
         self.cooldown: int = token_data.cooldown
         self.mate_id: str = token_data.mate_discord_id
         self.my_discord_id: str = token_data.token_discord_id
-        self.user_channel_pk: int = token_data.user_channel_pk
-        self.token_name: str = token_data.token_name
-        self._last_message_time: float = last_message_time
+        self.__user_channel_pk: int = token_data.user_channel_pk
+        self.__token_name: str = token_data.token_name
+        self.__last_message_time: float = last_message_time
+        self.__token_pk = token_pk
         self.update_end_cooldown_time()
 
-    def update_end_cooldown_time(self):
-        self._end_cooldown_time = self._last_message_time + self._cooldown
+    @property
+    def user_channel_pk(self) -> int:
+        return self.__user_channel_pk
+
+    @property
+    def end_cooldown_time(self) -> float:
+        return self.__end_cooldown_time
+
+    @property
+    def token_name(self) -> str:
+        return self.__token_name
+
+    @property
+    def token_pk(self) -> int:
+        return self.__token_pk
+
+    @property
+    def to_delete(self) -> bool:
+        return self.__to_delete
+
+    def delete(self):
+        self.__to_delete = True
+
+    def update_end_cooldown_time(self, now: bool = False):
+        if now:
+            self.update_last_message_time_now()
+        self.__end_cooldown_time = self.__last_message_time + self.__cooldown
+
+    def update_last_message_time_now(self):
+        self.__last_message_time = int(datetime.datetime.utcnow().replace(tzinfo=None).timestamp())
 
     @property
     def all_tokens_ids(self) -> List[str]:
@@ -70,6 +107,14 @@ class TokenData:
         self.__MY_DISCORD_ID = my_discord_id
 
     @property
+    def token_time_delta(self) -> int:
+        return self.__token_time_delta
+
+    @token_time_delta.setter
+    def token_time_delta(self, value: int):
+        self.__token_time_delta = value
+
+    @property
     def mate_id(self) -> str:
         return self.__MATE_DISCORD_ID
 
@@ -82,7 +127,7 @@ class TokenData:
         """Максимальное время поиска сообщения
         (для поиска сообщений позднее данного времени)"""
 
-        return self._cooldown + self.token_time_delta
+        return self.__cooldown + self.token_time_delta
 
     @property
     def delay(self) -> int:
@@ -94,11 +139,11 @@ class TokenData:
 
     @property
     def cooldown(self) -> int:
-        return self._cooldown
+        return self.__cooldown
 
     @cooldown.setter
     def cooldown(self, cooldown: int):
-        self._cooldown = cooldown
+        self.__cooldown = cooldown
 
     @property
     def current_message_id(self) -> int:
