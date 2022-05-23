@@ -425,7 +425,7 @@ class DiscordManager:
                 formed_pairs += await DBI.make_tokens_pair(
                     first_token.token_pk, second_token.token_pk)
                 datastores: List['TokenData'] = await self._create_datastore(
-                    first_token, second_token)
+                    data=(first_token, second_token))
                 self._datastores_list.extend(datastores)
                 self.total_tokens_count += 2
 
