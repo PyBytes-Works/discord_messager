@@ -396,11 +396,12 @@ class DiscordManager:
     @check_working
     @logger.catch
     async def _make_token_pairs(self) -> None:
-        """Формирует пары из свободных токенов если они в одном канале"""
+        """Очищает список работников и формирует новые пары"""
 
         self.__workers = []
         await DBI.delete_all_pairs(telegram_id=self._telegram_id)
         await self.__form_new_tokens_pairs()
+        await self.__check_is_datastores_ready()
 
     @logger.catch
     async def __form_new_tokens_pairs(self) -> None:
@@ -418,39 +419,49 @@ class DiscordManager:
         self._datastores_list = []
         self.total_tokens_count = 0
         for tokens_list in sorted_tokens:
-            channel_list = []
             while len(tokens_list) > 1:
                 first_token: namedtuple = tokens_list.pop()
                 second_token: namedtuple = tokens_list.pop()
                 formed_pairs += await DBI.make_tokens_pair(
                     first_token.token_pk, second_token.token_pk)
-                channel_list.append(first_token)
-                channel_list.append(second_token)
-            if channel_list:
+                datastores: List['TokenData'] = await self._create_datastore(
+                    first_token, second_token)
+                self._datastores_list.extend(datastores)
                 self.total_tokens_count += 2
-                await self.__update_datastore_list(channel_list=channel_list)
+
+    @logger.catch
+    async def __check_is_datastores_ready(self) -> None:
+        """Проверяет количество токенов для работы бота, должно быть не меньше двух"""
 
         if len(self._datastores_list) < 2:
-            await self.message.answer(
-                "Недостаточно токенов для работы. Не смог сформировать ни одной пары")
-            logger.error(f"\n\nNEW Total tokens: {len(free_tokens)}"
-                         f"\nNEW Tokens: {free_tokens}\n")
+            text: str = "Недостаточно токенов для работы. Не смог сформировать ни одной пары"
+            await self.message.answer(text)
+            logger.error(text)
             self.is_working = False
 
     @logger.catch
-    async def __update_datastore_list(self, channel_list: List[namedtuple]):
-        for elem in channel_list:
-            datastore: 'TokenData' = TokenData(telegram_id=self._telegram_id)
-            token_data = await DBI.get_info_by_token(token=elem.token)
-            datastore.update_data(
-                token=elem.token, token_data=token_data,
-                last_message_time=elem.last_message_time.timestamp(),
-                token_pk=elem.token_pk
-            )
-            self._datastores_list.append(datastore)
+    async def _create_datastore(self, data: Tuple[namedtuple, ...]) -> List['TokenData']:
+        """Возвращает список экземпляров TokenData, созданных из данных о токенах."""
+
+        return [await self.__create_datastore(data=elem) for elem in data]
+
+    @logger.catch
+    async def __create_datastore(self, data: namedtuple) -> 'TokenData':
+        """Возвращает экземпляр TokenData, созданный из данных о токене."""
+
+        datastore = TokenData(telegram_id=self._telegram_id)
+        # TODO переписать после апдейта БД, вся информация должна быть уже в дате
+        token_data: namedtuple = await DBI.get_info_by_token(token=data.token)
+        datastore.update_data(
+            token=data.token, token_data=token_data,
+            last_message_time=data.last_message_time.timestamp(),
+            token_pk=data.token_pk
+        )
+        return datastore
 
     @logger.catch
     async def __get_cooldown(self) -> int:
+        """Возвращает время для сна"""
 
         token_with_min_end_time: 'TokenData' = min(
             self._datastores_list,
