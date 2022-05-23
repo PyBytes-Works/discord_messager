@@ -2,6 +2,7 @@ from typing import List
 from collections import namedtuple
 
 from config import logger
+from utils import get_current_timestamp
 
 
 class TokenData:
@@ -20,7 +21,7 @@ class TokenData:
         self.__PROXY: str = ''
         self.__CHANNEL: int = 0
         self.__GUILD: int = 0
-        self.__TOKEN_COOLDOWN: int = 0
+        self._cooldown: int = 0
         self.__MATE_DISCORD_ID: str = ''
         self.__DELAY: int = 0
         self.__MY_DISCORD_ID: str = ''
@@ -30,9 +31,11 @@ class TokenData:
         self.token_name: str = ''
         self.token_time_delta = 0
         self.__all_tokens_ids: List[str] = []
+        self._last_message_time: float = 0
+        self._end_cooldown_time: float = 0
 
     @logger.catch
-    def update_data(self, token: str, token_data: namedtuple):
+    def update_data(self, token: str, token_data: namedtuple, last_message_time: float = 0):
         self.token: str = token
         self.proxy: str = token_data.proxy
         self.channel: int = token_data.channel_id
@@ -42,6 +45,11 @@ class TokenData:
         self.my_discord_id: str = token_data.token_discord_id
         self.user_channel_pk: int = token_data.user_channel_pk
         self.token_name: str = token_data.token_name
+        self._last_message_time: float = last_message_time
+        self.update_end_cooldown_time()
+
+    def update_end_cooldown_time(self):
+        self._end_cooldown_time = self._last_message_time + self._cooldown
 
     @property
     def all_tokens_ids(self) -> List[str]:
@@ -70,8 +78,11 @@ class TokenData:
         self.__MATE_DISCORD_ID = mate_id
 
     @property
-    def max_last_message_time(self) -> float:
-        return self.__TOKEN_COOLDOWN + self.token_time_delta
+    def max_message_search_time(self) -> float:
+        """Максимальное время поиска сообщения
+        (для поиска сообщений позднее данного времени)"""
+
+        return self._cooldown + self.token_time_delta
 
     @property
     def delay(self) -> int:
@@ -83,11 +94,11 @@ class TokenData:
 
     @property
     def cooldown(self) -> int:
-        return self.__TOKEN_COOLDOWN
+        return self._cooldown
 
     @cooldown.setter
     def cooldown(self, cooldown: int):
-        self.__TOKEN_COOLDOWN = cooldown
+        self._cooldown = cooldown
 
     @property
     def current_message_id(self) -> int:

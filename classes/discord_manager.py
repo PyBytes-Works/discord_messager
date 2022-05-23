@@ -436,6 +436,7 @@ class DiscordManager:
             for array in free_tokens
         )
         # self.__related_tokens = []
+        self._token_data_lists = []
         self.channels_list = []
         self.total_tokens_count = 0
         for tokens_list in sorted_tokens:
@@ -450,9 +451,12 @@ class DiscordManager:
                 # IN TESTING
                 channel_list.append(first_token)
                 channel_list.append(second_token)
-            if len(channel_list) > 1:
+            if channel_list:
+                # FIXME OLD
                 self.channels_list.append(channel_list)
+                # ******
                 self.total_tokens_count += 2
+                await self.__update_datastore_list(channel_list=channel_list)
                 # *****
         # if len(self.__related_tokens) < 2:
         #     await self.message.answer(
@@ -470,6 +474,17 @@ class DiscordManager:
             self.is_working = False
 
     # IN TESTING!!! *************************
+
+    async def __update_datastore_list(self, channel_list: List[namedtuple]):
+        for elem in channel_list:
+            datastore = TokenData(telegram_id=self._telegram_id)
+            token_data = await DBI.get_info_by_token(token=elem.token)
+            datastore.update_data(
+                token=elem.token, token_data=token_data,
+                last_message_time=elem.last_message_time.timestamp()
+            )
+            self._token_data_lists.append(datastore)
+            logger.debug(f"\nDatastore added to Token Data list [{len(self._token_data_lists)}]: {datastore}")
 
     async def __get_workers_list_from_channels_list(self) -> List[str]:
         workers = []
@@ -502,7 +517,6 @@ class DiscordManager:
             map(lambda x: self.__get_last_time_token(x), self.channels_list),
             key=lambda x: x.cooldown
         ).cooldown
-        # TODO придумать алгоритм как вычислять этот кулдаун
         message_time: int = int(token_data.last_message_time.timestamp())
         # cooldown: int = token_data.cooldown
         min_time: int = min_cooldown + message_time - get_current_timestamp()
@@ -514,7 +528,7 @@ class DiscordManager:
         return sorted(
             data,
             key=lambda x: x.last_message_time.timestamp() + x.cooldown
-        )[-1]
+        )[0]
 
     def __new_update_token_last_message_time(self, token: str):
         self.channels_list = [
