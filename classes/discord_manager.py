@@ -1,4 +1,3 @@
-import datetime
 import random
 from typing import List, Optional, Tuple
 from collections import namedtuple
@@ -152,7 +151,12 @@ class DiscordManager:
 
     @logger.catch
     async def __is_token_deleted(self) -> bool:
-        if self.datastore.token == 'deleted':
+        if self.datastore.need_to_delete:
+            token = self.datastore.token
+            if await DBI.delete_token(token=token):
+                text: str = f"\nТокен удален:\n" + token
+                logger.warning(text)
+                await self.message.answer(text)
             await self._make_token_pairs()
             return True
         return False
@@ -172,17 +176,41 @@ class DiscordManager:
             return
         await DBI.update_token_last_message_time(token=self.datastore.token)
         await self.__update_datastore_end_cooldown_time()
-        status = answer.get("status")
-        if status == 200:
-            return
-        elif status in (407, 429):
-            self.__workers = []
-            await self._set_delay_equal_channel_cooldown()
+        await self._check_datastore_new_delay()
+        if answer.get("status") == 407:
+            await self.__go_correcting_cooldown()
+
+    async def __go_correcting_cooldown(self):
+        """Удаляет всех работников и уходит на кулдаун канала текущего токена."""
+
+        self.__workers = []
+        await self._set_delay_equal_channel_cooldown()
         logger.warning(
             f"\nUser: [{self.datastore.telegram_id}]"
             f"\nDeleting workers and sleep {self.delay} seconds."
-            f"\nError [{answer}]"
         )
+
+    async def _check_datastore_new_delay(self) -> None:
+        """Проверяет изменился ли кулдаун и если изменился - меняет кулдаун
+        пользовательского канала"""
+
+        if self.datastore.new_delay <= self.datastore.delay:
+            return
+        new_cooldown: int = self.datastore.new_delay
+        logger.warning(f"New cooldown set: "
+                       f"\tChannel: {self.datastore.channel}"
+                       f"\tCooldown: {new_cooldown}")
+        await DBI.update_user_channel_cooldown(
+            user_channel_pk=self.datastore.user_channel_pk, cooldown=new_cooldown)
+        text = (
+            "Для данного токена сообщения отправляются чаще, чем разрешено в канале."
+            f"\nToken: {self.datastore.token}"
+            f"\nГильдия/Канал: {self.datastore.guild}/{self.datastore.channel}"
+            f"\nВремя скорректировано. Кулдаун установлен: {new_cooldown} секунд"
+        )
+        await self.message.answer(text)
+        self.datastore.delay = new_cooldown
+        await self.__go_correcting_cooldown()
 
     @logger.catch
     async def __update_datastore_end_cooldown_time(self):
@@ -252,7 +280,7 @@ class DiscordManager:
 
         if self.delay:  # Delay может быть уже задан в функции: _set_delay_equal_channel_cooldown
             return
-        self.delay = self.__get_cooldown()
+        self.delay = await self.__get_cooldown()
         self.delay += random.randint(3, 7)
         logger.debug(f"User: {self._username}: {self._telegram_id}: Sleep delay = [{self.delay}]")
 
@@ -390,6 +418,7 @@ class DiscordManager:
                          f"\nNEW Tokens: {free_tokens}\n")
             self.is_working = False
 
+    @logger.catch
     async def __update_datastore_list(self, channel_list: List[namedtuple]):
         for elem in channel_list:
             datastore: 'TokenData' = TokenData(telegram_id=self._telegram_id)
@@ -400,7 +429,8 @@ class DiscordManager:
             )
             self._datastores_list.append(datastore)
 
-    def __get_cooldown(self) -> int:
+    @logger.catch
+    async def __get_cooldown(self) -> int:
         self.min_cooldown: int = min(self._datastores_list, key=lambda x: x.cooldown).cooldown
         token_with_min_end_time: 'TokenData' = min(
             self._datastores_list,
