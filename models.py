@@ -954,18 +954,20 @@ class Token(BaseModel):
             cooldown  int
             channel_id int
         """
-        # TODO ДОБАВИТЬ в кортеж ВСЮ информацию по токену (как в функции get_token_info):
+        # TODO ДОБАВИТЬ в возвращаемый кортеж ВСЮ информацию по токену:
         """
-                    Вернуть info по токен
-        возвращает объект токен
-            'user_channel_pk' int
-            'proxy':proxy(str),
+        ИТОГО ДОЛЖНО ВЕРНУТЬСЯ:
+            'token_pk': int
+            'token': str
+            'token_name': str
+            'token_discord_id': str
+            'mate_discord_id': str (discord_id)
             'guild_id':guild_id(int),
+            'user_channel_pk' int
             'channel_id': channel_id(int),
+            'proxy':proxy(str),
             'cooldown': cooldown(int, seconds)}
-            'mate_discord_id' str (discord_id)
-            'token_discord_id' str
-            'token_name' str
+            'last_message_time' datetime
         """
 
         data = (
