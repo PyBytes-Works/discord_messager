@@ -104,7 +104,7 @@ class MessageManager(ChannelData):
             return False
         message_time: 'datetime' = elem.get("timestamp")
         mes_time = datetime.datetime.fromisoformat(message_time).replace(tzinfo=None).timestamp()
-        return mes_time >= get_current_timestamp() - self.datastore.max_last_message_time
+        return mes_time >= get_current_timestamp() - self.datastore.max_message_search_time
 
     @logger.catch
     def __get_target_id(self, elem: dict) -> str:

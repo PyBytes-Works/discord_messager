@@ -57,14 +57,13 @@ class ErrorsReporter:
             await self.errors_manager()
         return self._answer
 
-    @logger.catch
-    async def _delete_token(self) -> str:
-        if await DBI.delete_token(token=self._token):
-            self.datastore.token = 'deleted'
-            text: str = f"\nТокен удален."
-            logger.warning(text + self._token)
-            return text
-        return ''
+    # @logger.catch
+    # async def _delete_token(self) -> str:
+    #     if await DBI.delete_token(token=self._token):
+    #         text: str = f"\nТокен удален."
+    #         logger.warning(text + self._token)
+    #         return text
+    #     return ''
 
     @logger.catch
     async def errors_manager(
@@ -107,7 +106,7 @@ class ErrorsReporter:
         elif self._status == 401:
             if self._code == 0:
                 text: str = f"Токен не рабочий."
-                text += await self._delete_token()
+                self.datastore.delete()
             else:
                 text: str = (
                     "Произошла ошибка данных."
@@ -132,7 +131,7 @@ class ErrorsReporter:
                 )
             else:
                 text: str = f"Ошибка {self._status} Code: {self._code}"
-            text += await self._delete_token()
+            self.datastore.delete()
         elif self._status == 404:
             if self._code == 10003:
                 text: str = "Ошибка отправки сообщения. Неверный канал. (Ошибка 404 - 10003)"
@@ -149,21 +148,7 @@ class ErrorsReporter:
                 cooldown: int = int(self._answer_data_dict.get("retry_after")) + 1
                 if cooldown:
                     cooldown += self.datastore.cooldown
-                    logger.warning(f"New cooldown set: "
-                                   f"\tChannel: {self.datastore.channel}"
-                                   f"\tCooldown: {cooldown}")
-                    await DBI.update_user_channel_cooldown(
-                        user_channel_pk=self.datastore.user_channel_pk, cooldown=cooldown)
-                    self.datastore.delay = cooldown
-                await self.send_message_to_user(
-                    text=(
-                        "Для данного токена сообщения отправляются чаще, чем разрешено в канале."
-                        f"\nToken: {self.datastore.token}"
-                        f"\nГильдия/Канал: {self.datastore.guild}/{self.datastore.channel}"
-                        f"\nВремя скорректировано. Кулдаун установлен: {cooldown} секунд"
-                    ),
-                    telegram_id=self._telegram_id
-                )
+                    self.datastore.new_delay = cooldown
             elif self._code == 40062:
                 text: str = (
                     f"Ошибка 429 код ошибки 40062."
