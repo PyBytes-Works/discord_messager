@@ -1,14 +1,12 @@
 from collections import namedtuple
 
-import aiogram.utils.exceptions
 from aiogram.types import Message
 from aiogram.dispatcher import FSMContext
 
 from classes.db_interface import DBI
 from classes.errors_reporter import ErrorsReporter
-from config import logger, Dispatcher, admins_list, bot
+from config import logger, Dispatcher, admins_list
 from keyboards import user_menu_keyboard, cancel_keyboard
-from models import User
 from states import LogiStates
 from utils import check_is_int
 
@@ -130,6 +128,13 @@ async def check_expiration_and_add_new_user_handler(message: Message, state: FSM
         await state.finish()
         return
     await message.answer(text, reply_markup=user_menu_keyboard())
+    logger.log(
+        "ADMIN",
+        f"Admin: {message.from_user.username}: {message.from_user.id} "
+        f"добавил пользователя {new_user_nickname}: {new_user_telegram_id}"
+        f"\tТокенов: [{max_tokens}]"
+        f"\tВремя подписки (в часах): {subscribe_time}"
+    )
     await ErrorsReporter.send_message_to_user(
         text="Вы добавлены в базу данных.",
         telegram_id=new_user_telegram_id,

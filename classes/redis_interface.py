@@ -15,7 +15,8 @@ class RedisDB:
         self.data: list = []
         self.timeout_sec: int = 300
 
-    async def _send_request_do_redis_db(self, key: str, mate_id: str = '', data: list = None) -> list:
+    async def _send_request_do_redis_db(
+            self, key: str, mate_id: str = '', data: list = None) -> list:
         """Запрашивает или записывает данные в редис, возвращает список если запрашивали"""
 
         result: list = []

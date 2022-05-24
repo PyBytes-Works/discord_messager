@@ -50,18 +50,16 @@ class OpenAI:
     @logger.catch
     async def get_answer(self, message: str) -> str:
         """Returns answer from bot or empty string if errors"""
-
+        # TODO написать логгер-левел для OpenAI
         # logger.debug(f"\n\t\tOpenAI mode: {self.__mode}")
 
         self.__counter += 1
         # logger.debug(f"№ {self.__counter} - Message for OpenAI: [{message.strip()}]")
 
-        plugs: Tuple[str, ...] = ('server here:', 'https://discord.gg/', ".com", ".net", "www.", "http://", "https://")
-        defaults: Tuple[str, ...] = ('how are you', 'how are you doing')
+        plugs: Tuple[str, ...] = (
+            'server here:', 'https://discord.gg/', ".com", ".net", "www.", "http://", "https://")
 
         if self.__counter > 5:
-            # logger.warning(f"OpenAI counter out of range: {self.__counter}"
-            #                f"\nMessage: {message}")
             return ''
 
         if not message:
