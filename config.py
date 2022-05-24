@@ -79,6 +79,7 @@ logger.add(sink=errors_file_path, enqueue=True, level='ERROR', rotation="50 MB")
 logger.add(sink=warnings_file_path, enqueue=True, level='WARNING', rotation="50 MB")
 logger.add(sink=json_file_path, enqueue=True, level='WARNING', rotation="50 MB", serialize=True)
 logger.add(sink=sys.stdout, level=DEBUG_LEVEL)
+# TODO добавить уровень для админов
 logger.configure(
     levels=[
         dict(name="DEBUG", color="<white>"),
@@ -88,6 +89,7 @@ logger.configure(
     ]
 )
 logger.info(f'Start logging to: {errors_file_path}')
+logger.trace()
 #  ********** END OF LOGGER CONFIG *************************
 
 #  ********** DATABASE CONFIG *************************
