@@ -25,7 +25,7 @@ class MessageSender(PostRequest):
             f"message text: [{self.datastore.text_to_send}]"
         )
         if self.datastore.current_message_id:
-            text += f"\tMessage to reply: {self.datastore.current_message_id}"
+            text += f"\treply to message id: [{self.datastore.current_message_id}]"
         logger.info(text)
         return await self.__send_data()
 
