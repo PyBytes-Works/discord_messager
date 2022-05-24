@@ -17,9 +17,9 @@ load_dotenv()
 # Версия приложения
 NAME: str = os.getenv("NAME")
 CURRENT_VERSION: str = os.getenv("VERSION")
-STAGE: str = os.getenv("STAGE")
+STAGE: str = os.getenv("STAGE", '')
 VERSION: str = f"\nBot name: {NAME}\nVersion: {CURRENT_VERSION}"
-if STAGE != "prod":
+if STAGE:
     VERSION += f"\nStage: {STAGE}"
 if DEBUG:
     VERSION += "\nDEBUG = TRUE"
