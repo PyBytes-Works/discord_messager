@@ -6,41 +6,62 @@ from dotenv import load_dotenv
 from loguru import logger
 
 
-# Загружаем переменные из файла .env
+# Load variables from .env
 load_dotenv()
 
-# DEBUG setting
+if not os.path.exists('./logs'):
+    os.mkdir("./logs")
+
+# DEBUG settings
 DEBUG = bool(os.getenv("DEBUG", 0))
 
-LOGGING_DIRECTORY: str = 'logs'
+# CONSTANTS
+PATH: str = os.getcwd()
+TODAY: str = datetime.datetime.today().strftime("%Y-%m-%d")
+LOGGING_DIRECTORY: str = os.path.join(PATH, 'logs', TODAY)
 ERRORS_LOG: str = 'errors.log'
 WARNINGS_LOG: str = 'warnings.log'
 ADMINS_LOG: str = 'admins.log'
-PATH: str = os.getcwd()
-if not os.path.exists('./logs'):
-    os.mkdir("./logs")
-today: str = datetime.datetime.today().strftime("%Y-%m-%d")
-errors_file_path: str = os.path.join(PATH, LOGGING_DIRECTORY, today, ERRORS_LOG)
-warnings_file_path: str = os.path.join(PATH, LOGGING_DIRECTORY, today, WARNINGS_LOG)
-admins_file_path: str = os.path.join(PATH, LOGGING_DIRECTORY, today, ADMINS_LOG)
-json_file_path: str = os.path.join(PATH, LOGGING_DIRECTORY, today, 'errors.txt')
-DEBUG_LEVEL: str = "INFO"
-if DEBUG:
-    DEBUG_LEVEL: str = "DEBUG"
+TOKENS_LOG: str = 'tokens.log'
+
+
+levels: dict = {
+    "DEBUG": {
+        "config": {"name": "DEBUG", "color": "<white>"},
+        "path": os.path.join(LOGGING_DIRECTORY, ERRORS_LOG)
+    },
+    "INFO": {
+        "config": {"name": "INFO", "color": "<fg #afffff>"},
+        "path": os.path.join(LOGGING_DIRECTORY, ERRORS_LOG)
+    },
+    "WARNING": {
+        "config": {"name": "WARNING", "color": "<light-yellow>"},
+        "path": os.path.join(LOGGING_DIRECTORY, ERRORS_LOG)
+    },
+    "ERROR": {
+        "config": {"name": "ERROR", "color": "<red>"},
+        "path": os.path.join(LOGGING_DIRECTORY, ERRORS_LOG)
+    },
+    "ADMIN": {
+        "config": {"name": "ADMIN", "color": "<fg #d787ff>", "no": 100},
+        "path": os.path.join(LOGGING_DIRECTORY, ADMINS_LOG)
+    },
+    "TOKEN": {
+        "config": {"name": "TOKEN", "color": "<white>", "no": 90},
+        "path": os.path.join(LOGGING_DIRECTORY, TOKENS_LOG)
+    },
+}
 logger.remove()
 logger.configure(
-    levels=[
-        dict(name="DEBUG", color="<white>"),
-        dict(name="INFO", color="<fg #afffff>"),
-        dict(name="WARNING", color="<light-yellow>"),
-        dict(name="ERROR", color="<red>"),
-        dict(name="ADMIN", color="<fg #d787ff>", no=100),
-    ]
+    levels=[elem.get("config") for elem in levels.values()]
 )
-logger.add(sink=errors_file_path, enqueue=True, level='ERROR', rotation="50 MB")
-logger.add(sink=warnings_file_path, enqueue=True, level='WARNING', rotation="50 MB")
-logger.add(sink=json_file_path, enqueue=True, level='WARNING', rotation="50 MB", serialize=True)
-logger.add(sink=admins_file_path, enqueue=True, level='ADMIN', rotation="100 MB")
-logger.add(sink=sys.stdout, level=DEBUG_LEVEL)
+logger.add(sink=levels["ERROR"]["path"], enqueue=True, level='ERROR', rotation="50 MB")
+logger.add(sink=levels["WARNING"]["path"], enqueue=True, level='WARNING', rotation="50 MB")
+logger.add(sink=levels["WARNING"]["path"], enqueue=True, level='WARNING', rotation="50 MB", serialize=True)
+logger.add(sink=levels["ADMIN"]["path"], enqueue=True, level='ADMIN', rotation="100 MB")
+logger.add(sink=levels["TOKEN"]["path"], enqueue=True, level='TOKEN', rotation="50 MB")
+logger.add(sink=sys.stdout, level="DEBUG" if DEBUG else "INFO")
 
-logger.info(f'Start logging to: {errors_file_path}')
+logger.debug(f'Start logging to: {levels["ERROR"]["path"]}')
+
+logger.log("TOKEN", 'levels["ERROR"]["path"]')
