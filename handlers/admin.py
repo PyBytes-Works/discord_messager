@@ -85,6 +85,9 @@ async def set_max_tokens_handler(message: Message, state: FSMContext) -> None:
                 f'Для пользователя {telegram_id} установили количество токенов {new_tokens_count}',
                 reply_markup=user_menu_keyboard()
             )
+            logger.warning(
+                f"Admin: {message.from_user.username}: {message.from_user.id} "
+                f"установил пользователю {telegram_id} количество токенов: {new_tokens_count}")
         else:
             text = (
                "F: set_max_tokens_handler: Не изменилось количество токенов пользователя."
@@ -132,6 +135,10 @@ async def add_new_proxy_handler(message: Message) -> None:
     for proxy in proxies:
         await DBI.add_new_proxy(proxy=proxy)
         await message.answer(f"Добавлена прокси: {proxy}")
+        logger.warning(
+            f"Admin: {message.from_user.username}: {message.from_user.id} "
+            f"добавил прокси {proxy}")
+
     await DBI.delete_proxy_for_all_users()
     await DBI.set_new_proxy_for_all_users()
 
@@ -144,6 +151,7 @@ async def delete_all_proxies(message: Message, state: FSMContext) -> None:
         await DBI.delete_all_proxy()
         await ErrorsReporter.send_report_to_admins(
             f"Пользователь {message.from_user.username}: {message.from_user.id} удалил ВСЕ прокси.")
+
         await state.finish()
         return
     await message.answer("Прокси не удалены.")
@@ -187,6 +195,9 @@ async def set_user_admin_handler(message: Message, state: FSMContext) -> None:
         )
         await bot.send_message(
             chat_id=user_telegram_id_for_admin, text='Вас назначили администратором.')
+        logger.warning(
+            f"Admin: {message.from_user.username}: {message.from_user.id} "
+            f"назначил пользователя {user_telegram_id_for_admin} администратором.")
     else:
         await message.answer(f'Имя пользователя нераспознано.')
     await state.finish()
@@ -314,6 +325,9 @@ async def delete_user_handler(callback: CallbackQuery, state: FSMContext) -> Non
     else:
         message_text: str = f"Пользователь {telegram_id} не найден в БД."
     await callback.message.answer(message_text, reply_markup=user_menu_keyboard())
+    logger.warning(
+        f"Admin: {callback.from_user.username}: {callback.from_user.id} "
+        f"удалил пользователя {telegram_id}.")
     await state.finish()
     await callback.answer()
 
