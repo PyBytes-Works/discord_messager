@@ -62,6 +62,5 @@ logger.add(sink=levels["ADMIN"]["path"], enqueue=True, level='ADMIN', rotation="
 logger.add(sink=levels["TOKEN"]["path"], enqueue=True, level='TOKEN', rotation="50 MB")
 logger.add(sink=sys.stdout, level="DEBUG" if DEBUG else "INFO")
 
-logger.debug(f'Start logging to: {levels["ERROR"]["path"]}')
+logger.info(f'Start logging to: {levels["INFO"]["path"]}')
 
-logger.log("TOKEN", 'levels["ERROR"]["path"]')
