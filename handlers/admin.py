@@ -45,16 +45,16 @@ async def send_message_to_all_users_handler(message: Message) -> None:
             try:
                 await bot.send_message(chat_id=user, text=data)
             except aiogram.utils.exceptions.ChatNotFound as err:
-                logger.error(f"Не смог отправить сообщение пользователю {user}.", err)
+                logger.error(f"Не смог отправить сообщение пользователю {user}. \n{err}")
             except aiogram.utils.exceptions.BotBlocked as err:
-                logger.error(f"Пользователь {user} заблокировал бота", err)
+                logger.error(f"Пользователь {user} заблокировал бота. \n{err}")
                 result: bool = await DBI.deactivate_user(telegram_id=user)
                 if result:
                     await ErrorsReporter.send_report_to_admins(
                         f"Пользователь {user} заблокировал бота. "
                         f"\nЕго аккаунт деактивирован.")
             except aiogram.utils.exceptions.CantInitiateConversation as err:
-                logger.error(f"Не смог отправить сообщение пользователю {user}.", err)
+                logger.error(f"Не смог отправить сообщение пользователю {user}. \n{err}")
 
 
 @logger.catch
