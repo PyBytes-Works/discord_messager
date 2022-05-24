@@ -46,8 +46,9 @@ async def on_startup(_) -> None:
         logger.warning(f"Database not found with file name: {DB_FILE_NAME}")
         recreate_db(DB_FILE_NAME)
 
-    logger.success(f'Bot started at: {datetime.datetime.now()}'
-                f'\nBOT POLLING ONLINE')
+    logger.success(
+        f'Bot started at: {datetime.datetime.now()}'
+        f'\nBOT POLLING ONLINE')
 
 
 @logger.catch

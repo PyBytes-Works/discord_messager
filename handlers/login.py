@@ -1,14 +1,12 @@
 from collections import namedtuple
 
-import aiogram.utils.exceptions
 from aiogram.types import Message
 from aiogram.dispatcher import FSMContext
 
 from classes.db_interface import DBI
 from classes.errors_reporter import ErrorsReporter
-from config import logger, Dispatcher, admins_list, bot
+from config import logger, Dispatcher, admins_list
 from keyboards import user_menu_keyboard, cancel_keyboard
-from models import User
 from states import LogiStates
 from utils import check_is_int
 

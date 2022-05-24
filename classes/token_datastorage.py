@@ -3,7 +3,6 @@ from typing import List
 from collections import namedtuple
 
 from config import logger
-from utils import get_current_timestamp
 
 
 class TokenData:
