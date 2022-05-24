@@ -50,7 +50,7 @@ class DiscordManager:
         self.total_tokens_count: int = 0
         self.__workers: List['TokenData'] = []
         self.__all_user_tokens_discord_ids: List[str] = []
-        self.__token_work_time: int = 10
+        self.__TOKEN_WORK_TIME: int = 10
         self.channels_list: List[List[namedtuple]] = []
         self.min_cooldown: int = 60
 
@@ -144,11 +144,7 @@ class DiscordManager:
                          f"\nToken: {self.datastore.token}"
                          f"\nChannel: {self.datastore.channel}")
             return
-        self.datastore.token_time_delta = (
-                (self.total_tokens_count - len(self.__workers))
-                * self.__token_work_time
-        )
-        logger.debug(f"{self.datastore.token_time_delta=}")
+        self.datastore.token_time_delta = self.total_tokens_count * self.__TOKEN_WORK_TIME
         await MessageManager(datastore=self.datastore).handling_messages()
         await self.__is_token_deleted()
 
@@ -157,7 +153,7 @@ class DiscordManager:
         if self.datastore.need_to_delete:
             token = self.datastore.token
             if await DBI.delete_token(token=token):
-                text: str = f"\nТокен удален:\n" + token
+                text: str = f"\nТОКЕН УДАЛЕН!!!:\n" + token
                 logger.warning(text)
                 await self.message.answer(text)
             await self._make_token_pairs()
