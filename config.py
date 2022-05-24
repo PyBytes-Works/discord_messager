@@ -89,7 +89,6 @@ logger.configure(
     ]
 )
 logger.info(f'Start logging to: {errors_file_path}')
-logger.trace()
 #  ********** END OF LOGGER CONFIG *************************
 
 #  ********** DATABASE CONFIG *************************
