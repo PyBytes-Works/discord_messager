@@ -56,13 +56,10 @@ class ErrorsReporter:
             await self.errors_manager()
         return self._answer
 
-    # @logger.catch
-    # async def _delete_token(self) -> str:
-    #     if await DBI.delete_token(token=self._token):
-    #         text: str = f"\nТокен удален."
-    #         logger.warning(text + self._token)
-    #         return text
-    #     return ''
+    @logger.catch
+    async def _set_datastore_delete_token(self) -> None:
+        if self.datastore:
+            self.datastore.delete()
 
     @logger.catch
     async def errors_manager(
@@ -105,7 +102,7 @@ class ErrorsReporter:
         elif self._status == 401:
             if self._code == 0:
                 text: str = f"Токен не рабочий."
-                self.datastore.delete()
+                await self._set_datastore_delete_token()
             else:
                 text: str = (
                     "Произошла ошибка данных."
@@ -130,7 +127,7 @@ class ErrorsReporter:
                 )
             else:
                 text: str = f"Ошибка {self._status} Code: {self._code}"
-            self.datastore.delete()
+            await self._set_datastore_delete_token()
         elif self._status == 404:
             if self._code == 10003:
                 text: str = "Ошибка отправки сообщения. Неверный канал. (Ошибка 404 - 10003)"
