@@ -112,7 +112,7 @@ async def check_channel_and_add_token_handler(message: Message, state: FSMContex
     try:
         guild, channel = message.text.rsplit('/', maxsplit=3)[-2:]
     except ValueError as err:
-        logger.error("F: add_channel_handler error: err", err)
+        logger.error(f"ValueError: {err}")
         guild: str = ''
         channel: str = ''
     guild: int = check_is_int(guild)
@@ -333,7 +333,7 @@ async def delete_token_handler(callback: CallbackQuery, state: FSMContext) -> No
     try:
         await callback.message.delete()
     except aiogram.utils.exceptions.MessageToDeleteNotFound as err:
-        logger.error(f"delete_token_handler: {err}")
+        logger.error(f"MessageToDeleteNotFound: {err}")
     await state.finish()
     await callback.answer()
 
@@ -436,7 +436,7 @@ async def set_user_channel_name(message: Message, state: FSMContext) -> None:
         try:
             await bot.delete_message(message.chat.id, message_id=message_id)
         except aiogram.utils.exceptions.MessageToDeleteNotFound as err:
-            pass
+            logger.error(f"MessageToDeleteNotFound: {err}")
 
     await DBI.set_user_channel_name(user_channel_pk=user_channel_pk, name=name)
     await state.finish()
@@ -532,7 +532,7 @@ async def delete_user_channel_handler(callback: CallbackQuery, state: FSMContext
         try:
             await bot.delete_message(callback.message.chat.id, message_id=message_id)
         except aiogram.utils.exceptions.MessageToDeleteNotFound as err:
-            pass
+            logger.error(f"MessageToDeleteNotFound: {err}")
     await state.finish()
 
 

@@ -4,7 +4,6 @@ from typing import Optional
 import aiogram.utils.exceptions
 from json import JSONDecodeError
 
-from classes.db_interface import DBI
 from classes.token_datastorage import TokenData
 from config import logger, admins_list, bot
 
