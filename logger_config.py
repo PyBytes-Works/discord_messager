@@ -48,11 +48,11 @@ levels: dict = {
         "path": os.path.join(LOGGING_DIRECTORY, ADMINS_LOG)
     },
     "TOKEN": {
-        "config": {"name": "TOKEN", "color": "<white>", "no": 19},
+        "config": {"name": "TOKEN", "color": "<white>", "no": 51},
         "path": os.path.join(LOGGING_DIRECTORY, TOKENS_LOG)
     },
     "OPENAI": {
-        "config": {"name": "OPENAI", "color": "<yellow>", "no": 19},
+        "config": {"name": "OPENAI", "color": "<yellow>", "no": 51},
         "path": os.path.join(LOGGING_DIRECTORY, OPENAI_LOG)
     },
 }
