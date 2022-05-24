@@ -2,7 +2,6 @@ import asyncio
 from abc import abstractmethod, ABC
 from typing import Union, Optional
 
-import aiohttp
 import aiohttp.client_exceptions
 import aiohttp.http_exceptions
 

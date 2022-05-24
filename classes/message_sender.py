@@ -12,6 +12,10 @@ class MessageSender(PostRequest):
         super().__init__()
         self.datastore: 'TokenData' = datastore
         self.channel: int = 0
+        self.token = self.datastore.token
+        self.proxy = self.datastore.proxy
+        self.channel = self.datastore.channel
+        self._data_for_send = self.datastore.data_for_send
 
     @logger.catch
     async def send_message_to_discord(self) -> dict:
@@ -19,11 +23,19 @@ class MessageSender(PostRequest):
 
         if not self.datastore.data_for_send:
             return {}
-        logger.info(
+        text: str = (
             f"User: {self.datastore.telegram_id}:\t"
             f"send to channel: [{self.datastore.channel}]:\t"
             f"message text: [{self.datastore.text_to_send}]"
         )
+        if self.datastore.current_message_id:
+            text += f"\treply to message id: [{self.datastore.current_message_id}]"
+        logger.info(text)
+
+        await self._typing()
+        if self.datastore.need_to_delete:
+            return {}
+
         return await self.__send_data()
 
     async def _typing(self) -> None:
@@ -37,13 +49,5 @@ class MessageSender(PostRequest):
         Sends data to discord channel
         :return:
         """
-
-        self.token = self.datastore.token
-        self.proxy = self.datastore.proxy
-        self.channel = self.datastore.channel
-        self._data_for_send = self.datastore.data_for_send
-
-        await self._typing()
-
         self.url = DISCORD_BASE_URL + f'{self.channel}/messages?'
         return await self._send_request()

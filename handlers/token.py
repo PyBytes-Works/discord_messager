@@ -112,7 +112,7 @@ async def check_channel_and_add_token_handler(message: Message, state: FSMContex
     try:
         guild, channel = message.text.rsplit('/', maxsplit=3)[-2:]
     except ValueError as err:
-        logger.error("F: add_channel_handler error: err", err)
+        logger.error(f"ValueError: {err}")
         guild: str = ''
         channel: str = ''
     guild: int = check_is_int(guild)
@@ -221,6 +221,10 @@ async def check_and_add_token_handler(message: Message, state: FSMContext) -> No
         "\nХотите ввести кулдаун для данного канала?",
         reply_markup=yes_no_buttons(yes_msg=f'set_cooldown_{user_channel_pk}', no_msg='endof')
     )
+    logger.log(
+        "TOKEN",
+        f"User: {telegram_id} add token: {token} to channel: {channel}"
+    )
     await state.finish()
 
 
@@ -272,7 +276,9 @@ async def add_channel_cooldown_handler(message: Message, state: FSMContext) -> N
         await state.finish()
         return
     await message.answer("Кулдаун установлен.", reply_markup=user_menu_keyboard())
-    logger.info(f"User: {message.from_user.id} set cooldown {cooldown} for channel {user_channel_pk}")
+    logger.log(
+        "TOKEN",
+        f"User: {message.from_user.id} set cooldown {cooldown} for channel {user_channel_pk}")
     await state.finish()
 
 
@@ -287,7 +293,7 @@ async def info_tokens_handler(message: Message) -> None:
     telegram_id: str = str(message.from_user.id)
     all_tokens: List[namedtuple] = await DBI.get_all_tokens_info(telegram_id)
     for token_info in all_tokens:
-        mess: str = (
+        text: str = (
             f"Имя токена: {token_info.token_name}"
             f"\nТокен: {token_info.token}"
             f"\nКанал: {token_info.channel_id}"
@@ -300,7 +306,7 @@ async def info_tokens_handler(message: Message) -> None:
             text="Удалить токен.", callback_data=f"del_token_{token_info.token_pk}"),
             InlineKeyboardButton(
                 text="Переименовать токен.", callback_data=f"rename_token_{token_info.token_pk}"))
-        await message.answer(mess, reply_markup=keyboard)
+        await message.answer(text, reply_markup=keyboard)
 
     date_expiration: int = await DBI.get_expiration_date(telegram_id)
     if not all_tokens:
@@ -330,10 +336,13 @@ async def delete_token_handler(callback: CallbackQuery, state: FSMContext) -> No
     token_pk: int = int(callback.data.rsplit('_', maxsplit=1)[-1])
     await DBI.delete_token_by_pk(token_pk=token_pk)
     await callback.message.answer("Токен удален.", reply_markup=user_menu_keyboard())
+    logger.log(
+        "TOKEN",
+        f"User: {telegram_id} deleted token {token_pk}")
     try:
         await callback.message.delete()
     except aiogram.utils.exceptions.MessageToDeleteNotFound as err:
-        logger.error(f"delete_token_handler: {err}")
+        logger.error(f"MessageToDeleteNotFound: {err}")
     await state.finish()
     await callback.answer()
 
@@ -388,8 +397,7 @@ async def list_channel_handler(message: Message, state: FSMContext) -> None:
         await state.finish()
         return
     await state.set_state(UserChannelStates.select_user_channel_to_rename)
-    # await state.update_data({'start_message': message.message_id})
-    list_messages = [message.message_id]
+    list_messages: list = [message.message_id]
     for elem in channels:
         keyboard = InlineKeyboardMarkup(row_width=1)
         keyboard.add(InlineKeyboardButton(
@@ -397,12 +405,12 @@ async def list_channel_handler(message: Message, state: FSMContext) -> None:
             callback_data=f"{elem.user_channel_pk}")
         )
         text: str = f"Имя канала: {elem.channel_name}\nСервер/канал: {elem.guild_id}/{elem.channel_id}"
-        mess = await message.answer(text, reply_markup=keyboard)
+        mess: 'Message' = await message.answer(text, reply_markup=keyboard)
         list_messages.append(mess.message_id)
-    await message.delete()
-    mess = await message.answer('Выберите действие', reply_markup=cancel_keyboard())
+    mess: 'Message' = await message.answer('Выберите действие', reply_markup=cancel_keyboard())
     list_messages.append(mess.message_id)
     await state.update_data({'messages': list_messages})
+    await message.delete()
 
 
 @logger.catch
@@ -414,7 +422,7 @@ async def rename_channel_handler(callback: CallbackQuery, state: FSMContext) -> 
     await state.update_data({'user_channel_pk': user_channel_pk})
     mess = await callback.message.answer("Введите новое имя.", reply_markup=cancel_keyboard())
     data: dict = await state.get_data()
-    old_messages = data.get('messages', [])
+    old_messages: list = data.get('messages', [])
     old_messages.append(mess.message_id)
     await state.update_data({'messages': old_messages})
 
@@ -425,22 +433,23 @@ async def set_user_channel_name(message: Message, state: FSMContext) -> None:
 
     if await DBI.is_expired_user_deactivated(message):
         return
-    name = message.text
+    name: str = message.text
     data: dict = await state.get_data()
     user_channel_pk: int = data.get('user_channel_pk')
-    old_messages = data.get('messages', [])
-    chat_id = message.chat.id
-    await message.delete()
-
+    old_messages: list = data.get('messages', [])
     for message_id in old_messages:
         try:
             await bot.delete_message(message.chat.id, message_id=message_id)
         except aiogram.utils.exceptions.MessageToDeleteNotFound as err:
-            pass
+            logger.error(f"MessageToDeleteNotFound: message_id: {message_id}: {err}")
 
     await DBI.set_user_channel_name(user_channel_pk=user_channel_pk, name=name)
+    await message.answer("Канал переименован.", reply_markup=user_menu_keyboard())
+    logger.log(
+        "TOKEN",
+        f"User: {message.from_user.id} renamed channel {user_channel_pk}")
+    await message.delete()
     await state.finish()
-    await bot.send_message(chat_id, "Канал переименован.", reply_markup=user_menu_keyboard())
 
 
 # TODO переписать дублирование кода
@@ -464,7 +473,7 @@ async def list_channel_handler_for_delete(message: Message, state: FSMContext) -
 
     await state.set_state(UserChannelStates.checks_tokens_for_user_channel)
 
-    list_messages = []
+    list_messages: list = []
 
     for elem in channels:
         keyboard = InlineKeyboardMarkup(row_width=1)
@@ -473,9 +482,9 @@ async def list_channel_handler_for_delete(message: Message, state: FSMContext) -
             callback_data=f"{elem.user_channel_pk}")
         )
         text: str = f"Имя канала: {elem.channel_name}\nСервер/канал: {elem.guild_id}/{elem.channel_id}"
-        mess = await message.answer(text, reply_markup=keyboard)
+        mess: 'Message' = await message.answer(text, reply_markup=keyboard)
         list_messages.append(mess.message_id)
-    mess = await message.answer('Выберите действие', reply_markup=cancel_keyboard())
+    mess: 'Message' = await message.answer('Выберите действие', reply_markup=cancel_keyboard())
     list_messages.append(mess.message_id)
     await state.update_data({'messages': list_messages})
 
@@ -489,7 +498,7 @@ async def check_tokens_for_user_channel_handler(callback: CallbackQuery, state: 
 
     await state.update_data({'user_channel_pk': user_channel_pk})
     data: dict = await state.get_data()
-    old_messages = data.get('messages', [])
+    old_messages: list = data.get('messages', [])
     old_messages.append(callback.message.message_id)
     if await DBI.get_count_tokens_by_user_channel(user_channel_pk=user_channel_pk):
         keyboard = InlineKeyboardMarkup(row_width=3)
@@ -499,12 +508,12 @@ async def check_tokens_for_user_channel_handler(callback: CallbackQuery, state: 
         keyboard.add(InlineKeyboardButton(
             text="Отмена",
             callback_data=f"{'False'}"))
-        mess = await callback.message.answer(
+        mess: 'Message' = await callback.message.answer(
             'В этом канале есть токены, если продолжить они будут удалены',
             reply_markup=keyboard
         )
         old_messages.append(mess.message_id)
-        mess = await callback.message.answer('Выберите действие', reply_markup=cancel_keyboard())
+        mess: 'Message' = await callback.message.answer('Выберите действие', reply_markup=cancel_keyboard())
 
         old_messages.append(mess.message_id)
         await state.update_data({'user_channel_pk': user_channel_pk})
@@ -524,28 +533,32 @@ async def delete_user_channel_handler(callback: CallbackQuery, state: FSMContext
         user_channel_pk: int = data.get('user_channel_pk')
         await DBI.delete_user_channel(user_channel_pk=user_channel_pk)
         await callback.message.answer("Канал удален.", reply_markup=user_menu_keyboard())
+        logger.log(
+            "TOKEN",
+            f"User: {callback.from_user.id} deleted channel {user_channel_pk}")
     else:
         await callback.message.answer('Удаление отменено', reply_markup=user_menu_keyboard())
         await callback.message.delete()
-    old_messages = data.get('messages', [])
+    old_messages: list = data.get('messages', [])
     for message_id in old_messages:
         try:
             await bot.delete_message(callback.message.chat.id, message_id=message_id)
         except aiogram.utils.exceptions.MessageToDeleteNotFound as err:
-            pass
+            logger.error(f"MessageToDeleteNotFound: {err}")
     await state.finish()
 
 
 @logger.catch
 async def set_token_name(message: Message, state: FSMContext) -> None:
     """Хэндлер для переименования токена """
-    name = message.text
+
+    name: str = message.text
     data: dict = await state.get_data()
-    token_pk = data.get('token_pk')
+    token_pk: int = data.get('token_pk')
     await DBI.set_token_name(token_pk=token_pk, name=name)
     await message.answer("Токен переименован.", reply_markup=user_menu_keyboard())
     token_info = await DBI.get_info_by_token_pk(token_pk=token_pk)
-    mess: str = (
+    text: str = (
         f"Имя токена: {token_info.token_name}"
         f"\nТокен: {token_info.token}"
         f"\nКанал: {token_info.channel_id}"
@@ -558,7 +571,7 @@ async def set_token_name(message: Message, state: FSMContext) -> None:
         text="Удалить токен.", callback_data=f"del_token_{token_info.token_pk}"),
         InlineKeyboardButton(
             text="Переименовать токен.", callback_data=f"rename_token_{token_info.token_pk}"))
-    await message.answer(mess, reply_markup=keyboard)
+    await message.answer(text, reply_markup=keyboard)
     await state.finish()
 
 

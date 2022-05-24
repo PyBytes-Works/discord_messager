@@ -31,11 +31,7 @@ register_handlers(dp=dp)
 async def on_startup(_) -> None:
     """Функция выполняющаяся при старте бота."""
 
-    text: str = (
-        "Discord_mailer started."
-        f"\nVersion: {VERSION}")
-    if DEBUG:
-        text += "\nDEBUG = TRUE"
+    text: str = f"STARTED: {VERSION} "
     try:
         await ErrorsReporter.send_report_to_admins(text=text)
     except Exception:
@@ -46,15 +42,16 @@ async def on_startup(_) -> None:
         logger.warning(f"Database not found with file name: {DB_FILE_NAME}")
         recreate_db(DB_FILE_NAME)
 
-    logger.success(f'Bot started at: {datetime.datetime.now()}'
-                f'\nBOT POLLING ONLINE')
+    logger.success(
+        f'Bot started at: {datetime.datetime.now()}'
+        f'\nBOT POLLING ONLINE')
 
 
 @logger.catch
 async def on_shutdown(dp) -> None:
     """Действия при отключении бота."""
     try:
-        await ErrorsReporter.send_report_to_admins(text="Discord_mailer stopping.")
+        await ErrorsReporter.send_report_to_admins(text=f"STOPPING: {VERSION}")
     except Exception:
         pass
     logger.warning("BOT shutting down.")
