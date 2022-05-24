@@ -18,9 +18,11 @@ load_dotenv()
 NAME: str = os.getenv("NAME")
 CURRENT_VERSION: str = os.getenv("VERSION")
 STAGE: str = os.getenv("STAGE")
-VERSION: str = f"Bot: {NAME}\nVersion: {CURRENT_VERSION}"
+VERSION: str = f"\nBot name: {NAME}\nVersion: {CURRENT_VERSION}"
 if STAGE != "prod":
     VERSION += f"\nStage: {STAGE}"
+if DEBUG:
+    VERSION += "\nDEBUG = TRUE"
 
 # initialization admins list
 deskent = os.getenv("DESKENT_TELEGRAM_ID")
