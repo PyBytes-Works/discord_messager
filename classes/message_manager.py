@@ -149,14 +149,14 @@ class MessageManager(ChannelData):
             for elem in self._last_messages
             if self.datastore.mate_id == str(elem["author"]["id"])
         ]
-        return await self.__get_random_message_id(mate_messages)
+        return await self.__get_last_mate_message_id(mate_messages)
 
     @logger.catch
-    async def __get_random_message_id(self, data: list) -> int:
+    async def __get_last_mate_message_id(self, data: list) -> int:
         if not data:
             return 0
-        random_elem: dict = random.choice(data)
-        return random_elem.get("id", 0)
+        sordted_mate_messages: list = sorted(data, key=lambda x: x.get("timestamp"))
+        return sordted_mate_messages[-1].get("id", 0)
 
     @logger.catch
     async def __update_datastore_replies(self) -> None:
