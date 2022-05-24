@@ -27,6 +27,9 @@ class MessageSender(PostRequest):
         if self.datastore.current_message_id:
             text += f"\treply to message id: [{self.datastore.current_message_id}]"
         logger.info(text)
+        await self._typing()
+        if self.datastore.need_to_delete:
+            return {}
         return await self.__send_data()
 
     async def _typing(self) -> None:
@@ -45,8 +48,5 @@ class MessageSender(PostRequest):
         self.proxy = self.datastore.proxy
         self.channel = self.datastore.channel
         self._data_for_send = self.datastore.data_for_send
-
-        await self._typing()
-
         self.url = DISCORD_BASE_URL + f'{self.channel}/messages?'
         return await self._send_request()
