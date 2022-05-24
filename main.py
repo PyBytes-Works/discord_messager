@@ -31,9 +31,7 @@ register_handlers(dp=dp)
 async def on_startup(_) -> None:
     """Функция выполняющаяся при старте бота."""
 
-    text: str = (
-        "Discord_mailer started."
-        f"\nVersion: {VERSION}")
+    text: str = f"{VERSION} started"
     if DEBUG:
         text += "\nDEBUG = TRUE"
     try:
@@ -55,7 +53,7 @@ async def on_startup(_) -> None:
 async def on_shutdown(dp) -> None:
     """Действия при отключении бота."""
     try:
-        await ErrorsReporter.send_report_to_admins(text="Discord_mailer stopping.")
+        await ErrorsReporter.send_report_to_admins(text=f"{VERSION} stopping")
     except Exception:
         pass
     logger.warning("BOT shutting down.")
