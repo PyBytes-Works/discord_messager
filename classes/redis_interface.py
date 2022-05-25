@@ -76,7 +76,7 @@ class RedisDB:
         return await self._send_request_do_redis_db(key="get")
 
     @logger.catch
-    async def delete(self, mate_id: str) -> List[dict]:
+    async def delete_key(self, mate_id: str) -> List[dict]:
         """Удаляет данные из Редис для себя и напарника"""
 
         return await self._send_request_do_redis_db(key="del", mate_id=mate_id)
