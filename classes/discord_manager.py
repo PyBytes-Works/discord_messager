@@ -151,7 +151,6 @@ class DiscordManager:
     @logger.catch
     async def __is_token_deleted(self) -> bool:
 
-        logger.debug(f"Is token need to delete: [{self.datastore.need_to_delete}]")
         if self.datastore.need_to_delete:
             token = self.datastore.token
             if await DBI.delete_token(token=token):
