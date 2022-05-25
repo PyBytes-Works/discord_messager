@@ -150,6 +150,8 @@ class DiscordManager:
 
     @logger.catch
     async def __is_token_deleted(self) -> bool:
+
+        logger.debug(f"Is token need to delete: [{self.datastore.need_to_delete}]")
         if self.datastore.need_to_delete:
             token = self.datastore.token
             if await DBI.delete_token(token=token):
@@ -175,9 +177,9 @@ class DiscordManager:
     async def _handling_errors(self, answer: dict) -> None:
         """Проверяет ошибки отправки сообщений"""
 
-        if not answer:
-            return
         if await self.__is_token_deleted():
+            return
+        if not answer:
             return
         await DBI.update_token_last_message_time(token=self.datastore.token)
         await self.__update_datastore_end_cooldown_time()
