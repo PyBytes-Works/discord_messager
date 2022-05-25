@@ -1,5 +1,6 @@
 """Модуль для обработчиков администратора"""
 
+import asyncio
 from collections import namedtuple
 import re
 from typing import Tuple
@@ -9,15 +10,17 @@ import aiogram.utils.exceptions
 from aiogram import Dispatcher
 from aiogram.dispatcher import FSMContext
 from aiogram.dispatcher.filters import Text
-from aiogram.types import Message, CallbackQuery, ReplyKeyboardRemove, InlineKeyboardMarkup, \
-    InlineKeyboardButton
+from aiogram.types import (
+    Message, CallbackQuery, ReplyKeyboardRemove, InlineKeyboardMarkup, InlineKeyboardButton)
 
 from classes.instances_storage import InstancesStorage
 from classes.vocabulary import Vocabulary
-from config import logger, bot, admins_list
+from config import logger, admins_list
 from handlers.cancel_handler import message_cancel_handler
-from keyboards import cancel_keyboard, user_menu_keyboard, inactive_users_keyboard, admin_keyboard, \
+from keyboards import (
+    cancel_keyboard, user_menu_keyboard, inactive_users_keyboard, admin_keyboard,
     superadmin_keyboard
+)
 from states import AdminStates
 from classes.db_interface import DBI
 from classes.errors_reporter import ErrorsReporter
@@ -43,7 +46,8 @@ async def send_message_to_all_users_handler(message: Message) -> None:
     if user_id in admins_list:
         for user in await DBI.get_active_users():
             try:
-                await bot.send_message(chat_id=user, text=data)
+                await ErrorsReporter.send_message_to_user(telegram_id=user, text=data)
+                await asyncio.sleep(1)
             except aiogram.utils.exceptions.ChatNotFound as err:
                 logger.error(f"Не смог отправить сообщение пользователю {user}. \n{err}")
             except aiogram.utils.exceptions.BotBlocked as err:
@@ -194,8 +198,8 @@ async def set_user_admin_handler(message: Message, state: FSMContext) -> None:
             f'{user_telegram_id_for_admin} назначен администратором. ',
             reply_markup=user_menu_keyboard()
         )
-        await bot.send_message(
-            chat_id=user_telegram_id_for_admin, text='Вас назначили администратором.')
+        await ErrorsReporter.send_message_to_user(
+            telegram_id=user_telegram_id_for_admin, text='Вас назначили администратором.')
         logger.log(
             "ADMIN",
             f"Admin: {message.from_user.username}: {message.from_user.id}: "
@@ -346,7 +350,7 @@ async def reboot_handler(message: Message) -> None:
         await message.answer(text)
         for user_telegram_id in await DBI.get_working_users():
             try:
-                await bot.send_message(user_telegram_id, text=text)
+                await ErrorsReporter.send_message_to_user(telegram_id=user_telegram_id, text=text)
                 await DBI.set_user_is_not_work(user_telegram_id)
                 await InstancesStorage.reboot(user_telegram_id)
             except aiogram.utils.exceptions.ChatNotFound:
