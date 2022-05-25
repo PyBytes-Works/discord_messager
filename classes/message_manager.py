@@ -239,7 +239,7 @@ class MessageManager(ChannelData):
         mate_message: List[str] = await RedisDB(redis_key=self.datastore.my_discord_id).load()
         if mate_message:
             await RedisDB(
-                redis_key=self.datastore.my_discord_id).delete(mate_id=self.datastore.mate_id)
+                redis_key=self.datastore.my_discord_id).delete_key(mate_id=self.datastore.mate_id)
             return mate_message[0]
         return ''
 

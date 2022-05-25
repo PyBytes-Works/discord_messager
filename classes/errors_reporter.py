@@ -59,7 +59,7 @@ class ErrorsReporter:
     @logger.catch
     async def _set_datastore_delete_token(self) -> None:
         if self.datastore:
-            self.datastore.delete()
+            self.datastore.delete_token()
 
     @logger.catch
     async def errors_manager(
@@ -109,12 +109,7 @@ class ErrorsReporter:
                     "\nУбедитесь, что вы ввели верные данные. Код ошибки - 401."
                 )
         elif self._status == 403:
-            if self._code == 50013:
-                text: str = (
-                    "Не могу отправить сообщение для токена. (Ошибка 403 - 50013)"
-                    "\nТокен в муте."
-                )
-            elif self._code == 50001:
+            if self._code == 50001:
                 text: str = (
                     "Не могу отправить сообщение для токена. (Ошибка 403 - 50001)"
                     "\nТокен забанили."
@@ -125,9 +120,15 @@ class ErrorsReporter:
                     "Необходимо подтвердить учетную запись дискорда."
                     "(Ошибка 403 - 40002)"
                 )
+            elif self._code == 50013:
+                text: str = (
+                    "Не могу отправить сообщение для токена. (Ошибка 403 - 50013)"
+                    "\nТокен в муте."
+                )
             else:
                 text: str = f"Ошибка {self._status} Code: {self._code}"
             await self._set_datastore_delete_token()
+
         elif self._status == 404:
             if self._code == 10003:
                 text: str = "Ошибка отправки сообщения. Неверный канал. (Ошибка 404 - 10003)"

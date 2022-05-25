@@ -34,7 +34,7 @@ class TokenData:
         self.__all_tokens_ids: List[str] = []
         self.__last_message_time: float = 0
         self.__end_cooldown_time: float = 0
-        self.__to_delete: bool = False
+        self.__is_deleted: bool = False
         self.__token_pk: int = 0
 
     @logger.catch
@@ -58,9 +58,10 @@ class TokenData:
         self.token_pk = token_pk
         self.update_end_cooldown_time()
 
-    def delete(self):
+    def delete_token(self):
         """Устанавливает флаг для удаления токена"""
-        self.__to_delete = True
+
+        self.__is_deleted = True
 
     def update_end_cooldown_time(self, now: bool = False):
         if now:
@@ -140,7 +141,7 @@ class TokenData:
 
     @property
     def need_to_delete(self) -> bool:
-        return self.__to_delete
+        return self.__is_deleted
 
     @property
     def all_tokens_ids(self) -> List[str]:
