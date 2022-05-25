@@ -1143,6 +1143,7 @@ class Token(BaseModel):
     @logger.catch
     def delete_token(cls, token: str) -> int:
         """Удалить токен по его "значению": """
+
         return cls.delete().where(cls.token == token).execute()
 
     @classmethod

@@ -145,11 +145,14 @@ class DiscordManager:
                          f"\nChannel: {self.datastore.channel}")
             return
         self.datastore.token_time_delta = self.total_tokens_count * self.__TOKEN_WORK_TIME
+        self.datastore.all_tokens_ids = self.__all_user_tokens_discord_ids
+        logger.debug(f"ALL TOKEN IDS: {self.__all_user_tokens_discord_ids}")
         await MessageManager(datastore=self.datastore).handling_messages()
         await self.__is_token_deleted()
 
     @logger.catch
     async def __is_token_deleted(self) -> bool:
+
         if self.datastore.need_to_delete:
             token = self.datastore.token
             if await DBI.delete_token(token=token):
@@ -175,9 +178,9 @@ class DiscordManager:
     async def _handling_errors(self, answer: dict) -> None:
         """Проверяет ошибки отправки сообщений"""
 
-        if not answer:
-            return
         if await self.__is_token_deleted():
+            return
+        if not answer:
             return
         await DBI.update_token_last_message_time(token=self.datastore.token)
         await self.__update_datastore_end_cooldown_time()
@@ -464,13 +467,4 @@ class DiscordManager:
             key=lambda x: x.end_cooldown_time
         )
         first_end_time: int = int(token_with_min_end_time.end_cooldown_time)
-        min_time: int = first_end_time - get_current_timestamp()
-        logger.debug(
-            f"\n\t\tTotal workers:\t {len(self.__workers)}"
-            f"\n\t\tTotal datastore list:\t {len(self._datastores_list)}"
-            f"\n\t\tToken with min time: {token_with_min_end_time.token}"
-            f"\n\t\tFirst end time:\t {first_end_time}"
-            f"\n\t\tCurrent time:  \t {get_current_timestamp()}"
-            f"\n\t\tMin time: {min_time}"
-        )
-        return min_time
+        return first_end_time - get_current_timestamp()
