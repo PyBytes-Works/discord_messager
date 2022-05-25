@@ -40,7 +40,7 @@ levels: dict = {
         "path": os.path.join(LOGGING_DIRECTORY, ERRORS_LOG)
     },
     "ERROR": {
-        "config": {"name": "ERROR", "color": "<red>"},  # "no": 30
+        "config": {"name": "ERROR", "color": "<red>"},  # "no": 40
         "path": os.path.join(LOGGING_DIRECTORY, ERRORS_LOG)
     },
     "ADMIN": {
