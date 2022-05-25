@@ -30,7 +30,7 @@ class TokenData:
         self.__text_to_send: str = ''
         self.__user_channel_pk: int = 0
         self.__token_name: str = ''
-        self.__token_time_delta = 0
+        self.__token_time_delta: int = 0
         self.__all_tokens_ids: List[str] = []
         self.__last_message_time: float = 0
         self.__end_cooldown_time: float = 0
@@ -55,7 +55,7 @@ class TokenData:
         self.user_channel_pk: int = token_data.user_channel_pk
         self.token_name: str = token_data.token_name
         self.last_message_time: float = last_message_time
-        self.token_pk = token_pk
+        self.token_pk: int = token_pk
         self.update_end_cooldown_time()
 
     def delete_token(self):
