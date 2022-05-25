@@ -207,7 +207,7 @@ class ErrorsReporter:
             logger.error(f"Пользователь {telegram_id} заблокировал бота {err}")
         except aiogram.utils.exceptions.CantInitiateConversation as err:
             logger.error(f"Не смог отправить сообщение пользователю {telegram_id}. {err}")
-        logger.warning(f"Send_message_to_user: {telegram_id}: {text}")
+        logger.log("TOKEN", f"Send_message_to_user: {telegram_id}: {text}")
 
     @classmethod
     @logger.catch

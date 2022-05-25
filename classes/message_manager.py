@@ -32,6 +32,7 @@ class MessageManager(ChannelData):
         self.datastore.text_to_send = ''
         # TODO поискать метод для получения сообщений за интервал времени, а не всех
         all_messages: List[dict] = await self.__get_all_discord_messages()
+        logger.debug(f"All messages: {len(all_messages)}")
         self._last_messages: List[dict] = await self.__get_last_messages(all_messages)
         if not await self.__get_message_id_and_text_for_send_answer():
             self.datastore.current_message_id = await self.__get_message_id_from_last_messages()
@@ -76,7 +77,7 @@ class MessageManager(ChannelData):
             elem
             for elem in self._last_messages
             if (
-                    elem.get("mentions")
+                    elem.get("mentions") != []
                     and elem.get("mentions")[0].get("id", '') in self.datastore.all_tokens_ids
                     and elem.get("id") != self.datastore.mate_id
             )
@@ -161,11 +162,14 @@ class MessageManager(ChannelData):
     @logger.catch
     async def __update_datastore_replies(self) -> None:
         """Сохраняет реплаи и последнее сообщение в datastore"""
-
+        logger.debug(f"\n\nLast messages: \n{self._last_messages}\n")
         if not self._last_messages:
             return
         all_replies: List[dict] = await self.__get_my_replies()
+        logger.debug(f"\n\nAll replies: \n{all_replies}\n")
+
         new_replies: List[dict] = await self.__get_filtered_replies(all_replies)
+        logger.debug(f"\n\nNew replies: \n{new_replies}\n")
         await self.__update_replies(new_replies)
 
     @logger.catch
@@ -185,6 +189,7 @@ class MessageManager(ChannelData):
         replies: 'RepliesManager' = RepliesManager(redis_key=self.datastore.telegram_id)
         my_answered: List[
             dict] = await replies.get_not_answered_with_text(self.datastore.my_discord_id)
+        logger.debug(f"\n\nMy answered: \n{my_answered}\n")
         if not my_answered:
             return 0
         current_reply: dict = my_answered.pop()
