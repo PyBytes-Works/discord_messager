@@ -145,6 +145,8 @@ class DiscordManager:
                          f"\nChannel: {self.datastore.channel}")
             return
         self.datastore.token_time_delta = self.total_tokens_count * self.__TOKEN_WORK_TIME
+        self.datastore.all_tokens_ids = self.__all_user_tokens_discord_ids
+        logger.debug(f"ALL TOKEN IDS: {self.__all_user_tokens_discord_ids}")
         await MessageManager(datastore=self.datastore).handling_messages()
         await self.__is_token_deleted()
 
