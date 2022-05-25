@@ -48,11 +48,11 @@ levels: dict = {
         "path": os.path.join(LOGGING_DIRECTORY, ADMINS_LOG)
     },
     "TOKEN": {
-        "config": {"name": "TOKEN", "color": "<white>", "no": 51},
+        "config": {"name": "TOKEN", "color": "<white>", "no": 90},
         "path": os.path.join(LOGGING_DIRECTORY, TOKENS_LOG)
     },
     "OPENAI": {
-        "config": {"name": "OPENAI", "color": "<yellow>", "no": 51},
+        "config": {"name": "OPENAI", "color": "<yellow>", "no": 80},
         "path": os.path.join(LOGGING_DIRECTORY, OPENAI_LOG)
     },
 }
@@ -70,3 +70,6 @@ logger.add(sink=levels["OPENAI"]["path"], enqueue=True, level='OPENAI', rotation
 logger.add(sink=sys.stdout, level=LOGGING_LEVEL)
 
 logger.info(f'Start logging to: {levels["INFO"]["path"]}')
+logger.log('ADMIN', f'Start logging to: {levels["INFO"]["path"]}')
+logger.log('TOKEN', f'Start logging to: {levels["INFO"]["path"]}')
+logger.log('OPENAI', f'Start logging to: {levels["INFO"]["path"]}')
