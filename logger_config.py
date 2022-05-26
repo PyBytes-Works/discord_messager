@@ -70,6 +70,3 @@ logger.add(sink=levels["OPENAI"]["path"], enqueue=True, level='OPENAI', rotation
 logger.add(sink=sys.stdout, level=LOGGING_LEVEL)
 
 logger.info(f'Start logging to: {levels["INFO"]["path"]}')
-logger.log('ADMIN', f'Start logging to: {levels["INFO"]["path"]}')
-logger.log('TOKEN', f'Start logging to: {levels["INFO"]["path"]}')
-logger.log('OPENAI', f'Start logging to: {levels["INFO"]["path"]}')
