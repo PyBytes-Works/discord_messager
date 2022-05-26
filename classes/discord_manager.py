@@ -54,6 +54,9 @@ class DiscordManager:
         self.channels_list: List[List[namedtuple]] = []
         self.min_cooldown: int = 60
 
+    def del_workers(self):
+        self.__workers = []
+
     @info_logger
     @logger.catch
     async def lets_play(self) -> None:
