@@ -29,7 +29,7 @@ from utils import check_is_int
 
 @logger.catch
 async def send_message_to_all_users_handler(message: Message) -> None:
-    """Обработчик команд /sendall, /su"""
+    """Обработчик команд /sendall, /sa"""
 
     index: int = 0
     text: str = message.text
