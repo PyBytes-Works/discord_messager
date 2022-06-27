@@ -1,9 +1,7 @@
 #!/usr/local/bin/python
 # -*- coding: UTF-8 -*-
 """
-Python 3.8 or higher
-Docker version 20.10.13 +
-Redis server v=5.0.14 +
+Python 3.10 or higher
 """
 
 import os.path
@@ -11,6 +9,7 @@ import datetime
 
 from aiogram import executor
 
+from _resources import __appname__, __version__, __build__
 from handlers.admin import register_admin_handlers
 from config import dp, logger, DB_FILE_NAME, VERSION, DEBUG
 from handlers.main_handlers import register_handlers
@@ -31,7 +30,13 @@ register_handlers(dp=dp)
 async def on_startup(_) -> None:
     """Функция выполняющаяся при старте бота."""
 
-    text: str = f"STARTED: {VERSION} "
+    text: str = (
+        f"{__appname__} started:"
+        f"\nBuild:[{__build__}]"
+        f"\nVersionL[{__version__}]"
+    )
+    if DEBUG:
+        text += "\nDebug: True"
     try:
         await ErrorsReporter.send_report_to_admins(text=text)
     except Exception:
