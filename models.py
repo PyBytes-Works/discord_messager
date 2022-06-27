@@ -977,9 +977,7 @@ class Token(BaseModel):
                 .join(Channel, JOIN.LEFT_OUTER, on=(UserChannel.channel == Channel.id))
                 .join(User, JOIN.LEFT_OUTER, on=(UserChannel.user == User.id))
                 .join(Proxy, JOIN.LEFT_OUTER, on=(Proxy.id == User.proxy))
-                .join(TokenPair, JOIN.LEFT_OUTER, on=(TokenPair.first_id == cls.id))
-                .where(User.telegram_id == telegram_id)
-                .where(TokenPair.first_id.is_null(True)).namedtuples().execute()
+                .where(User.telegram_id == telegram_id).namedtuples().execute()
         )
         result: Tuple[List[int], ...] = tuple(
             [token for token in tokens]
