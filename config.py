@@ -3,54 +3,43 @@ import os
 
 from aiogram import Bot, Dispatcher
 from aiogram.contrib.fsm_storage.memory import MemoryStorage
-from dotenv import load_dotenv
-from logger_config import logger, DEBUG, PATH
-from db_config import db, REDIS_CLIENT, DB_FILE_NAME
-import psycopg2
+from pydantic import BaseSettings
 
-# flag for saving files
-SAVING: bool = False
+from myloguru.mailer import get_mailer_logger
 
-# Загружаем переменные из файла .env
-load_dotenv()
-
-# Версия приложения
-NAME: str = os.getenv("NAME")
-CURRENT_VERSION: str = os.getenv("VERSION")
-STAGE: str = os.getenv("STAGE", '')
-VERSION: str = f"\nBot name: {NAME}\nVersion: {CURRENT_VERSION}"
-if STAGE:
-    VERSION += f"\nStage: {STAGE}"
-if DEBUG:
-    VERSION += "\nDEBUG = TRUE"
-
-# initialization admins list
-deskent = os.getenv("DESKENT_TELEGRAM_ID")
-artem = os.getenv("ARTEM_TELEGRAM_ID")
-vova = os.getenv("VOVA_TELEGRAM_ID")
-
-# set admins list
-admins_list = [deskent]
-if artem:
-    admins_list.append(artem)
-if vova:
-    admins_list.append(vova)
-
-# Proxy config
-PROXY_USER = os.getenv("PROXY_USER")
-PROXY_PASSWORD = os.getenv("PROXY_PASSWORD")
-DEFAULT_PROXY = os.getenv("DEFAULT_PROXY")
-if not DEFAULT_PROXY:
-    raise ValueError("Config: DEFAULT_PROXY not found in file .env")
-
-tgToken = os.getenv("TELEBOT_TOKEN")
-
-# configure bot
-bot = Bot(token=tgToken)
-storage = MemoryStorage()
-dp = Dispatcher(bot, storage=storage)
-SEMAPHORE_MAX_TASKS: int = int(os.getenv("SEMAPHORE_MAX_TASKS"))
-SEMAPHORE = asyncio.Semaphore(SEMAPHORE_MAX_TASKS)
 
 # Constants
 DISCORD_BASE_URL: str = f'https://discord.com/api/v9/channels/'
+# flag for saving files
+SAVING: bool = False
+
+
+class Settings(BaseSettings):
+    STAGE: str
+    TELEBOT_TOKEN: str
+    PROXY_USER: str
+    PROXY_PASSWORD: str
+    DEFAULT_PROXY: str
+    BASE_API_URL: str
+    ADMINS: list = ["305353027"]
+    SEMAPHORE_MAX_TASKS: int = 10
+    DEBUG: bool = False
+
+
+settings = Settings(_env_file='.env', _env_file_encoding='utf-8')
+
+# logger
+if not os.path.exists('./logs'):
+    os.mkdir("./logs")
+level = 1 if settings.DEBUG else 30
+logger = get_mailer_logger(level)
+
+# set admins list
+admins_list = settings.ADMINS
+
+# configure bot
+bot = Bot(token=settings.TELEBOT_TOKEN)
+storage = MemoryStorage()
+dp = Dispatcher(bot, storage=storage)
+
+SEMAPHORE = asyncio.Semaphore(settings.SEMAPHORE_MAX_TASKS)

@@ -61,6 +61,7 @@ class DiscordManager:
     @logger.catch
     async def lets_play(self) -> None:
         """Show must go on
+
         Запускает рабочий цикл бота, проверяет ошибки."""
 
         # TODO сделать команду для отображения работающих в данный момент пользователей
@@ -155,6 +156,7 @@ class DiscordManager:
 
     @logger.catch
     async def __is_token_deleted(self) -> bool:
+        """Проверяет поле need_to_delete, если True - удаляет токен из БД"""
 
         if self.datastore.need_to_delete:
             token = self.datastore.token

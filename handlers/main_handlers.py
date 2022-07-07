@@ -6,11 +6,12 @@ from aiogram.dispatcher import FSMContext
 
 from classes.instances_storage import InstancesStorage
 from classes.replies import RepliesManager
-from config import logger, Dispatcher, VERSION, bot
+from config import logger, Dispatcher, bot
 from keyboards import user_menu_keyboard, in_work_keyboard
 from classes.discord_manager import DiscordManager
 from classes.db_interface import DBI
 from states import UserStates
+from _resources import __version__
 
 
 @logger.catch
@@ -85,7 +86,7 @@ async def default_message(message: Message) -> None:
     is_user_exists: bool = await DBI.get_user_by_telegram_id(telegram_id=user_telegram_id)
     if is_user_exists:
         if not await DBI.is_expired_user_deactivated(message):
-            await message.answer(f'Текущая версия: {VERSION}', reply_markup=user_menu_keyboard())
+            await message.answer(f'Текущая версия: {__version__}', reply_markup=user_menu_keyboard())
 
 
 @logger.catch

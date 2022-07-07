@@ -9,8 +9,10 @@ from peewee import (
     JOIN, Case, fn, BigIntegerField
 )
 
-from config import logger, admins_list, db, DB_FILE_NAME, DEFAULT_PROXY
+from config import logger, admins_list, settings
 from utils import get_current_time, get_current_timestamp, get_from_timestamp
+from db_config import db
+import psycopg2
 
 
 class BaseModel(Model):
@@ -1264,13 +1266,11 @@ if __name__ == '__main__':
     #         (UserTokenDiscord.add_token_by_telegram_id(user_id, f'{user_id}token{number}'))
     #         for user_id in ('test1', 'test3', 'test5') for number in range(1, 4)
     #     ]
-    if recreate:
-        recreate_db(DB_FILE_NAME)
 
     if add_admins:
         for idx, admin_id in enumerate(admins_list, start=1):
             t_nick_name = f"Admin_{idx}"
-            User.add_new_user(nick_name=t_nick_name, telegram_id=admin_id, proxy=DEFAULT_PROXY)
+            User.add_new_user(nick_name=t_nick_name, telegram_id=admin_id, proxy=settings.DEFAULT_PROXY)
 
             User.set_user_status_admin(telegram_id=admin_id)
             User.activate_user(admin_id)

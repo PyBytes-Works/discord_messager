@@ -7,7 +7,7 @@ import aiohttp.http_exceptions
 
 from classes.db_interface import DBI
 from classes.errors_reporter import ErrorsReporter
-from config import logger, DISCORD_BASE_URL, PROXY_USER, PROXY_PASSWORD
+from config import logger, DISCORD_BASE_URL, settings
 from classes.token_datastorage import TokenData
 
 
@@ -49,7 +49,7 @@ class RequestSender(ABC):
             )
 
     async def _send_request(self) -> dict:
-        self.proxy_data: str = f"http://{PROXY_USER}:{PROXY_PASSWORD}@{self.proxy}/"
+        self.proxy_data: str = f"http://{settings.PROXY_USER}:{settings.PROXY_PASSWORD}@{self.proxy}/"
         answer: dict = {
             "status": 0,
             "answer_data": ''

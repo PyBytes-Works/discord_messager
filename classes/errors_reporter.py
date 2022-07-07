@@ -115,6 +115,7 @@ class ErrorsReporter:
                     "\nТокен забанили."
                     f"\nФормирую новые пары."
                 )
+                await self._set_datastore_delete_token()
             elif self._code == 40002:
                 text: str = (
                     "Необходимо подтвердить учетную запись дискорда."
@@ -127,8 +128,6 @@ class ErrorsReporter:
                 )
             else:
                 text: str = f"Ошибка {self._status} Code: {self._code}"
-            await self._set_datastore_delete_token()
-
         elif self._status == 404:
             if self._code == 10003:
                 text: str = "Ошибка отправки сообщения. Неверный канал. (Ошибка 404 - 10003)"
@@ -207,7 +206,7 @@ class ErrorsReporter:
             logger.error(f"Пользователь {telegram_id} заблокировал бота {err}")
         except aiogram.utils.exceptions.CantInitiateConversation as err:
             logger.error(f"Не смог отправить сообщение пользователю {telegram_id}. {err}")
-        logger.log("TOKEN", f"Send_message_to_user: {telegram_id}: {text}")
+        logger.token(f"Send_message_to_user: {telegram_id}: {text}")
 
     @classmethod
     @logger.catch
