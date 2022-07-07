@@ -10,7 +10,8 @@ from config import logger, Dispatcher
 @logger.catch
 async def silence_mode_handler(message: Message):
     """Включает тихий режим"""
-
+    # todo написать менюшки на классах
+    # todo написать граббер и хэндлеры
     pass
 
 

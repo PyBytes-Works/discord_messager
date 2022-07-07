@@ -15,12 +15,12 @@ SAVING: bool = False
 
 
 class Settings(BaseSettings):
-    STAGE: str
-    TELEBOT_TOKEN: str
-    PROXY_USER: str
-    PROXY_PASSWORD: str
-    DEFAULT_PROXY: str
-    BASE_API_URL: str
+    STAGE: str = 'local'
+    TELEBOT_TOKEN: str = ''
+    PROXY_USER: str = ''
+    PROXY_PASSWORD: str = ''
+    DEFAULT_PROXY: str = ''
+    BASE_API_URL: str = ''
     ADMINS: list = ["305353027"]
     SEMAPHORE_MAX_TASKS: int = 10
     DEBUG: bool = False

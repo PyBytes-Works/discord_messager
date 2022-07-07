@@ -54,6 +54,11 @@ class Proxy(BaseModel):
 
     @classmethod
     @logger.catch
+    def get_all_proxies(cls) -> list[str]:
+        return [elem.proxy for elem in cls.select()]
+
+    @classmethod
+    @logger.catch
     def delete_proxy(cls, proxy: str) -> bool:
         """Proxy removal"""
         return bool(cls.delete().where(cls.proxy == proxy).execute())
@@ -1287,3 +1292,4 @@ if __name__ == '__main__':
 
     for token in answer:
         print(len(token))
+

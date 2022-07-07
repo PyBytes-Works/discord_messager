@@ -17,6 +17,7 @@ from handlers.login import login_register_handlers
 from handlers.token import token_register_handlers
 from handlers.cancel_handler import cancel_register_handlers
 from classes.errors_reporter import ErrorsReporter
+from classes.request_classes import ProxyChecker
 from classes.redis_interface import RedisDB
 
 cancel_register_handlers(dp=dp)
@@ -49,6 +50,8 @@ async def on_startup(_) -> None:
         logger.success("Redis check...OK")
     else:
         logger.warning("Redis check...FAIL")
+    proxies: dict = await ProxyChecker().check_all_proxies()
+    logger.success(f"Proxies: {proxies}")
     logger.success(
         f'Bot started at: {datetime.datetime.now()}'
         f'\nBOT POLLING ONLINE')

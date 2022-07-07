@@ -196,6 +196,15 @@ class ProxyChecker(GetRequest):
             return 'no proxies'
         return await self.get_checked_proxy(telegram_id=telegram_id)
 
+    @logger.catch
+    async def check_all_proxies(self) -> dict[str: int]:
+        """Проверяет все прокси в БД, возвращает словарь со статусами"""
+
+        return {
+            proxy: await self._check_proxy(proxy=proxy)
+            for proxy in await DBI.get_all_proxies()
+        }
+
 
 class TokenChecker(GetRequest):
     """Класс для проверки токена в дискорд канале"""
