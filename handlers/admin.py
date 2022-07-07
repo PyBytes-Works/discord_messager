@@ -113,15 +113,11 @@ async def set_max_tokens_handler(message: Message, state: FSMContext) -> None:
 
 @logger.catch
 async def request_proxies_handler(message: Message) -> None:
-    """Обработчик команды /add_proxy /delete_proxy, /delete_all_proxy"""
+    """Обработчик команды /add_proxy /delete_proxy, /delete_all_proxy, /show_proxies"""
 
     user_telegram_id: str = str(message.from_user.id)
     user_is_superadmin: bool = user_telegram_id in admins_list
     if user_is_superadmin:
-        await message.answer(
-            'Введите прокси в формате "123.123.123.123:5555" (можно несколько через пробел)',
-            reply_markup=cancel_keyboard()
-        )
         if message.text == '/add_proxy':
             await AdminStates.user_add_proxy.set()
         elif message.text == '/delete_proxy':
@@ -130,6 +126,15 @@ async def request_proxies_handler(message: Message) -> None:
             await message.answer(
                 "ТОЧНО удалить все прокси? (yes/No)", reply_markup=cancel_keyboard())
             await AdminStates.user_delete_all_proxy.set()
+        elif message.text == "/show_proxies":
+            proxies: list[str] = await DBI.get_all_proxies()
+            proxies: str = '\n'.join(proxies)
+            await message.answer(f"Proxies:\n{proxies}")
+            return
+        await message.answer(
+            'Введите прокси в формате "123.123.123.123:5555" (можно несколько через пробел или списком)',
+            reply_markup=cancel_keyboard()
+        )
 
 
 @logger.catch
@@ -231,6 +236,7 @@ async def admin_help_handler(message: Message) -> None:
                 "\n/sendall 'тут текст сообщения без кавычек' - отправить сообщение всем активным пользователям",
                 "\n/add_proxy - добавить прокси",
                 "\n/delete_proxy - удалить прокси",
+                "\n/show_proxies - показать список проксей",
                 "\n/delete_all_proxy - удалить ВСЕ прокси",
                 "\n/set_max_tokens - изменить кол-во токенов пользователя",
                 "\n/reboot - предупредить о перезагрузке, остановить работу всех ботов",
@@ -369,7 +375,7 @@ def register_admin_handlers(dp: Dispatcher) -> None:
     dp.register_message_handler(request_user_admin_handler, commands=['add_admin'])
     dp.register_message_handler(set_user_admin_handler, state=AdminStates.name_for_admin)
     dp.register_message_handler(request_proxies_handler, commands=['add_proxy', 'delete_proxy',
-                                                                   'delete_all_proxy'])
+                                                                   'delete_all_proxy', 'show_proxies'])
     dp.register_message_handler(add_new_proxy_handler, state=AdminStates.user_add_proxy)
     dp.register_message_handler(delete_proxy_handler, state=AdminStates.user_delete_proxy)
     dp.register_message_handler(delete_all_proxies, state=AdminStates.user_delete_all_proxy)

@@ -87,6 +87,8 @@ class RedisDB:
     async def health_check(self) -> bool:
         """Проверяет работу Редис"""
 
+        logger.info("Redis checking...")
+
         check_data = ['test']
         await self.save(check_data, 60)
         result = await self.load()
