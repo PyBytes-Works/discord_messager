@@ -21,7 +21,7 @@ class AdminStates(StatesGroup):
     user_set_max_tokens = State()
 
 
-class LogiStates(StatesGroup):
+class LoginState(StatesGroup):
     add_new_user = State()
     add_new_user_expiration = State()
     add_new_user_max_tokens = State()
@@ -43,3 +43,7 @@ class UserChannelStates(StatesGroup):
     enter_name_for_user_channel = State()
     delete_for_user_channel = State()
     checks_tokens_for_user_channel = State()
+
+
+class GrabberStates(StatesGroup):
+    enter_data = State()

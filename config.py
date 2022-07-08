@@ -16,6 +16,7 @@ SAVING: bool = False
 
 class Settings(BaseSettings):
     STAGE: str = 'local'
+    LOGGING_LEVEL: int = 20
     TELEBOT_TOKEN: str = ''
     PROXY_USER: str = ''
     PROXY_PASSWORD: str = ''
@@ -31,8 +32,7 @@ settings = Settings(_env_file='.env', _env_file_encoding='utf-8')
 # logger
 if not os.path.exists('./logs'):
     os.mkdir("./logs")
-level = 1 if settings.DEBUG else 30
-logger = get_mailer_logger(level)
+logger = get_mailer_logger(level=settings.LOGGING_LEVEL)
 
 # set admins list
 admins_list = settings.ADMINS

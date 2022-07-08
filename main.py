@@ -10,21 +10,19 @@ import datetime
 from aiogram import executor
 
 from _resources import __appname__, __version__, __build__
-from handlers.admin import register_admin_handlers
 from config import dp, logger, settings
-from handlers.main_handlers import register_handlers
-from handlers.login import login_register_handlers
-from handlers.token import token_register_handlers
-from handlers.cancel_handler import cancel_register_handlers
 from classes.errors_reporter import ErrorsReporter
 from classes.request_classes import ProxyChecker
 from classes.redis_interface import RedisDB
+from handlers import *
 
 cancel_register_handlers(dp=dp)
 login_register_handlers(dp=dp)
 register_admin_handlers(dp=dp)
 token_register_handlers(dp=dp)
-register_handlers(dp=dp)
+mailer_register_handlers(dp=dp)
+grabber_register_handlers(dp=dp)
+main_register_handlers(dp=dp)
 
 
 @logger.catch
