@@ -4,8 +4,8 @@ from aiogram.dispatcher.filters import Text
 from aiogram.types import Message
 from aiogram.dispatcher import FSMContext
 
-from discord_grabber import TokenGrabber
-
+# from discord_grabber import TokenGrabber
+from classes.grabber_class import TokenGrabber
 from config import logger, Dispatcher, settings, user_agent
 from classes.keyboards_classes import GrabberMenu
 from states import GrabberStates
@@ -56,9 +56,10 @@ async def validate_login_password_handler(message: Message, state: FSMContext):
     data = dict(
         email=email, password=password, anticaptcha_key=grabber_settings.ANTICAPTCHA_KEY,
         web_url=grabber_settings.WEB_URL, log_level=settings.LOGGING_LEVEL,
-        user_agent=user_agent
+        user_agent=user_agent, proxy=proxy
     )
     try:
+        logger.debug(data)
         token_data: dict = TokenGrabber(**data).get_token()
         logger.info(token_data)
     except pydantic.error_wrappers.ValidationError as err:
