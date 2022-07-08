@@ -1,5 +1,6 @@
 aiogram==2.18
 aioredis==2.0.1
+fake-useragent==0.1.11
 hiredis==2.0.0
 openai==0.18.1
 peewee==3.14.8

@@ -1,6 +1,7 @@
 import asyncio
 import os
 
+import fake_useragent
 from aiogram import Bot, Dispatcher
 from aiogram.contrib.fsm_storage.memory import MemoryStorage
 from pydantic import BaseSettings
@@ -43,3 +44,4 @@ storage = MemoryStorage()
 dp = Dispatcher(bot, storage=storage)
 
 SEMAPHORE = asyncio.Semaphore(settings.SEMAPHORE_MAX_TASKS)
+user_agent = fake_useragent.UserAgent(path='./useragent.json', verify_ssl=False)['google chrome']

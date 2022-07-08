@@ -29,18 +29,18 @@ main_register_handlers(dp=dp)
 async def on_startup(_) -> None:
     """Функция выполняющаяся при старте бота."""
 
-    user = 'test'
-    redis_text = "Redis check...OK"
-    if await RedisDB(redis_key=user).health_check():
-        logger.success(redis_text)
-    else:
-        redis_text = "Redis check...FAIL"
-        logger.warning(redis_text)
-
-    proxies: dict = await ProxyChecker().check_all_proxies()
-    proxies: str = '\n'.join(proxies)
-    proxy_text = f"Proxies checked:\n{proxies}\n"
-    logger.success(proxy_text)
+    # user = 'test'
+    # redis_text = "Redis check...OK"
+    # if await RedisDB(redis_key=user).health_check():
+    #     logger.success(redis_text)
+    # else:
+    #     redis_text = "Redis check...FAIL"
+    #     logger.warning(redis_text)
+    #
+    # proxies: dict = await ProxyChecker().check_all_proxies()
+    # proxies: str = '\n'.join(proxies)
+    # proxy_text = f"Proxies checked:\n{proxies}\n"
+    # logger.success(proxy_text)
     text: str = (
         f"{__appname__} started:"
         f"\nBuild:[{__build__}]"
@@ -48,7 +48,7 @@ async def on_startup(_) -> None:
     )
     if settings.DEBUG:
         text += "\nDebug: True"
-    text += f"\n\n{redis_text}\n\n{proxy_text}"
+    # text += f"\n\n{redis_text}\n\n{proxy_text}"
     await ErrorsReporter.send_report_to_admins(text=text)
     logger.success(
         f'Bot started at: {datetime.datetime.now()}'
