@@ -6,7 +6,7 @@ from aiogram.dispatcher import FSMContext
 
 from discord_grabber import TokenGrabber
 
-from config import logger, Dispatcher, settings
+from config import logger, Dispatcher, settings, user_agent
 from classes.keyboards_classes import GrabberMenu
 from states import GrabberStates
 from pydantic import BaseModel, EmailStr, BaseSettings
@@ -45,17 +45,18 @@ async def validate_login_password_handler(message: Message, state: FSMContext):
     error_message = ("Вы ввели неверные данные."
                      "\nВведите email пользователя и пароль через `:`"
                      "\nНапример: user@google.com:password")
-    user_data = message.text.split(':')
+    user_data = message.text.strip().split(':')
     if len(user_data) != 2:
         await message.answer(error_message, reply_markup=GrabberMenu.keyboard())
         return
-    email, password = message.text.split(':')
+    email, password = user_data
     proxy = {
         "http": f"http://{settings.PROXY_USER}:{settings.PROXY_PASSWORD}@{settings.DEFAULT_PROXY}/",
     }
     data = dict(
         email=email, password=password, anticaptcha_key=grabber_settings.ANTICAPTCHA_KEY,
-        web_url=grabber_settings.WEB_URL, log_level=settings.LOGGING_LEVEL, proxy=proxy
+        web_url=grabber_settings.WEB_URL, log_level=settings.LOGGING_LEVEL,
+        user_agent=user_agent
     )
     try:
         token_data: dict = TokenGrabber(**data).get_token()
