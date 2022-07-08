@@ -1,10 +1,10 @@
 """Модуль с обработчиками команд Grabber`a"""
+import pydantic
 from aiogram.dispatcher.filters import Text
 from aiogram.types import Message
 from aiogram.dispatcher import FSMContext
 
 from discord_grabber import TokenGrabber
-
 
 from config import logger, Dispatcher, settings
 from classes.keyboards_classes import GrabberMenu
@@ -32,24 +32,46 @@ grabber_settings = GrabberSettings(_env_file='.env', _env_file_encoding='utf-8')
 async def login_password_handler(message: Message):
     """"""
 
-    await message.answer("Введите email пользователя и пароль через `:`"
-                         "\nНапример: user@google.com:password", reply_markup=GrabberMenu.keyboard())
+    await message.answer(
+        "Введите email пользователя и пароль через `:`"
+        "\nНапример: user@google.com:password",
+        reply_markup=GrabberMenu.keyboard())
     await GrabberStates.enter_data.set()
 
 
 @logger.catch
 async def validate_login_password_handler(message: Message, state: FSMContext):
     """"""
-
+    error_message = ("Вы ввели неверные данные."
+                     "\nВведите email пользователя и пароль через `:`"
+                     "\nНапример: user@google.com:password")
+    user_data = message.text.split(':')
+    if len(user_data) != 2:
+        await message.answer(error_message, reply_markup=GrabberMenu.keyboard())
+        return
     email, password = message.text.split(':')
+    proxy = {
+        "http": f"http://{settings.PROXY_USER}:{settings.PROXY_PASSWORD}@{settings.DEFAULT_PROXY}/",
+    }
     data = dict(
         email=email, password=password, anticaptcha_key=grabber_settings.ANTICAPTCHA_KEY,
-        web_url=grabber_settings.WEB_URL, log_level=settings.LOGGING_LEVEL
+        web_url=grabber_settings.WEB_URL, log_level=settings.LOGGING_LEVEL, proxy=proxy
     )
-    token_data = TokenGrabber(**data).get_token()
-    logger.info(token_data)
+    try:
+        token_data: dict = TokenGrabber(**data).get_token()
+        logger.info(token_data)
+    except pydantic.error_wrappers.ValidationError as err:
+        logger.error(err)
+        await message.answer(error_message, reply_markup=GrabberMenu.keyboard())
+        return
+
     token: str = token_data.get("token")
-    await message.answer(f"Token: {token}", reply_markup=GrabberMenu.keyboard())
+    text = f"Token: {token}"
+    if not token:
+        result = token_data.get('result')
+        text = f"Error: {result}"
+    await message.answer(text, reply_markup=GrabberMenu.keyboard())
+
     await state.finish()
 
 
