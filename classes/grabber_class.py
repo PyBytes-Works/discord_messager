@@ -1,4 +1,5 @@
 import json
+import time
 from random import randint, choice
 from base64 import b64encode
 from typing import Tuple, Dict
@@ -92,8 +93,8 @@ class TokenGrabber:
                 'verify': False
             }
         try:
-            r = self.session.get(**params)
-            self.fingerprint = json.loads(r.text)["fingerprint"]
+            response = self.session.get(**params)
+            self.fingerprint = json.loads(response.text)["fingerprint"]
             self.logger.success("Getting fingerprint...OK")
         except KeyError as err:
             self.logger.exception(f'Getting fingerprint...FAIL: {err}')
@@ -139,6 +140,40 @@ class TokenGrabber:
             self.logger.error(f"Authenticating...FAIL: {status_code}")
         return response.text, status_code
 
+    def _get_captcha_id(self, captcha_sitekey: str) -> str:
+        url = (f'http://2captcha.com/in.php?'
+               f'key={self.anticaptcha_key}'
+               f'&method=hcaptcha'
+               f'&sitekey={captcha_sitekey}'
+               f'&pageurl=https://discord.com/api/v9/auth/login'
+               f'&json=1'
+               )
+        response = requests.get(url)
+        self.logger.debug(response.text)
+        if response.status_code == 200:
+            data: dict = response.json()
+            if data.get("status") == 1:
+                return data.get("request", '')
+        return ''
+
+    def _get_captcha_key(self, captcha_id: str) -> str:
+        delay = 25
+        self.logger.debug(f"Sleep for {delay} seconds.")
+        time.sleep(delay)
+        url = (f'http://2captcha.com/res.php?'
+               f'key={self.anticaptcha_key}'
+               f'&action=get'
+               f'&id={captcha_id}'
+               f'&json=1'
+               )
+        response = requests.get(url)
+        self.logger.debug(response.text)
+        if response.status_code == 200:
+            data: dict = response.json()
+            if data.get("status") == 1:
+                return data.get("request", '')
+        return ''
+
     def _get_captcha(self, response_text: str) -> Dict[str, str]:
         self.logger.debug("Getting captcha...")
         captcha_sitekey: str = json.loads(response_text)['captcha_sitekey']
@@ -149,18 +184,13 @@ class TokenGrabber:
         #     .captcha_handler(websiteURL=self.web_url, websiteKey=captcha_sitekey)
         # )
         # captcha_key = result.get('solution', {}).get('gRecaptchaResponse', '')
-        url = (f'http://2captcha.com/in.php?'
-               f'key={self.anticaptcha_key}'
-               f'&method=hcaptcha'
-               f'&sitekey={captcha_sitekey}'
-               f'&pageurl=https://discord.com/api/v9/auth/login'
-               )
-        response = requests.get(url)
+        captcha_id: str = self._get_captcha_id(captcha_sitekey)
         captcha_key = ''
-        if 'OK|' in response.text:
-            captcha_key: str = response.text.split('|')[-1]
-            self.logger.debug(captcha_key)
-        self.logger.debug(f'Ответ от капчи пришел:\n{response.text}')
+        for _ in range(3):
+            captcha_key: str = self._get_captcha_key(captcha_id)
+            if captcha_key:
+                break
+        self.logger.debug(f'Ответ от капчи пришел:\n{captcha_key}')
         if not captcha_key:
             self.logger.error("Getting captcha...FAIL")
             return {"result": 'Captcha error'}
