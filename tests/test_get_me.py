@@ -1,4 +1,4 @@
-from fake_data import *
+from data.fake_data import *
 from classes.request_classes import GetMe
 
 

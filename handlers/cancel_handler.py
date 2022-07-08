@@ -4,8 +4,8 @@ from aiogram.dispatcher import FSMContext
 
 from classes.db_interface import DBI
 from classes.instances_storage import InstancesStorage
+from classes.keyboards_classes import StartMenu
 from config import logger, Dispatcher, bot
-from keyboards import user_menu_keyboard
 
 
 @logger.catch
@@ -31,7 +31,7 @@ async def send_cancel_message(telegram_id: str, state: FSMContext) -> None:
     Обработчик команды /cancel, /Отмена, кнопки Отмена и инлайн кнопки Отмена
     """
     text: str = ''
-    keyboard = user_menu_keyboard
+    keyboard = StartMenu.keyboard
     if await DBI.is_user_work(telegram_id=telegram_id):
         text: str = ("\nДождитесь завершения работы бота. Это займет около 5 секунд..."
                      "\nЕсли бот не завершил работу - введите 'Отмена' или любую команду для вызова "
@@ -55,5 +55,5 @@ def cancel_register_handlers(dp: Dispatcher) -> None:
     """
 
     dp.register_message_handler(message_cancel_handler, commands=['отмена', 'cancel'], state="*")
-    dp.register_message_handler(message_cancel_handler, Text(startswith=["отмена",
-                                                                         "cancel"], ignore_case=True), state="*")
+    dp.register_message_handler(message_cancel_handler, Text(
+        startswith=[StartMenu.cancel_key], ignore_case=True), state="*")

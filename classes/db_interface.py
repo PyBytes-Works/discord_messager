@@ -313,6 +313,11 @@ class DBI:
 
     @classmethod
     @logger.catch
+    async def get_all_proxies(cls) -> list[str]:
+        return Proxy.get_all_proxies()
+
+    @classmethod
+    @logger.catch
     async def delete_all_proxy(cls) -> bool:
         return Proxy.delete_all_proxy()
 

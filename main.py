@@ -10,43 +10,46 @@ import datetime
 from aiogram import executor
 
 from _resources import __appname__, __version__, __build__
-from handlers.admin import register_admin_handlers
-from config import dp, logger, DB_FILE_NAME, VERSION, DEBUG
-from handlers.main_handlers import register_handlers
-from handlers.login import login_register_handlers
-from handlers.token import token_register_handlers
-from handlers.cancel_handler import cancel_register_handlers
-from models import recreate_db
+from config import dp, logger, settings
 from classes.errors_reporter import ErrorsReporter
+from classes.request_classes import ProxyChecker
+from classes.redis_interface import RedisDB
+from handlers import *
 
 cancel_register_handlers(dp=dp)
 login_register_handlers(dp=dp)
 register_admin_handlers(dp=dp)
 token_register_handlers(dp=dp)
-register_handlers(dp=dp)
+mailer_register_handlers(dp=dp)
+grabber_register_handlers(dp=dp)
+main_register_handlers(dp=dp)
 
 
 @logger.catch
 async def on_startup(_) -> None:
     """Функция выполняющаяся при старте бота."""
 
+    user = 'test'
+    redis_text = "Redis check...OK"
+    if await RedisDB(redis_key=user).health_check():
+        logger.success(redis_text)
+    else:
+        redis_text = "Redis check...FAIL"
+        logger.warning(redis_text)
+
+    proxies: dict = await ProxyChecker().check_all_proxies()
+    proxies: str = '\n'.join(proxies)
+    proxy_text = f"Proxies checked:\n{proxies}\n"
+    logger.success(proxy_text)
     text: str = (
         f"{__appname__} started:"
         f"\nBuild:[{__build__}]"
         f"\nVersionL[{__version__}]"
     )
-    if DEBUG:
+    if settings.DEBUG:
         text += "\nDebug: True"
-    try:
-        await ErrorsReporter.send_report_to_admins(text=text)
-    except Exception:
-        pass
-    if not os.path.exists('./db'):
-        os.mkdir("./db")
-    if not os.path.exists(DB_FILE_NAME):
-        logger.warning(f"Database not found with file name: {DB_FILE_NAME}")
-        recreate_db(DB_FILE_NAME)
-
+    text += f"\n\n{redis_text}\n\n{proxy_text}"
+    await ErrorsReporter.send_report_to_admins(text=text)
     logger.success(
         f'Bot started at: {datetime.datetime.now()}'
         f'\nBOT POLLING ONLINE')
@@ -56,7 +59,7 @@ async def on_startup(_) -> None:
 async def on_shutdown(dp) -> None:
     """Действия при отключении бота."""
     try:
-        await ErrorsReporter.send_report_to_admins(text=f"STOPPING: {VERSION}")
+        await ErrorsReporter.send_report_to_admins(text=f"STOPPING: {__appname__} {__version__}")
     except Exception:
         pass
     logger.warning("BOT shutting down.")

@@ -1,7 +1,7 @@
 import asyncio
 
 from classes.message_sender import MessageSender
-from fake_data import proxies
+from data.fake_data import proxies
 
 
 async def test_send_messages(datastore):

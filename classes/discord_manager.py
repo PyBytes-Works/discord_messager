@@ -11,11 +11,11 @@ from classes.message_sender import MessageSender
 from classes.open_ai import OpenAI
 from classes.replies import RepliesManager
 from classes.token_datastorage import TokenData
+from classes.keyboards_classes import MailerMenu, MailerInWorkMenu
 
 from config import logger, SEMAPHORE
 from classes.db_interface import DBI
 from decorators.decorators import check_working, info_logger
-from keyboards import user_menu_keyboard, in_work_keyboard
 from utils import get_current_timestamp
 
 
@@ -61,6 +61,7 @@ class DiscordManager:
     @logger.catch
     async def lets_play(self) -> None:
         """Show must go on
+
         Запускает рабочий цикл бота, проверяет ошибки."""
 
         # TODO сделать команду для отображения работающих в данный момент пользователей
@@ -91,7 +92,7 @@ class DiscordManager:
         if self.reboot:
             await self.message.answer(
                 "Ожидайте перезагрузки сервера.",
-                reply_markup=user_menu_keyboard())
+                reply_markup=MailerMenu.keyboard())
             self.is_working = False
 
     @logger.catch
@@ -155,6 +156,7 @@ class DiscordManager:
 
     @logger.catch
     async def __is_token_deleted(self) -> bool:
+        """Проверяет поле need_to_delete, если True - удаляет токен из БД"""
 
         if self.datastore.need_to_delete:
             token = self.datastore.token
@@ -326,7 +328,7 @@ class DiscordManager:
         text: str = f"Все токены отработали. Следующий старт через {delay} {text}."
         logger.info(f"{self.message.from_user.username}: {self.message.from_user.id}: {text}")
         if not self.silence:
-            await self.message.answer(text, reply_markup=in_work_keyboard())
+            await self.message.answer(text, reply_markup=MailerInWorkMenu.keyboard())
 
     @check_working
     @logger.catch
@@ -356,11 +358,11 @@ class DiscordManager:
             await replier.update_showed(message_id)
             text: str = await self.__get_message_text_from_dict(data)
             result: str = text + f"\nОтвет от ИИ: {ai_reply_text}"
-            await self.message.answer(result, reply_markup=in_work_keyboard())
+            await self.message.answer(result, reply_markup=MailerInWorkMenu.keyboard())
             return
         text: str = f"ИИ не ответил на реплай: [{reply_text}]"
         logger.log("OPENAI", text)
-        await self.message.answer(text, reply_markup=in_work_keyboard())
+        await self.message.answer(text, reply_markup=MailerInWorkMenu.keyboard())
         await self.__send_reply_to_telegram(data, replier)
 
     @logger.catch

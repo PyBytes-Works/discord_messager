@@ -7,7 +7,7 @@ import aiohttp.http_exceptions
 
 from classes.db_interface import DBI
 from classes.errors_reporter import ErrorsReporter
-from config import logger, DISCORD_BASE_URL, PROXY_USER, PROXY_PASSWORD
+from config import logger, DISCORD_BASE_URL, settings
 from classes.token_datastorage import TokenData
 
 
@@ -49,7 +49,7 @@ class RequestSender(ABC):
             )
 
     async def _send_request(self) -> dict:
-        self.proxy_data: str = f"http://{PROXY_USER}:{PROXY_PASSWORD}@{self.proxy}/"
+        self.proxy_data: str = f"http://{settings.PROXY_USER}:{settings.PROXY_PASSWORD}@{self.proxy}/"
         answer: dict = {
             "status": 0,
             "answer_data": ''
@@ -195,6 +195,16 @@ class ProxyChecker(GetRequest):
         if not await DBI.update_proxies_for_owners(proxy=proxy):
             return 'no proxies'
         return await self.get_checked_proxy(telegram_id=telegram_id)
+
+    @logger.catch
+    async def check_all_proxies(self) -> dict[str: int]:
+        """Проверяет все прокси в БД, возвращает словарь со статусами"""
+
+        logger.info("Proxies check begin...")
+        return {
+            proxy: await self._check_proxy(proxy=proxy)
+            for proxy in await DBI.get_all_proxies()
+        }
 
 
 class TokenChecker(GetRequest):

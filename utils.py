@@ -3,7 +3,7 @@ import os
 import json
 
 from typing import Union
-from config import logger, DEBUG, SAVING
+from config import logger, settings, SAVING
 
 
 @logger.catch
@@ -26,7 +26,7 @@ def save_data_to_json(data: Union[dict, list], file_name: str = "data.json", key
             result.update(data)
         save_data_to_json(data=result, file_name=file_name, key='w')
 
-    if DEBUG and SAVING:
+    if settings.DEBUG and SAVING:
         logger.debug(f"{path} saved.")
 
 
@@ -36,7 +36,7 @@ def save_data_to_txt(data: Union[dict, list], file_name: str = "data.json"):
         data = "\n".join(data)
         f.write(data)
 
-    if DEBUG and SAVING:
+    if settings.DEBUG and SAVING:
         logger.debug(f"{file_name} saved.")
 
 

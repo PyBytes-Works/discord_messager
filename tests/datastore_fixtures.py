@@ -1,7 +1,7 @@
 import pytest
 
 from classes.token_datastorage import TokenData
-from fake_data import *
+from data.fake_data import *
 
 
 @pytest.fixture

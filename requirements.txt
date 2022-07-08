@@ -1,8 +1,13 @@
 aiogram==2.18
 aioredis==2.0.1
 hiredis==2.0.0
-loguru==0.5.3
 openai==0.18.1
 peewee==3.14.8
 psycopg2==2.9.3
+pydantic==1.9.1
 python-dotenv==0.19.2
+pytest==7.1.2
+pytest-aio==1.4.1
+
+myloguru-deskent
+discord-grabber-deskent
