@@ -143,17 +143,27 @@ class TokenGrabber:
         self.logger.debug("Getting captcha...")
         captcha_sitekey: str = json.loads(response_text)['captcha_sitekey']
         self.logger.debug(f"Response: {response_text}")
-        result: dict = (
-            HCaptchaTaskProxyless
-            .HCaptchaTaskProxyless(anticaptcha_key=self.anticaptcha_key)
-            .captcha_handler(websiteURL=self.web_url, websiteKey=captcha_sitekey)
-        )
-        self.logger.debug(f'Ответ от капчи пришел:\n{result}')
-        captcha_key = result.get('solution', {}).get('gRecaptchaResponse', '')
-
+        # result: dict = (
+        #     HCaptchaTaskProxyless
+        #     .HCaptchaTaskProxyless(anticaptcha_key=self.anticaptcha_key)
+        #     .captcha_handler(websiteURL=self.web_url, websiteKey=captcha_sitekey)
+        # )
+        # captcha_key = result.get('solution', {}).get('gRecaptchaResponse', '')
+        url = (f'http://2captcha.com/in.php?'
+               f'key={self.anticaptcha_key}'
+               f'&method=hcaptcha'
+               f'&sitekey={captcha_sitekey}'
+               f'&pageurl=https://discord.com/api/v9/auth/login'
+               )
+        response = requests.get(url)
+        captcha_key = ''
+        if 'OK|' in response.text:
+            captcha_key: str = response.text.split('|')[-1]
+            self.logger.debug(captcha_key)
+        self.logger.debug(f'Ответ от капчи пришел:\n{response.text}')
         if not captcha_key:
             self.logger.error("Getting captcha...FAIL")
-            return {"result": 'Account authorization key not found in the system'}
+            return {"result": 'Captcha error'}
         self.logger.success("Getting captcha...OK")
         response_text, status_code = self._authenticate(captcha_key)
         if status_code == 200:
