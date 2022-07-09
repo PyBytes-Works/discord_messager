@@ -5,3 +5,4 @@ from .main_handlers import main_register_handlers
 from .login import login_register_handlers
 from .mailer import mailer_register_handlers
 from .grabber import grabber_register_handlers
+from .joiner import joiner_register_handlers

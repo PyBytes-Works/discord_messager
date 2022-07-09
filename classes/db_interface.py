@@ -201,8 +201,9 @@ class DBI:
 
     @classmethod
     @logger.catch
-    async def get_all_user_tokens(cls, telegram_id: str) -> int:
-        return Token.get_all_user_tokens(telegram_id=telegram_id)
+    async def get_user_tokens_amount(cls, telegram_id: str) -> int:
+        """Returns TOTAL token user amount"""
+        return Token.get_user_tokens_amount(telegram_id=telegram_id)
 
     @classmethod
     @logger.catch

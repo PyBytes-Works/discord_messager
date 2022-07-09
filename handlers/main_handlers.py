@@ -2,7 +2,7 @@
 from aiogram.types import Message
 from aiogram.dispatcher.filters import Text
 
-from classes.keyboards_classes import StartMenu, MailerMenu, GrabberMenu
+from classes.keyboards_classes import StartMenu, MailerMenu, GrabberMenu, JoinerMenu
 from config import logger, Dispatcher
 from classes.db_interface import DBI
 from _resources import __version__
@@ -31,6 +31,7 @@ async def menu_selector_message(message: Message) -> None:
     spam = {
         StartMenu.mailer: MailerMenu.keyboard(),
         StartMenu.grabber: GrabberMenu.keyboard(),
+        StartMenu.joiner: JoinerMenu.keyboard(),
 
     }
     await message.answer(f'Выберите команду:', reply_markup=spam[message.text])
@@ -55,5 +56,5 @@ def main_register_handlers(dp: Dispatcher) -> None:
 
     dp.register_message_handler(activate_valid_user_handler, commands=["start"])
     dp.register_message_handler(menu_selector_message, Text(
-        equals=[StartMenu.mailer, StartMenu.grabber]))
+        equals=[StartMenu.mailer, StartMenu.grabber, StartMenu.joiner]))
     dp.register_message_handler(default_message)

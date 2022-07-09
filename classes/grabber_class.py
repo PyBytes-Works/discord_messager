@@ -5,9 +5,11 @@ from base64 import b64encode
 from typing import Tuple, Dict
 
 import requests
+import twocaptcha
 from python3_anticaptcha import HCaptchaTaskProxyless
 from myloguru.my_loguru import get_logger
 from pydantic import BaseModel, EmailStr
+from twocaptcha import TwoCaptcha
 
 
 class UserModel(BaseModel):
@@ -145,7 +147,7 @@ class TokenGrabber:
                f'key={self.anticaptcha_key}'
                f'&method=hcaptcha'
                f'&sitekey={captcha_sitekey}'
-               f'&pageurl=https://discord.com/api/v9/auth/login'
+               f'&pageurl=https://discord.com/login'
                f'&json=1'
                )
         response = requests.get(url)
@@ -174,22 +176,47 @@ class TokenGrabber:
                 return data.get("request", '')
         return ''
 
+    def _two_captcha(self, captcha_sitekey: str) -> str:
+        self.logger.debug("Two captcha started...")
+        config = {
+            'server': '2captcha.com',
+            'apiKey': self.anticaptcha_key,
+            'defaultTimeout': 30,
+            'recaptchaTimeout': 600,
+            'pollingInterval': 10,
+        }
+        solver = TwoCaptcha(**config)
+        try:
+            result = solver.hcaptcha(
+                sitekey=captcha_sitekey,
+                url='https://hcaptcha.com/'
+                )
+            self.logger.debug(result)
+            return result
+        except twocaptcha.solver.TimeoutException as err:
+            self.logger.debug(err)
+            return ''
+
     def _get_captcha(self, response_text: str) -> Dict[str, str]:
         self.logger.debug("Getting captcha...")
         captcha_sitekey: str = json.loads(response_text)['captcha_sitekey']
         self.logger.debug(f"Response: {response_text}")
+        # todo need to get captcha
         # result: dict = (
         #     HCaptchaTaskProxyless
         #     .HCaptchaTaskProxyless(anticaptcha_key=self.anticaptcha_key)
         #     .captcha_handler(websiteURL=self.web_url, websiteKey=captcha_sitekey)
         # )
         # captcha_key = result.get('solution', {}).get('gRecaptchaResponse', '')
-        captcha_id: str = self._get_captcha_id(captcha_sitekey)
-        captcha_key = ''
-        for _ in range(3):
-            captcha_key: str = self._get_captcha_key(captcha_id)
-            if captcha_key:
-                break
+
+        # captcha_id: str = self._get_captcha_id(captcha_sitekey)
+        # captcha_key = ''
+        # for _ in range(3):
+        #     captcha_key: str = self._get_captcha_key(captcha_id)
+        #     if captcha_key:
+        #         break
+
+        captcha_key: str = self._two_captcha(captcha_sitekey)
         self.logger.debug(f'Ответ от капчи пришел:\n{captcha_key}')
         if not captcha_key:
             self.logger.error("Getting captcha...FAIL")

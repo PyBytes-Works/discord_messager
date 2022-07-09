@@ -47,7 +47,7 @@ class StartMenu(BaseMenu):
         return default_keyboard().add(
             KeyboardButton(cls.mailer),
             KeyboardButton(cls.grabber),
-            # KeyboardButton(cls.joiner),
+            KeyboardButton(cls.joiner),
             # KeyboardButton(cls.modifer),
             KeyboardButton(cls.cancel_key),
         )
@@ -111,6 +111,25 @@ class GrabberMenu(BaseMenu):
 
         return default_keyboard().add(
             KeyboardButton(cls.get_token),
+            KeyboardButton(cls.main),
+            KeyboardButton(cls.cancel_key),
+        )
+
+
+@dataclass(frozen=True)
+class JoinerMenu(BaseMenu):
+    """Grabber menu keyboard"""
+
+    add_tokens: str = 'Добавить токены'
+    main: str = 'В главное меню'
+
+    @classmethod
+    @logger.catch
+    def keyboard(cls) -> 'ReplyKeyboardMarkup':
+        """Возвращает кнопочки меню для канала из списка"""
+
+        return default_keyboard().add(
+            KeyboardButton(cls.add_tokens),
             KeyboardButton(cls.main),
             KeyboardButton(cls.cancel_key),
         )

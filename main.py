@@ -22,6 +22,7 @@ register_admin_handlers(dp=dp)
 token_register_handlers(dp=dp)
 mailer_register_handlers(dp=dp)
 grabber_register_handlers(dp=dp)
+joiner_register_handlers(dp=dp)
 main_register_handlers(dp=dp)
 
 
