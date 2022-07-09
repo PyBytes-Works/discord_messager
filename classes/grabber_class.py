@@ -143,6 +143,7 @@ class TokenGrabber:
         }
         if captcha_key:
             data.update(captcha_key=captcha_key)
+            self.logger.debug(f"_authenticate data:\n{data}")
         response = self.session.post(
             url='https://discord.com/api/v9/auth/login',
             json=data,
