@@ -1,15 +1,14 @@
+import asyncio
 import json
-import time
+
 from random import randint, choice
 from base64 import b64encode
 from typing import Tuple, Dict
 
+import aiohttp
 import requests
-import twocaptcha
-from python3_anticaptcha import HCaptchaTaskProxyless
 from myloguru.my_loguru import get_logger
 from pydantic import BaseModel, EmailStr
-from twocaptcha import TwoCaptcha
 
 
 class UserModel(BaseModel):
@@ -40,13 +39,19 @@ class TokenGrabber:
              example: proxy = {
                 "http": "http://user:pass@10.10.1.10:3128/",
 
-                "https": "https://user:pass@10.10.1.10:3128/"
-
                 }
         user_agent: str [Optional] =
         "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36
         (KHTML, like Gecko) Chrome/101.0.4951.41 Safari/537.36"
 
+        logger=None
+            By default will be used my_loguru logger by Deskent
+
+            (pip install myloguru-deskent)
+
+        max_tries: int = 12
+            Maximum amount of tries for getting captcha.
+            Delay between tries 10 seconds.
 
     Methods
         get_token
@@ -54,24 +59,33 @@ class TokenGrabber:
 
     def __init__(
             self, email: str, password: str, anticaptcha_key: str, web_url: str,
-            log_level: int = 20, proxy: dict = None, user_agent: str = ''
+            log_level: int = 20, proxy: dict = None, user_agent: str = '', logger=None,
+            max_tries: int = 12
     ):
         self.user = UserModel(email=email, password=password)
         self.anticaptcha_key: str = anticaptcha_key
         self.web_url: str = web_url
-        self.user_agent: str = user_agent if user_agent else "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/101.0.4951.41 Safari/537.36"
+        self.user_agent: str = (
+            user_agent
+            if user_agent
+            else (
+                "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
+                "(KHTML, like Gecko) Chrome/101.0.4951.41 Safari/537.36"
+            )
+        )
         self.session: requests.Session = requests.Session()
         self.fingerprint: str
         self.proxy: dict = proxy if proxy else {}
-        self.logger = get_logger(log_level)
+        self.max_tries: int = max_tries
+        self.logger = logger if logger else get_logger(log_level)
 
-    def get_token(self) -> Dict[str, str]:
+    async def get_token(self) -> Dict[str, str]:
         self._update_headers()
         self._update_proxy()
         self._update_fingerprint()
         self.session.headers.update({'X-Fingerprint': self.fingerprint})
 
-        return self._get_token_data()
+        return await self._get_token_data()
 
     def _update_proxy(self):
         if self.proxy:
@@ -102,7 +116,7 @@ class TokenGrabber:
             self.logger.exception(f'Getting fingerprint...FAIL: {err}')
             raise
 
-    def _get_token_data(self) -> dict:
+    async def _get_token_data(self) -> dict:
         self.logger.debug("Getting token...")
         response_text, _ = self._authenticate()
         if 'token' in response_text:
@@ -110,16 +124,15 @@ class TokenGrabber:
             return json.loads(response_text)
         elif 'captcha_sitekey' in response_text:
             self.logger.debug(f'Капча для {self.user.email}, отправляю запрос на решение')
-            return self._get_captcha(response_text)
+            return await self._get_captcha(response_text)
         elif 'The resource is being rate limited' in response_text:
-            self.logger.error('Рейт-лимит')
-            return {'result': 'rate limit'}
+            error_text = 'The resource is being rate limited'
         elif 'ACCOUNT_LOGIN_VERIFICATION_EMAIL' in response_text:
-            self.logger.error(f'Требуется подтверждение по почте для {self.user.email}')
-            return {'result': 'email secure'}
+            error_text = f'Требуется подтверждение по почте для {self.user.email}'
         else:
-            self.logger.error('Ошибка во время решения капчи')
-            return {'result': 'captcha error'}
+            error_text = 'Ошибка во время решения капчи'
+        self.logger.error(error_text)
+        return {'result': error_text}
 
     def _authenticate(self, captcha_key: str = '') -> Tuple[str, int]:
         self.logger.debug("Authenticating...")
@@ -142,85 +155,62 @@ class TokenGrabber:
             self.logger.error(f"Authenticating...FAIL: {status_code}")
         return response.text, status_code
 
-    def _get_captcha_id(self, captcha_sitekey: str) -> str:
-        url = (f'http://2captcha.com/in.php?'
-               f'key={self.anticaptcha_key}'
-               f'&method=hcaptcha'
-               f'&sitekey={captcha_sitekey}'
-               f'&pageurl=https://discord.com/login'
-               f'&json=1'
-               )
-        response = requests.get(url)
-        self.logger.debug(response.text)
-        if response.status_code == 200:
-            data: dict = response.json()
-            if data.get("status") == 1:
-                return data.get("request", '')
-        return ''
-
-    def _get_captcha_key(self, captcha_id: str) -> str:
-        delay = 25
-        self.logger.debug(f"Sleep for {delay} seconds.")
-        time.sleep(delay)
-        url = (f'http://2captcha.com/res.php?'
-               f'key={self.anticaptcha_key}'
-               f'&action=get'
-               f'&id={captcha_id}'
-               f'&json=1'
-               )
-        response = requests.get(url)
-        self.logger.debug(response.text)
-        if response.status_code == 200:
-            data: dict = response.json()
-            if data.get("status") == 1:
-                return data.get("request", '')
-        return ''
-
-    def _two_captcha(self, captcha_sitekey: str) -> str:
-        self.logger.debug("Two captcha started...")
-        config = {
-            'server': '2captcha.com',
-            'apiKey': self.anticaptcha_key,
-            'defaultTimeout': 30,
-            'recaptchaTimeout': 600,
-            'pollingInterval': 10,
+    async def _send_get_request(self, url: str) -> dict:
+        params = {
+            "url": url,
+            "ssl": False
         }
-        solver = TwoCaptcha(**config)
-        try:
-            result = solver.hcaptcha(
-                sitekey=captcha_sitekey,
-                url='https://hcaptcha.com/'
-                )
-            self.logger.debug(result)
-            return result
-        except twocaptcha.solver.TimeoutException as err:
-            self.logger.debug(err)
-            return ''
+        if self.proxy:
+            params.update(proxy=self.proxy.get('http'))
+        async with aiohttp.ClientSession() as session:
+            async with session.get(**params) as response:
+                if response.status == 200:
+                    return await response.json()
+        self.logger.error(await response.text())
+        return {}
 
-    def _get_captcha(self, response_text: str) -> Dict[str, str]:
+    async def __get_captcha(self, site_key: str) -> dict:
+        result = {"success": False}
+        url = (
+            f"http://2captcha.com/in.php?key={self.anticaptcha_key}"
+            f"&method=hcaptcha"
+            f"&sitekey={site_key}"
+            f"&pageurl=https://discord.com/login&json=1"
+        )
+        response_id: dict = await self._send_get_request(url)
+        id: str = response_id.get("request", '')
+        if not id:
+            result.update(message="Captcha ID error")
+            return result
+        url = (
+            f"http://2captcha.com/res.php?key={self.anticaptcha_key}"
+            f"&action=get"
+            f"&json=1"
+            f"&id={id}"
+        )
+        await asyncio.sleep(10)
+        for index, _ in enumerate(range(self.max_tries), start=1):
+            response_token: dict = await self._send_get_request(url)
+            self.logger.debug(f"Try №{index}/{self.max_tries}: {response_token}")
+            if response_token['status']:
+                result.update(success=True, token=response_token['request'])
+                return result
+            await asyncio.sleep(10)
+        else:
+            result.update(message="Captcha time is over. Please try later...")
+        return result
+
+    async def _get_captcha(self, response_text: str) -> Dict[str, str]:
         self.logger.debug("Getting captcha...")
         captcha_sitekey: str = json.loads(response_text)['captcha_sitekey']
         self.logger.debug(f"Response: {response_text}")
-        # todo need to get captcha
-        # result: dict = (
-        #     HCaptchaTaskProxyless
-        #     .HCaptchaTaskProxyless(anticaptcha_key=self.anticaptcha_key)
-        #     .captcha_handler(websiteURL=self.web_url, websiteKey=captcha_sitekey)
-        # )
-        # captcha_key = result.get('solution', {}).get('gRecaptchaResponse', '')
-
-        # captcha_id: str = self._get_captcha_id(captcha_sitekey)
-        # captcha_key = ''
-        # for _ in range(3):
-        #     captcha_key: str = self._get_captcha_key(captcha_id)
-        #     if captcha_key:
-        #         break
-
-        captcha_key: str = self._two_captcha(captcha_sitekey)
-        self.logger.debug(f'Ответ от капчи пришел:\n{captcha_key}')
-        if not captcha_key:
-            self.logger.error("Getting captcha...FAIL")
-            return {"result": 'Captcha error'}
+        captcha_result: dict = await self.__get_captcha(captcha_sitekey)
+        self.logger.debug(f'Ответ от капчи пришел:\n{captcha_result}')
+        if not captcha_result.get("success"):
+            message: str = captcha_result.get('message')
+            self.logger.error(f"Getting captcha...FAIL: {message}")
+            return {"result": message}
+        captcha_key: str = captcha_result["token"]
         self.logger.success("Getting captcha...OK")
         response_text, status_code = self._authenticate(captcha_key)
         if status_code == 200:
@@ -228,7 +218,7 @@ class TokenGrabber:
             return json.loads(response_text)
         else:
             self.logger.error(f'Невалидная комбинация для {self.user.email}:{self.user.password}')
-            return {'result': 'invalid email or password'}
+            return {'result': 'Invalid email or password'}
 
     def __get_xsuperproperties(self) -> bytes:
         browser_vers = f'{randint(10, 99)}.{randint(0, 9)}.{randint(1000, 9999)}.{randint(10, 99)}'

@@ -7,7 +7,7 @@ from aiogram.dispatcher import FSMContext
 # from discord_grabber import TokenGrabber
 from classes.grabber_class import TokenGrabber
 from config import logger, Dispatcher, settings, user_agent
-from classes.keyboards_classes import GrabberMenu
+from classes.keyboards_classes import GrabberMenu, BaseMenu
 from states import GrabberStates
 from pydantic import BaseModel, EmailStr, BaseSettings
 
@@ -18,6 +18,7 @@ class GrabberSettings(BaseSettings):
     EMAIL: EmailStr = ''
     PASSWORD: str = ''
     DEBUG: bool = False
+    MAX_CAPTCHA_TRIES: int = 12
 
 
 class UserModel(BaseModel):
@@ -35,7 +36,7 @@ async def login_password_handler(message: Message):
     await message.answer(
         "Введите email пользователя и пароль через `:`"
         "\nНапример: user@google.com:password",
-        reply_markup=GrabberMenu.keyboard())
+        reply_markup=BaseMenu.keyboard())
     await GrabberStates.enter_data.set()
 
 
@@ -56,11 +57,18 @@ async def validate_login_password_handler(message: Message, state: FSMContext):
     data = dict(
         email=email, password=password, anticaptcha_key=grabber_settings.ANTICAPTCHA_KEY,
         web_url=grabber_settings.WEB_URL, log_level=settings.LOGGING_LEVEL,
-        user_agent=user_agent, proxy=proxy
+        user_agent=user_agent, proxy=proxy, logger=logger,
+        max_tries=grabber_settings.MAX_CAPTCHA_TRIES
     )
+    captcha_total_time: int = 10 * grabber_settings.MAX_CAPTCHA_TRIES
     try:
         logger.debug(data)
-        token_data: dict = TokenGrabber(**data).get_token()
+        await message.answer(
+            "Получаю данные, ожидайте ответа..."
+            f"\nВ случае необходимости прохождения капчи "
+            f"- время ожидания составит до {captcha_total_time} секунд..."
+        )
+        token_data: dict = await TokenGrabber(**data).get_token()
         logger.info(token_data)
     except pydantic.error_wrappers.ValidationError as err:
         logger.error(err)

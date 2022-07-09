@@ -1,7 +1,7 @@
 FROM python:3.10-slim
 
 RUN apt-get update && \
-    apt-get -y install libpq-dev gcc libcurl4-openssl-dev
+    apt-get -y install libpq-dev gcc
 
 WORKDIR /app
 
