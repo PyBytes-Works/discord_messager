@@ -732,7 +732,7 @@ class Token(BaseModel):
       methods:
           add_token_by_telegram_id
           is_token_exists
-          get_all_user_tokens
+          get_user_tokens_amount
           get_all_info_tokens
           get_number_of_free_slots_for_tokens
           get_min_last_time_token_data
@@ -766,7 +766,7 @@ class Token(BaseModel):
 
     @classmethod
     @logger.catch
-    def get_all_user_tokens(cls: 'Token', telegram_id: str) -> int:
+    def get_user_tokens_amount(cls: 'Token', telegram_id: str) -> int:
         """Returns TOTAL token user amount"""
         return (
             cls.select()

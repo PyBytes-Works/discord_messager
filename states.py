@@ -47,3 +47,7 @@ class UserChannelStates(StatesGroup):
 
 class GrabberStates(StatesGroup):
     enter_data = State()
+
+
+class JoinerStates(StatesGroup):
+    enter_data = State()
