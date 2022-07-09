@@ -338,6 +338,12 @@ class DBI:
     @classmethod
     @logger.catch
     async def get_low_used_proxy(cls) -> namedtuple:
+        """        Возвращает первую прокси с самым малым использованием
+        return:
+        namedtuple fields:
+            proxy_pk: int
+            proxy: str
+        """
         return Proxy.get_low_used_proxy()
 
     @classmethod

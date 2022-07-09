@@ -50,4 +50,5 @@ class GrabberStates(StatesGroup):
 
 
 class JoinerStates(StatesGroup):
-    enter_data = State()
+    enter_link = State()
+    enter_tokens = State()

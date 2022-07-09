@@ -13,32 +13,51 @@ from discord_joiner.joiner import DiscordJoiner
 
 
 @logger.catch
-async def enter_token_handler(message: Message):
+async def enter_invite_link_handler(message: Message):
     """"""
 
-    if not await DBI.get_user_tokens_amount(message.from_user.id):
-        await message.answer(
-            "У вас нет ни одного токена. Сначала добавьте хотя бы один.",
-            reply_markup=JoinerMenu.keyboard())
-        return
     await message.answer(
         "Введите ссылку-приглашение: "
         "\nНапример: https://discord.gg/cf3f9sD9",
+        disable_web_page_preview=True,
         reply_markup=JoinerMenu.keyboard())
-    await JoinerStates.enter_data.set()
+    await JoinerStates.enter_link.set()
+
+
+def _check_invite_link(invite_link: str):
+    if invite_link.startswith(('https://discord.com/invite/', 'https://discord.gg')):
+        return invite_link
+    return ''
+
+
+@logger.catch
+async def enter_tokens_handler(message: Message, state: FSMContext):
+    """"""
+    invite_link: str = _check_invite_link(message.text.strip())
+    if not invite_link:
+        await message.answer(
+            "Ссылка должна быть в формате:"
+            "\nhttps://discord.gg/cf3f9sD9",
+            disable_web_page_preview=True,
+            reply_markup=JoinerMenu.keyboard())
+        return
+    await state.update_data(invite_link=invite_link)
+    await message.answer(
+        "Введите токены списком: ",
+        reply_markup=JoinerMenu.keyboard())
+    await JoinerStates.enter_tokens.set()
 
 
 @logger.catch
 async def add_token_by_invite_link_handler(message: Message, state: FSMContext):
     """"""
-
-    invite_link = message.text.strip()
-    tokens_info: list[namedtuple] = await DBI.get_all_tokens_info(message.from_user.id)
-    token_proxy = tokens_info[0].proxy
-    tokens: list[str] = [elem.token for elem in tokens_info]
+    data = await state.get_data()
+    invite_link = data['invite_link']
+    tokens: list[str] = message.text.strip().split()
+    proxy_addr: namedtuple = await DBI.get_low_used_proxy()
 
     proxy = {
-        "http": f"http://{settings.PROXY_USER}:{settings.PROXY_PASSWORD}@{token_proxy}/",
+        "http": f"http://{settings.PROXY_USER}:{settings.PROXY_PASSWORD}@{proxy_addr.proxy}/",
     }
 
     data = dict(
@@ -74,5 +93,6 @@ def joiner_register_handlers(dp: Dispatcher) -> None:
     Регистратор для функций данного модуля
     """
 
-    dp.register_message_handler(enter_token_handler, Text(equals=[JoinerMenu.add_tokens]))
-    dp.register_message_handler(add_token_by_invite_link_handler, state=JoinerStates.enter_data)
+    dp.register_message_handler(enter_invite_link_handler, Text(equals=[JoinerMenu.add_tokens]))
+    dp.register_message_handler(enter_tokens_handler, state=JoinerStates.enter_link)
+    dp.register_message_handler(add_token_by_invite_link_handler, state=JoinerStates.enter_tokens)
