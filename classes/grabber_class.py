@@ -166,7 +166,7 @@ class TokenGrabber:
             async with session.get(**params) as response:
                 if response.status == 200:
                     return await response.json()
-        self.logger.error(await response.text())
+                self.logger.error(await response.text())
         return {}
 
     async def __get_captcha(self, site_key: str) -> dict:
