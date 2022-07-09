@@ -81,7 +81,8 @@ async def add_token_by_invite_link_handler(message: Message, state: FSMContext):
         f"Итого:"
         f"\nТокенов: {len(tokens)}"
         f"\nДобавлено: {success}"
-        f"\nНе добавлено: {errors}"
+        f"\nНе добавлено: {errors}",
+        reply_markup=JoinerMenu.keyboard()
     )
 
     await state.finish()
