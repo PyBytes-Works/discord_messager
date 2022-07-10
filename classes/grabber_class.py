@@ -1,9 +1,10 @@
 import asyncio
 
 from random import randint, choice
-from typing import Dict
+from typing import Dict, Optional
 
 import aiohttp
+import fake_useragent
 from myloguru.my_loguru import get_logger
 from pydantic import BaseModel, EmailStr
 
@@ -26,6 +27,7 @@ class CaptchaIDError(Exception):
 class RequestError(Exception):
     def __str__(self):
         return "Request error"
+
 
 class TokenGrabber:
     """
@@ -71,16 +73,14 @@ class TokenGrabber:
             log_level: int = 20, proxy: str = '', user_agent: str = '', logger=None,
             max_tries: int = 12
     ):
+        self.session: Optional[aiohttp.ClientSession] = None
         self.user = UserModel(email=email, password=password)
         self.anticaptcha_key: str = anticaptcha_key
         self.web_url: str = web_url
         self.user_agent: str = (
             user_agent
             if user_agent
-            else (
-                "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
-                "(KHTML, like Gecko) Chrome/101.0.4951.41 Safari/537.36"
-            )
+            else fake_useragent.UserAgent(path='./useragent.json', verify_ssl=False)['google chrome']
         )
         self.headers: dict = {}
         self.fingerprint: str
@@ -93,17 +93,18 @@ class TokenGrabber:
         """
         :return: dict: {'token': '...'} if no errors else {''errors}
         """
+        async with aiohttp.ClientSession() as session:
+            self.session: aiohttp.ClientSession = session
+            self._update_headers()
+            await self._update_fingerprint()
+            self.headers.update({'X-Fingerprint': self.fingerprint})
+            try:
+                return await self._get_token_data()
+            except (CaptchaTimeoutError, CaptchaIDError, RequestError) as err:
+                error_text = f'{err}'
+            self.logger.error(error_text)
 
-        self._update_headers()
-        await self._update_fingerprint()
-        self.headers.update({'X-Fingerprint': self.fingerprint})
-        try:
-            return await self._get_token_data()
-        except (CaptchaTimeoutError, CaptchaIDError, RequestError) as err:
-            error_text = f'{err}'
-        self.logger.error(error_text)
-
-        return {'error': error_text}
+            return {'error': error_text}
 
     def _update_headers(self):
         self.logger.debug("Getting headers...")
@@ -122,7 +123,7 @@ class TokenGrabber:
                 'url': "https://discord.com/api/v9/experiments",
                 'headers': self.headers
             }
-        response: dict = await self._send_get_request(params)
+        response: dict = await self._send_request(params)
         self.fingerprint = response.get("fingerprint")
         if not self.fingerprint:
             self.logger.exception(f'Getting fingerprint... FAIL')
@@ -173,7 +174,7 @@ class TokenGrabber:
             headers=self.headers,
             json=data,
         )
-        response: dict = await self._send_post_request(params=params)
+        response: dict = await self._send_request(params=params, method='post')
         if response:
             self.logger.success("Authenticating...OK")
         else:
@@ -181,35 +182,18 @@ class TokenGrabber:
 
         return response
 
-    async def _send_post_request(self, params: dict) -> dict:
+    async def _send_request(self, params: dict, method: str = 'get') -> dict:
         if self.proxy:
             params.update(proxy=self.proxy)
         params.update(ssl=False)
-        async with aiohttp.ClientSession() as session:
-            async with session.post(**params) as response:
-                try:
-                    return await response.json()
-                except Exception as err:
-                    self.logger.exception(err)
-                    response_text: str = await response.text()
-                    self.logger.debug(response_text)
-                    raise RequestError
-
-            return {}
-
-    async def _send_get_request(self, params: dict) -> dict:
-        if self.proxy:
-            params.update(proxy=self.proxy)
-        params.update(ssl=False)
-        async with aiohttp.ClientSession() as session:
-            async with session.get(**params) as response:
-                try:
-                    return await response.json()
-                except Exception as err:
-                    self.logger.exception(err)
-                    response_text: str = await response.text()
-                    self.logger.debug(response_text)
-                    raise RequestError
+        async with self.session.request(method=method, **params) as response:
+            try:
+                return await response.json()
+            except Exception as err:
+                self.logger.exception(err)
+                response_text: str = await response.text()
+                self.logger.debug(response_text)
+                raise RequestError
 
         return {}
 
@@ -221,7 +205,7 @@ class TokenGrabber:
             f"&sitekey={site_key}"
             f"&pageurl=https://discord.com/login&json=1"
         )
-        response_id: dict = await self._send_get_request(params=dict(url=url))
+        response_id: dict = await self._send_request(params=dict(url=url))
         id: str = response_id.get("request", '')
         if not id:
             raise CaptchaIDError
@@ -234,7 +218,7 @@ class TokenGrabber:
         self.logger.debug(f"Pause {self.pause} seconds")
         await asyncio.sleep(self.pause)
         for index, _ in enumerate(range(self.max_tries), start=1):
-            response_token: dict = await self._send_get_request(params=dict(url=url))
+            response_token: dict = await self._send_request(params=dict(url=url))
             self.logger.debug(f"Try №{index}/{self.max_tries}: {response_token}")
             status: int = response_token.get('status')
             token: str = response_token.get('request')

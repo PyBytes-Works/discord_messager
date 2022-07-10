@@ -44,4 +44,3 @@ storage = MemoryStorage()
 dp = Dispatcher(bot, storage=storage)
 
 SEMAPHORE = asyncio.Semaphore(settings.SEMAPHORE_MAX_TASKS)
-user_agent = fake_useragent.UserAgent(path='./useragent.json', verify_ssl=False)['google chrome']
