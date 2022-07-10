@@ -53,6 +53,7 @@ async def validate_login_password_handler(message: Message, state: FSMContext):
     email, password = user_data
     proxy = {
         "http": f"http://{settings.PROXY_USER}:{settings.PROXY_PASSWORD}@{settings.DEFAULT_PROXY}/",
+        "https": f"http://{settings.PROXY_USER}:{settings.PROXY_PASSWORD}@{settings.DEFAULT_PROXY}/"
     }
     data = dict(
         email=email, password=password, anticaptcha_key=grabber_settings.ANTICAPTCHA_KEY,
