@@ -60,7 +60,7 @@ async def on_startup(_) -> None:
         text += "\nDebug: True"
     else:
         redis_text = await _check_redis()
-    proxy_text = await _check_proxies()
+        proxy_text = await _check_proxies()
     text += f"\n\n{redis_text}\n\n{proxy_text}"
 
     await ErrorsReporter.send_report_to_admins(text=text)

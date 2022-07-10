@@ -49,7 +49,6 @@ class StartMenu(BaseMenu):
             KeyboardButton(cls.grabber),
             KeyboardButton(cls.joiner),
             # KeyboardButton(cls.modifer),
-            KeyboardButton(cls.cancel_key),
         )
 
 
