@@ -50,7 +50,6 @@ async def _check_proxies() -> str:
 async def on_startup(_) -> None:
     """Функция выполняющаяся при старте бота."""
 
-    redis_text = proxy_text = ''
     text: str = (
         f"{__appname__} started:"
         f"\nBuild:[{__build__}]"
@@ -58,10 +57,10 @@ async def on_startup(_) -> None:
     )
     if settings.DEBUG:
         text += "\nDebug: True"
-    else:
+    if settings.STAGE != 'local':
         redis_text = await _check_redis()
         proxy_text = await _check_proxies()
-    text += f"\n\n{redis_text}\n\n{proxy_text}"
+        text += f"\n{redis_text}\n{proxy_text}"
 
     await ErrorsReporter.send_report_to_admins(text=text)
     logger.success(

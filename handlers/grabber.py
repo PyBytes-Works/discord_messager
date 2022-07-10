@@ -13,10 +13,6 @@ from pydantic import BaseModel, EmailStr, BaseSettings
 
 class GrabberSettings(BaseSettings):
     ANTICAPTCHA_KEY: str = ''
-    WEB_URL: str = ''
-    EMAIL: EmailStr = ''
-    PASSWORD: str = ''
-    DEBUG: bool = False
     MAX_CAPTCHA_TRIES: int = 12
 
 
