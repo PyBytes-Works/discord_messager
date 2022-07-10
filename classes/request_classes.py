@@ -172,7 +172,7 @@ class ProxyChecker(GetRequest):
 
     def __init__(self):
         super().__init__()
-        self.url: str = 'https://www.google.com'
+        self.url: str = "https://ifconfig.me/all.json"
 
     @logger.catch
     async def _check_proxy(self, proxy: str) -> int:
@@ -201,10 +201,26 @@ class ProxyChecker(GetRequest):
         """Проверяет все прокси в БД, возвращает словарь со статусами"""
 
         logger.info("Proxies check begin...")
-        return {
-            proxy: await self._check_proxy(proxy=proxy)
-            for proxy in await DBI.get_all_proxies()
-        }
+
+        self.timeout = 5
+        proxies: list[str] = await DBI.get_all_proxies()
+        result = {}
+        for proxy in proxies:
+            logger.debug(f"Checking proxy: {proxy} ...")
+            self.proxy = proxy
+            answer: dict = await self._send_request()
+            status: int = answer.get("status")
+            if status != 200:
+                logger.debug(f"Checking proxy: {proxy}: FAIL")
+                continue
+            answer_data = answer.get("answer_data", {})
+            ip_addr: str = answer_data.get("ip_addr", '')
+            if ip_addr == proxy.split(':')[0]:
+                result.update({
+                    proxy: status
+                })
+                logger.debug(f"Checking proxy: {proxy}: OK")
+        return result
 
 
 class TokenChecker(GetRequest):

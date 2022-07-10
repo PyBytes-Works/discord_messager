@@ -39,9 +39,9 @@ async def _check_redis() -> str:
 
 async def _check_proxies() -> str:
     proxies: dict = await ProxyChecker().check_all_proxies()
+    logger.debug(proxies.items())
     proxies: str = '\n'.join(proxies)
     proxy_text = f"Proxies checked:\n{proxies}\n"
-    logger.success(proxy_text)
 
     return proxy_text
 
