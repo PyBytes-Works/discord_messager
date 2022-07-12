@@ -8,6 +8,9 @@ psycopg2==2.9.3
 pydantic==1.9.1
 python-dotenv==0.19.2
 
+pytest==7.1.2
+pytest-aio==1.4.1
+
 myloguru-deskent==0.0.12
-discord-grabber-deskent==1.0.7
-discord-joiner-deskent==1.0.2
+discord-grabber-deskent==1.0.9
+discord-joiner-deskent==1.0.3
