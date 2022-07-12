@@ -4,6 +4,7 @@ from typing import Optional
 import aiogram.utils.exceptions
 from json import JSONDecodeError
 
+from classes.db_interface import DBI
 from classes.token_datastorage import TokenData
 from config import logger, admins_list, bot
 
@@ -201,9 +202,11 @@ class ErrorsReporter:
         try:
             await bot.send_message(**params)
         except aiogram.utils.exceptions.ChatNotFound:
-            logger.error(f"Chat {telegram_id} not found")
+            logger.error(f"Chat {telegram_id} not found. Deleting from DB.")
+            await DBI.delete_user_by_telegram_id(telegram_id)
         except aiogram.utils.exceptions.BotBlocked as err:
-            logger.error(f"Пользователь {telegram_id} заблокировал бота {err}")
+            logger.error(f"User {telegram_id} blocked me: {err}. Deleting from DB.")
+            await DBI.delete_user_by_telegram_id(telegram_id)
         except aiogram.utils.exceptions.CantInitiateConversation as err:
             logger.error(f"Не смог отправить сообщение пользователю {telegram_id}. {err}")
         except Exception as err:

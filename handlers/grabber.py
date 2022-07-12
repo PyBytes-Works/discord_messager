@@ -5,6 +5,8 @@ from aiogram.types import Message
 from aiogram.dispatcher import FSMContext
 
 from discord_grabber import TokenGrabber
+
+from classes.errors_reporter import ErrorsReporter
 from config import logger, Dispatcher, settings, user_agent
 from classes.keyboards_classes import GrabberMenu, BaseMenu
 from states import GrabberStates
@@ -68,8 +70,11 @@ async def validate_login_password_handler(message: Message, state: FSMContext):
 
     token: str = token_data.get("token")
     text = f"Token:\n{token}"
-    if not token:
-        text = f"Error: {token_data.get('error')}"
+    error_text = token_data.get('error')
+    if error_text == 'Anticaptcha API key error':
+        await ErrorsReporter.send_report_to_admins(error_text)
+    elif not token:
+        text = f"Error: {error_text}"
     await message.answer(text, reply_markup=GrabberMenu.keyboard())
 
     await state.finish()
