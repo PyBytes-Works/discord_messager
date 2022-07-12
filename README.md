@@ -4,7 +4,7 @@ Production:
 Develop:
 <img src="https://github.com/Deskent/discord_mailer/workflows/discord_mailer/badge.svg?branch=develop"><br>
 
-Authors: Deskent & vovk-wan
+Authors: Deskent & Vovk-wan
 
 
 
