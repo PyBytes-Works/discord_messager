@@ -112,7 +112,7 @@ class GetRequest(RequestSender):
         super().__init__()
 
     async def _send(self) -> dict:
-        conn = aiohttp.TCPConnector(verify_ssl=False)
+        conn = aiohttp.TCPConnector(ssl=False)
         async with aiohttp.ClientSession(trust_env=self.trust_env, connector=conn) as session:
             if self.token:
                 session.headers['authorization']: str = self.token
@@ -133,7 +133,7 @@ class PostRequest(RequestSender):
     async def _send(self) -> dict:
         """Отправляет данные в дискорд канал"""
 
-        conn = aiohttp.TCPConnector(verify_ssl=False)
+        conn = aiohttp.TCPConnector(ssl=False)
         async with aiohttp.ClientSession(trust_env=self.trust_env, connector=conn) as session:
             if self.token:
                 session.headers['authorization']: str = self.token
@@ -197,21 +197,24 @@ class ProxyChecker(GetRequest):
         return await self.get_checked_proxy(telegram_id=telegram_id)
 
     @logger.catch
-    async def check_all_proxies(self) -> dict[str: int]:
+    async def update_tested_proxies(self) -> dict[str: int]:
         """Проверяет все прокси в БД, возвращает словарь со статусами"""
 
         logger.info("Proxies check begin...")
-
         self.timeout = 5
-        proxies: list[str] = await DBI.get_all_proxies()
+        db_proxies: list[str] = await DBI.get_all_proxies()
+        proxies = db_proxies[:]
+        proxies.extend(settings.PROXIES)
         result = {}
-        for proxy in proxies:
+        for proxy in set(proxies):
             logger.debug(f"Checking proxy: {proxy} ...")
             self.proxy = proxy
             answer: dict = await self._send_request()
             status: int = answer.get("status")
             if status != 200:
-                logger.debug(f"Checking proxy: {proxy}: FAIL")
+                logger.warning(f"Checking proxy: {proxy}: FAIL")
+                # await DBI.delete_proxy(proxy)
+                logger.warning("Proxy should deleted from DB.")
                 continue
             answer_data = answer.get("answer_data", {})
             ip_addr: str = answer_data.get("ip_addr", '')
@@ -219,7 +222,14 @@ class ProxyChecker(GetRequest):
                 result.update({
                     proxy: status
                 })
+                if proxy not in db_proxies:
+                    await DBI.add_new_proxy(proxy)
+                    logger.info("Proxy added to DB.")
                 logger.debug(f"Checking proxy: {proxy}: OK")
+
+        await DBI.delete_proxy_for_all_users()
+        await DBI.set_new_proxy_for_all_users()
+
         return result
 
 
