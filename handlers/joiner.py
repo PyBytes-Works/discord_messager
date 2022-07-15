@@ -58,10 +58,7 @@ async def add_token_by_invite_link_handler(message: Message, state: FSMContext):
     tokens: list[str] = message.text.strip().split()
     proxy_addr: namedtuple = await DBI.get_low_used_proxy()
 
-    proxy = {
-        "http": f"http://{settings.PROXY_USER}:{settings.PROXY_PASSWORD}@{proxy_addr.proxy}/",
-        "https": f"http://{settings.PROXY_USER}:{settings.PROXY_PASSWORD}@{proxy_addr.proxy}/"
-    }
+    proxy = f"http://{settings.PROXY_USER}:{settings.PROXY_PASSWORD}@{proxy_addr.proxy}/"
 
     data = dict(
         invite_link=invite_link, log_level=settings.LOGGING_LEVEL,
