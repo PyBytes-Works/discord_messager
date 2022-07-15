@@ -1,32 +1,29 @@
 from collections import namedtuple
 
+from aiogram.dispatcher.filters import Text
 from aiogram.types import Message
 from aiogram.dispatcher import FSMContext
 
 from classes.db_interface import DBI
 from classes.errors_reporter import ErrorsReporter
-from config import logger, Dispatcher, admins_list
-from keyboards import user_menu_keyboard, cancel_keyboard
-from states import LogiStates
+from classes.keyboards_classes import BaseMenu, StartMenu, AdminMenu
+from config import logger, Dispatcher
+from decorators.checkers import check_is_admin
+from states import LoginState
 from utils import check_is_int
 
 
+@check_is_admin
 @logger.catch
 async def start_add_new_user_handler(message: Message) -> None:
     """Получает сообщение от админа и добавляет пользователя в БД"""
 
-    telegram_id: str = str(message.from_user.id)
-    user_is_superadmin: bool = telegram_id in admins_list
-    user_is_admin: bool = await DBI.is_admin(telegram_id)
-    if user_is_admin or user_is_superadmin:
-        await message.answer(
-            "Перешлите (forward) мне любое сообщение пользователя, "
-            "которого вы хотите добавить.",
-            reply_markup=cancel_keyboard()
-        )
-        await LogiStates.add_new_user.set()
-    else:
-        logger.info(f"User {telegram_id} try to add user.")
+    await message.answer(
+        "Перешлите (forward) мне любое сообщение пользователя, "
+        "которого вы хотите добавить.",
+        reply_markup=BaseMenu.keyboard()
+    )
+    await LoginState.add_new_user.set()
 
 
 @logger.catch
@@ -40,7 +37,7 @@ async def check_new_user_is_exists_handler(message: Message, state: FSMContext) 
             "Нужно переслать (forward) любое сообщение из телеграма от пользователя, "
             "которого вы хотите добавить. Если не получается - скажите пользователю, "
             "чтоб разрешил пересылку сообшений в своих настройках телеграма.",
-            reply_markup=cancel_keyboard()
+            reply_markup=BaseMenu.keyboard()
         )
         return
 
@@ -48,7 +45,7 @@ async def check_new_user_is_exists_handler(message: Message, state: FSMContext) 
     new_user_nickname: str = message.forward_from.username
     await message.answer(
         f"Выбран пользователь {new_user_telegram_id}: {new_user_nickname}",
-        reply_markup=cancel_keyboard()
+        reply_markup=BaseMenu.keyboard()
     )
     await state.update_data(
         new_user_telegram_id=new_user_telegram_id, new_user_nickname=new_user_nickname
@@ -57,8 +54,8 @@ async def check_new_user_is_exists_handler(message: Message, state: FSMContext) 
         await message.answer("Пользователь существует и будет перезаписан."
                              "\nВсе его токены и каналы будут удалены.")
     text: str = f"Введите количество токенов для пользователя {new_user_nickname}:"
-    await message.answer(text, reply_markup=cancel_keyboard())
-    await LogiStates.add_new_user_max_tokens.set()
+    await message.answer(text, reply_markup=BaseMenu.keyboard())
+    await LoginState.add_new_user_max_tokens.set()
 
 
 @logger.catch
@@ -69,12 +66,12 @@ async def set_max_tokens_for_new_user_handler(message: Message, state: FSMContex
     if not max_tokens:
         await message.answer(
             'Число должно быть целым положительным. Введите еще раз: ',
-            reply_markup=cancel_keyboard()
+            reply_markup=BaseMenu.keyboard()
         )
         return
     await state.update_data(max_tokens=max_tokens)
-    await message.answer('Введите время подписки в ЧАСАХ:: ', reply_markup=cancel_keyboard())
-    await LogiStates.add_new_user_expiration.set()
+    await message.answer('Введите время подписки в ЧАСАХ:: ', reply_markup=BaseMenu.keyboard())
+    await LoginState.add_new_user_expiration.set()
 
 
 @logger.catch
@@ -89,7 +86,7 @@ async def check_expiration_and_add_new_user_handler(message: Message, state: FSM
         await message.answer(
             'Время в часах должно быть целым положительным. '
             '\nВведите еще раз время подписки в ЧАСАХ: ',
-            reply_markup=cancel_keyboard()
+            reply_markup=BaseMenu.keyboard()
         )
         return
     state_data: dict = await state.get_data()
@@ -115,7 +112,7 @@ async def check_expiration_and_add_new_user_handler(message: Message, state: FSM
     )
     if await DBI.get_user_by_telegram_id(telegram_id=new_user_telegram_id):
         await DBI.reactivate_user(**user_data)
-        await message.answer("Пользователь активирован.", reply_markup=user_menu_keyboard())
+        await message.answer("Пользователь активирован.", reply_markup=StartMenu.keyboard())
         await state.finish()
         return
 
@@ -127,7 +124,7 @@ async def check_expiration_and_add_new_user_handler(message: Message, state: FSM
         logger.error(text)
         await state.finish()
         return
-    await message.answer(text, reply_markup=user_menu_keyboard())
+    await message.answer(text, reply_markup=StartMenu.keyboard())
     logger.log(
         "ADMIN",
         f"Admin: {message.from_user.username}: {message.from_user.id} "
@@ -138,7 +135,7 @@ async def check_expiration_and_add_new_user_handler(message: Message, state: FSM
     await ErrorsReporter.send_message_to_user(
         text="Вы добавлены в базу данных.",
         telegram_id=new_user_telegram_id,
-        keyboard=user_menu_keyboard())
+        keyboard=StartMenu.keyboard())
     await state.finish()
 
 
@@ -147,7 +144,7 @@ def login_register_handlers(dp: Dispatcher) -> None:
     """
     Регистратор для функций данного модуля
     """
-    dp.register_message_handler(start_add_new_user_handler, commands=['add_user', 'activate_user'])
-    dp.register_message_handler(check_new_user_is_exists_handler, state=LogiStates.add_new_user)
-    dp.register_message_handler(set_max_tokens_for_new_user_handler, state=LogiStates.add_new_user_max_tokens)
-    dp.register_message_handler(check_expiration_and_add_new_user_handler, state=LogiStates.add_new_user_expiration)
+    dp.register_message_handler(start_add_new_user_handler, Text(equals=[AdminMenu.add_user, AdminMenu.add_user]))
+    dp.register_message_handler(check_new_user_is_exists_handler, state=LoginState.add_new_user)
+    dp.register_message_handler(set_max_tokens_for_new_user_handler, state=LoginState.add_new_user_max_tokens)
+    dp.register_message_handler(check_expiration_and_add_new_user_handler, state=LoginState.add_new_user_expiration)

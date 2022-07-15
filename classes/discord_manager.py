@@ -11,11 +11,11 @@ from classes.message_sender import MessageSender
 from classes.open_ai import OpenAI
 from classes.replies import RepliesManager
 from classes.token_datastorage import TokenData
+from classes.keyboards_classes import MailerMenu, MailerInWorkMenu
 
 from config import logger, SEMAPHORE
 from classes.db_interface import DBI
 from decorators.decorators import check_working, info_logger
-from keyboards import user_menu_keyboard, in_work_keyboard
 from utils import get_current_timestamp
 
 
@@ -54,10 +54,14 @@ class DiscordManager:
         self.channels_list: List[List[namedtuple]] = []
         self.min_cooldown: int = 60
 
+    def del_workers(self):
+        self.__workers = []
+
     @info_logger
     @logger.catch
     async def lets_play(self) -> None:
         """Show must go on
+
         Запускает рабочий цикл бота, проверяет ошибки."""
 
         # TODO сделать команду для отображения работающих в данный момент пользователей
@@ -88,7 +92,7 @@ class DiscordManager:
         if self.reboot:
             await self.message.answer(
                 "Ожидайте перезагрузки сервера.",
-                reply_markup=user_menu_keyboard())
+                reply_markup=MailerMenu.keyboard())
             self.is_working = False
 
     @logger.catch
@@ -152,6 +156,7 @@ class DiscordManager:
 
     @logger.catch
     async def __is_token_deleted(self) -> bool:
+        """Проверяет поле need_to_delete, если True - удаляет токен из БД"""
 
         if self.datastore.need_to_delete:
             token = self.datastore.token
@@ -323,7 +328,7 @@ class DiscordManager:
         text: str = f"Все токены отработали. Следующий старт через {delay} {text}."
         logger.info(f"{self.message.from_user.username}: {self.message.from_user.id}: {text}")
         if not self.silence:
-            await self.message.answer(text, reply_markup=in_work_keyboard())
+            await self.message.answer(text, reply_markup=MailerInWorkMenu.keyboard())
 
     @check_working
     @logger.catch
@@ -353,11 +358,11 @@ class DiscordManager:
             await replier.update_showed(message_id)
             text: str = await self.__get_message_text_from_dict(data)
             result: str = text + f"\nОтвет от ИИ: {ai_reply_text}"
-            await self.message.answer(result, reply_markup=in_work_keyboard())
+            await self.message.answer(result, reply_markup=MailerInWorkMenu.keyboard())
             return
         text: str = f"ИИ не ответил на реплай: [{reply_text}]"
-        logger.warning(text)
-        await self.message.answer(text, reply_markup=in_work_keyboard())
+        logger.log("OPENAI", text)
+        await self.message.answer(text, reply_markup=MailerInWorkMenu.keyboard())
         await self.__send_reply_to_telegram(data, replier)
 
     @logger.catch
@@ -421,12 +426,29 @@ class DiscordManager:
             while len(tokens_list) > 1:
                 first_token: namedtuple = tokens_list.pop()
                 second_token: namedtuple = tokens_list.pop()
+                # FIXME удалить формирование пар в БД после всех фиксов
                 formed_pairs += await DBI.make_tokens_pair(
                     first_token.token_pk, second_token.token_pk)
-                datastores: List['TokenData'] = await self._create_datastore(
-                    data=(first_token, second_token))
+                datastores: List['TokenData'] = await self._create_datastore(first_token, second_token)
                 self._datastores_list.extend(datastores)
                 self.total_tokens_count += 2
+
+    @logger.catch
+    async def _create_datastore(
+            self, first_token: namedtuple, second_token: namedtuple) -> List['TokenData']:
+        """Возвращает список экземпляров TokenData, созданных из данных о токенах."""
+        # FIXME удалить дату и сделать функцию синхронной
+        data = (first_token, second_token)
+
+        first = TokenData(self._telegram_id).update_data(
+            token_data=first_token, mate_id=second_token.token_discord_id)
+        second = TokenData(self._telegram_id).update_data(
+            token_data=second_token, mate_id=first_token.token_discord_id)
+
+        # FIXME возвращать результат
+        result = [first, second]
+        # FIXME удалить функцию __create_datastore
+        return [await self.__create_datastore(data=elem) for elem in data if elem.proxy]
 
     @logger.catch
     async def __check_is_datastores_ready(self) -> None:
@@ -439,17 +461,10 @@ class DiscordManager:
             self.is_working = False
 
     @logger.catch
-    async def _create_datastore(self, data: Tuple[namedtuple, ...]) -> List['TokenData']:
-        """Возвращает список экземпляров TokenData, созданных из данных о токенах."""
-
-        return [await self.__create_datastore(data=elem) for elem in data]
-
-    @logger.catch
     async def __create_datastore(self, data: namedtuple) -> 'TokenData':
         """Возвращает экземпляр TokenData, созданный из данных о токене."""
 
         datastore = TokenData(telegram_id=self._telegram_id)
-        # TODO переписать после апдейта БД, вся информация должна быть уже в дате
         token_data: namedtuple = await DBI.get_info_by_token(token=data.token)
         datastore.update_data(
             token=data.token, token_data=token_data,

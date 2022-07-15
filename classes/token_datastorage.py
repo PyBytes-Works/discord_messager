@@ -30,7 +30,7 @@ class TokenData:
         self.__text_to_send: str = ''
         self.__user_channel_pk: int = 0
         self.__token_name: str = ''
-        self.__token_time_delta = 0
+        self.__token_time_delta: int = 0
         self.__all_tokens_ids: List[str] = []
         self.__last_message_time: float = 0
         self.__end_cooldown_time: float = 0
@@ -43,20 +43,26 @@ class TokenData:
             token: str,
             token_data: namedtuple,
             last_message_time: float = 0,
-            token_pk: int = 0
-    ) -> None:
+            token_pk: int = 0,
+            mate_id: str = ''
+    ) -> 'TokenData':
         self.token: str = token
         self.proxy: str = token_data.proxy
         self.channel: int = token_data.channel_id
         self.guild: int = token_data.guild_id
         self.cooldown: int = token_data.cooldown
-        self.mate_id: str = token_data.mate_discord_id
+        # FIXME УДАЛИТЬ часть после or
+        self.mate_id: str = mate_id or token_data.mate_discord_id
         self.my_discord_id: str = token_data.token_discord_id
         self.user_channel_pk: int = token_data.user_channel_pk
         self.token_name: str = token_data.token_name
-        self.last_message_time: float = last_message_time
-        self.token_pk = token_pk
+        # FIXME УДАЛИТЬ часть после or
+        self.last_message_time: float = last_message_time or token_data.last_message_time.timestamp()
+        # FIXME УДАЛИТЬ часть после or
+        self.token_pk: int = token_pk or token_data.token_pk
         self.update_end_cooldown_time()
+
+        return self
 
     def delete_token(self):
         """Устанавливает флаг для удаления токена"""

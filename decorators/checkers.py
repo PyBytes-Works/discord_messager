@@ -16,9 +16,9 @@ def check_is_super_admin(func: Callable) -> Callable:
         message: Message = args[0]
         telegram_id: str = str(message.from_user.id)
         if await DBI.is_superadmin(telegram_id=telegram_id):
-            logger.debug(f"User {message.from_user.id} is superadmin.")
+            logger.debug(f"User {telegram_id} is superadmin.")
             return await func(*args, **kwargs)
-        logger.debug(f"User {message.from_user.id} is not superadmin.")
+        logger.debug(f"User {telegram_id} is not superadmin.")
 
     return wrapper
 
@@ -33,9 +33,9 @@ def check_is_admin(func: Callable) -> Callable:
         telegram_id: str = str(message.from_user.id)
         user_is_admin: bool = await DBI.is_admin(telegram_id=telegram_id)
         if user_is_admin:
-            logger.debug(f"User {message.from_user.id} is admin.")
+            logger.debug(f"User {telegram_id} is admin.")
             return await func(*args, **kwargs)
-        logger.warning(f"User {message.from_user.id} is not admin.")
+        logger.warning(f"User {telegram_id} is not admin.")
 
     return wrapper
 

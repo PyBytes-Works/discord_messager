@@ -4,6 +4,7 @@ from typing import Optional
 import aiogram.utils.exceptions
 from json import JSONDecodeError
 
+from classes.db_interface import DBI
 from classes.token_datastorage import TokenData
 from config import logger, admins_list, bot
 
@@ -115,6 +116,7 @@ class ErrorsReporter:
                     "\nТокен забанили."
                     f"\nФормирую новые пары."
                 )
+                await self._set_datastore_delete_token()
             elif self._code == 40002:
                 text: str = (
                     "Необходимо подтвердить учетную запись дискорда."
@@ -127,8 +129,6 @@ class ErrorsReporter:
                 )
             else:
                 text: str = f"Ошибка {self._status} Code: {self._code}"
-            await self._set_datastore_delete_token()
-
         elif self._status == 404:
             if self._code == 10003:
                 text: str = "Ошибка отправки сообщения. Неверный канал. (Ошибка 404 - 10003)"
@@ -202,12 +202,16 @@ class ErrorsReporter:
         try:
             await bot.send_message(**params)
         except aiogram.utils.exceptions.ChatNotFound:
-            logger.error(f"Chat {telegram_id} not found")
+            logger.error(f"Chat {telegram_id} not found. Deleting from DB.")
+            await DBI.delete_user_by_telegram_id(telegram_id)
         except aiogram.utils.exceptions.BotBlocked as err:
-            logger.error(f"Пользователь {telegram_id} заблокировал бота {err}")
+            logger.error(f"User {telegram_id} blocked me: {err}. Deleting from DB.")
+            await DBI.delete_user_by_telegram_id(telegram_id)
         except aiogram.utils.exceptions.CantInitiateConversation as err:
             logger.error(f"Не смог отправить сообщение пользователю {telegram_id}. {err}")
-        logger.log("TOKEN", f"Send_message_to_user: {telegram_id}: {text}")
+        except Exception as err:
+            logger.error(f"Не смог отправить сообщение {err}")
+        logger.token(f"Send_message_to_user: {telegram_id}: {text}")
 
     @classmethod
     @logger.catch

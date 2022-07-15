@@ -63,7 +63,7 @@ class OpenAI:
             return ''
 
         if not message:
-            logger.warning("OpenAI: No message sent to OpenAI")
+            logger.log("OPENAI", "OpenAI: No message sent to OpenAI")
             return ''
         self.__message = message.strip()
         data: dict = self.__send_message()

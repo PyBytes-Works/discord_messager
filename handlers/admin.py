@@ -17,19 +17,17 @@ from classes.instances_storage import InstancesStorage
 from classes.vocabulary import Vocabulary
 from config import logger, admins_list
 from handlers.cancel_handler import message_cancel_handler
-from keyboards import (
-    cancel_keyboard, user_menu_keyboard, inactive_users_keyboard, admin_keyboard,
-    superadmin_keyboard
-)
 from states import AdminStates
 from classes.db_interface import DBI
 from classes.errors_reporter import ErrorsReporter
+from classes.keyboards_classes import AdminMenu, SuperAdminMenu, BaseMenu, StartMenu, \
+    inactive_users_keyboard
 from utils import check_is_int
 
 
 @logger.catch
 async def send_message_to_all_users_handler(message: Message) -> None:
-    """Обработчик команд /sendall, /su"""
+    """Обработчик команд /sendall, /sa"""
 
     index: int = 0
     text: str = message.text
@@ -72,7 +70,7 @@ async def request_max_tokens_handler(message: Message) -> None:
         await message.answer(
             'Введите telegram_id пользователя и количество токенов через пробел. '
             '\nПример: "3333333 10"',
-            reply_markup=cancel_keyboard()
+            reply_markup=BaseMenu.keyboard()
         )
         await AdminStates.user_set_max_tokens.set()
 
@@ -87,7 +85,7 @@ async def set_max_tokens_handler(message: Message, state: FSMContext) -> None:
         if await DBI.set_max_tokens(telegram_id=telegram_id, max_tokens=new_tokens_count):
             await message.answer(
                 f'Для пользователя {telegram_id} установили количество токенов {new_tokens_count}',
-                reply_markup=user_menu_keyboard()
+                reply_markup=StartMenu.keyboard()
             )
             logger.log(
                 "ADMIN",
@@ -106,30 +104,35 @@ async def set_max_tokens_handler(message: Message, state: FSMContext) -> None:
             f'Введеные неверные данные.'
             f'Введите telegram_id пользователя и количество токенов через пробел без кавычек'
             '\nПример: "3333333 10"',
-            reply_markup=cancel_keyboard()
+            reply_markup=BaseMenu.keyboard()
         )
         return
 
 
 @logger.catch
 async def request_proxies_handler(message: Message) -> None:
-    """Обработчик команды /add_proxy /delete_proxy, /delete_all_proxy"""
+    """Обработчик команды /add_proxy /delete_proxy, /delete_all_proxy, /show_proxies"""
 
     user_telegram_id: str = str(message.from_user.id)
     user_is_superadmin: bool = user_telegram_id in admins_list
     if user_is_superadmin:
-        await message.answer(
-            'Введите прокси в формате "123.123.123.123:5555" (можно несколько через пробел)',
-            reply_markup=cancel_keyboard()
-        )
         if message.text == '/add_proxy':
             await AdminStates.user_add_proxy.set()
         elif message.text == '/delete_proxy':
             await AdminStates.user_delete_proxy.set()
         elif message.text == '/delete_all_proxy':
             await message.answer(
-                "ТОЧНО удалить все прокси? (yes/No)", reply_markup=cancel_keyboard())
+                "ТОЧНО удалить все прокси? (yes/No)", reply_markup=BaseMenu.keyboard())
             await AdminStates.user_delete_all_proxy.set()
+        elif message.text == "/show_proxies":
+            proxies: list[str] = await DBI.get_all_proxies()
+            proxies: str = '\n'.join(proxies)
+            await message.answer(f"Proxies:\n{proxies}")
+            return
+        await message.answer(
+            'Введите прокси в формате "123.123.123.123:5555" (можно несколько через пробел или списком)',
+            reply_markup=BaseMenu.keyboard()
+        )
 
 
 @logger.catch
@@ -182,7 +185,7 @@ async def request_user_admin_handler(message: Message) -> None:
     if str(message.from_user.id) in admins_list:
         await message.answer(
             f'Введите telegram_id пользователя для назначения его администратором:',
-            reply_markup=cancel_keyboard()
+            reply_markup=BaseMenu.keyboard()
         )
         await AdminStates.name_for_admin.set()
 
@@ -196,7 +199,7 @@ async def set_user_admin_handler(message: Message, state: FSMContext) -> None:
         await DBI.set_user_status_admin(telegram_id=user_telegram_id_for_admin)
         await message.answer(
             f'{user_telegram_id_for_admin} назначен администратором. ',
-            reply_markup=user_menu_keyboard()
+            reply_markup=StartMenu.keyboard()
         )
         await ErrorsReporter.send_message_to_user(
             telegram_id=user_telegram_id_for_admin, text='Вас назначили администратором.')
@@ -224,19 +227,20 @@ async def admin_help_handler(message: Message) -> None:
             "\n/delete_user - удалить пользователя.",
             '\n/activate_user - активировать пользователя'
         ]
-        keyboard = admin_keyboard()
+        keyboard = AdminMenu.keyboard()
         if user_is_superadmin:
             superadmin: list = [
                 "\n/add_admin - команда для назначения пользователя администратором",
                 "\n/sendall 'тут текст сообщения без кавычек' - отправить сообщение всем активным пользователям",
                 "\n/add_proxy - добавить прокси",
                 "\n/delete_proxy - удалить прокси",
+                "\n/show_proxies - показать список проксей",
                 "\n/delete_all_proxy - удалить ВСЕ прокси",
                 "\n/set_max_tokens - изменить кол-во токенов пользователя",
                 "\n/reboot - предупредить о перезагрузке, остановить работу всех ботов",
             ]
             commands.extend(superadmin)
-            keyboard = superadmin_keyboard()
+            keyboard = SuperAdminMenu.keyboard()
         admin_commands: str = "".join(commands)
         await message.answer(f'Список команд администратора: {admin_commands}')
         await message.answer(
@@ -262,7 +266,7 @@ async def request_activate_user_handler(message: Message) -> None:
         else:
             await message.answer(
                 "Нет неактивных пользователей.",
-                reply_markup=user_menu_keyboard()
+                reply_markup=StartMenu.keyboard()
             )
 
 
@@ -317,7 +321,7 @@ async def delete_user_name_handler(message: Message) -> None:
                     text=text, callback_data=f'user_{elem.telegram_id}'))
             await message.answer(
                 f'Выберите пользователя для удаления: {index}/{lenght}', reply_markup=keyboard)
-        await message.answer("Для отмены нажмите кнопку Отмена", reply_markup=cancel_keyboard())
+        await message.answer("Для отмены нажмите кнопку Отмена", reply_markup=BaseMenu.keyboard())
         await AdminStates.name_for_del.set()
 
 
@@ -330,7 +334,7 @@ async def delete_user_handler(callback: CallbackQuery, state: FSMContext) -> Non
         message_text: str = f"Пользователь {telegram_id} удален из БД."
     else:
         message_text: str = f"Пользователь {telegram_id} не найден в БД."
-    await callback.message.answer(message_text, reply_markup=user_menu_keyboard())
+    await callback.message.answer(message_text, reply_markup=StartMenu.keyboard())
     logger.log(
         "ADMIN",
         f"Admin: {callback.from_user.username}: {callback.from_user.id}: "
@@ -369,7 +373,7 @@ def register_admin_handlers(dp: Dispatcher) -> None:
     dp.register_message_handler(request_user_admin_handler, commands=['add_admin'])
     dp.register_message_handler(set_user_admin_handler, state=AdminStates.name_for_admin)
     dp.register_message_handler(request_proxies_handler, commands=['add_proxy', 'delete_proxy',
-                                                                   'delete_all_proxy'])
+                                                                   'delete_all_proxy', 'show_proxies'])
     dp.register_message_handler(add_new_proxy_handler, state=AdminStates.user_add_proxy)
     dp.register_message_handler(delete_proxy_handler, state=AdminStates.user_delete_proxy)
     dp.register_message_handler(delete_all_proxies, state=AdminStates.user_delete_all_proxy)

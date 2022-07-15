@@ -1,10 +1,9 @@
 import asyncio
 
 from classes.message_sender import MessageSender
-from fake_data import proxies
 
 
-async def test_send_messages(datastore):
+async def test_send_messages_to_discord(datastore, proxies):
     tasks_count = len(proxies)
     tasks = []
     for proxy in proxies:

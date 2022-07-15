@@ -1,6 +1,6 @@
 from collections import namedtuple
 from itertools import groupby
-from typing import List, Tuple, Any, Union, Dict
+from typing import List, Tuple, Any, Union, Dict, NamedTuple
 import datetime
 import os
 
@@ -9,8 +9,10 @@ from peewee import (
     JOIN, Case, fn, BigIntegerField
 )
 
-from config import logger, admins_list, db, DB_FILE_NAME, DEFAULT_PROXY
+from config import logger, admins_list, settings
 from utils import get_current_time, get_current_timestamp, get_from_timestamp
+from db_config import db
+import psycopg2
 
 
 class BaseModel(Model):
@@ -49,6 +51,11 @@ class Proxy(BaseModel):
     @logger.catch
     def get_proxy_count(cls) -> int:
         return cls.select().count()
+
+    @classmethod
+    @logger.catch
+    def get_all_proxies(cls) -> list[str]:
+        return [elem.proxy for elem in cls.select()]
 
     @classmethod
     @logger.catch
@@ -262,7 +269,6 @@ class User(BaseModel):
         """
         remove all associations of user token pairs and User channels
         """
-        # TODO упростить ????
         return TokenPair.delete().where(
             (TokenPair.first_id.in_(
                 Token.select(Token.id)
@@ -726,7 +732,7 @@ class Token(BaseModel):
       methods:
           add_token_by_telegram_id
           is_token_exists
-          get_all_user_tokens
+          get_user_tokens_amount
           get_all_info_tokens
           get_number_of_free_slots_for_tokens
           get_min_last_time_token_data
@@ -760,7 +766,7 @@ class Token(BaseModel):
 
     @classmethod
     @logger.catch
-    def get_all_user_tokens(cls: 'Token', telegram_id: str) -> int:
+    def get_user_tokens_amount(cls: 'Token', telegram_id: str) -> int:
         """Returns TOTAL token user amount"""
         return (
             cls.select()
@@ -944,24 +950,14 @@ class Token(BaseModel):
 
     @classmethod
     @logger.catch
-    def get_all_free_tokens(cls, telegram_id: Union[str, int] = None) -> Tuple[
-        List[namedtuple], ...]:
+    def get_all_free_tokens(
+            cls, telegram_id: Union[str, int] = None) -> Tuple[List[namedtuple], ...]:
         """
         Возвращает список всех свободных токенов по каналам
-            token_pk int
-            token str
-            last_message_time datetime
-            cooldown  int
-            channel_id int
-        """
-        # TODO ДОБАВИТЬ в возвращаемый кортеж ВСЮ информацию по токену:
-        """
-        ИТОГО ДОЛЖНО ВЕРНУТЬСЯ:
             'token_pk': int
             'token': str
             'token_name': str
             'token_discord_id': str
-            'mate_discord_id': str (discord_id)
             'guild_id':guild_id(int),
             'user_channel_pk' int
             'channel_id': channel_id(int),
@@ -974,17 +970,21 @@ class Token(BaseModel):
             cls.select(
                 cls.id.alias('token_pk'),
                 cls.token.alias('token'),
-                cls.last_message_time.alias('last_message_time'),
-                UserChannel.cooldown.alias('cooldown'),
+                cls.name.alias('token_name'),
+                cls.discord_id.alias('token_discord_id'),
+                Channel.guild_id.alias('guild_id'),
+                UserChannel.id.alias('user_channel_pk'),
                 Channel.channel_id.alias('channel_id'),
+                Proxy.proxy.alias('proxy'),
+                UserChannel.cooldown.alias('cooldown'),
+                cls.last_message_time.alias('last_message_time'),
             )
-                .join_from(cls, UserChannel, JOIN.LEFT_OUTER, on=(
+                .join(UserChannel, JOIN.LEFT_OUTER, on=(
                     cls.user_channel == UserChannel.id))
-                .join_from(cls, Channel, JOIN.LEFT_OUTER, on=(UserChannel.channel == Channel.id))
-                .join_from(cls, User, JOIN.LEFT_OUTER, on=(UserChannel.user == User.id))
-                .join_from(cls, TokenPair, JOIN.LEFT_OUTER, on=(TokenPair.first_id == cls.id))
-                .where(User.telegram_id == telegram_id)
-                .where(TokenPair.first_id.is_null(True)).namedtuples().execute()
+                .join(Channel, JOIN.LEFT_OUTER, on=(UserChannel.channel == Channel.id))
+                .join(User, JOIN.LEFT_OUTER, on=(UserChannel.user == User.id))
+                .join(Proxy, JOIN.LEFT_OUTER, on=(Proxy.id == User.proxy))
+                .where(User.telegram_id == telegram_id).namedtuples().execute()
         )
         result: Tuple[List[int], ...] = tuple(
             [token for token in tokens]
@@ -1092,34 +1092,6 @@ class Token(BaseModel):
                 )
 
         return data
-
-    # @classmethod
-    # @logger.catch
-    # def get_closest_token_time(cls: 'Token', telegram_id: str) -> namedtuple:
-    #     """
-    #     Вернуть info по токен
-    #     возвращает объект токен
-    #         'cooldown': cooldown(int, seconds)}
-    #         'last_message_time' int
-    #     """
-    #     data = (
-    #         cls.select(
-    #             UserChannel.cooldown.alias('cooldown'),
-    #             cls.last_message_time.alias('last_message_time'),
-    #         )
-    #             .join(UserChannel, JOIN.LEFT_OUTER, on=(cls.user_channel == UserChannel.id))
-    #             .join(Channel, JOIN.LEFT_OUTER, on=(UserChannel.channel == Channel.id))
-    #             .join(User, JOIN.LEFT_OUTER, on=(UserChannel.user == User.id))
-    #             .join(TokenPair, JOIN.LEFT_OUTER, on=(TokenPair.first_id == cls.id))
-    #             .join(Proxy, JOIN.LEFT_OUTER, on=(Proxy.id == User.proxy))
-    #             .join(cls.alias('pair'), JOIN.LEFT_OUTER,
-    #             on=(cls.alias('pair').id == TokenPair.second_id))
-    #             .where(User.telegram_id == telegram_id)
-    #             .order_by(cls.last_message_time).namedtuples().first()
-    #     )
-
-        # return data if data else namedtuple(
-        #     'Row', ['cooldown', 'last_message_time'])(cooldown=None, last_message_time=None)
 
     @classmethod
     @logger.catch
@@ -1299,13 +1271,11 @@ if __name__ == '__main__':
     #         (UserTokenDiscord.add_token_by_telegram_id(user_id, f'{user_id}token{number}'))
     #         for user_id in ('test1', 'test3', 'test5') for number in range(1, 4)
     #     ]
-    if recreate:
-        recreate_db(DB_FILE_NAME)
 
     if add_admins:
         for idx, admin_id in enumerate(admins_list, start=1):
             t_nick_name = f"Admin_{idx}"
-            User.add_new_user(nick_name=t_nick_name, telegram_id=admin_id, proxy=DEFAULT_PROXY)
+            User.add_new_user(nick_name=t_nick_name, telegram_id=admin_id, proxy=settings.DEFAULT_PROXY)
 
             User.set_user_status_admin(telegram_id=admin_id)
             User.activate_user(admin_id)
@@ -1315,3 +1285,11 @@ if __name__ == '__main__':
         t_telegram_id = ''
         t_max_tokens = 0
         User.set_max_tokens(telegram_id=t_telegram_id, max_tokens=t_max_tokens)
+
+    import json
+
+    answer = Token.get_all_free_tokens(979660649)
+
+    for token in answer:
+        print(len(token))
+

@@ -1,23 +1,15 @@
 import aiohttp
 import pytest
-
-from fake_data import proxies
-from config import PROXY_USER, PROXY_PASSWORD
+from tests.conftest import PROXIES, PROXY_USER, PROXY_PASSWORD, PROXY_TEST_URL
 
 
-@pytest.mark.parametrize("sent, received", [(sent, received[:-6]) for sent, received in zip(proxies, proxies)])
+@pytest.mark.server
+@pytest.mark.parametrize("sent, received", [(sent, received)
+                                            for sent, received in zip(PROXIES, PROXIES)])
 async def test_all_proxies(sent, received):
     async with aiohttp.ClientSession() as session:
-        url = 'http://superpomerashki.xyz/scripts/my_ip'
+        url = PROXY_TEST_URL
         proxy = f"http://{PROXY_USER}:{PROXY_PASSWORD}@{sent}/"
-        async with session.get(url=url, proxy=proxy) as response:
-            assert await response.text() == received
-#
-#
-# @pytest.mark.parametrize("sent, received", [("185.240.120.61:45785", "185.240.120.61")])
-# async def test_one_proxy(sent, received):
-#     async with aiohttp.ClientSession() as session:
-#         url = 'http://superpomerashki.xyz/scripts/my_ip'
-#         proxy = f"http://{PROXY_USER}:{PROXY_PASSWORD}@{sent}/"
-#         async with session.get(url=url, proxy=proxy) as response:
-#             assert await response.text() == received
+        async with session.get(url=url, proxy=proxy, timeout=5) as response:
+            data = await response.json()
+            assert data['ip_addr'] == str(received).split(':')[0]
