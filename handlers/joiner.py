@@ -59,6 +59,7 @@ async def add_token_by_invite_link_handler(message: Message, state: FSMContext):
 
     proxy = {
         "http": f"http://{settings.PROXY_USER}:{settings.PROXY_PASSWORD}@{proxy_addr.proxy}/",
+        "https": f"http://{settings.PROXY_USER}:{settings.PROXY_PASSWORD}@{proxy_addr.proxy}/"
     }
 
     data = dict(
