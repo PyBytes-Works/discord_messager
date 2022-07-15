@@ -44,7 +44,8 @@ async def enter_tokens_handler(message: Message, state: FSMContext):
         return
     await state.update_data(invite_link=invite_link)
     await message.answer(
-        "Введите токены списком: ",
+        "Введите токены через пробел:"
+        "\nНапример: Токен1 Токен2 Токен3",
         reply_markup=JoinerMenu.keyboard())
     await JoinerStates.enter_tokens.set()
 

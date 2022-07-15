@@ -46,7 +46,7 @@ class StartMenu(BaseMenu):
 
         return default_keyboard().add(
             KeyboardButton(cls.mailer),
-            KeyboardButton(cls.grabber),
+            # KeyboardButton(cls.grabber),
             KeyboardButton(cls.joiner),
             # KeyboardButton(cls.modifer),
         )
