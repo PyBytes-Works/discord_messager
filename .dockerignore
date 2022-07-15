@@ -7,5 +7,4 @@ README.md
 /logs
 /redis
 /venv
-/tests
-docker-compose.yml
+docker-compose_examples.yml

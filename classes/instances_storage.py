@@ -1,8 +1,8 @@
 from aiogram.types import Message
 
 from classes.discord_manager import DiscordManager
+from classes.keyboards_classes import MailerInWorkMenu
 from config import logger
-from keyboards import in_work_keyboard
 
 
 class InstancesStorage:
@@ -51,7 +51,7 @@ class InstancesStorage:
                 text: str = "Тихий режим вЫключен."
             else:
                 user_class.silence = True
-            await message.answer(text, reply_markup=in_work_keyboard())
+            await message.answer(text, reply_markup=MailerInWorkMenu.keyboard())
 
     @classmethod
     @logger.catch
@@ -65,7 +65,7 @@ class InstancesStorage:
                 user_class.auto_answer = False
             else:
                 user_class.auto_answer = True
-            await message.answer(text, reply_markup=in_work_keyboard())
+            await message.answer(text, reply_markup=MailerInWorkMenu.keyboard())
 
     @classmethod
     @logger.catch

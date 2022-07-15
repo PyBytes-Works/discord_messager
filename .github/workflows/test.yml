@@ -1,5 +1,6 @@
 name: discord_mailer_test
 env:
+  GIT_USER: 'deskent'
   DOCKER_USER: "deskent"
   DOCKER_REPOSITORY_NAME: "deskent"
   PROJECT_NAME: "discord_mailer"
@@ -38,6 +39,12 @@ jobs:
           key: ${{ secrets.SSH_KEY_PROD }}
           script: |
             cd "/home/${{ secrets.USERNAME }}/deploy/${{ env.PROJECT_NAME }}/${{ env.STAGE }}"
+            git clone git@github.com:${{ env.GIT_USER }}/${{ env.PROJECT_NAME }}.git
+            cd ${{ env.PROJECT_NAME }}
+            docker run python:3.10-alpine pip install pytest && python -s -v -m pytest --disable-warnings tests/
+            cd ..
+            rm -rf ${{ env.PROJECT_NAME }}
+            docker pull ${{ env.DOCKER_USER }}/${{ env.DOCKER_REPOSITORY_NAME }}:${{ env.PROJECT_NAME}}-${{ env.COUNT }}
             docker-compose -f docker-compose-${{ env.PROJECT_NAME}}-${{ env.STAGE }}.yml down
             docker rmi ${{ env.DOCKER_USER }}/${{ env.DOCKER_REPOSITORY_NAME }}:${{ env.PROJECT_NAME}}-${{ env.COUNT }}
             docker-compose -f docker-compose-${{ env.PROJECT_NAME}}-${{ env.STAGE }}.yml up -d --build

@@ -5,11 +5,11 @@ RUN apt-get update && \
 
 WORKDIR /app
 
-ADD requirements.txt .
+COPY requirements.txt .
 
 RUN python3 -m pip install --no-cache-dir --upgrade pip && \
     python3 -m pip install --no-cache-dir --upgrade -r requirements.txt
 
-ADD . .
+COPY . .
 
 CMD ["python", "main.py"]

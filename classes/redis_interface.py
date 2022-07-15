@@ -3,7 +3,8 @@ import json
 import aioredis
 from typing import List
 
-from config import logger, REDIS_CLIENT
+from config import logger
+from db_config import REDIS_CLIENT
 
 
 class RedisDB:
@@ -15,6 +16,7 @@ class RedisDB:
         self.data: list = []
         self.timeout_sec: int = 300
 
+    @logger.catch()
     async def _send_request_do_redis_db(
             self, key: str, mate_id: str = '', data: list = None) -> list:
         """Запрашивает или записывает данные в редис, возвращает список если запрашивали"""
@@ -80,3 +82,16 @@ class RedisDB:
         """Удаляет данные из Редис для себя и напарника"""
 
         return await self._send_request_do_redis_db(key="del", mate_id=mate_id)
+
+    @logger.catch
+    async def health_check(self) -> bool:
+        """Проверяет работу Редис"""
+
+        logger.info("Redis checking...")
+
+        check_data = ['test']
+        await self.save(check_data, 60)
+        result = await self.load()
+        return check_data == result
+
+

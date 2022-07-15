@@ -201,8 +201,9 @@ class DBI:
 
     @classmethod
     @logger.catch
-    async def get_all_user_tokens(cls, telegram_id: str) -> int:
-        return Token.get_all_user_tokens(telegram_id=telegram_id)
+    async def get_user_tokens_amount(cls, telegram_id: str) -> int:
+        """Returns TOTAL token user amount"""
+        return Token.get_user_tokens_amount(telegram_id=telegram_id)
 
     @classmethod
     @logger.catch
@@ -313,6 +314,11 @@ class DBI:
 
     @classmethod
     @logger.catch
+    async def get_all_proxies(cls) -> list[str]:
+        return Proxy.get_all_proxies()
+
+    @classmethod
+    @logger.catch
     async def delete_all_proxy(cls) -> bool:
         return Proxy.delete_all_proxy()
 
@@ -332,6 +338,12 @@ class DBI:
     @classmethod
     @logger.catch
     async def get_low_used_proxy(cls) -> namedtuple:
+        """        Возвращает первую прокси с самым малым использованием
+        return:
+        namedtuple fields:
+            proxy_pk: int
+            proxy: str
+        """
         return Proxy.get_low_used_proxy()
 
     @classmethod
