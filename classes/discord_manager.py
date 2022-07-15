@@ -448,7 +448,7 @@ class DiscordManager:
         # FIXME возвращать результат
         result = [first, second]
         # FIXME удалить функцию __create_datastore
-        return [await self.__create_datastore(data=elem) for elem in data]
+        return [await self.__create_datastore(data=elem) for elem in data if elem.proxy]
 
     @logger.catch
     async def __check_is_datastores_ready(self) -> None:

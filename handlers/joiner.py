@@ -1,4 +1,5 @@
 """Модуль с обработчиками команд Grabber`a"""
+import asyncio
 from collections import namedtuple
 
 from aiogram.dispatcher.filters import Text
@@ -65,12 +66,17 @@ async def add_token_by_invite_link_handler(message: Message, state: FSMContext):
         user_agent=user_agent, proxy=proxy
     )
     success = errors = 0
+    tasks = []
     for token in tokens:
         await message.answer(f"Добавляю токен:\n{token}")
         data["token"] = token
-        result: dict = await DiscordJoiner(**data).join()
+        joiner = DiscordJoiner(**data)
+        tasks.append(asyncio.create_task(joiner.join()))
+
+    responses = await asyncio.gather(*tasks)
+    for result in responses:
         if result['success']:
-            text = f"Токен {token} добавлен."
+            text = f"Токен {result['token']} добавлен."
             success += 1
         else:
             text = f'Токен НЕ добавлен: {result["message"]}'

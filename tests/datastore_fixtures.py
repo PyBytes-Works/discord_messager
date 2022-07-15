@@ -1,5 +1,6 @@
 from classes.token_datastorage import TokenData
-from conftest import *
+
+from tests.conftest import *
 
 
 @pytest.fixture
