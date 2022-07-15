@@ -1,6 +1,6 @@
 import aiohttp
 import pytest
-from conftest import PROXIES, PROXY_USER, PROXY_PASSWORD, PROXY_TEST_URL
+from tests.conftest import PROXIES, PROXY_USER, PROXY_PASSWORD, PROXY_TEST_URL
 
 
 @pytest.mark.server

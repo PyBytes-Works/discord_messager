@@ -12,6 +12,31 @@ from classes.token_datastorage import TokenData
 
 
 class RequestSender(ABC):
+    """
+    ABC class for requests
+
+    Attributes
+
+        proxy: str = ''
+
+        token: str = ''
+
+        url: str = url
+
+        telegram_id: str = ''
+
+        datastore: Optional['TokenData'] = None
+
+        trust_env: bool = False
+
+        timeout: int = 30
+
+        request_delay: int = 3
+
+    Methods
+
+        _send_request
+    """
 
     def __init__(self, url: str = ''):
         self.proxy: str = ''
@@ -49,21 +74,32 @@ class RequestSender(ABC):
             )
 
     async def _send_request(self) -> dict:
-        self.proxy_data: str = f"http://{settings.PROXY_USER}:{settings.PROXY_PASSWORD}@{self.proxy}/"
+
         answer: dict = {
             "status": 0,
             "answer_data": ''
         }
         self._params: dict = {
             'url': self.url,
-            "proxy": self.proxy_data,
             "ssl": False,
             "timeout": self.timeout,
         }
-
+        if self.proxy:
+            self.proxy_data: str = f"http://{settings.PROXY_USER}:{settings.PROXY_PASSWORD}@{self.proxy}/"
+            self._params.update(proxy=self.proxy_data)
+        session_params: dict = {
+            "trust_env": True,
+            "connector": aiohttp.TCPConnector(),
+        }
+        if self.token:
+            session_params.update({
+                'headers': {
+                    'authorization': self.token
+                }
+            })
         try:
-            await asyncio.sleep(self.request_delay)
-            answer: dict = await self._send()
+            async with aiohttp.ClientSession(**session_params) as session:
+                answer: dict = await self._send(session)
         except aiohttp.http_exceptions.BadHttpMessage as err:
             logger.error(f"aiohttp.http_exceptions.BadHttpMessage: {err}")
             answer.update(status=407)
@@ -108,19 +144,12 @@ class RequestSender(ABC):
 class GetRequest(RequestSender):
     """Класс для отправки GET запросов"""
 
-    def __init__(self):
-        super().__init__()
-
-    async def _send(self) -> dict:
-        conn = aiohttp.TCPConnector(ssl=False)
-        async with aiohttp.ClientSession(trust_env=self.trust_env, connector=conn) as session:
-            if self.token:
-                session.headers['authorization']: str = self.token
-            async with session.get(**self._params) as response:
-                return {
-                    "status": response.status,
-                    "answer_data": await response.text()
-                }
+    async def _send(self, session) -> dict:
+        async with session.get(**self._params) as response:
+            return {
+                "status": response.status,
+                "answer_data": await response.text()
+            }
 
 
 class PostRequest(RequestSender):
@@ -130,19 +159,13 @@ class PostRequest(RequestSender):
         super().__init__()
         self._data_for_send: dict = {}
 
-    async def _send(self) -> dict:
-        """Отправляет данные в дискорд канал"""
-
-        conn = aiohttp.TCPConnector(ssl=False)
-        async with aiohttp.ClientSession(trust_env=self.trust_env, connector=conn) as session:
-            if self.token:
-                session.headers['authorization']: str = self.token
-            self._params.update(json=self._data_for_send)
-            async with session.post(**self._params) as response:
-                return {
-                    "status": response.status,
-                    "answer_data": await response.text()
-                }
+    async def _send(self, session) -> dict:
+        self._params.update(json=self._data_for_send)
+        async with session.post(**self._params) as response:
+            return {
+                "status": response.status,
+                "answer_data": await response.text()
+            }
 
 
 class GetMe(GetRequest):
