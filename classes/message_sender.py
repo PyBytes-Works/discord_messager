@@ -1,3 +1,6 @@
+import asyncio
+import random
+
 from classes.request_classes import PostRequest, DISCORD_BASE_URL
 from config import logger
 from classes.token_datastorage import TokenData
@@ -32,9 +35,11 @@ class MessageSender(PostRequest):
             text += f"\treply to message id: [{self.datastore.current_message_id}]"
         logger.info(text)
 
-        await self._typing()
         if self.datastore.need_to_delete:
             return {}
+
+        await self._typing()
+        await asyncio.sleep(random.randint(4, 8))
 
         return await self.__send_data()
 
