@@ -24,7 +24,7 @@ class Settings(BaseSettings):
     DEFAULT_PROXY: str = ''
     BASE_API_URL: str = ''
     PROXY_TEST_URL: str = ''
-    ADMINS: list[str] = ["305353027"]
+    ADMINS: list[str] = []
     PROXIES: list[str] = None
     SEMAPHORE_MAX_TASKS: int = 10
     DEBUG: bool = False
@@ -38,7 +38,7 @@ if not os.path.exists('./logs'):
 logger = get_mailer_logger(level=settings.LOGGING_LEVEL)
 
 # set admins list
-admins_list = settings.ADMINS
+admins_list = settings.ADMINS[:]
 
 # configure bot
 bot = Bot(token=settings.TELEBOT_TOKEN)

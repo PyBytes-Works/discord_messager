@@ -145,7 +145,7 @@ class AdminMenu(BaseMenu):
 
     @classmethod
     @logger.catch
-    def keyboard(cls) -> 'ReplyKeyboardMarkup':
+    def _keyboard(cls) -> 'ReplyKeyboardMarkup':
         """Возвращает кнопочки меню для канала из списка"""
 
         return default_keyboard().add(
@@ -153,6 +153,14 @@ class AdminMenu(BaseMenu):
             KeyboardButton(cls.show_users),
             KeyboardButton(cls.delete_user),
             KeyboardButton(cls.activate_user),
+        )
+
+    @classmethod
+    @logger.catch
+    def keyboard(cls) -> 'ReplyKeyboardMarkup':
+        """Возвращает кнопочки меню для канала из списка"""
+
+        return cls._keyboard().add(
             KeyboardButton(cls.cancel_key),
         )
 
@@ -169,7 +177,7 @@ class AdminMenu(BaseMenu):
 
 
 @dataclass(frozen=True)
-class SuperAdminMenu(AdminMenu):
+class SuperAdminMenu(BaseMenu):
     """Админское меню"""
 
     add_proxy: str = 'Добавить прокси'
@@ -182,11 +190,12 @@ class SuperAdminMenu(AdminMenu):
     def keyboard(cls) -> 'ReplyKeyboardMarkup':
         """Возвращает кнопочки меню для канала из списка"""
 
-        return default_keyboard().add(
+        return AdminMenu._keyboard().add(
             KeyboardButton(cls.add_proxy),
             KeyboardButton(cls.delete_proxy),
             KeyboardButton(cls.show_proxies),
             KeyboardButton(cls.set_max_tokens),
+            KeyboardButton(cls.cancel_key)
         )
 
 
