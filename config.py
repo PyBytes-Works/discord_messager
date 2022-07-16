@@ -24,7 +24,7 @@ class Settings(BaseSettings):
     DEFAULT_PROXY: str = ''
     BASE_API_URL: str = ''
     PROXY_TEST_URL: str = ''
-    ADMINS: list[str] = ["305353027"]
+    ADMINS: list[str] = []
     PROXIES: list[str] = None
     SEMAPHORE_MAX_TASKS: int = 10
     DEBUG: bool = False
