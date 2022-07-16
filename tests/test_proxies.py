@@ -3,7 +3,7 @@ import pytest
 from tests.conftest import PROXIES, PROXY_USER, PROXY_PASSWORD, PROXY_TEST_URL
 
 
-@pytest.mark.server
+@pytest.mark.local
 @pytest.mark.parametrize("sent, received", [(sent, received)
                                             for sent, received in zip(PROXIES, PROXIES)])
 async def test_all_proxies(sent, received):

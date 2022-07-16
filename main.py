@@ -54,6 +54,7 @@ async def on_startup(_) -> None:
         f"{__appname__} started:"
         f"\nBuild: [{__build__}]"
         f"\nVersion: [{__version__}]"
+        f"\n1.3"
     )
     if settings.DEBUG:
         text += "\nDebug: True"

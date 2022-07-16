@@ -1,7 +1,10 @@
 import aiohttp
+import pytest
 from discord_grabber import TokenGrabber
 
 
+@pytest.mark.local
+@pytest.mark.server
 async def test_bad_api_key():
     anticaptcha_key = 'bad key'
     email = "aaa@google.com"
@@ -11,6 +14,8 @@ async def test_bad_api_key():
     assert token_data == {'error': 'Anticaptcha API key error'}
 
 
+@pytest.mark.local
+@pytest.mark.server
 async def test_good_api_key(anticaptcha_key):
     email = "aaa@google.com"
     password = "123"

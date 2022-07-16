@@ -9,7 +9,7 @@ env:
   COUNT: "4.12-develop"
 on:
   push:
-    branches: [ test ]
+    branches: [ test1 ]
 jobs:
   create_docker_build:
     runs-on: ubuntu-latest
