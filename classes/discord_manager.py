@@ -426,29 +426,30 @@ class DiscordManager:
             while len(tokens_list) > 1:
                 first_token: namedtuple = tokens_list.pop()
                 second_token: namedtuple = tokens_list.pop()
-                # FIXME удалить формирование пар в БД после всех фиксов
-                formed_pairs += await DBI.make_tokens_pair(
-                    first_token.token_pk, second_token.token_pk)
-                datastores: List['TokenData'] = await self._create_datastore(first_token, second_token)
+                # # FIXME удалить формирование пар в БД после всех фиксов
+                # formed_pairs += await DBI.make_tokens_pair(
+                #     first_token.token_pk, second_token.token_pk)
+                datastores: List['TokenData'] = self._create_datastore(first_token, second_token)
                 self._datastores_list.extend(datastores)
                 self.total_tokens_count += 2
+                formed_pairs += 1
+        logger.token(f"Formed pairs: {formed_pairs}")
 
     @logger.catch
-    async def _create_datastore(
+    def _create_datastore(
             self, first_token: namedtuple, second_token: namedtuple) -> List['TokenData']:
         """Возвращает список экземпляров TokenData, созданных из данных о токенах."""
-        # FIXME удалить дату и сделать функцию синхронной
-        data = (first_token, second_token)
+        # # FIXME удалить дату и сделать функцию синхронной
+        # data = (first_token, second_token)
 
         first = TokenData(self._telegram_id).update_data(
             token_data=first_token, mate_id=second_token.token_discord_id)
         second = TokenData(self._telegram_id).update_data(
             token_data=second_token, mate_id=first_token.token_discord_id)
 
-        # FIXME возвращать результат
-        result = [first, second]
+        return [first, second]
         # FIXME удалить функцию __create_datastore
-        return [await self.__create_datastore(data=elem) for elem in data if elem.proxy]
+        # return [await self.__create_datastore(data=elem) for elem in data if elem.proxy]
 
     @logger.catch
     async def __check_is_datastores_ready(self) -> None:

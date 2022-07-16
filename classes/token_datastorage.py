@@ -40,26 +40,20 @@ class TokenData:
     @logger.catch
     def update_data(
             self,
-            token: str,
             token_data: namedtuple,
-            last_message_time: float = 0,
-            token_pk: int = 0,
-            mate_id: str = ''
+            mate_id: str
     ) -> 'TokenData':
-        self.token: str = token
+        self.token: str = token_data.token
         self.proxy: str = token_data.proxy
         self.channel: int = token_data.channel_id
         self.guild: int = token_data.guild_id
         self.cooldown: int = token_data.cooldown
-        # FIXME УДАЛИТЬ часть после or
-        self.mate_id: str = mate_id or token_data.mate_discord_id
+        self.mate_id: str = mate_id
         self.my_discord_id: str = token_data.token_discord_id
         self.user_channel_pk: int = token_data.user_channel_pk
         self.token_name: str = token_data.token_name
-        # FIXME УДАЛИТЬ часть после or
-        self.last_message_time: float = last_message_time or token_data.last_message_time.timestamp()
-        # FIXME УДАЛИТЬ часть после or
-        self.token_pk: int = token_pk or token_data.token_pk
+        self.last_message_time: float = token_data.last_message_time.timestamp()
+        self.token_pk: int = token_data.token_pk
         self.update_end_cooldown_time()
 
         return self
