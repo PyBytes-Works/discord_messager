@@ -1,7 +1,7 @@
 version: '3.9'
 
 services:
-  redis_mailer:
+  redis:
     container_name: redis_mailer
     image: redis:alpine
     volumes:
@@ -10,10 +10,10 @@ services:
       - ./redis/data:/data
     ports:
       - "6379:6379"
-  discord_mailer:
+  app:
     build: .
-    container_name: discord_mailer-${VERSION}
-    image: discord_mailer:${VERSION}
+    container_name: ${APPNAME}-${VERSION}
+    image: ${APPNAME}:${VERSION}
     environment:
       REDIS_DB: redis://redis_mailer:6379/0
     env_file:
