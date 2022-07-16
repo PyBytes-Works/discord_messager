@@ -404,11 +404,11 @@ class DiscordManager:
 
         self.__workers = []
         await DBI.delete_all_pairs(telegram_id=self._telegram_id)
-        await self.__form_new_tokens_pairs()
+        await self._form_new_tokens_pairs()
         await self.__check_is_datastores_ready()
 
     @logger.catch
-    async def __form_new_tokens_pairs(self) -> None:
+    async def _form_new_tokens_pairs(self) -> None:
         """Формирует пары токенов из свободных"""
 
         free_tokens: Tuple[
