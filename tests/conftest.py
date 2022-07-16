@@ -41,8 +41,3 @@ def proxy() -> str:
 @pytest.fixture
 def anticaptcha_key() -> str:
     return ANTICAPTCHA_KEY
-
-
-@pytest.fixture
-def get_request_class():
-    return GetRequest

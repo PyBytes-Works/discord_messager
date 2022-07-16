@@ -27,11 +27,11 @@ main_register_handlers(dp=dp)
 
 async def _check_redis() -> str:
     user = 'test'
-    redis_text = "Redis check...OK"
+    redis_text = "Redis check... OK"
     if await RedisDB(redis_key=user).health_check():
         logger.success(redis_text)
     else:
-        redis_text = "Redis check...FAIL"
+        redis_text = "Redis check... FAIL"
         logger.warning(redis_text)
 
     return redis_text
@@ -52,8 +52,8 @@ async def on_startup(_) -> None:
 
     text: str = (
         f"{__appname__} started:"
-        f"\nBuild:[{__build__}]"
-        f"\nVersionL[{__version__}]"
+        f"\nBuild: [{__build__}]"
+        f"\nVersion: [{__version__}]"
     )
     if settings.DEBUG:
         text += "\nDebug: True"
@@ -72,7 +72,8 @@ async def on_startup(_) -> None:
 async def on_shutdown(dp) -> None:
     """Действия при отключении бота."""
     try:
-        await ErrorsReporter.send_report_to_admins(text=f"STOPPING: {__appname__} {__version__}")
+        await ErrorsReporter.send_report_to_admins(
+            f"STOPPING: {__appname__} {__version__} {__build__}")
     except Exception:
         pass
     logger.warning("BOT shutting down.")

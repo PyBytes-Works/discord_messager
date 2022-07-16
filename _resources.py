@@ -1,4 +1,4 @@
-__build__ = '4.12.58'
+__build__ = '4.12.59'
 __version__ = '5.0.2'
 __author__ = 'Deskent & Vovk'
 __appname__ = "Discord mailer"
