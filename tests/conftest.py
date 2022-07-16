@@ -8,7 +8,9 @@ except:
     pass
 
 
-pytest_plugins = ['datastore_fixtures', ]
+pytest_plugins = [
+    'tests.datastore.datastore_fixtures',
+]
 
 
 PROXY_USER: str = os.getenv('PROXY_USER')
@@ -36,6 +38,16 @@ def token() -> str:
 @pytest.fixture
 def proxy() -> str:
     return DEFAULT_PROXY
+
+
+@pytest.fixture
+def admin() -> str:
+    return ADMINS[0]
+
+
+@pytest.fixture
+def channel() -> int:
+    return CHANNEL
 
 
 @pytest.fixture

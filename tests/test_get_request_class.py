@@ -1,3 +1,4 @@
+import pytest
 from classes.request_classes import GetRequest
 
 
