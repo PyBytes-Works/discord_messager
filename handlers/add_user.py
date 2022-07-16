@@ -20,7 +20,7 @@ async def start_add_new_user_handler(message: Message) -> None:
 
     await message.answer(
         "Перешлите (forward) мне любое сообщение пользователя, "
-        "которого вы хотите добавить.",
+        "которого вы хотите добавить или активировать.",
         reply_markup=BaseMenu.keyboard()
     )
     await LoginState.add_new_user.set()
@@ -125,8 +125,7 @@ async def check_expiration_and_add_new_user_handler(message: Message, state: FSM
         await state.finish()
         return
     await message.answer(text, reply_markup=StartMenu.keyboard())
-    logger.log(
-        "ADMIN",
+    logger.admin(
         f"Admin: {message.from_user.username}: {message.from_user.id} "
         f"добавил пользователя {new_user_nickname}: {new_user_telegram_id}"
         f"\tТокенов: [{max_tokens}]"
@@ -144,7 +143,8 @@ def login_register_handlers(dp: Dispatcher) -> None:
     """
     Регистратор для функций данного модуля
     """
-    dp.register_message_handler(start_add_new_user_handler, Text(equals=[AdminMenu.add_user, AdminMenu.add_user]))
+    dp.register_message_handler(start_add_new_user_handler, Text(
+        equals=[AdminMenu.add_user, AdminMenu.activate_user, '/add_user', '/activate_user']))
     dp.register_message_handler(check_new_user_is_exists_handler, state=LoginState.add_new_user)
     dp.register_message_handler(set_max_tokens_for_new_user_handler, state=LoginState.add_new_user_max_tokens)
     dp.register_message_handler(check_expiration_and_add_new_user_handler, state=LoginState.add_new_user_expiration)
