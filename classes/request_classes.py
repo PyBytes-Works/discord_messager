@@ -171,7 +171,7 @@ class PostRequest(RequestSender):
 class GetMe(GetRequest):
     """Класс для получения дискорд_ид по токену"""
 
-    async def get_discord_id(self, token: str, proxy: str) -> str:
+    async def get_discord_id(self, token: str, proxy: str = '') -> str:
         self.proxy = proxy
         self.token = token
         self.url: str = f'https://discord.com/api/v9/users/@me'

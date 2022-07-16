@@ -1,4 +1,5 @@
 import asyncio
+import pytest
 
 from classes.message_sender import MessageSender
 
