@@ -20,8 +20,7 @@ from handlers.cancel_handler import message_cancel_handler
 from states import AdminStates
 from classes.db_interface import DBI
 from classes.errors_reporter import ErrorsReporter
-from classes.keyboards_classes import AdminMenu, SuperAdminMenu, BaseMenu, StartMenu, \
-    inactive_users_keyboard
+from classes.keyboards_classes import AdminMenu, SuperAdminMenu, BaseMenu, StartMenu
 from utils import check_is_int
 
 
@@ -87,8 +86,7 @@ async def set_max_tokens_handler(message: Message, state: FSMContext) -> None:
                 f'Для пользователя {telegram_id} установили количество токенов {new_tokens_count}',
                 reply_markup=StartMenu.keyboard()
             )
-            logger.log(
-                "ADMIN",
+            logger.admin(
                 f"Admin: {message.from_user.username}: {message.from_user.id}: "
                 f"установил пользователю {telegram_id} количество токенов: {new_tokens_count}")
         else:
@@ -143,8 +141,7 @@ async def add_new_proxy_handler(message: Message) -> None:
     for proxy in proxies:
         await DBI.add_new_proxy(proxy=proxy)
         await message.answer(f"Добавлена прокси: {proxy}")
-        logger.log(
-            "ADMIN",
+        logger.admin(
             f"Admin: {message.from_user.username}: {message.from_user.id}: "
             f"добавил прокси {proxy}")
 
@@ -203,8 +200,7 @@ async def set_user_admin_handler(message: Message, state: FSMContext) -> None:
         )
         await ErrorsReporter.send_message_to_user(
             telegram_id=user_telegram_id_for_admin, text='Вас назначили администратором.')
-        logger.log(
-            "ADMIN",
+        logger.admin(
             f"Admin: {message.from_user.username}: {message.from_user.id}: "
             f"назначил пользователя {user_telegram_id_for_admin} администратором.")
     else:
@@ -252,25 +248,6 @@ async def admin_help_handler(message: Message) -> None:
 
 
 @logger.catch
-async def request_activate_user_handler(message: Message) -> None:
-    """Обработчик команды /activate_user"""
-
-    user_telegram_id: str = str(message.from_user.id)
-    user_is_admin: bool = await DBI.is_admin(telegram_id=user_telegram_id)
-    user_is_superadmin: bool = user_telegram_id in admins_list
-    if user_is_admin or user_is_superadmin:
-        users: dict = await DBI.get_all_inactive_users()
-        if users:
-            await message.answer("Выберите пользователя:", reply_markup=inactive_users_keyboard(users))
-            await AdminStates.user_add_token.set()
-        else:
-            await message.answer(
-                "Нет неактивных пользователей.",
-                reply_markup=StartMenu.keyboard()
-            )
-
-
-@logger.catch
 async def show_all_users_handler(message: Message) -> None:
     """Обработчик команды /show_users. Показывает список всех пользователей"""
 
@@ -311,8 +288,8 @@ async def delete_user_name_handler(message: Message) -> None:
     user_is_superadmin: bool = user_telegram_id in admins_list
     if user_is_admin or user_is_superadmin:
         all_users: 'Tuple[namedtuple]' = await DBI.get_all_users()
-        lenght: int = len(all_users)
-        for index in range(0, lenght, 10):
+        length: int = len(all_users)
+        for index in range(0, length, 10):
             keyboard = InlineKeyboardMarkup(row_width=1)
             users_group: 'Tuple[namedtuple]' = all_users[index: index + 10]
             for elem in users_group:
@@ -320,7 +297,7 @@ async def delete_user_name_handler(message: Message) -> None:
                 keyboard.add(InlineKeyboardButton(
                     text=text, callback_data=f'user_{elem.telegram_id}'))
             await message.answer(
-                f'Выберите пользователя для удаления: {index}/{lenght}', reply_markup=keyboard)
+                f'Выберите пользователя для удаления: {index}/{length}', reply_markup=keyboard)
         await message.answer("Для отмены нажмите кнопку Отмена", reply_markup=BaseMenu.keyboard())
         await AdminStates.name_for_del.set()
 
@@ -335,8 +312,7 @@ async def delete_user_handler(callback: CallbackQuery, state: FSMContext) -> Non
     else:
         message_text: str = f"Пользователь {telegram_id} не найден в БД."
     await callback.message.answer(message_text, reply_markup=StartMenu.keyboard())
-    logger.log(
-        "ADMIN",
+    logger.admin(
         f"Admin: {callback.from_user.username}: {callback.from_user.id}: "
         f"удалил пользователя {telegram_id}.")
     await state.finish()
@@ -374,17 +350,22 @@ def register_admin_handlers(dp: Dispatcher) -> None:
     dp.register_message_handler(set_user_admin_handler, state=AdminStates.name_for_admin)
     dp.register_message_handler(request_proxies_handler, commands=['add_proxy', 'delete_proxy',
                                                                    'delete_all_proxy', 'show_proxies'])
+    dp.register_message_handler(request_proxies_handler, Text(equals=[
+        SuperAdminMenu.add_proxy, SuperAdminMenu.delete_proxy, SuperAdminMenu.show_proxies
+    ]))
     dp.register_message_handler(add_new_proxy_handler, state=AdminStates.user_add_proxy)
     dp.register_message_handler(delete_proxy_handler, state=AdminStates.user_delete_proxy)
     dp.register_message_handler(delete_all_proxies, state=AdminStates.user_delete_all_proxy)
     dp.register_message_handler(delete_user_name_handler, commands=['delete_user'])
+    dp.register_message_handler(delete_user_name_handler, Text(equals=[AdminMenu.delete_user]))
     dp.register_callback_query_handler(delete_user_handler, Text(startswith=[
         'user_']), state=AdminStates.name_for_del)
-    dp.register_message_handler(request_activate_user_handler, commands=['activate_user'])
     dp.register_message_handler(show_all_users_handler, commands=['show_users', 'su'])
+    dp.register_message_handler(show_all_users_handler, Text(equals=[AdminMenu.show_users]))
     dp.register_message_handler(reboot_handler, commands=['reboot'], state="*")
     dp.register_message_handler(admin_help_handler, commands=['admin', 'adm'])
     dp.register_message_handler(request_max_tokens_handler, commands=['set_max_tokens'])
+    dp.register_message_handler(request_max_tokens_handler, Text(equals=[SuperAdminMenu.set_max_tokens]))
     dp.register_message_handler(set_max_tokens_handler, state=AdminStates.user_set_max_tokens)
     dp.register_message_handler(send_message_to_all_users_handler, Text(startswith=["/sendall",
                                                                                     "/sa"]))

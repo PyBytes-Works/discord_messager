@@ -38,7 +38,7 @@ if not os.path.exists('./logs'):
 logger = get_mailer_logger(level=settings.LOGGING_LEVEL)
 
 # set admins list
-admins_list = settings.ADMINS
+admins_list = settings.ADMINS[:]
 
 # configure bot
 bot = Bot(token=settings.TELEBOT_TOKEN)
