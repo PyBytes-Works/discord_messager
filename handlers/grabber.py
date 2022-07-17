@@ -15,6 +15,7 @@ from pydantic import BaseModel, EmailStr, BaseSettings
 
 class GrabberSettings(BaseSettings):
     ANTICAPTCHA_KEY: str = ''
+    TWO_CAPTCHA_KEY: str = ''
     MAX_CAPTCHA_TRIES: int = 12
 
 
@@ -49,18 +50,18 @@ async def validate_login_password_handler(message: Message, state: FSMContext):
         return
     email, password = user_data
     proxy = f"http://{settings.PROXY_USER}:{settings.PROXY_PASSWORD}@{settings.DEFAULT_PROXY}/"
+    proxy_ip, proxy_port = settings.DEFAULT_PROXY.split(':')
     data = dict(
         email=email, password=password, anticaptcha_key=grabber_settings.ANTICAPTCHA_KEY,
         log_level=settings.LOGGING_LEVEL, proxy=proxy, user_agent=user_agent,
-        max_tries=grabber_settings.MAX_CAPTCHA_TRIES
+        max_tries=grabber_settings.MAX_CAPTCHA_TRIES, proxy_ip=proxy_ip, proxy_port=proxy_port,
+        proxy_user=settings.PROXY_USER, proxy_password=settings.PROXY_PASSWORD
     )
-    captcha_total_time: int = 10 * grabber_settings.MAX_CAPTCHA_TRIES
     try:
         logger.debug(data)
         await message.answer(
             "Получаю данные, ожидайте ответа..."
-            f"\nВ случае необходимости прохождения капчи "
-            f"время ожидания составит до {captcha_total_time} секунд..."
+            f"\nВ случае необходимости прохождения капчи это займет время..."
         )
         token_data: dict = await TokenGrabber(**data).get_token()
     except pydantic.error_wrappers.ValidationError as err:

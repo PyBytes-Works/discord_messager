@@ -53,3 +53,13 @@ def channel() -> int:
 @pytest.fixture
 def anticaptcha_key() -> str:
     return ANTICAPTCHA_KEY
+
+
+@pytest.fixture
+def proxy_data() -> dict:
+    return dict(
+        proxy_ip=DEFAULT_PROXY.split(':')[0],
+        proxy_port=DEFAULT_PROXY.split(':')[1],
+        proxy_user=PROXY_USER,
+        proxy_password=PROXY_PASSWORD
+    )
