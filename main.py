@@ -57,7 +57,7 @@ async def on_startup(_) -> None:
     )
     if settings.DEBUG:
         text += "\nDebug: True"
-    if settings.STAGE != 'local1':
+    if settings.STAGE != 'local':
         redis_text = await _check_redis()
         proxy_text = await _check_proxies()
         text += f"\n\n{redis_text}\n\n{proxy_text}"
