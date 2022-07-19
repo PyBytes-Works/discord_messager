@@ -7,8 +7,6 @@ services:
       - ./redis/etc/redis.conf:/usr/local/etc/redis/redis.conf
       - ./redis/etc/sysctl.conf:/usr/local/etc/redis/sysctl.conf
       - ./redis/data:/data
-    ports:
-      - "6379:6379"
   app:
     build: .
     container_name: ${APPNAME}-${VERSION}
@@ -20,3 +18,5 @@ services:
     volumes:
       - ./db:/app/db
       - ./logs:/app/logs
+    depends_on:
+      - redis
