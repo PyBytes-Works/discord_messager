@@ -11,10 +11,27 @@ from config import logger, Dispatcher, settings, user_agent
 from classes.keyboards_classes import GrabberMenu, BaseMenu
 from states import GrabberStates
 from pydantic import BaseModel, EmailStr, BaseSettings
+# from selenium import webdriver
+# from selenium.webdriver.common.desired_capabilities import DesiredCapabilities
+#
+#
+# options = webdriver.ChromeOptions()
+# # options.add_experimental_option('excludeSwitches', ['enable-automation'])
+# options.add_argument("--headless")
+# options.add_argument('--disable-gpu')
+# # options.add_argument('--lang=en')
+# # options.add_argument("--disable-blink-features=AutomationControlled")
+# # options.add_argument('--log-level 3')
+# # options.add_argument('--disable-logging')
+# options.add_argument('--no-sandbox')
+# options.add_argument('--window-size=1920,1080')
+# options.add_argument('--disable-dev-shm-usage')
+# browser = webdriver.Remote("http://selenium:4444/wd/hub", DesiredCapabilities.CHROME, options=options)
 
 
 class GrabberSettings(BaseSettings):
     ANTICAPTCHA_KEY: str = ''
+    TWO_CAPTCHA_KEY: str = ''
     MAX_CAPTCHA_TRIES: int = 12
 
 
@@ -49,18 +66,18 @@ async def validate_login_password_handler(message: Message, state: FSMContext):
         return
     email, password = user_data
     proxy = f"http://{settings.PROXY_USER}:{settings.PROXY_PASSWORD}@{settings.DEFAULT_PROXY}/"
+    proxy_ip, proxy_port = settings.DEFAULT_PROXY.split(':')
     data = dict(
         email=email, password=password, anticaptcha_key=grabber_settings.ANTICAPTCHA_KEY,
         log_level=settings.LOGGING_LEVEL, proxy=proxy, user_agent=user_agent,
-        max_tries=grabber_settings.MAX_CAPTCHA_TRIES
+        max_tries=grabber_settings.MAX_CAPTCHA_TRIES, proxy_ip=proxy_ip, proxy_port=proxy_port,
+        proxy_user=settings.PROXY_USER, proxy_password=settings.PROXY_PASSWORD,
     )
-    captcha_total_time: int = 10 * grabber_settings.MAX_CAPTCHA_TRIES
     try:
         logger.debug(data)
         await message.answer(
             "Получаю данные, ожидайте ответа..."
-            f"\nВ случае необходимости прохождения капчи "
-            f"время ожидания составит до {captcha_total_time} секунд..."
+            f"\nВ случае необходимости прохождения капчи это займет время..."
         )
         token_data: dict = await TokenGrabber(**data).get_token()
     except pydantic.error_wrappers.ValidationError as err:

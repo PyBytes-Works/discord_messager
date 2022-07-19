@@ -8,7 +8,9 @@ except:
     pass
 
 
-pytest_plugins = ['datastore_fixtures', ]
+pytest_plugins = [
+    'tests.datastore.datastore_fixtures',
+]
 
 
 PROXY_USER: str = os.getenv('PROXY_USER')
@@ -39,5 +41,25 @@ def proxy() -> str:
 
 
 @pytest.fixture
+def admin() -> str:
+    return ADMINS[0]
+
+
+@pytest.fixture
+def channel() -> int:
+    return CHANNEL
+
+
+@pytest.fixture
 def anticaptcha_key() -> str:
     return ANTICAPTCHA_KEY
+
+
+@pytest.fixture
+def proxy_data() -> dict:
+    return dict(
+        proxy_ip=DEFAULT_PROXY.split(':')[0],
+        proxy_port=DEFAULT_PROXY.split(':')[1],
+        proxy_user=PROXY_USER,
+        proxy_password=PROXY_PASSWORD
+    )
