@@ -2,22 +2,21 @@ version: '3.9'
 
 services:
   redis:
-    container_name: redis-${APPNAME}-${VERSION}
     image: redis:alpine
     volumes:
       - ./redis/etc/redis.conf:/usr/local/etc/redis/redis.conf
       - ./redis/etc/sysctl.conf:/usr/local/etc/redis/sysctl.conf
       - ./redis/data:/data
-    ports:
-      - "6379:6379"
   app:
     build: .
     container_name: ${APPNAME}-${VERSION}
     image: ${APPNAME}:${VERSION}
     environment:
-      REDIS_DB: redis://redis-${APPNAME}-${VERSION}:6379/0
+      REDIS_DB: redis://redis:6379/0
     env_file:
       - ./.env
     volumes:
       - ./db:/app/db
       - ./logs:/app/logs
+    depends_on:
+      - redis
