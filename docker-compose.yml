@@ -21,3 +21,5 @@ services:
     volumes:
       - ./db:/app/db
       - ./logs:/app/logs
+    depends_on:
+      - redis
