@@ -2,6 +2,7 @@ version: '3.9'
 
 services:
   redis:
+    container_name: redis-${APPNAME}-${VERSION}
     image: redis:alpine
     volumes:
       - ./redis/etc/redis.conf:/usr/local/etc/redis/redis.conf
