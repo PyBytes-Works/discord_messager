@@ -2,6 +2,7 @@ version: '3.9'
 
 services:
   redis:
+    container_name: redis-${APPNAME}-${VERSION}
     image: redis:alpine
     volumes:
       - ./redis/etc/redis.conf:/usr/local/etc/redis/redis.conf
@@ -14,7 +15,7 @@ services:
     container_name: ${APPNAME}-${VERSION}
     image: ${APPNAME}:${VERSION}
     environment:
-      REDIS_DB: redis://redis_mailer:6379/0
+      REDIS_DB: redis://redis-${APPNAME}-${VERSION}:6379/0
     env_file:
       - ./.env
     volumes:
