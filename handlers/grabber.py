@@ -5,28 +5,13 @@ from aiogram.types import Message
 from aiogram.dispatcher import FSMContext
 
 from discord_grabber import TokenGrabber
+from discord_grabber.exceptions import CaptchaAPIkeyError
 
 from classes.errors_reporter import ErrorsReporter
 from config import logger, Dispatcher, settings, user_agent
 from classes.keyboards_classes import GrabberMenu, BaseMenu
 from states import GrabberStates
 from pydantic import BaseModel, EmailStr, BaseSettings
-# from selenium import webdriver
-# from selenium.webdriver.common.desired_capabilities import DesiredCapabilities
-#
-#
-# options = webdriver.ChromeOptions()
-# # options.add_experimental_option('excludeSwitches', ['enable-automation'])
-# options.add_argument("--headless")
-# options.add_argument('--disable-gpu')
-# # options.add_argument('--lang=en')
-# # options.add_argument("--disable-blink-features=AutomationControlled")
-# # options.add_argument('--log-level 3')
-# # options.add_argument('--disable-logging')
-# options.add_argument('--no-sandbox')
-# options.add_argument('--window-size=1920,1080')
-# options.add_argument('--disable-dev-shm-usage')
-# browser = webdriver.Remote("http://selenium:4444/wd/hub", DesiredCapabilities.CHROME, options=options)
 
 
 class GrabberSettings(BaseSettings):
@@ -82,13 +67,13 @@ async def validate_login_password_handler(message: Message, state: FSMContext):
         token_data: dict = await TokenGrabber(**data).get_token()
     except pydantic.error_wrappers.ValidationError as err:
         logger.error(err)
-        await message.answer(error_message, reply_markup=GrabberMenu.keyboard())
+        await message.answer(f'Validation error: {err}', reply_markup=GrabberMenu.keyboard())
         return
 
     token: str = token_data.get("token")
     text = f"Token:\n{token}"
     error_text = token_data.get('error')
-    if error_text == 'Anticaptcha API key error':
+    if error_text == CaptchaAPIkeyError().text:
         await ErrorsReporter.send_report_to_admins(error_text)
     elif not token:
         text = f"Error: {error_text}"
