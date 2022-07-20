@@ -56,9 +56,9 @@ async def add_token_by_invite_link_handler(message: Message, state: FSMContext):
     data = await state.get_data()
     invite_link = data['invite_link']
     tokens: list[str] = message.text.strip().split()
-    proxy_addr: namedtuple = await DBI.get_low_used_proxy()
+    proxy_addr: str = await DBI.get_user_proxy(telegram_id=message.from_user.id)
 
-    proxy = f"http://{settings.PROXY_USER}:{settings.PROXY_PASSWORD}@{proxy_addr.proxy}/"
+    proxy = f"http://{settings.PROXY_USER}:{settings.PROXY_PASSWORD}@{proxy_addr}/"
 
     data = dict(
         invite_link=invite_link, log_level=settings.LOGGING_LEVEL,
