@@ -11,4 +11,4 @@ python-dotenv==0.19.2
 
 myloguru-deskent==0.0.12
 discord-grabber-deskent==1.2.3
-discord-joiner-deskent==1.0.7
+discord-joiner-deskent==1.0.5
