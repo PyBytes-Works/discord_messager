@@ -58,7 +58,10 @@ async def add_token_by_invite_link_handler(message: Message, state: FSMContext):
     tokens: list[str] = message.text.strip().split()
     proxy_addr: str = await DBI.get_user_proxy(telegram_id=message.from_user.id)
 
-    proxy = f"http://{settings.PROXY_USER}:{settings.PROXY_PASSWORD}@{proxy_addr}/"
+    proxy = {
+        'http': f"http://{settings.PROXY_USER}:{settings.PROXY_PASSWORD}@{proxy_addr}/",
+        'https': f"http://{settings.PROXY_USER}:{settings.PROXY_PASSWORD}@{proxy_addr}/",
+    }
 
     data = dict(
         invite_link=invite_link, log_level=settings.LOGGING_LEVEL,
@@ -66,8 +69,9 @@ async def add_token_by_invite_link_handler(message: Message, state: FSMContext):
     )
     success = errors = 0
     tasks = []
+    await message.answer(f"Добавляю токены: {len(tokens)} штук.")
     for token in tokens:
-        await message.answer(f"Добавляю токен:\n{token}")
+
         data["token"] = token
         joiner = DiscordJoiner(**data)
         tasks.append(asyncio.create_task(joiner.join()))
@@ -78,7 +82,7 @@ async def add_token_by_invite_link_handler(message: Message, state: FSMContext):
             text = f"Токен {result['token']} добавлен."
             success += 1
         else:
-            text = f'Токен НЕ добавлен: {result["message"]}'
+            text = f'Токен {result["token"]} НЕ добавлен: {result["message"]}'
             errors += 1
         await message.answer(text)
 
