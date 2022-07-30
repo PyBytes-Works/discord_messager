@@ -237,7 +237,7 @@ class ProxyChecker(GetRequest):
             if status != 200:
                 logger.warning(f"Checking proxy: {proxy}: FAIL")
                 # await DBI.delete_proxy(proxy)
-                logger.warning("Proxy should deleted from DB.")
+                logger.warning("Proxy should be deleted from DB.")
                 continue
             answer_data = answer.get("answer_data", {})
             ip_addr: str = answer_data.get("ip_addr", '')

@@ -69,7 +69,9 @@ async def ask_token_for_selected_channel_handler(callback: CallbackQuery, state:
     :param state:
     :return:
     """
-    await state.update_data(user_channel_pk=callback.data)
+
+    user_channel_pk: int = check_is_int(callback.data)
+    await state.update_data(user_channel_pk=user_channel_pk)
     link: str = "https://teletype.in/@ted_crypto/Txzfz8Vuwd2"
     await callback.message.answer(
         "\nЧтобы узнать свой токен - перейдите по ссылке: "
