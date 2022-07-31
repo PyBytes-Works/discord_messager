@@ -1,4 +1,6 @@
 """Модуль с обработчиками команд Grabber`a"""
+import asyncio
+
 import pydantic
 from aiogram.dispatcher.filters import Text
 from aiogram.types import Message
@@ -40,44 +42,54 @@ async def login_password_handler(message: Message):
 
 
 @logger.catch
-async def validate_login_password_handler(message: Message, state: FSMContext):
+async def enter_accounts_data_handler(message: Message, state: FSMContext):
     """"""
-    error_message = ("Вы ввели неверные данные."
-                     "\nВведите email пользователя и пароль через `:`"
-                     "\nНапример: user@google.com:password")
-    user_data = message.text.strip().split(':')
-    if len(user_data) != 2:
-        await message.answer(error_message, reply_markup=GrabberMenu.keyboard())
-        return
-    email, password = user_data
+
+    accounts: list[str, ...] = message.text.strip().split()
     proxy = f"http://{settings.PROXY_USER}:{settings.PROXY_PASSWORD}@{settings.DEFAULT_PROXY}/"
+    proxy = ''
     proxy_ip, proxy_port = settings.DEFAULT_PROXY.split(':')
     data = dict(
-        email=email, password=password, anticaptcha_key=grabber_settings.ANTICAPTCHA_KEY,
+        anticaptcha_key=grabber_settings.ANTICAPTCHA_KEY,
         log_level=settings.LOGGING_LEVEL, proxy=proxy, user_agent=user_agent,
         max_tries=grabber_settings.MAX_CAPTCHA_TRIES, proxy_ip=proxy_ip, proxy_port=proxy_port,
-        proxy_user=settings.PROXY_USER, proxy_password=settings.PROXY_PASSWORD,
+        proxy_user=settings.PROXY_USER, proxy_password=settings.PROXY_PASSWORD, verbose=1
     )
-    try:
-        logger.debug(data)
-        await message.answer(
-            "Получаю данные, ожидайте ответа..."
-            f"\nВ случае необходимости прохождения капчи это займет время..."
-        )
-        token_data: dict = await TokenGrabber(**data).get_token()
-    except pydantic.error_wrappers.ValidationError as err:
-        logger.error(err)
-        await message.answer(f'Validation error: {err}', reply_markup=GrabberMenu.keyboard())
-        return
+    tasks = []
+    for account in accounts:
+        user_data: list[str, str] = account.strip().split(':')
+        if len(user_data) != 2:
+            error_message = ("Вы ввели неверные данные."
+                             "\nВведите email пользователя и пароль через `:`"
+                             "\nНапример: user@google.com:password")
+            await message.answer(error_message, reply_markup=GrabberMenu.keyboard())
+            continue
+        email, password = user_data
+        data.update(email=email, password=password)
+        try:
+            grabber = TokenGrabber(**data)
+            tasks.append(asyncio.create_task(grabber.get_token()))
+        except pydantic.error_wrappers.ValidationError as err:
+            logger.error(err)
+            await message.answer(f'Validation error: {err}', reply_markup=GrabberMenu.keyboard())
 
-    token: str = token_data.get("token")
-    text = f"Token:\n{token}"
-    error_text = token_data.get('error')
-    if error_text == CaptchaAPIkeyError().text:
-        await ErrorsReporter.send_report_to_admins(error_text)
-    elif not token:
-        text = f"Error: {error_text}"
-    await message.answer(text, reply_markup=GrabberMenu.keyboard())
+    await message.answer(
+        "Получаю данные, ожидайте ответа..."
+        f"\nВ случае необходимости прохождения капчи или подтверждения по почте это займет время..."
+    )
+    responses: tuple = await asyncio.gather(*tasks)
+    for token_data in responses:
+        email: str = token_data.get('email')
+        text = f"Email: {email}"
+        token: str = token_data.get("token")
+        if token:
+            text += f'\nToken:\n{token}'
+        else:
+            error_text = token_data.get('error')
+            if error_text == CaptchaAPIkeyError().text:
+                await ErrorsReporter.send_report_to_admins(error_text)
+            text += f"\nError: {error_text}"
+        await message.answer(text, reply_markup=GrabberMenu.keyboard())
 
     await state.finish()
 
@@ -89,4 +101,4 @@ def grabber_register_handlers(dp: Dispatcher) -> None:
     """
 
     dp.register_message_handler(login_password_handler, Text(equals=[GrabberMenu.get_token]))
-    dp.register_message_handler(validate_login_password_handler, state=GrabberStates.enter_data)
+    dp.register_message_handler(enter_accounts_data_handler, state=GrabberStates.enter_data)
