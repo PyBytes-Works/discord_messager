@@ -47,7 +47,6 @@ async def enter_accounts_data_handler(message: Message, state: FSMContext):
 
     accounts: list[str, ...] = message.text.strip().split()
     proxy = f"http://{settings.PROXY_USER}:{settings.PROXY_PASSWORD}@{settings.DEFAULT_PROXY}/"
-    proxy = ''
     proxy_ip, proxy_port = settings.DEFAULT_PROXY.split(':')
     data = dict(
         anticaptcha_key=grabber_settings.ANTICAPTCHA_KEY,
