@@ -42,7 +42,7 @@ def save_data_to_txt(data: Union[dict, list], file_name: str = "data.json"):
 
 @logger.catch
 def check_is_int(text: str) -> int:
-    """Проверяет что в строке пришло положительное число и возвращает его обратно если да"""
+    """Returns type integer number if can else zero"""
 
     if text.isdigit():
         if int(text) > 0:

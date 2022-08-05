@@ -46,7 +46,7 @@ class StartMenu(BaseMenu):
 
         return default_keyboard().add(
             KeyboardButton(cls.mailer),
-            # KeyboardButton(cls.grabber),
+            KeyboardButton(cls.grabber),
             KeyboardButton(cls.joiner),
             # KeyboardButton(cls.modifer),
         )
@@ -180,6 +180,7 @@ class AdminMenu(BaseMenu):
 class SuperAdminMenu(BaseMenu):
     """Админское меню"""
 
+    commands = ['add_proxy', 'delete_proxy', 'delete_all_proxy', 'show_proxies']
     add_proxy: str = 'Добавить прокси'
     delete_proxy: str = 'Удалить прокси'
     show_proxies: str = 'Список прокси'

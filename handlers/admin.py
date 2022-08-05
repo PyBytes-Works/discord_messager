@@ -109,26 +109,27 @@ async def set_max_tokens_handler(message: Message, state: FSMContext) -> None:
 
 @logger.catch
 async def request_proxies_handler(message: Message) -> None:
-    """Обработчик команды /add_proxy /delete_proxy, /delete_all_proxy, /show_proxies"""
+    """Обработчик команд /add_proxy /delete_proxy, /delete_all_proxy, /show_proxies"""
 
     user_telegram_id: str = str(message.from_user.id)
     user_is_superadmin: bool = user_telegram_id in admins_list
     if user_is_superadmin:
-        if message.text == '/add_proxy':
+        if message.text in ('/add_proxy', SuperAdminMenu.add_proxy):
             await AdminStates.user_add_proxy.set()
-        elif message.text == '/delete_proxy':
+        elif message.text in ('/delete_proxy', SuperAdminMenu.delete_proxy):
             await AdminStates.user_delete_proxy.set()
         elif message.text == '/delete_all_proxy':
             await message.answer(
                 "ТОЧНО удалить все прокси? (yes/No)", reply_markup=BaseMenu.keyboard())
             await AdminStates.user_delete_all_proxy.set()
-        elif message.text == "/show_proxies":
-            proxies: list[str] = await DBI.get_all_proxies()
-            proxies: str = '\n'.join(proxies)
+        elif message.text in ("/show_proxies", SuperAdminMenu.show_proxies):
+            all_proxies: list[str] = await DBI.get_all_proxies()
+            proxies: str = '\n'.join(all_proxies)
             await message.answer(f"Proxies:\n{proxies}")
             return
         await message.answer(
-            'Введите прокси в формате "123.123.123.123:5555" (можно несколько через пробел или списком)',
+            'Введите прокси в формате "123.123.123.123:5555" '
+            '(можно несколько через пробел или списком)',
             reply_markup=BaseMenu.keyboard()
         )
 
@@ -156,7 +157,8 @@ async def delete_all_proxies(message: Message, state: FSMContext) -> None:
     if message.text.lower() == "yes":
         await DBI.delete_all_proxy()
         await ErrorsReporter.send_report_to_admins(
-            f"Пользователь {message.from_user.username}: {message.from_user.id} удалил ВСЕ прокси.")
+            f"Пользователь {message.from_user.username}: "
+            f"{message.from_user.id} удалил ВСЕ прокси.")
         await state.finish()
         return
     await message.answer("Прокси не удалены.")
@@ -227,7 +229,10 @@ async def admin_help_handler(message: Message) -> None:
         if user_is_superadmin:
             superadmin: list = [
                 "\n/add_admin - команда для назначения пользователя администратором",
-                "\n/sendall 'тут текст сообщения без кавычек' - отправить сообщение всем активным пользователям",
+                (
+                    "\n/sendall 'тут текст сообщения без кавычек' - "
+                    "отправить сообщение всем активным пользователям"
+                ),
                 "\n/add_proxy - добавить прокси",
                 "\n/delete_proxy - удалить прокси",
                 "\n/show_proxies - показать список проксей",
@@ -255,7 +260,7 @@ async def show_all_users_handler(message: Message) -> None:
     user_is_admin: bool = await DBI.is_admin(telegram_id=user_telegram_id)
     user_is_superadmin: bool = user_telegram_id in admins_list
     if user_is_admin or user_is_superadmin:
-        users: Tuple[namedtuple] = await DBI.get_all_users()
+        users: tuple[namedtuple] = await DBI.get_all_users()
         lenght: int = len(users)
         for shift in range(0, lenght, 10):
             users_slice: tuple = users[shift:shift + 10]
@@ -291,7 +296,7 @@ async def delete_user_name_handler(message: Message) -> None:
         length: int = len(all_users)
         for index in range(0, length, 10):
             keyboard = InlineKeyboardMarkup(row_width=1)
-            users_group: 'Tuple[namedtuple]' = all_users[index: index + 10]
+            users_group: Tuple[namedtuple] = all_users[index: index + 10]
             for elem in users_group:
                 text: str = f"{elem.nick_name}: {elem.telegram_id}"
                 keyboard.add(InlineKeyboardButton(
@@ -348,24 +353,31 @@ def register_admin_handlers(dp: Dispatcher) -> None:
     )
     dp.register_message_handler(request_user_admin_handler, commands=['add_admin'])
     dp.register_message_handler(set_user_admin_handler, state=AdminStates.name_for_admin)
-    dp.register_message_handler(request_proxies_handler, commands=['add_proxy', 'delete_proxy',
-                                                                   'delete_all_proxy', 'show_proxies'])
-    dp.register_message_handler(request_proxies_handler, Text(equals=[
-        SuperAdminMenu.add_proxy, SuperAdminMenu.delete_proxy, SuperAdminMenu.show_proxies
-    ]))
+    dp.register_message_handler(request_proxies_handler, commands=[SuperAdminMenu.commands])
+    dp.register_message_handler(
+        request_proxies_handler,
+        Text(equals=[
+            SuperAdminMenu.add_proxy, SuperAdminMenu.delete_proxy, SuperAdminMenu.show_proxies
+        ])
+    )
     dp.register_message_handler(add_new_proxy_handler, state=AdminStates.user_add_proxy)
     dp.register_message_handler(delete_proxy_handler, state=AdminStates.user_delete_proxy)
     dp.register_message_handler(delete_all_proxies, state=AdminStates.user_delete_all_proxy)
     dp.register_message_handler(delete_user_name_handler, commands=['delete_user'])
     dp.register_message_handler(delete_user_name_handler, Text(equals=[AdminMenu.delete_user]))
-    dp.register_callback_query_handler(delete_user_handler, Text(startswith=[
-        'user_']), state=AdminStates.name_for_del)
+    dp.register_callback_query_handler(
+        delete_user_handler,
+        Text(startswith=['user_']),
+        state=AdminStates.name_for_del
+    )
     dp.register_message_handler(show_all_users_handler, commands=['show_users', 'su'])
     dp.register_message_handler(show_all_users_handler, Text(equals=[AdminMenu.show_users]))
     dp.register_message_handler(reboot_handler, commands=['reboot'], state="*")
     dp.register_message_handler(admin_help_handler, commands=['admin', 'adm'])
     dp.register_message_handler(request_max_tokens_handler, commands=['set_max_tokens'])
-    dp.register_message_handler(request_max_tokens_handler, Text(equals=[SuperAdminMenu.set_max_tokens]))
+    dp.register_message_handler(request_max_tokens_handler, Text(equals=[
+        SuperAdminMenu.set_max_tokens]))
     dp.register_message_handler(set_max_tokens_handler, state=AdminStates.user_set_max_tokens)
-    dp.register_message_handler(send_message_to_all_users_handler, Text(startswith=["/sendall",
-                                                                                    "/sa"]))
+    dp.register_message_handler(
+        send_message_to_all_users_handler,
+        Text(startswith=["/sendall", "/sa"]))
