@@ -6,6 +6,7 @@ import asyncio
 
 from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
 
+from classes.errors_reporter import ErrorsReporter
 from classes.message_manager import MessageManager
 from classes.message_sender import MessageSender
 from classes.open_ai import OpenAI
@@ -90,9 +91,10 @@ class DiscordManager:
 
         # TODO сделать декоратор из reboot
         if self.reboot:
-            await self.message.answer(
+            await ErrorsReporter.send_message_to_user(
                 "Ожидайте перезагрузки сервера.",
-                reply_markup=MailerMenu.keyboard())
+                telegram_id=self._telegram_id,
+                keyboard=MailerMenu.keyboard())
             self.is_working = False
 
     @logger.catch

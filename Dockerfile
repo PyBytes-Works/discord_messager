@@ -1,7 +1,4 @@
-FROM python:3.10-slim
-
-RUN apt-get update && \
-    apt-get -y install libpq-dev gcc
+FROM deskent/deskent:python_mailer-slim-3.10
 
 WORKDIR /app
 
