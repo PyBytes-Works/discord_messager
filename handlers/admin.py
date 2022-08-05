@@ -353,7 +353,7 @@ def register_admin_handlers(dp: Dispatcher) -> None:
     )
     dp.register_message_handler(request_user_admin_handler, commands=['add_admin'])
     dp.register_message_handler(set_user_admin_handler, state=AdminStates.name_for_admin)
-    dp.register_message_handler(request_proxies_handler, commands=[SuperAdminMenu.commands])
+    dp.register_message_handler(request_proxies_handler, commands=SuperAdminMenu.commands)
     dp.register_message_handler(
         request_proxies_handler,
         Text(equals=[
