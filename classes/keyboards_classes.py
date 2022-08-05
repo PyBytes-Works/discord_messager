@@ -180,6 +180,7 @@ class AdminMenu(BaseMenu):
 class SuperAdminMenu(BaseMenu):
     """Админское меню"""
 
+    commands = ['add_proxy', 'delete_proxy', 'delete_all_proxy', 'show_proxies']
     add_proxy: str = 'Добавить прокси'
     delete_proxy: str = 'Удалить прокси'
     show_proxies: str = 'Список прокси'
