@@ -1,6 +1,5 @@
 """Модуль с обработчиками команд Grabber`a"""
 import asyncio
-from collections import namedtuple
 
 from aiogram.dispatcher.filters import Text
 from aiogram.types import Message
@@ -10,7 +9,15 @@ from classes.db_interface import DBI
 from config import logger, Dispatcher, settings, user_agent
 from classes.keyboards_classes import JoinerMenu
 from states import JoinerStates
+from pydantic import BaseSettings
 from discord_joiner.joiner import DiscordJoiner
+
+
+class JoinerSettings(BaseSettings):
+    ANTICAPTCHA_KEY: str = ''
+
+
+joiner_settings = JoinerSettings(_env_file='.env', _env_file_encoding='utf-8')
 
 
 @logger.catch
@@ -56,16 +63,16 @@ async def add_token_by_invite_link_handler(message: Message, state: FSMContext):
     data = await state.get_data()
     invite_link = data['invite_link']
     tokens: list[str] = message.text.strip().split()
-    proxy_addr: str = await DBI.get_user_proxy(telegram_id=message.from_user.id)
+    user_proxy: str = await DBI.get_user_proxy(message.from_user.id)
 
     proxy = {
-        'http': f"http://{settings.PROXY_USER}:{settings.PROXY_PASSWORD}@{proxy_addr}/",
-        'https': f"http://{settings.PROXY_USER}:{settings.PROXY_PASSWORD}@{proxy_addr}/",
+        'http': f"http://{settings.PROXY_USER}:{settings.PROXY_PASSWORD}@{user_proxy}/",
+        'https': f"http://{settings.PROXY_USER}:{settings.PROXY_PASSWORD}@{user_proxy}/",
     }
 
     data = dict(
         invite_link=invite_link, log_level=settings.LOGGING_LEVEL,
-        user_agent=user_agent, proxy=proxy
+        user_agent=user_agent, proxy=proxy, anticaptcha_key=joiner_settings.ANTICAPTCHA_KEY
     )
     success = errors = 0
     tasks = []
