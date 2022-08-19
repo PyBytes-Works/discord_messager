@@ -64,21 +64,18 @@ async def add_token_by_invite_link_handler(message: Message, state: FSMContext):
     invite_link = data['invite_link']
     tokens: list[str] = message.text.strip().split()
     user_proxy: str = await DBI.get_user_proxy(message.from_user.id)
-
-    proxy = {
-        'http': f"http://{settings.PROXY_USER}:{settings.PROXY_PASSWORD}@{user_proxy}/",
-        'https': f"http://{settings.PROXY_USER}:{settings.PROXY_PASSWORD}@{user_proxy}/",
-    }
+    proxy_ip, proxy_port = user_proxy.split(':')
 
     data = dict(
         invite_link=invite_link, log_level=settings.LOGGING_LEVEL,
-        user_agent=user_agent, proxy=proxy, anticaptcha_key=joiner_settings.ANTICAPTCHA_KEY
+        user_agent=user_agent, anticaptcha_key=joiner_settings.ANTICAPTCHA_KEY,
+        proxy_user=settings.PROXY_USER, proxy_password=settings.PROXY_PASSWORD,
+        proxy_ip=proxy_ip, proxy_port=proxy_port
     )
     success = errors = 0
     tasks = []
     await message.answer(f"Добавляю токены: {len(tokens)} штук.")
     for token in tokens:
-
         data["token"] = token
         joiner = DiscordJoiner(**data)
         tasks.append(asyncio.create_task(joiner.join()))
