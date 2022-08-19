@@ -9,6 +9,7 @@ from aiogram.dispatcher import FSMContext
 from discord_grabber import TokenGrabber
 from discord_grabber.exceptions import CaptchaAPIkeyError
 
+from classes.db_interface import DBI
 from classes.errors_reporter import ErrorsReporter
 from config import logger, Dispatcher, settings, user_agent
 from classes.keyboards_classes import GrabberMenu, BaseMenu
@@ -46,8 +47,9 @@ async def enter_accounts_data_handler(message: Message, state: FSMContext):
     """"""
 
     accounts: list[str, ...] = message.text.strip().split()
-    proxy = f"http://{settings.PROXY_USER}:{settings.PROXY_PASSWORD}@{settings.DEFAULT_PROXY}/"
-    proxy_ip, proxy_port = settings.DEFAULT_PROXY.split(':')
+    user_proxy = await DBI.get_user_proxy(message.from_user.id)
+    proxy = f"http://{settings.PROXY_USER}:{settings.PROXY_PASSWORD}@{user_proxy}/"
+    proxy_ip, proxy_port = user_proxy.split(':')
     data = dict(
         anticaptcha_key=grabber_settings.ANTICAPTCHA_KEY,
         log_level=settings.LOGGING_LEVEL, proxy=proxy, user_agent=user_agent,

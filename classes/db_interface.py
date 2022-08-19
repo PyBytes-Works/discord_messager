@@ -173,6 +173,8 @@ class DBI:
     @classmethod
     @logger.catch
     async def get_user_proxy(cls, telegram_id: str) -> str:
+        """Returns user proxy by telegram id as string"""
+
         return User.get_proxy(telegram_id=telegram_id)
 
     @classmethod
